@@ -10,14 +10,25 @@ const Login = () => {
   
   return (
     <Layout>
-      <section className="section-padding">
-        <div className="container-custom max-w-md mx-auto">
+      <section className="section-padding relative min-h-[calc(100vh-200px)] flex items-center">
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&h=1080&fit=crop&q=80" 
+            alt="Background" 
+            className="w-full h-full object-cover"
+          />
+          {/* Overlay for better readability */}
+          <div className="absolute inset-0 bg-foreground/60 backdrop-blur-sm" />
+        </div>
+        
+        <div className="container-custom max-w-md mx-auto relative z-10">
           <div className="text-center mb-8">
-            <h1 className="font-serif text-3xl md:text-4xl mb-2">Welcome Back</h1>
-            <p className="text-muted-foreground">Sign in to your account to continue</p>
+            <h1 className="font-serif text-3xl md:text-4xl mb-2 text-white">Welcome Back</h1>
+            <p className="text-white/90">Sign in to your account to continue</p>
           </div>
           
-          <div className="bg-card p-6 md:p-8 rounded-2xl border border-border">
+          <div className="bg-card/95 backdrop-blur-md p-6 md:p-8 rounded-2xl border border-white/20 shadow-2xl">
             <Tabs defaultValue="email" className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="email">Email</TabsTrigger>
