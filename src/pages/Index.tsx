@@ -291,8 +291,82 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Why Choose Us - with floral vector bg */}
+      <section className="section-padding bg-vector-floral">
+        <div className="container-custom">
+          <h2 className="font-cursive text-3xl md:text-4xl text-center mb-10">Why Choose Us</h2>
+          <div className="grid md:grid-cols-4 gap-6">
+            {[
+              { icon: 'fa-hand-holding-heart', title: 'Handcrafted', desc: 'Each piece is carefully handcrafted by skilled artisans' },
+              { icon: 'fa-leaf', title: 'Eco-Friendly', desc: 'Sustainable materials and eco-conscious production' },
+              { icon: 'fa-medal', title: 'Premium Quality', desc: 'Only the finest fabrics and materials used' },
+              { icon: 'fa-truck', title: 'Pan India Delivery', desc: 'Fast & free shipping across India' },
+            ].map((item, i) => (
+              <ScrollReveal key={item.title} delay={i * 0.1}>
+                <div className="text-center p-6 bg-white/80 backdrop-blur-sm rounded-xl border border-border">
+                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                    <i className={`fa-solid ${item.icon} text-xl text-primary`}></i>
+                  </div>
+                  <h4 className="font-semibold mb-2">{item.title}</h4>
+                  <p className="text-sm text-muted-foreground">{item.desc}</p>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works - with waves vector bg */}
+      <section className="section-padding bg-muted bg-vector-waves">
+        <div className="container-custom">
+          <h2 className="font-cursive text-3xl md:text-4xl text-center mb-10">How It Works</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              { step: '01', title: 'Browse & Select', desc: 'Explore our curated collection of floral prints and textiles' },
+              { step: '02', title: 'Customize', desc: 'Personalize your design with our easy customization tools' },
+              { step: '03', title: 'Receive', desc: 'Get your handcrafted piece delivered to your doorstep' },
+            ].map((item, i) => (
+              <ScrollReveal key={item.step} delay={i * 0.15}>
+                <div className="text-center">
+                  <span className="font-cursive text-5xl text-primary/30">{item.step}</span>
+                  <h4 className="font-semibold text-lg mt-2 mb-2">{item.title}</h4>
+                  <p className="text-sm text-muted-foreground">{item.desc}</p>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Special Offer - with geometric vector bg */}
+      <section className="section-padding bg-secondary bg-vector-geometric">
+        <div className="container-custom">
+          <div className="max-w-2xl mx-auto text-center">
+            <ScrollReveal>
+              <span className="inline-block px-4 py-1.5 bg-primary text-white rounded-full text-xs uppercase tracking-wider mb-4">
+                Limited Time Offer
+              </span>
+              <h2 className="font-cursive text-3xl md:text-5xl text-secondary-foreground mb-4">
+                Get 20% Off Your First Order
+              </h2>
+              <p className="text-secondary-foreground/70 mb-6">
+                Sign up for our newsletter and receive an exclusive discount code for your first purchase.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto">
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  className="flex-1 px-5 py-3 rounded-full border border-border bg-white text-foreground text-sm"
+                />
+                <Button className="btn-primary">Get Code</Button>
+              </div>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
       {/* Instagram */}
-      <section className="section-padding">
+      <section className="section-padding bg-vector-circles">
         <div className="container-custom">
           <div className="text-center mb-8">
             <p className="text-primary font-semibold text-sm mb-1">@studiosara</p>
