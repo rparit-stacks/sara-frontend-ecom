@@ -56,8 +56,8 @@ const ProductDetail = () => {
   return (
     <Layout>
       {/* Breadcrumb */}
-      <section className="bg-secondary/30 py-4">
-        <div className="container-custom">
+      <section className="w-full bg-secondary/30 py-5">
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
           <nav className="flex items-center text-sm text-muted-foreground flex-wrap">
             <Link to="/" className="hover:text-primary transition-colors">Home</Link>
             <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
@@ -71,12 +71,12 @@ const ProductDetail = () => {
       </section>
 
       {/* Product Section */}
-      <section className="section-padding">
-        <div className="container-custom">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-14">
+      <section className="w-full py-14 lg:py-20">
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-20">
             {/* Images */}
             <ScrollReveal direction="left">
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {/* Main Image */}
                 <motion.div
                   key={selectedImage}
@@ -92,12 +92,12 @@ const ProductDetail = () => {
                 </motion.div>
                 
                 {/* Thumbnails */}
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-4">
                   {product.images.map((image, index) => (
                     <button
                       key={index}
                       onClick={() => setSelectedImage(index)}
-                      className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                      className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${
                         selectedImage === index 
                           ? 'border-primary' 
                           : 'border-transparent hover:border-primary/50'
@@ -116,12 +116,12 @@ const ProductDetail = () => {
 
             {/* Product Info */}
             <ScrollReveal direction="right">
-              <div className="lg:sticky lg:top-24 space-y-6">
+              <div className="lg:sticky lg:top-24 space-y-8">
                 {/* Badges */}
-                <div className="flex gap-2">
-                  {product.isNew && <Badge className="bg-accent text-accent-foreground">New Arrival</Badge>}
+                <div className="flex gap-3">
+                  {product.isNew && <Badge className="bg-accent text-accent-foreground text-sm px-4 py-1">New Arrival</Badge>}
                   {product.originalPrice && (
-                    <Badge className="bg-destructive text-destructive-foreground">
+                    <Badge className="bg-destructive text-destructive-foreground text-sm px-4 py-1">
                       {Math.round((1 - product.price / product.originalPrice) * 100)}% Off
                     </Badge>
                   )}
@@ -129,12 +129,12 @@ const ProductDetail = () => {
 
                 {/* Title & Price */}
                 <div>
-                  <p className="text-muted-foreground mb-2 text-base">{product.category}</p>
-                  <h1 className="font-cursive text-4xl md:text-5xl mb-4">{product.name}</h1>
+                  <p className="text-muted-foreground mb-3 text-lg">{product.category}</p>
+                  <h1 className="font-cursive text-5xl lg:text-6xl mb-5">{product.name}</h1>
                   
                   {/* Rating */}
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="flex gap-0.5">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="flex gap-1">
                       {[...Array(5)].map((_, i) => (
                         <Star
                           key={i}
@@ -142,16 +142,16 @@ const ProductDetail = () => {
                         />
                       ))}
                     </div>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-base text-muted-foreground">
                       {product.rating} ({product.reviewCount} reviews)
                     </span>
                   </div>
 
                   {/* Price */}
-                  <div className="flex items-center gap-3">
-                    <span className="font-cursive text-3xl text-primary">₹{product.price}</span>
+                  <div className="flex items-center gap-4">
+                    <span className="font-cursive text-4xl text-primary">₹{product.price}</span>
                     {product.originalPrice && (
-                      <span className="text-xl text-muted-foreground line-through">
+                      <span className="text-2xl text-muted-foreground line-through">
                         ₹{product.originalPrice}
                       </span>
                     )}
@@ -159,17 +159,17 @@ const ProductDetail = () => {
                 </div>
 
                 {/* Description */}
-                <p className="text-muted-foreground text-base leading-relaxed">{product.description}</p>
+                <p className="text-muted-foreground text-lg leading-relaxed">{product.description}</p>
 
                 {/* Color Selection */}
                 <div>
-                  <h4 className="font-medium mb-3 text-base">Color: <span className="text-muted-foreground">{selectedColor}</span></h4>
+                  <h4 className="font-medium mb-4 text-lg">Color: <span className="text-muted-foreground">{selectedColor}</span></h4>
                   <div className="flex flex-wrap gap-3">
                     {product.colors.map((color) => (
                       <button
                         key={color}
                         onClick={() => setSelectedColor(color)}
-                        className={`px-4 py-2 rounded-full border-2 transition-all text-sm ${
+                        className={`px-5 py-3 rounded-full border-2 transition-all text-base ${
                           selectedColor === color
                             ? 'border-primary bg-primary/10'
                             : 'border-border hover:border-primary/50'
@@ -183,28 +183,28 @@ const ProductDetail = () => {
 
                 {/* Quantity */}
                 <div>
-                  <h4 className="font-medium mb-3 text-base">Quantity</h4>
-                  <div className="flex items-center gap-4">
+                  <h4 className="font-medium mb-4 text-lg">Quantity</h4>
+                  <div className="flex items-center gap-5">
                     <div className="flex items-center border border-border rounded-full">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="rounded-full"
+                        className="rounded-full w-12 h-12"
                         onClick={() => setQuantity(Math.max(1, quantity - 1))}
                       >
-                        <Minus className="w-4 h-4" />
+                        <Minus className="w-5 h-5" />
                       </Button>
-                      <span className="w-12 text-center font-medium">{quantity}</span>
+                      <span className="w-14 text-center font-medium text-lg">{quantity}</span>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="rounded-full"
+                        className="rounded-full w-12 h-12"
                         onClick={() => setQuantity(quantity + 1)}
                       >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-5 h-5" />
                       </Button>
                     </div>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-base text-muted-foreground">
                       {product.inStock ? 'In Stock' : 'Out of Stock'}
                     </span>
                   </div>
@@ -212,40 +212,40 @@ const ProductDetail = () => {
 
                 {/* Actions */}
                 <div className="flex gap-4 flex-wrap">
-                  <Button size="lg" className="flex-1 min-w-[200px] btn-primary gap-2">
+                  <Button size="lg" className="flex-1 min-w-[220px] btn-primary gap-3 h-14 text-base">
                     <ShoppingBag className="w-5 h-5" />
                     Add to Cart
                   </Button>
-                  <Button size="lg" variant="outline" className="rounded-full">
+                  <Button size="lg" variant="outline" className="rounded-full w-14 h-14">
                     <Heart className="w-5 h-5" />
                   </Button>
-                  <Button size="lg" variant="outline" className="rounded-full">
+                  <Button size="lg" variant="outline" className="rounded-full w-14 h-14">
                     <Share2 className="w-5 h-5" />
                   </Button>
                 </div>
 
                 {/* Features */}
-                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
+                <div className="grid grid-cols-3 gap-6 pt-6 border-t border-border">
                   <div className="text-center">
-                    <Truck className="w-6 h-6 mx-auto text-primary mb-2" />
-                    <span className="text-sm text-muted-foreground">Free Shipping</span>
+                    <Truck className="w-7 h-7 mx-auto text-primary mb-3" />
+                    <span className="text-base text-muted-foreground">Free Shipping</span>
                   </div>
                   <div className="text-center">
-                    <RotateCcw className="w-6 h-6 mx-auto text-primary mb-2" />
-                    <span className="text-sm text-muted-foreground">Easy Returns</span>
+                    <RotateCcw className="w-7 h-7 mx-auto text-primary mb-3" />
+                    <span className="text-base text-muted-foreground">Easy Returns</span>
                   </div>
                   <div className="text-center">
-                    <Shield className="w-6 h-6 mx-auto text-primary mb-2" />
-                    <span className="text-sm text-muted-foreground">Secure Payment</span>
+                    <Shield className="w-7 h-7 mx-auto text-primary mb-3" />
+                    <span className="text-base text-muted-foreground">Secure Payment</span>
                   </div>
                 </div>
 
                 {/* Accordion Details */}
-                <Accordion type="single" collapsible className="border-t border-border pt-4">
+                <Accordion type="single" collapsible className="border-t border-border pt-6">
                   <AccordionItem value="details">
-                    <AccordionTrigger>Product Details</AccordionTrigger>
+                    <AccordionTrigger className="text-lg">Product Details</AccordionTrigger>
                     <AccordionContent>
-                      <ul className="space-y-2 text-muted-foreground">
+                      <ul className="space-y-3 text-muted-foreground text-base">
                         <li><strong>Material:</strong> {product.material}</li>
                         <li><strong>Care:</strong> {product.care}</li>
                         <li><strong>Size:</strong> {product.sizes.join(', ')}</li>
@@ -253,9 +253,9 @@ const ProductDetail = () => {
                     </AccordionContent>
                   </AccordionItem>
                   <AccordionItem value="shipping">
-                    <AccordionTrigger>Shipping & Returns</AccordionTrigger>
+                    <AccordionTrigger className="text-lg">Shipping & Returns</AccordionTrigger>
                     <AccordionContent>
-                      <p className="text-muted-foreground">
+                      <p className="text-muted-foreground text-base leading-relaxed">
                         Free standard shipping on orders over ₹500. Express shipping available. 
                         30-day return policy for unused items in original packaging.
                       </p>
@@ -267,40 +267,40 @@ const ProductDetail = () => {
           </div>
 
           {/* Reviews Section */}
-          <div className="mt-16">
+          <div className="mt-20 lg:mt-28">
             <Tabs defaultValue="reviews">
-              <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent p-0 gap-8">
+              <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent p-0 gap-10">
                 <TabsTrigger 
                   value="reviews" 
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent pb-4"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent pb-4 text-lg"
                 >
                   Reviews ({product.reviewCount})
                 </TabsTrigger>
                 <TabsTrigger 
                   value="qa" 
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent pb-4"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent pb-4 text-lg"
                 >
                   Q&A
                 </TabsTrigger>
               </TabsList>
               
-              <TabsContent value="reviews" className="pt-8">
-                <div className="grid md:grid-cols-3 gap-6">
+              <TabsContent value="reviews" className="pt-10">
+                <div className="grid lg:grid-cols-3 gap-8">
                   {reviews.map((review) => (
-                    <div key={review.id} className="bg-card p-6 rounded-2xl border border-border">
-                      <div className="flex gap-1 mb-3">
+                    <div key={review.id} className="bg-card p-8 rounded-2xl border border-border">
+                      <div className="flex gap-1 mb-4">
                         {[...Array(review.rating)].map((_, i) => (
-                          <Star key={i} className="w-4 h-4 fill-warm text-warm" />
+                          <Star key={i} className="w-5 h-5 fill-warm text-warm" />
                         ))}
                       </div>
-                      <p className="text-muted-foreground mb-4 leading-relaxed">"{review.text}"</p>
+                      <p className="text-muted-foreground mb-5 leading-relaxed text-base">"{review.text}"</p>
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium">{review.name}</p>
+                          <p className="font-medium text-lg">{review.name}</p>
                           <p className="text-sm text-muted-foreground">{review.date}</p>
                         </div>
                         {review.verified && (
-                          <Badge variant="secondary">Verified</Badge>
+                          <Badge variant="secondary" className="text-sm">Verified</Badge>
                         )}
                       </div>
                     </div>
@@ -308,8 +308,8 @@ const ProductDetail = () => {
                 </div>
               </TabsContent>
               
-              <TabsContent value="qa" className="pt-8">
-                <p className="text-muted-foreground">No questions yet. Be the first to ask!</p>
+              <TabsContent value="qa" className="pt-10">
+                <p className="text-muted-foreground text-lg">No questions yet. Be the first to ask!</p>
               </TabsContent>
             </Tabs>
           </div>
@@ -317,12 +317,12 @@ const ProductDetail = () => {
       </section>
 
       {/* Related Products */}
-      <section className="section-padding bg-secondary/30">
-        <div className="container-custom">
+      <section className="w-full py-14 lg:py-20 bg-secondary/30">
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
           <ScrollReveal>
-            <h2 className="font-cursive text-3xl md:text-4xl mb-10">You May Also Like</h2>
+            <h2 className="font-cursive text-4xl lg:text-5xl mb-12">You May Also Like</h2>
           </ScrollReveal>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
             {relatedProducts.map((product, index) => (
               <ScrollReveal key={product.id} delay={index * 0.1}>
                 <ProductCard product={product} />

@@ -55,24 +55,24 @@ const Products = () => {
   return (
     <Layout>
       {/* Hero */}
-      <section className="bg-secondary/30 py-10 md:py-14">
-        <div className="container-custom">
+      <section className="w-full bg-secondary/30 py-14 lg:py-20">
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
           <ScrollReveal>
             <nav className="text-sm text-muted-foreground mb-4">
               <span>Home</span>
               <span className="mx-2">/</span>
               <span className="text-foreground">{getPageTitle()}</span>
             </nav>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
               <div>
-                <h1 className="font-cursive text-4xl md:text-5xl">{getPageTitle()}</h1>
-                <p className="text-muted-foreground mt-2 text-base">{allProducts.length} Products</p>
+                <h1 className="font-cursive text-5xl lg:text-6xl">{getPageTitle()}</h1>
+                <p className="text-muted-foreground mt-3 text-lg">{allProducts.length} Products</p>
               </div>
-              <div className="w-full md:w-auto md:max-w-sm">
+              <div className="w-full lg:w-auto lg:min-w-[320px]">
                 <Input 
                   type="search" 
                   placeholder="Search products..." 
-                  className="rounded-full h-11"
+                  className="rounded-full h-12 text-base"
                 />
               </div>
             </div>
@@ -81,14 +81,14 @@ const Products = () => {
       </section>
 
       {/* Products Section */}
-      <section className="section-padding">
-        <div className="container-custom">
+      <section className="w-full py-14 lg:py-20">
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
           {/* Active Filters */}
           {selectedFilters.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 mb-6">
+            <div className="flex flex-wrap items-center gap-2 mb-8">
               <span className="text-sm text-muted-foreground">Active filters:</span>
               {selectedFilters.map((filter) => (
-                <Badge key={filter} variant="secondary" className="gap-1">
+                <Badge key={filter} variant="secondary" className="gap-1 text-sm py-1 px-3">
                   {filter}
                   <button onClick={() => removeFilter(filter)}>
                     <X className="w-3 h-3" />
@@ -102,12 +102,12 @@ const Products = () => {
           )}
 
           {/* Toolbar */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
             <div className="flex items-center gap-4">
               {/* Mobile Filter */}
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="outline" className="lg:hidden">
+                  <Button variant="outline" className="lg:hidden h-11">
                     <SlidersHorizontal className="w-4 h-4 mr-2" />
                     Filters
                   </Button>
@@ -159,7 +159,7 @@ const Products = () => {
                 <Button
                   variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
                   size="icon"
-                  className="w-8 h-8"
+                  className="w-9 h-9"
                   onClick={() => setViewMode('grid')}
                 >
                   <Grid className="w-4 h-4" />
@@ -167,7 +167,7 @@ const Products = () => {
                 <Button
                   variant={viewMode === 'list' ? 'secondary' : 'ghost'}
                   size="icon"
-                  className="w-8 h-8"
+                  className="w-9 h-9"
                   onClick={() => setViewMode('list')}
                 >
                   <List className="w-4 h-4" />
@@ -177,7 +177,7 @@ const Products = () => {
 
             {/* Sort */}
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[200px] h-11">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
@@ -190,39 +190,39 @@ const Products = () => {
             </Select>
           </div>
 
-          <div className="flex gap-6 lg:gap-10">
+          <div className="flex gap-10 lg:gap-14">
             {/* Desktop Sidebar Filters */}
-            <aside className="hidden lg:block w-56 flex-shrink-0">
-              <div className="sticky top-24 space-y-6">
+            <aside className="hidden lg:block w-64 flex-shrink-0">
+              <div className="sticky top-24 space-y-8">
                 <div>
-                  <h4 className="font-cursive text-xl mb-4">Category</h4>
-                  <div className="space-y-3">
+                  <h4 className="font-cursive text-2xl mb-5">Category</h4>
+                  <div className="space-y-4">
                     {categories.map((cat) => (
                       <label key={cat} className="flex items-center gap-3 cursor-pointer group">
                         <Checkbox />
-                        <span className="text-muted-foreground group-hover:text-foreground transition-colors">{cat}</span>
+                        <span className="text-muted-foreground group-hover:text-foreground transition-colors text-base">{cat}</span>
                       </label>
                     ))}
                   </div>
                 </div>
-                <div className="border-t border-border pt-6">
-                  <h4 className="font-cursive text-xl mb-4">Price Range</h4>
-                  <div className="space-y-3">
+                <div className="border-t border-border pt-8">
+                  <h4 className="font-cursive text-2xl mb-5">Price Range</h4>
+                  <div className="space-y-4">
                     {priceRanges.map((range) => (
                       <label key={range} className="flex items-center gap-3 cursor-pointer group">
                         <Checkbox />
-                        <span className="text-muted-foreground group-hover:text-foreground transition-colors">{range}</span>
+                        <span className="text-muted-foreground group-hover:text-foreground transition-colors text-base">{range}</span>
                       </label>
                     ))}
                   </div>
                 </div>
-                <div className="border-t border-border pt-6">
-                  <h4 className="font-cursive text-xl mb-4">Color</h4>
-                  <div className="space-y-3">
+                <div className="border-t border-border pt-8">
+                  <h4 className="font-cursive text-2xl mb-5">Color</h4>
+                  <div className="space-y-4">
                     {colors.map((color) => (
                       <label key={color} className="flex items-center gap-3 cursor-pointer group">
                         <Checkbox />
-                        <span className="text-muted-foreground group-hover:text-foreground transition-colors">{color}</span>
+                        <span className="text-muted-foreground group-hover:text-foreground transition-colors text-base">{color}</span>
                       </label>
                     ))}
                   </div>
@@ -232,9 +232,9 @@ const Products = () => {
 
             {/* Products Grid */}
             <div className="flex-1 min-w-0">
-              <div className={`grid gap-5 md:gap-6 ${
+              <div className={`grid gap-6 lg:gap-8 ${
                 viewMode === 'grid' 
-                  ? 'grid-cols-2 md:grid-cols-3' 
+                  ? 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
                   : 'grid-cols-1'
               }`}>
                 {allProducts.map((product, index) => (
@@ -245,14 +245,14 @@ const Products = () => {
               </div>
 
               {/* Pagination */}
-              <div className="flex justify-center items-center gap-2 mt-12">
-                <Button variant="outline" disabled>Previous</Button>
-                <Button variant="secondary" className="w-10 h-10">1</Button>
-                <Button variant="ghost" className="w-10 h-10">2</Button>
-                <Button variant="ghost" className="w-10 h-10">3</Button>
+              <div className="flex justify-center items-center gap-3 mt-16">
+                <Button variant="outline" disabled className="h-11">Previous</Button>
+                <Button variant="secondary" className="w-11 h-11">1</Button>
+                <Button variant="ghost" className="w-11 h-11">2</Button>
+                <Button variant="ghost" className="w-11 h-11">3</Button>
                 <span className="px-2">...</span>
-                <Button variant="ghost" className="w-10 h-10">10</Button>
-                <Button variant="outline">Next</Button>
+                <Button variant="ghost" className="w-11 h-11">10</Button>
+                <Button variant="outline" className="h-11">Next</Button>
               </div>
             </div>
           </div>

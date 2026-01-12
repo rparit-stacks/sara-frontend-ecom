@@ -18,14 +18,15 @@ const Categories = () => {
   return (
     <Layout>
       {/* Hero */}
-      <section className="bg-secondary/30 py-16 md:py-24">
-        <div className="container-custom">
+      <section className="w-full bg-secondary/30 py-20 lg:py-28">
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
           <ScrollReveal>
-            <div className="text-center max-w-3xl mx-auto">
-              <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl mb-6">
+            <div className="text-center max-w-4xl mx-auto">
+              <span className="text-primary uppercase tracking-[0.2em] text-sm font-medium">Browse Collection</span>
+              <h1 className="font-cursive text-5xl md:text-6xl lg:text-7xl mt-4 mb-6">
                 Shop by Category
               </h1>
-              <p className="text-lg text-muted-foreground">
+              <p className="text-lg lg:text-xl text-muted-foreground leading-relaxed">
                 Explore our diverse collection of prints and patterns, each category offering unique designs to match your style.
               </p>
             </div>
@@ -34,9 +35,9 @@ const Categories = () => {
       </section>
 
       {/* Categories Grid */}
-      <section className="section-padding">
-        <div className="container-custom">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <section className="w-full py-14 lg:py-20">
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
             {categories.map((category, index) => (
               <ScrollReveal key={category.id} delay={index * 0.05}>
                 <Link to={`/category/${category.id}`} className="group block">
@@ -44,16 +45,16 @@ const Categories = () => {
                     whileHover={{ y: -5 }}
                     className="card-floral overflow-hidden"
                   >
-                    <div className="relative aspect-[4/5] overflow-hidden">
+                    <div className="relative aspect-[3/4] overflow-hidden">
                       <img
                         src={category.image}
                         alt={category.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-transparent to-transparent" />
-                      <div className="absolute bottom-0 left-0 right-0 p-6">
-                        <h3 className="font-serif text-2xl text-white mb-2">{category.name}</h3>
-                        <p className="text-white/80 text-sm mb-2">{category.description}</p>
+                      <div className="absolute bottom-0 left-0 right-0 p-6 lg:p-8">
+                        <h3 className="font-cursive text-3xl lg:text-4xl text-white mb-2">{category.name}</h3>
+                        <p className="text-white/80 text-base mb-2">{category.description}</p>
                         <span className="text-white/60 text-sm">{category.count} Products</span>
                       </div>
                     </div>
