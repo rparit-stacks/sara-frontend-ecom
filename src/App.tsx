@@ -19,6 +19,15 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Refund from "./pages/Refund";
 import NotFound from "./pages/NotFound";
+import Customize from "./pages/Customize";
+import AdminLogin from "./pages/admin/AdminLogin";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminProducts from "./pages/admin/AdminProducts";
+import AdminFabrics from "./pages/admin/AdminFabrics";
+import AdminDesigns from "./pages/admin/AdminDesigns";
+import AdminCMS from "./pages/admin/AdminCMS";
+import AdminCategories from "./pages/admin/AdminCategories";
+import AdminUsers from "./pages/admin/AdminUsers";
 
 const queryClient = new QueryClient();
 
@@ -44,7 +53,18 @@ const App = () => (
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/refund" element={<Refund />} />
-          <Route path="/customize" element={<Products />} />
+          <Route path="/customize" element={<Customize />} />
+          
+          {/* Admin Routes */}
+          <Route path="/admin-sara/login" element={<AdminLogin />} />
+          <Route path="/admin-sara" element={<AdminDashboard />} />
+          <Route path="/admin-sara/products" element={<AdminProducts />} />
+          <Route path="/admin-sara/fabrics" element={<AdminFabrics />} />
+          <Route path="/admin-sara/designs" element={<AdminDesigns />} />
+          <Route path="/admin-sara/cms" element={<AdminCMS />} />
+          <Route path="/admin-sara/categories" element={<AdminCategories />} />
+          <Route path="/admin-sara/users" element={<AdminUsers />} />
+          
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

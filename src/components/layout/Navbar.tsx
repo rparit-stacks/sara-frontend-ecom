@@ -39,7 +39,7 @@ export const Navbar = () => {
   return (
     <header className="sticky top-0 left-0 right-0 z-50 bg-white border-b border-border">
       <div className="container-custom">
-        <nav className="flex items-center justify-between h-16">
+        <nav className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo - Text only, dual color */}
           <Link to="/" className="flex items-center z-10">
             <span className="font-cursive text-2xl md:text-3xl font-bold">

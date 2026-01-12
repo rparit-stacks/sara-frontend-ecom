@@ -73,26 +73,27 @@ const ProductDetail = () => {
       {/* Product Section */}
       <section className="w-full py-14 lg:py-20">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
-          <div className="grid lg:grid-cols-2 gap-10 lg:gap-20">
+          <div className="grid lg:grid-cols-12 gap-10 lg:gap-16">
             {/* Images */}
-            <ScrollReveal direction="left">
-              <div className="space-y-5">
-                {/* Main Image */}
-                <motion.div
-                  key={selectedImage}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="aspect-[4/5] rounded-2xl overflow-hidden bg-secondary/30"
-                >
-                  <img
-                    src={product.images[selectedImage]}
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                  />
-                </motion.div>
-                
-                {/* Thumbnails */}
-                <div className="grid grid-cols-4 gap-4">
+            <div className="lg:col-span-5">
+              <ScrollReveal direction="left">
+                <div className="space-y-5">
+                  {/* Main Image */}
+                  <motion.div
+                    key={selectedImage}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="aspect-square rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-sm mx-auto max-w-lg"
+                  >
+                    <img
+                      src={product.images[selectedImage]}
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </motion.div>
+                  
+                  {/* Thumbnails */}
+                  <div className="grid grid-cols-4 gap-4 max-w-lg mx-auto">
                   {product.images.map((image, index) => (
                     <button
                       key={index}
@@ -114,9 +115,12 @@ const ProductDetail = () => {
               </div>
             </ScrollReveal>
 
+            </div>
+
             {/* Product Info */}
-            <ScrollReveal direction="right">
-              <div className="lg:sticky lg:top-24 space-y-8">
+            <div className="lg:col-span-7">
+              <ScrollReveal direction="right">
+                <div className="lg:sticky lg:top-24 space-y-8 max-w-2xl">
                 {/* Badges */}
                 <div className="flex gap-3">
                   {product.isNew && <Badge className="bg-accent text-accent-foreground text-sm px-4 py-1">New Arrival</Badge>}
@@ -265,8 +269,9 @@ const ProductDetail = () => {
               </div>
             </ScrollReveal>
           </div>
+        </div>
 
-          {/* Reviews Section */}
+        {/* Reviews Section */}
           <div className="mt-20 lg:mt-28">
             <Tabs defaultValue="reviews">
               <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent p-0 gap-10">
