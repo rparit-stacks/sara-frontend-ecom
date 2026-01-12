@@ -1,25 +1,25 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Search, Heart, ShoppingBag, User, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 const navLinks = [
-  { name: 'Home', path: '/' },
+  { name: 'Home', path: '/', icon: 'fa-home' },
   { 
     name: 'Shop', 
     path: '/products',
+    icon: 'fa-bag-shopping',
     children: [
-      { name: 'All Products', path: '/products' },
-      { name: 'Categories', path: '/categories' },
-      { name: 'New Arrivals', path: '/products?filter=new' },
-      { name: 'Best Sellers', path: '/products?filter=best' },
+      { name: 'All Products', path: '/products', icon: 'fa-th-large' },
+      { name: 'Categories', path: '/categories', icon: 'fa-layer-group' },
+      { name: 'New Arrivals', path: '/products?filter=new', icon: 'fa-sparkles' },
+      { name: 'Best Sellers', path: '/products?filter=best', icon: 'fa-fire' },
     ]
   },
-  { name: 'Customize', path: '/customize' },
-  { name: 'About', path: '/about' },
-  { name: 'Contact', path: '/contact' },
+  { name: 'Customize', path: '/customize', icon: 'fa-palette' },
+  { name: 'About', path: '/about', icon: 'fa-heart' },
+  { name: 'Contact', path: '/contact', icon: 'fa-envelope' },
 ];
 
 export const Navbar = () => {
@@ -41,28 +41,45 @@ export const Navbar = () => {
     setActiveDropdown(null);
   }, [location]);
 
-  const cartItemCount = 3; // Mock cart count
-  const wishlistCount = 2; // Mock wishlist count
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
+  const cartItemCount = 3;
+  const wishlistCount = 2;
 
   return (
     <header
       className={cn(
-        'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
+        'fixed top-0 left-0 right-0 z-50 transition-all duration-500',
         isScrolled
-          ? 'bg-background/95 backdrop-blur-md shadow-soft py-2'
-          : 'bg-transparent py-4'
+          ? 'bg-background/98 backdrop-blur-lg shadow-medium py-2'
+          : 'bg-gradient-to-b from-background/80 to-transparent py-4'
       )}
     >
       <div className="container-custom">
         <nav className="flex items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 z-10">
-            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-serif text-xl">F</span>
+          <Link to="/" className="flex items-center gap-3 z-10 group">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary via-secondary to-tertiary flex items-center justify-center shadow-glow group-hover:scale-110 transition-transform duration-300">
+              <span className="text-white font-cursive text-2xl font-bold">S</span>
             </div>
-            <span className="font-serif text-xl md:text-2xl font-semibold text-foreground">
-              Florelia
-            </span>
+            <div className="flex flex-col">
+              <span className="font-cursive text-2xl md:text-3xl font-bold text-gradient leading-none">
+                Studio Sara
+              </span>
+              <span className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground hidden sm:block">
+                Premium Textiles
+              </span>
+            </div>
           </Link>
 
           {/* Desktop Navigation */}
@@ -77,18 +94,19 @@ export const Navbar = () => {
                 <Link
                   to={link.path}
                   className={cn(
-                    'flex items-center gap-1 font-medium transition-colors duration-200 link-underline',
+                    'flex items-center gap-2 font-medium transition-all duration-300 link-underline py-2',
                     location.pathname === link.path
                       ? 'text-primary'
                       : 'text-foreground hover:text-primary'
                   )}
                 >
+                  <i className={`fa-solid ${link.icon} text-sm`}></i>
                   {link.name}
                   {link.children && (
-                    <ChevronDown className={cn(
-                      'w-4 h-4 transition-transform duration-200',
+                    <i className={cn(
+                      'fa-solid fa-chevron-down text-xs transition-transform duration-300',
                       activeDropdown === link.name && 'rotate-180'
-                    )} />
+                    )}></i>
                   )}
                 </Link>
 
@@ -96,18 +114,19 @@ export const Navbar = () => {
                 <AnimatePresence>
                   {link.children && activeDropdown === link.name && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
                       transition={{ duration: 0.2 }}
-                      className="absolute top-full left-0 mt-2 w-48 bg-card rounded-xl shadow-medium border border-border overflow-hidden"
+                      className="absolute top-full left-0 mt-2 w-56 bg-card rounded-2xl shadow-medium border border-border overflow-hidden"
                     >
                       {link.children.map((child) => (
                         <Link
                           key={child.name}
                           to={child.path}
-                          className="block px-4 py-3 text-sm font-medium text-foreground hover:bg-secondary hover:text-primary transition-colors"
+                          className="flex items-center gap-3 px-5 py-4 text-sm font-medium text-foreground hover:bg-primary hover:text-primary-foreground transition-all"
                         >
+                          <i className={`fa-solid ${child.icon} w-4`}></i>
                           {child.name}
                         </Link>
                       ))}
@@ -119,18 +138,18 @@ export const Navbar = () => {
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-2 md:gap-4">
+          <div className="flex items-center gap-3 md:gap-4">
             {/* Search */}
-            <Button variant="ghost" size="icon" className="hidden md:flex hover:bg-secondary rounded-full">
-              <Search className="w-5 h-5" />
+            <Button variant="ghost" size="icon" className="hidden md:flex hover:bg-primary/10 rounded-full w-11 h-11">
+              <i className="fa-solid fa-search text-lg"></i>
             </Button>
 
             {/* Wishlist */}
             <Link to="/wishlist" className="relative">
-              <Button variant="ghost" size="icon" className="hover:bg-secondary rounded-full">
-                <Heart className="w-5 h-5" />
+              <Button variant="ghost" size="icon" className="hover:bg-secondary/20 rounded-full w-11 h-11">
+                <i className="fa-solid fa-heart text-lg text-secondary"></i>
                 {wishlistCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-secondary text-secondary-foreground text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse-soft">
                     {wishlistCount}
                   </span>
                 )}
@@ -139,10 +158,10 @@ export const Navbar = () => {
 
             {/* Cart */}
             <Link to="/cart" className="relative">
-              <Button variant="ghost" size="icon" className="hover:bg-secondary rounded-full">
-                <ShoppingBag className="w-5 h-5" />
+              <Button variant="ghost" size="icon" className="hover:bg-primary/10 rounded-full w-11 h-11">
+                <i className="fa-solid fa-bag-shopping text-lg"></i>
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center animate-bounce-soft">
                     {cartItemCount}
                   </span>
                 )}
@@ -151,8 +170,8 @@ export const Navbar = () => {
 
             {/* User/Login */}
             <Link to="/login" className="hidden md:block">
-              <Button variant="ghost" size="icon" className="hover:bg-secondary rounded-full">
-                <User className="w-5 h-5" />
+              <Button variant="ghost" size="icon" className="hover:bg-accent/20 rounded-full w-11 h-11">
+                <i className="fa-solid fa-user text-lg text-accent"></i>
               </Button>
             </Link>
 
@@ -160,73 +179,112 @@ export const Navbar = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden hover:bg-secondary rounded-full"
+              className="lg:hidden hover:bg-primary/10 rounded-full w-11 h-11"
               onClick={() => setIsOpen(!isOpen)}
             >
-              {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              <i className={`fa-solid ${isOpen ? 'fa-xmark' : 'fa-bars'} text-xl`}></i>
             </Button>
           </div>
         </nav>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu - Full Screen */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="lg:hidden bg-background border-t border-border overflow-hidden"
+            className="fixed inset-0 top-0 lg:hidden bg-background z-40"
           >
-            <div className="container-custom py-4 space-y-2">
-              {navLinks.map((link, index) => (
-                <motion.div
-                  key={link.name}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <Link
-                    to={link.path}
-                    className={cn(
-                      'block py-3 px-4 rounded-lg font-medium transition-colors',
-                      location.pathname === link.path
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-foreground hover:bg-secondary'
-                    )}
+            {/* Decorative background */}
+            <div className="absolute inset-0 bg-pattern-floral opacity-30" />
+            <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-80 h-80 bg-secondary/10 rounded-full blur-3xl" />
+            
+            <div className="relative h-full flex flex-col pt-20 pb-8 px-6 overflow-y-auto">
+              {/* Navigation Links */}
+              <div className="flex-1 space-y-2">
+                {navLinks.map((link, index) => (
+                  <motion.div
+                    key={link.name}
+                    initial={{ opacity: 0, x: -30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
                   >
-                    {link.name}
-                  </Link>
-                  {link.children && (
-                    <div className="ml-4 mt-1 space-y-1">
-                      {link.children.map((child) => (
-                        <Link
-                          key={child.name}
-                          to={child.path}
-                          className="block py-2 px-4 text-sm text-muted-foreground hover:text-primary transition-colors"
-                        >
-                          {child.name}
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              ))}
-              
-              {/* Mobile Search & Login */}
-              <div className="pt-4 border-t border-border flex gap-4">
-                <Button className="flex-1 btn-primary">
-                  <Search className="w-4 h-4 mr-2" />
-                  Search
-                </Button>
-                <Link to="/login" className="flex-1">
-                  <Button variant="outline" className="w-full btn-outline">
-                    <User className="w-4 h-4 mr-2" />
-                    Login
-                  </Button>
-                </Link>
+                    <Link
+                      to={link.path}
+                      onClick={() => setIsOpen(false)}
+                      className={cn(
+                        'flex items-center gap-4 py-4 px-6 rounded-2xl font-semibold text-lg transition-all',
+                        location.pathname === link.path
+                          ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-colored'
+                          : 'text-foreground hover:bg-muted'
+                      )}
+                    >
+                      <div className={cn(
+                        'w-12 h-12 rounded-xl flex items-center justify-center',
+                        location.pathname === link.path ? 'bg-white/20' : 'bg-primary/10'
+                      )}>
+                        <i className={`fa-solid ${link.icon} text-xl ${location.pathname === link.path ? 'text-white' : 'text-primary'}`}></i>
+                      </div>
+                      {link.name}
+                    </Link>
+                    
+                    {/* Sub-links */}
+                    {link.children && (
+                      <div className="ml-6 mt-2 space-y-1">
+                        {link.children.map((child) => (
+                          <Link
+                            key={child.name}
+                            to={child.path}
+                            onClick={() => setIsOpen(false)}
+                            className="flex items-center gap-3 py-3 px-6 text-muted-foreground hover:text-primary transition-colors"
+                          >
+                            <i className={`fa-solid ${child.icon} text-sm`}></i>
+                            {child.name}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
               </div>
+              
+              {/* Bottom Actions */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="pt-6 border-t border-border space-y-4"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <Button className="btn-primary gap-2 py-6">
+                    <i className="fa-solid fa-search"></i>
+                    Search
+                  </Button>
+                  <Link to="/login" onClick={() => setIsOpen(false)} className="block">
+                    <Button variant="outline" className="w-full btn-outline gap-2 py-6">
+                      <i className="fa-solid fa-user"></i>
+                      Login
+                    </Button>
+                  </Link>
+                </div>
+                
+                {/* Social Links */}
+                <div className="flex justify-center gap-4 pt-4">
+                  {['facebook', 'instagram', 'twitter', 'pinterest'].map((social) => (
+                    <a
+                      key={social}
+                      href="#"
+                      className="w-12 h-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:bg-primary hover:text-white transition-all"
+                    >
+                      <i className={`fa-brands fa-${social} text-lg`}></i>
+                    </a>
+                  ))}
+                </div>
+              </motion.div>
             </div>
           </motion.div>
         )}
