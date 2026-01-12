@@ -32,8 +32,8 @@ const CategoryProducts = () => {
   return (
     <Layout>
       {/* Hero */}
-      <section className="bg-secondary/30 py-12 md:py-16">
-        <div className="container-custom">
+      <section className="bg-secondary/30 py-12 md:py-16 overflow-x-hidden">
+        <div className="container-custom max-w-full overflow-x-hidden">
           <ScrollReveal>
             <nav className="text-sm text-muted-foreground mb-4">
               <span>Home</span>
@@ -49,8 +49,8 @@ const CategoryProducts = () => {
       </section>
 
       {/* Products Section */}
-      <section className="section-padding">
-        <div className="container-custom">
+      <section className="section-padding overflow-x-hidden">
+        <div className="container-custom max-w-full overflow-x-hidden">
           {/* Toolbar */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
             <div className="flex items-center gap-4">
@@ -129,7 +129,7 @@ const CategoryProducts = () => {
             </Select>
           </div>
 
-          <div className="flex gap-8">
+          <div className="flex gap-8 max-w-full w-full">
             {/* Desktop Sidebar Filters */}
             <aside className="hidden lg:block w-64 flex-shrink-0">
               <div className="sticky top-24 space-y-6">
@@ -159,8 +159,8 @@ const CategoryProducts = () => {
             </aside>
 
             {/* Products Grid */}
-            <div className="flex-1">
-              <div className={`grid gap-4 md:gap-6 ${
+            <div className="flex-1 min-w-0 max-w-full">
+              <div className={`grid gap-4 md:gap-6 w-full max-w-full ${
                 viewMode === 'grid' 
                   ? 'grid-cols-2 md:grid-cols-3' 
                   : 'grid-cols-1'

@@ -55,8 +55,8 @@ const Products = () => {
   return (
     <Layout>
       {/* Hero */}
-      <section className="bg-secondary/30 py-12 md:py-16">
-        <div className="container-custom">
+      <section className="bg-secondary/30 py-12 md:py-16 overflow-x-hidden">
+        <div className="container-custom max-w-full overflow-x-hidden">
           <ScrollReveal>
             <nav className="text-sm text-muted-foreground mb-4">
               <span>Home</span>
@@ -81,8 +81,8 @@ const Products = () => {
       </section>
 
       {/* Products Section */}
-      <section className="section-padding">
-        <div className="container-custom">
+      <section className="section-padding overflow-x-hidden">
+        <div className="container-custom max-w-full overflow-x-hidden">
           {/* Active Filters */}
           {selectedFilters.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -190,7 +190,7 @@ const Products = () => {
             </Select>
           </div>
 
-          <div className="flex gap-8">
+          <div className="flex gap-8 max-w-full w-full">
             {/* Desktop Sidebar Filters */}
             <aside className="hidden lg:block w-64 flex-shrink-0">
               <div className="sticky top-24 space-y-6">
@@ -231,8 +231,8 @@ const Products = () => {
             </aside>
 
             {/* Products Grid */}
-            <div className="flex-1">
-              <div className={`grid gap-4 md:gap-6 ${
+            <div className="flex-1 min-w-0 max-w-full">
+              <div className={`grid gap-4 md:gap-6 w-full max-w-full ${
                 viewMode === 'grid' 
                   ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4' 
                   : 'grid-cols-1'

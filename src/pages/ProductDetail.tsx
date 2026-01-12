@@ -56,9 +56,9 @@ const ProductDetail = () => {
   return (
     <Layout>
       {/* Breadcrumb */}
-      <section className="bg-secondary/30 py-4">
-        <div className="container-custom">
-          <nav className="flex items-center text-sm text-muted-foreground">
+      <section className="bg-secondary/30 py-4 overflow-x-hidden">
+        <div className="container-custom max-w-full overflow-x-hidden">
+          <nav className="flex items-center text-sm text-muted-foreground flex-wrap">
             <Link to="/" className="hover:text-primary transition-colors">Home</Link>
             <ChevronRight className="w-4 h-4 mx-2" />
             <Link to="/products" className="hover:text-primary transition-colors">Products</Link>
@@ -71,18 +71,18 @@ const ProductDetail = () => {
       </section>
 
       {/* Product Section */}
-      <section className="section-padding">
-        <div className="container-custom">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+      <section className="section-padding overflow-x-hidden">
+        <div className="container-custom max-w-full overflow-x-hidden">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 max-w-full">
             {/* Images */}
             <ScrollReveal direction="left">
-              <div className="space-y-4">
+              <div className="space-y-4 w-full max-w-full">
                 {/* Main Image */}
                 <motion.div
                   key={selectedImage}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="aspect-[4/5] rounded-2xl overflow-hidden bg-secondary/30"
+                  className="aspect-[4/5] rounded-2xl overflow-hidden bg-secondary/30 w-full"
                 >
                   <img
                     src={product.images[selectedImage]}
@@ -92,7 +92,7 @@ const ProductDetail = () => {
                 </motion.div>
                 
                 {/* Thumbnails */}
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-3 w-full max-w-full">
                   {product.images.map((image, index) => (
                     <button
                       key={index}
@@ -317,12 +317,12 @@ const ProductDetail = () => {
       </section>
 
       {/* Related Products */}
-      <section className="section-padding bg-secondary/30">
-        <div className="container-custom">
+      <section className="section-padding bg-secondary/30 overflow-x-hidden">
+        <div className="container-custom max-w-full overflow-x-hidden">
           <ScrollReveal>
             <h2 className="font-serif text-2xl md:text-3xl mb-8">You May Also Like</h2>
           </ScrollReveal>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 w-full max-w-full">
             {relatedProducts.map((product, index) => (
               <ScrollReveal key={product.id} delay={index * 0.1}>
                 <ProductCard product={product} />

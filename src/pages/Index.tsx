@@ -98,11 +98,11 @@ const Index = () => {
   return (
     <Layout>
       {/* Hero Slider */}
-      <section className="relative">
+      <section className="relative mb-8 md:mb-12 overflow-x-hidden">
         <div ref={heroRef} className="overflow-hidden">
           <div className="flex">
             {heroSlides.map((slide) => (
-              <div key={slide.id} className="flex-[0_0_100%] min-w-0 relative h-[60vh] md:h-[70vh]">
+              <div key={slide.id} className="flex-[0_0_100%] min-w-0 relative h-[65vh] md:h-[75vh]">
                 <img
                   src={slide.image}
                   alt={slide.title}
@@ -137,17 +137,17 @@ const Index = () => {
       </section>
 
       {/* Features Bar */}
-      <section className="bg-muted py-6 border-y border-border">
+      <section className="bg-muted py-8 md:py-10 border-y border-border overflow-x-hidden">
         <div className="container-custom">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6">
             {features.map((feature) => (
               <div key={feature.title} className="flex items-center gap-3 justify-center md:justify-start">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <i className={`fa-solid ${feature.icon} text-sm text-primary`}></i>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-xs">{feature.title}</h4>
-                  <p className="text-[10px] text-muted-foreground">{feature.desc}</p>
+                  <h4 className="font-semibold text-xs md:text-sm">{feature.title}</h4>
+                  <p className="text-[10px] md:text-xs text-muted-foreground">{feature.desc}</p>
                 </div>
               </div>
             ))}
@@ -156,12 +156,12 @@ const Index = () => {
       </section>
 
       {/* Categories */}
-      <section className="section-padding">
+      <section className="section-padding py-14 md:py-20 overflow-x-hidden">
         <div className="container-custom">
-          <div className="text-center mb-8">
+          <div className="text-center mb-12 md:mb-16">
             <h2 className="font-cursive text-3xl md:text-4xl">Shop by Category</h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             {categories.map((category, index) => (
               <ScrollReveal key={category.id} delay={index * 0.05}>
                 <Link to={`/category/${category.id}`} className="group block">
@@ -173,8 +173,8 @@ const Index = () => {
                     />
                     <div className="absolute inset-0 bg-foreground/30 group-hover:bg-foreground/40 transition-colors" />
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-                      <h3 className="font-cursive text-2xl md:text-3xl">{category.name}</h3>
-                      <p className="text-xs mt-1">{category.count} Products</p>
+                      <h3 className="font-cursive text-2xl md:text-3xl lg:text-4xl">{category.name}</h3>
+                      <p className="text-xs md:text-sm mt-1">{category.count} Products</p>
                     </div>
                   </div>
                 </Link>
@@ -185,9 +185,9 @@ const Index = () => {
       </section>
 
       {/* Featured Products Slider */}
-      <section className="section-padding bg-muted">
+      <section className="section-padding py-14 md:py-20 bg-muted overflow-x-hidden">
         <div className="container-custom">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-12 md:mb-16">
             <h2 className="font-cursive text-3xl md:text-4xl">Best Sellers</h2>
             <Link to="/products">
               <Button variant="outline" className="btn-outline text-xs">View All</Button>
@@ -206,7 +206,7 @@ const Index = () => {
       </section>
 
       {/* Banner */}
-      <section className="relative h-[300px] md:h-[400px]">
+      <section className="relative h-[350px] md:h-[450px] my-8 md:my-12 overflow-x-hidden">
         <img
           src="https://images.unsplash.com/photo-1558171813-4c088753af8f?w=1400&h=500&fit=crop"
           alt="Customize"
@@ -216,7 +216,7 @@ const Index = () => {
         <div className="absolute inset-0 flex items-center justify-center text-center text-white px-4">
           <div>
             <h2 className="font-cursive text-3xl md:text-5xl mb-4">Create Your Own Design</h2>
-            <p className="text-sm text-white/80 mb-6 max-w-md mx-auto">
+            <p className="text-sm md:text-base lg:text-lg text-white/80 mb-6 max-w-md mx-auto">
               Choose from 100+ fabrics and 500+ patterns to create something unique
             </p>
             <Link to="/customize">
@@ -229,15 +229,15 @@ const Index = () => {
       </section>
 
       {/* New Arrivals */}
-      <section className="section-padding">
+      <section className="section-padding py-14 md:py-20 overflow-x-hidden">
         <div className="container-custom">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-12 md:mb-16">
             <h2 className="font-cursive text-3xl md:text-4xl">New Arrivals</h2>
             <Link to="/products?filter=new">
-              <Button variant="outline" className="btn-outline text-xs">View All</Button>
+              <Button variant="outline" className="btn-outline text-xs md:text-sm">View All</Button>
             </Link>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6">
             {newArrivals.map((product, index) => (
               <ScrollReveal key={product.id} delay={index * 0.05}>
                 <ProductCard product={product} />
@@ -248,7 +248,7 @@ const Index = () => {
       </section>
 
       {/* Stats */}
-      <section className="bg-primary py-10">
+      <section className="bg-primary py-12 md:py-16 my-8 md:my-12 overflow-x-hidden">
         <div className="container-custom">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center text-white">
             <div>
@@ -272,10 +272,10 @@ const Index = () => {
       </section>
 
       {/* Testimonials */}
-      <section className="section-padding bg-muted">
+      <section className="section-padding py-14 md:py-20 bg-muted overflow-x-hidden">
         <div className="container-custom">
-          <h2 className="font-cursive text-3xl md:text-4xl text-center mb-8">What Customers Say</h2>
-          <div className="grid md:grid-cols-3 gap-4">
+          <h2 className="font-cursive text-3xl md:text-4xl text-center mb-12 md:mb-16">What Customers Say</h2>
+          <div className="grid md:grid-cols-3 gap-8 md:gap-10">
             {testimonials.map((testimonial) => (
               <div key={testimonial.id} className="bg-white p-6 rounded-lg border border-border">
                 <div className="flex gap-0.5 mb-3">
@@ -283,8 +283,8 @@ const Index = () => {
                     <i key={i} className="fa-solid fa-star text-xs text-primary"></i>
                   ))}
                 </div>
-                <p className="text-sm text-muted-foreground mb-4">"{testimonial.text}"</p>
-                <p className="font-semibold text-sm">{testimonial.name}</p>
+                <p className="text-sm md:text-base text-muted-foreground mb-4">"{testimonial.text}"</p>
+                <p className="font-semibold text-sm md:text-base">{testimonial.name}</p>
               </div>
             ))}
           </div>
@@ -292,10 +292,23 @@ const Index = () => {
       </section>
 
       {/* Why Choose Us - with floral vector bg */}
-      <section className="section-padding bg-vector-floral">
-        <div className="container-custom">
-          <h2 className="font-cursive text-3xl md:text-4xl text-center mb-10">Why Choose Us</h2>
-          <div className="grid md:grid-cols-4 gap-6">
+      <section className="section-padding py-12 md:py-16 bg-vector-floral relative overflow-hidden">
+        {/* Background Vector Images */}
+        <div className="absolute inset-0 pointer-events-none opacity-10">
+          <img 
+            src="/bg_vectors/scene-with-birds-flying-by-tree.png" 
+            alt="" 
+            className="absolute top-10 right-10 w-64 h-64 object-contain"
+          />
+          <img 
+            src="/bg_vectors/smalls/pngtree-ethnic-dress-drawing-style-vector-icon-png-image_6847204.png" 
+            alt="" 
+            className="absolute bottom-10 left-10 w-48 h-48 object-contain"
+          />
+        </div>
+        <div className="container-custom relative z-10">
+          <h2 className="font-cursive text-3xl md:text-4xl text-center mb-12 md:mb-14">Why Choose Us</h2>
+          <div className="grid md:grid-cols-4 gap-6 md:gap-8">
             {[
               { icon: 'fa-hand-holding-heart', title: 'Handcrafted', desc: 'Each piece is carefully handcrafted by skilled artisans' },
               { icon: 'fa-leaf', title: 'Eco-Friendly', desc: 'Sustainable materials and eco-conscious production' },
@@ -307,8 +320,8 @@ const Index = () => {
                   <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                     <i className={`fa-solid ${item.icon} text-xl text-primary`}></i>
                   </div>
-                  <h4 className="font-semibold mb-2">{item.title}</h4>
-                  <p className="text-sm text-muted-foreground">{item.desc}</p>
+                  <h4 className="font-semibold mb-2 text-base md:text-lg">{item.title}</h4>
+                  <p className="text-sm md:text-base text-muted-foreground">{item.desc}</p>
                 </div>
               </ScrollReveal>
             ))}
@@ -317,10 +330,23 @@ const Index = () => {
       </section>
 
       {/* How It Works - with waves vector bg */}
-      <section className="section-padding bg-muted bg-vector-waves">
-        <div className="container-custom">
-          <h2 className="font-cursive text-3xl md:text-4xl text-center mb-10">How It Works</h2>
-          <div className="grid md:grid-cols-3 gap-8">
+      <section className="section-padding py-12 md:py-16 bg-muted bg-vector-waves relative overflow-hidden">
+        {/* Background Vector Images */}
+        <div className="absolute inset-0 pointer-events-none opacity-10">
+          <img 
+            src="/bg_vectors/smalls/image-removebg-preview.png" 
+            alt="" 
+            className="absolute top-20 left-20 w-56 h-56 object-contain"
+          />
+          <img 
+            src="/bg_vectors/smalls/image.png" 
+            alt="" 
+            className="absolute bottom-20 right-20 w-52 h-52 object-contain"
+          />
+        </div>
+        <div className="container-custom relative z-10">
+          <h2 className="font-cursive text-3xl md:text-4xl text-center mb-12 md:mb-14">How It Works</h2>
+          <div className="grid md:grid-cols-3 gap-8 md:gap-10">
             {[
               { step: '01', title: 'Browse & Select', desc: 'Explore our curated collection of floral prints and textiles' },
               { step: '02', title: 'Customize', desc: 'Personalize your design with our easy customization tools' },
@@ -329,8 +355,8 @@ const Index = () => {
               <ScrollReveal key={item.step} delay={i * 0.15}>
                 <div className="text-center">
                   <span className="font-cursive text-5xl text-primary/30">{item.step}</span>
-                  <h4 className="font-semibold text-lg mt-2 mb-2">{item.title}</h4>
-                  <p className="text-sm text-muted-foreground">{item.desc}</p>
+                  <h4 className="font-semibold text-lg md:text-xl mt-2 mb-2">{item.title}</h4>
+                  <p className="text-sm md:text-base text-muted-foreground">{item.desc}</p>
                 </div>
               </ScrollReveal>
             ))}
@@ -339,17 +365,30 @@ const Index = () => {
       </section>
 
       {/* Special Offer - with geometric vector bg */}
-      <section className="section-padding bg-secondary bg-vector-geometric">
-        <div className="container-custom">
+      <section className="section-padding py-12 md:py-16 bg-secondary bg-vector-geometric relative overflow-hidden">
+        {/* Background Vector Images */}
+        <div className="absolute inset-0 pointer-events-none opacity-10">
+          <img 
+            src="/bg_vectors/29c6adfd-eab3-4978-86bb-773d20301c4d.jpg" 
+            alt="" 
+            className="absolute top-0 right-0 w-96 h-96 object-cover"
+          />
+          <img 
+            src="/bg_vectors/3e8e84f9-9e4b-4d5b-bbbb-4924f4181ded.jpg" 
+            alt="" 
+            className="absolute bottom-0 left-0 w-80 h-80 object-cover"
+          />
+        </div>
+        <div className="container-custom relative z-10">
           <div className="max-w-2xl mx-auto text-center">
             <ScrollReveal>
-              <span className="inline-block px-4 py-1.5 bg-primary text-white rounded-full text-xs uppercase tracking-wider mb-4">
+              <span className="inline-block px-4 py-1.5 bg-primary text-white rounded-full text-xs uppercase tracking-wider mb-6">
                 Limited Time Offer
               </span>
-              <h2 className="font-cursive text-3xl md:text-5xl text-secondary-foreground mb-4">
+              <h2 className="font-cursive text-3xl md:text-5xl text-secondary-foreground mb-6">
                 Get 20% Off Your First Order
               </h2>
-              <p className="text-secondary-foreground/70 mb-6">
+              <p className="text-secondary-foreground/70 mb-8 text-base md:text-lg">
                 Sign up for our newsletter and receive an exclusive discount code for your first purchase.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto">
@@ -366,13 +405,21 @@ const Index = () => {
       </section>
 
       {/* Instagram */}
-      <section className="section-padding bg-vector-circles">
-        <div className="container-custom">
-          <div className="text-center mb-8">
-            <p className="text-primary font-semibold text-sm mb-1">@studiosara</p>
+      <section className="section-padding py-12 md:py-16 bg-vector-circles relative overflow-hidden">
+        {/* Background Vector Images */}
+        <div className="absolute inset-0 pointer-events-none opacity-10">
+          <img 
+            src="/bg_vectors/11c9c9f9-3185-4e41-bbd4-487a790c2609-removebg-preview.png" 
+            alt="" 
+            className="absolute top-10 left-10 w-72 h-72 object-contain"
+          />
+        </div>
+        <div className="container-custom relative z-10">
+          <div className="text-center mb-10 md:mb-12">
+            <p className="text-primary font-semibold text-sm md:text-base mb-1">@studiosara</p>
             <h2 className="font-cursive text-3xl md:text-4xl">Follow Us</h2>
           </div>
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-4">
             {instagramPosts.map((post, index) => (
               <a key={index} href="#" className="group block aspect-square rounded-lg overflow-hidden">
                 <img
