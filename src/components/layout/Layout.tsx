@@ -10,9 +10,9 @@ interface LayoutProps {
 
 export const Layout = ({ children, showFooter = true }: LayoutProps) => {
   return (
-    <div className="min-h-screen flex flex-col w-full overflow-x-hidden">
+    <div className="min-h-screen flex flex-col w-full overflow-x-hidden max-w-[100vw]">
       <Navbar />
-      <main className="flex-1 pb-16 lg:pb-0 w-full overflow-x-hidden">
+      <main className="flex-1 pb-16 lg:pb-0 w-full overflow-x-hidden max-w-full">
         {children}
       </main>
       {showFooter && <Footer />}

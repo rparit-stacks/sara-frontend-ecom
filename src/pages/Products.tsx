@@ -13,22 +13,22 @@ import { Input } from '@/components/ui/input';
 
 // Mock all products
 const allProducts: Product[] = [
-  { id: '1', name: 'Rose Garden Silk Scarf', price: 89.99, originalPrice: 120, image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=400&h=500&fit=crop', category: 'Scarves', isNew: true },
-  { id: '2', name: 'Lavender Fields Cushion', price: 45.00, image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&h=500&fit=crop', category: 'Home Decor' },
-  { id: '3', name: 'Cherry Blossom Dress', price: 159.99, originalPrice: 199, image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400&h=500&fit=crop', category: 'Clothing', isSale: true },
-  { id: '4', name: 'Wildflower Print Tote', price: 35.00, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&h=500&fit=crop', category: 'Bags', isNew: true },
-  { id: '5', name: 'Peony Paradise Blouse', price: 79.99, image: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=400&h=500&fit=crop', category: 'Clothing' },
-  { id: '6', name: 'Tropical Leaf Throw', price: 68.00, image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=400&h=500&fit=crop', category: 'Home Decor' },
-  { id: '7', name: 'Daisy Chain Earrings', price: 28.00, image: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=400&h=500&fit=crop', category: 'Jewelry', isNew: true },
-  { id: '8', name: 'Sunflower Print Skirt', price: 65.00, image: 'https://images.unsplash.com/photo-1583496661160-fb5886a0unk?w=400&h=500&fit=crop', category: 'Clothing' },
-  { id: '9', name: 'Orchid Silk Blouse', price: 125.00, image: 'https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=400&h=500&fit=crop', category: 'Clothing' },
-  { id: '10', name: 'Botanical Print Cushion Set', price: 89.00, originalPrice: 110, image: 'https://images.unsplash.com/photo-1540574163026-643ea20ade25?w=400&h=500&fit=crop', category: 'Home Decor', isSale: true },
-  { id: '11', name: 'Floral Pendant Necklace', price: 48.00, image: 'https://images.unsplash.com/photo-1599643477877-530eb83abc8e?w=400&h=500&fit=crop', category: 'Jewelry', isNew: true },
-  { id: '12', name: 'Garden Party Maxi Dress', price: 189.00, image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&h=500&fit=crop', category: 'Clothing' },
+  { id: '1', name: 'Rose Garden Silk Scarf', price: 899, originalPrice: 1200, image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=400&h=500&fit=crop', category: 'Scarves', isNew: true },
+  { id: '2', name: 'Lavender Fields Cushion', price: 450, image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&h=500&fit=crop', category: 'Home Decor' },
+  { id: '3', name: 'Cherry Blossom Dress', price: 1599, originalPrice: 1999, image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400&h=500&fit=crop', category: 'Clothing', isSale: true },
+  { id: '4', name: 'Wildflower Print Tote', price: 350, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&h=500&fit=crop', category: 'Bags', isNew: true },
+  { id: '5', name: 'Peony Paradise Blouse', price: 799, image: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=400&h=500&fit=crop', category: 'Clothing' },
+  { id: '6', name: 'Tropical Leaf Throw', price: 680, image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=400&h=500&fit=crop', category: 'Home Decor' },
+  { id: '7', name: 'Daisy Chain Earrings', price: 280, image: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=400&h=500&fit=crop', category: 'Jewelry', isNew: true },
+  { id: '8', name: 'Sunflower Print Skirt', price: 650, image: 'https://images.unsplash.com/photo-1583496661160-fb5886a0unk?w=400&h=500&fit=crop', category: 'Clothing' },
+  { id: '9', name: 'Orchid Silk Blouse', price: 1250, image: 'https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=400&h=500&fit=crop', category: 'Clothing' },
+  { id: '10', name: 'Botanical Print Cushion Set', price: 890, originalPrice: 1100, image: 'https://images.unsplash.com/photo-1540574163026-643ea20ade25?w=400&h=500&fit=crop', category: 'Home Decor', isSale: true },
+  { id: '11', name: 'Floral Pendant Necklace', price: 480, image: 'https://images.unsplash.com/photo-1599643477877-530eb83abc8e?w=400&h=500&fit=crop', category: 'Jewelry', isNew: true },
+  { id: '12', name: 'Garden Party Maxi Dress', price: 1890, image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&h=500&fit=crop', category: 'Clothing' },
 ];
 
 const categories = ['All', 'Clothing', 'Home Decor', 'Bags', 'Jewelry', 'Scarves'];
-const priceRanges = ['Under $50', '$50 - $100', '$100 - $200', 'Over $200'];
+const priceRanges = ['Under ₹500', '₹500 - ₹1000', '₹1000 - ₹2000', 'Over ₹2000'];
 const colors = ['White', 'Pink', 'Green', 'Blue', 'Yellow', 'Multi'];
 
 const Products = () => {
@@ -55,24 +55,24 @@ const Products = () => {
   return (
     <Layout>
       {/* Hero */}
-      <section className="bg-secondary/30 py-12 md:py-16 overflow-x-hidden">
-        <div className="container-custom max-w-full overflow-x-hidden">
+      <section className="bg-secondary/30 py-10 md:py-14">
+        <div className="container-custom">
           <ScrollReveal>
             <nav className="text-sm text-muted-foreground mb-4">
               <span>Home</span>
               <span className="mx-2">/</span>
               <span className="text-foreground">{getPageTitle()}</span>
             </nav>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
               <div>
-                <h1 className="font-serif text-3xl md:text-4xl lg:text-5xl">{getPageTitle()}</h1>
-                <p className="text-muted-foreground mt-2">{allProducts.length} Products</p>
+                <h1 className="font-cursive text-4xl md:text-5xl">{getPageTitle()}</h1>
+                <p className="text-muted-foreground mt-2 text-base">{allProducts.length} Products</p>
               </div>
-              <div className="flex-1 max-w-md">
+              <div className="w-full md:w-auto md:max-w-sm">
                 <Input 
                   type="search" 
                   placeholder="Search products..." 
-                  className="rounded-full"
+                  className="rounded-full h-11"
                 />
               </div>
             </div>
@@ -81,8 +81,8 @@ const Products = () => {
       </section>
 
       {/* Products Section */}
-      <section className="section-padding overflow-x-hidden">
-        <div className="container-custom max-w-full overflow-x-hidden">
+      <section className="section-padding">
+        <div className="container-custom">
           {/* Active Filters */}
           {selectedFilters.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -190,12 +190,12 @@ const Products = () => {
             </Select>
           </div>
 
-          <div className="flex gap-8 max-w-full w-full">
+          <div className="flex gap-6 lg:gap-10">
             {/* Desktop Sidebar Filters */}
-            <aside className="hidden lg:block w-64 flex-shrink-0">
+            <aside className="hidden lg:block w-56 flex-shrink-0">
               <div className="sticky top-24 space-y-6">
                 <div>
-                  <h4 className="font-serif text-lg mb-4">Category</h4>
+                  <h4 className="font-cursive text-xl mb-4">Category</h4>
                   <div className="space-y-3">
                     {categories.map((cat) => (
                       <label key={cat} className="flex items-center gap-3 cursor-pointer group">
@@ -206,7 +206,7 @@ const Products = () => {
                   </div>
                 </div>
                 <div className="border-t border-border pt-6">
-                  <h4 className="font-serif text-lg mb-4">Price Range</h4>
+                  <h4 className="font-cursive text-xl mb-4">Price Range</h4>
                   <div className="space-y-3">
                     {priceRanges.map((range) => (
                       <label key={range} className="flex items-center gap-3 cursor-pointer group">
@@ -217,7 +217,7 @@ const Products = () => {
                   </div>
                 </div>
                 <div className="border-t border-border pt-6">
-                  <h4 className="font-serif text-lg mb-4">Color</h4>
+                  <h4 className="font-cursive text-xl mb-4">Color</h4>
                   <div className="space-y-3">
                     {colors.map((color) => (
                       <label key={color} className="flex items-center gap-3 cursor-pointer group">
@@ -231,10 +231,10 @@ const Products = () => {
             </aside>
 
             {/* Products Grid */}
-            <div className="flex-1 min-w-0 max-w-full">
-              <div className={`grid gap-4 md:gap-6 w-full max-w-full ${
+            <div className="flex-1 min-w-0">
+              <div className={`grid gap-5 md:gap-6 ${
                 viewMode === 'grid' 
-                  ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4' 
+                  ? 'grid-cols-2 md:grid-cols-3' 
                   : 'grid-cols-1'
               }`}>
                 {allProducts.map((product, index) => (
