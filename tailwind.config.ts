@@ -81,6 +81,32 @@ export default {
         'glow': 'var(--shadow-glow)',
       },
       keyframes: {
+        "float-drift-right": {
+          "0%": { transform: "translateX(0) translateY(0)" },
+          "50%": { transform: "translateX(30px) translateY(-10px)" },
+          "100%": { transform: "translateX(0) translateY(0)" },
+        },
+        "float-drift-left": {
+          "0%": { transform: "translateX(0) translateY(0)" },
+          "50%": { transform: "translateX(-30px) translateY(-8px)" },
+          "100%": { transform: "translateX(0) translateY(0)" },
+        },
+        "float-drift-slow": {
+          "0%": { transform: "translateX(0) translateY(0)" },
+          "33%": { transform: "translateX(15px) translateY(-5px)" },
+          "66%": { transform: "translateX(-10px) translateY(5px)" },
+          "100%": { transform: "translateX(0) translateY(0)" },
+        },
+        "float-drift-left-slow": {
+          "0%": { transform: "translateX(0) translateY(0)" },
+          "50%": { transform: "translateX(-20px) translateY(-12px)" },
+          "100%": { transform: "translateX(0) translateY(0)" },
+        },
+        "float-drift-right-slow": {
+          "0%": { transform: "translateX(0) translateY(0)" },
+          "50%": { transform: "translateX(25px) translateY(-8px)" },
+          "100%": { transform: "translateX(0) translateY(0)" },
+        },
         "accordion-down": {
           from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
@@ -148,6 +174,11 @@ export default {
         "wave-medium": "wave-medium 25s linear infinite",
         "wave-fast": "wave-fast 18s linear infinite",
         "wave-slow-reverse": "wave-slow-reverse 40s linear infinite",
+        "float-drift-right": "float-drift-right 12s ease-in-out infinite",
+        "float-drift-left": "float-drift-left 14s ease-in-out infinite",
+        "float-drift-slow": "float-drift-slow 20s ease-in-out infinite",
+        "float-drift-left-slow": "float-drift-left-slow 18s ease-in-out infinite",
+        "float-drift-right-slow": "float-drift-right-slow 16s ease-in-out infinite",
       },
     },
   },
