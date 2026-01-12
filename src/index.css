@@ -8,9 +8,9 @@
 
 @layer base {
   :root {
-    /* Primary - Golden Yellow #ffc84d */
-    --primary: 42 100% 65%;
-    --primary-foreground: 197 72% 15%;
+    /* Primary - Dark Pink */
+    --primary: 340 75% 55%;
+    --primary-foreground: 0 0% 100%;
     
     /* Secondary - Light Teal tint */
     --secondary: 174 40% 92%;
@@ -24,8 +24,8 @@
     --dark: 197 72% 15%;
     --dark-foreground: 0 0% 100%;
     
-    /* Warm - Light golden */
-    --warm: 42 80% 90%;
+    /* Warm - Light pink */
+    --warm: 340 60% 92%;
     --warm-foreground: 197 72% 15%;
     
     /* Background - Pure White */
@@ -66,8 +66,8 @@
     /* Sidebar */
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 197 72% 15%;
-    --sidebar-primary: 42 100% 65%;
-    --sidebar-primary-foreground: 197 72% 15%;
+    --sidebar-primary: 340 75% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 171 40% 92%;
     --sidebar-accent-foreground: 197 72% 15%;
     --sidebar-border: 171 20% 85%;
@@ -75,8 +75,8 @@
   }
 
   .dark {
-    --primary: 42 100% 65%;
-    --primary-foreground: 197 72% 10%;
+    --primary: 340 70% 60%;
+    --primary-foreground: 0 0% 100%;
     
     --secondary: 197 50% 15%;
     --secondary-foreground: 171 56% 70%;
@@ -87,8 +87,8 @@
     --dark: 0 0% 95%;
     --dark-foreground: 197 72% 15%;
     
-    --warm: 42 50% 25%;
-    --warm-foreground: 42 80% 85%;
+    --warm: 340 40% 25%;
+    --warm-foreground: 340 60% 85%;
     
     --background: 197 72% 8%;
     --foreground: 0 0% 95%;
@@ -114,8 +114,8 @@
     
     --sidebar-background: 197 72% 8%;
     --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 42 100% 65%;
-    --sidebar-primary-foreground: 197 72% 10%;
+    --sidebar-primary: 340 70% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 197 40% 18%;
     --sidebar-accent-foreground: 0 0% 95%;
     --sidebar-border: 197 40% 22%;
