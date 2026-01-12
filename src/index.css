@@ -126,45 +126,73 @@
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
   }
 
   html {
     scroll-behavior: smooth;
-    font-size: 110%; /* Increase base font size by 10% */
+    font-size: 100%;
     overflow-x: hidden;
-    width: 100%;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Poppins', sans-serif;
-    font-size: 0.938rem; /* ~15px base */
+    font-size: 1rem;
+    line-height: 1.7;
     overflow-x: hidden;
-    width: 100%;
     max-width: 100vw;
   }
 
   h1, h2, h3 {
     font-family: 'Dancing Script', cursive;
     @apply font-bold tracking-normal;
+    line-height: 1.3;
   }
 
   h4, h5, h6 {
     font-family: 'Cormorant Garamond', serif;
     @apply font-semibold;
+    line-height: 1.4;
+  }
+
+  p {
+    line-height: 1.75;
   }
 }
 
 @layer components {
-  /* Container with consistent margins */
+  /* Container with consistent margins - better desktop spacing */
   .container-custom {
-    @apply w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8;
-    box-sizing: border-box;
+    @apply w-full mx-auto;
+    max-width: 1280px;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
   }
 
-  /* Section spacing - more compact */
+  @media (min-width: 640px) {
+    .container-custom {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .container-custom {
+      padding-left: 3rem;
+      padding-right: 3rem;
+    }
+  }
+
+  /* Section spacing - balanced */
   .section-padding {
-    @apply py-12 sm:py-16 lg:py-20;
+    @apply py-10 sm:py-14 lg:py-16;
+  }
+
+  /* Prevent horizontal overflow */
+  .overflow-fix {
+    overflow-x: hidden;
+    max-width: 100%;
   }
 
   /* Card style */

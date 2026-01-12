@@ -14,8 +14,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 const product = {
   id: '1',
   name: 'Rose Garden Silk Scarf',
-  price: 89.99,
-  originalPrice: 120,
+  price: 899,
+  originalPrice: 1200,
   images: [
     'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=800&h=1000&fit=crop',
     'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&h=1000&fit=crop',
@@ -35,10 +35,10 @@ const product = {
 };
 
 const relatedProducts: Product[] = [
-  { id: '2', name: 'Lavender Fields Cushion', price: 45.00, image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&h=500&fit=crop', category: 'Home Decor' },
-  { id: '3', name: 'Cherry Blossom Dress', price: 159.99, originalPrice: 199, image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400&h=500&fit=crop', category: 'Clothing', isSale: true },
-  { id: '4', name: 'Wildflower Print Tote', price: 35.00, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&h=500&fit=crop', category: 'Bags', isNew: true },
-  { id: '5', name: 'Peony Paradise Blouse', price: 79.99, image: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=400&h=500&fit=crop', category: 'Clothing' },
+  { id: '2', name: 'Lavender Fields Cushion', price: 450, image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&h=500&fit=crop', category: 'Home Decor' },
+  { id: '3', name: 'Cherry Blossom Dress', price: 1599, originalPrice: 1999, image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400&h=500&fit=crop', category: 'Clothing', isSale: true },
+  { id: '4', name: 'Wildflower Print Tote', price: 350, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&h=500&fit=crop', category: 'Bags', isNew: true },
+  { id: '5', name: 'Peony Paradise Blouse', price: 799, image: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=400&h=500&fit=crop', category: 'Clothing' },
 ];
 
 const reviews = [
@@ -56,33 +56,33 @@ const ProductDetail = () => {
   return (
     <Layout>
       {/* Breadcrumb */}
-      <section className="bg-secondary/30 py-4 overflow-x-hidden">
-        <div className="container-custom max-w-full overflow-x-hidden">
+      <section className="bg-secondary/30 py-4">
+        <div className="container-custom">
           <nav className="flex items-center text-sm text-muted-foreground flex-wrap">
             <Link to="/" className="hover:text-primary transition-colors">Home</Link>
-            <ChevronRight className="w-4 h-4 mx-2" />
+            <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
             <Link to="/products" className="hover:text-primary transition-colors">Products</Link>
-            <ChevronRight className="w-4 h-4 mx-2" />
+            <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
             <Link to={`/category/${product.category.toLowerCase()}`} className="hover:text-primary transition-colors">{product.category}</Link>
-            <ChevronRight className="w-4 h-4 mx-2" />
-            <span className="text-foreground">{product.name}</span>
+            <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
+            <span className="text-foreground truncate">{product.name}</span>
           </nav>
         </div>
       </section>
 
       {/* Product Section */}
-      <section className="section-padding overflow-x-hidden">
-        <div className="container-custom max-w-full overflow-x-hidden">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 max-w-full">
+      <section className="section-padding">
+        <div className="container-custom">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-14">
             {/* Images */}
             <ScrollReveal direction="left">
-              <div className="space-y-4 w-full max-w-full">
+              <div className="space-y-4">
                 {/* Main Image */}
                 <motion.div
                   key={selectedImage}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="aspect-[4/5] rounded-2xl overflow-hidden bg-secondary/30 w-full"
+                  className="aspect-[4/5] rounded-2xl overflow-hidden bg-secondary/30"
                 >
                   <img
                     src={product.images[selectedImage]}
@@ -92,7 +92,7 @@ const ProductDetail = () => {
                 </motion.div>
                 
                 {/* Thumbnails */}
-                <div className="grid grid-cols-4 gap-3 w-full max-w-full">
+                <div className="grid grid-cols-4 gap-3">
                   {product.images.map((image, index) => (
                     <button
                       key={index}
@@ -129,8 +129,8 @@ const ProductDetail = () => {
 
                 {/* Title & Price */}
                 <div>
-                  <p className="text-muted-foreground mb-2">{product.category}</p>
-                  <h1 className="font-serif text-3xl md:text-4xl mb-4">{product.name}</h1>
+                  <p className="text-muted-foreground mb-2 text-base">{product.category}</p>
+                  <h1 className="font-cursive text-4xl md:text-5xl mb-4">{product.name}</h1>
                   
                   {/* Rating */}
                   <div className="flex items-center gap-2 mb-4">
@@ -149,27 +149,27 @@ const ProductDetail = () => {
 
                   {/* Price */}
                   <div className="flex items-center gap-3">
-                    <span className="font-serif text-3xl text-primary">${product.price}</span>
+                    <span className="font-cursive text-3xl text-primary">₹{product.price}</span>
                     {product.originalPrice && (
                       <span className="text-xl text-muted-foreground line-through">
-                        ${product.originalPrice}
+                        ₹{product.originalPrice}
                       </span>
                     )}
                   </div>
                 </div>
 
                 {/* Description */}
-                <p className="text-muted-foreground">{product.description}</p>
+                <p className="text-muted-foreground text-base leading-relaxed">{product.description}</p>
 
                 {/* Color Selection */}
                 <div>
-                  <h4 className="font-medium mb-3">Color: <span className="text-muted-foreground">{selectedColor}</span></h4>
-                  <div className="flex gap-3">
+                  <h4 className="font-medium mb-3 text-base">Color: <span className="text-muted-foreground">{selectedColor}</span></h4>
+                  <div className="flex flex-wrap gap-3">
                     {product.colors.map((color) => (
                       <button
                         key={color}
                         onClick={() => setSelectedColor(color)}
-                        className={`px-4 py-2 rounded-full border-2 transition-all ${
+                        className={`px-4 py-2 rounded-full border-2 transition-all text-sm ${
                           selectedColor === color
                             ? 'border-primary bg-primary/10'
                             : 'border-border hover:border-primary/50'
@@ -183,7 +183,7 @@ const ProductDetail = () => {
 
                 {/* Quantity */}
                 <div>
-                  <h4 className="font-medium mb-3">Quantity</h4>
+                  <h4 className="font-medium mb-3 text-base">Quantity</h4>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center border border-border rounded-full">
                       <Button
@@ -211,8 +211,8 @@ const ProductDetail = () => {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-4">
-                  <Button size="lg" className="flex-1 btn-primary gap-2">
+                <div className="flex gap-4 flex-wrap">
+                  <Button size="lg" className="flex-1 min-w-[200px] btn-primary gap-2">
                     <ShoppingBag className="w-5 h-5" />
                     Add to Cart
                   </Button>
@@ -256,7 +256,7 @@ const ProductDetail = () => {
                     <AccordionTrigger>Shipping & Returns</AccordionTrigger>
                     <AccordionContent>
                       <p className="text-muted-foreground">
-                        Free standard shipping on orders over $50. Express shipping available. 
+                        Free standard shipping on orders over ₹500. Express shipping available. 
                         30-day return policy for unused items in original packaging.
                       </p>
                     </AccordionContent>
@@ -293,7 +293,7 @@ const ProductDetail = () => {
                           <Star key={i} className="w-4 h-4 fill-warm text-warm" />
                         ))}
                       </div>
-                      <p className="text-muted-foreground mb-4">"{review.text}"</p>
+                      <p className="text-muted-foreground mb-4 leading-relaxed">"{review.text}"</p>
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{review.name}</p>
@@ -317,12 +317,12 @@ const ProductDetail = () => {
       </section>
 
       {/* Related Products */}
-      <section className="section-padding bg-secondary/30 overflow-x-hidden">
-        <div className="container-custom max-w-full overflow-x-hidden">
+      <section className="section-padding bg-secondary/30">
+        <div className="container-custom">
           <ScrollReveal>
-            <h2 className="font-serif text-2xl md:text-3xl mb-8">You May Also Like</h2>
+            <h2 className="font-cursive text-3xl md:text-4xl mb-10">You May Also Like</h2>
           </ScrollReveal>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 w-full max-w-full">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
             {relatedProducts.map((product, index) => (
               <ScrollReveal key={product.id} delay={index * 0.1}>
                 <ProductCard product={product} />

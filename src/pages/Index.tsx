@@ -98,11 +98,11 @@ const Index = () => {
   return (
     <Layout>
       {/* Hero Slider */}
-      <section className="relative mb-8 md:mb-12 overflow-x-hidden">
+      <section className="relative">
         <div ref={heroRef} className="overflow-hidden">
           <div className="flex">
             {heroSlides.map((slide) => (
-              <div key={slide.id} className="flex-[0_0_100%] min-w-0 relative h-[65vh] md:h-[75vh]">
+              <div key={slide.id} className="flex-[0_0_100%] min-w-0 relative h-[60vh] md:h-[70vh]">
                 <img
                   src={slide.image}
                   alt={slide.title}
@@ -111,8 +111,8 @@ const Index = () => {
                 <div className="absolute inset-0 bg-foreground/40" />
                 <div className="absolute inset-0 flex items-center justify-center text-center text-white px-4">
                   <div>
-                    <p className="text-sm uppercase tracking-widest mb-2">{slide.title}</p>
-                    <h1 className="font-cursive text-4xl md:text-6xl lg:text-7xl mb-6">{slide.subtitle}</h1>
+                    <p className="text-base uppercase tracking-widest mb-2">{slide.title}</p>
+                    <h1 className="font-cursive text-5xl md:text-6xl lg:text-7xl mb-6">{slide.subtitle}</h1>
                     <Link to={slide.link}>
                       <Button className="btn-primary px-8">{slide.cta}</Button>
                     </Link>
@@ -137,17 +137,17 @@ const Index = () => {
       </section>
 
       {/* Features Bar */}
-      <section className="bg-muted py-8 md:py-10 border-y border-border overflow-x-hidden">
+      <section className="bg-muted py-8 border-y border-border">
         <div className="container-custom">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             {features.map((feature) => (
-              <div key={feature.title} className="flex items-center gap-3 justify-center md:justify-start">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <i className={`fa-solid ${feature.icon} text-sm text-primary`}></i>
+              <div key={feature.title} className="flex items-center gap-4 justify-center md:justify-start">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <i className={`fa-solid ${feature.icon} text-base text-primary`}></i>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-xs md:text-sm">{feature.title}</h4>
-                  <p className="text-[10px] md:text-xs text-muted-foreground">{feature.desc}</p>
+                  <h4 className="font-semibold text-sm">{feature.title}</h4>
+                  <p className="text-xs text-muted-foreground">{feature.desc}</p>
                 </div>
               </div>
             ))}
@@ -156,16 +156,16 @@ const Index = () => {
       </section>
 
       {/* Categories */}
-      <section className="section-padding py-14 md:py-20 overflow-x-hidden">
+      <section className="section-padding">
         <div className="container-custom">
-          <div className="text-center mb-12 md:mb-16">
-            <h2 className="font-cursive text-3xl md:text-4xl">Shop by Category</h2>
+          <div className="text-center mb-10">
+            <h2 className="font-cursive text-4xl md:text-5xl">Shop by Category</h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6">
             {categories.map((category, index) => (
               <ScrollReveal key={category.id} delay={index * 0.05}>
                 <Link to={`/category/${category.id}`} className="group block">
-                  <div className="relative aspect-[4/5] rounded-lg overflow-hidden">
+                  <div className="relative aspect-[4/5] rounded-xl overflow-hidden">
                     <img
                       src={category.image}
                       alt={category.name}
@@ -173,8 +173,8 @@ const Index = () => {
                     />
                     <div className="absolute inset-0 bg-foreground/30 group-hover:bg-foreground/40 transition-colors" />
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-                      <h3 className="font-cursive text-2xl md:text-3xl lg:text-4xl">{category.name}</h3>
-                      <p className="text-xs md:text-sm mt-1">{category.count} Products</p>
+                      <h3 className="font-cursive text-3xl md:text-4xl">{category.name}</h3>
+                      <p className="text-sm mt-2">{category.count} Products</p>
                     </div>
                   </div>
                 </Link>
@@ -185,18 +185,18 @@ const Index = () => {
       </section>
 
       {/* Featured Products Slider */}
-      <section className="section-padding py-14 md:py-20 bg-muted overflow-x-hidden">
+      <section className="section-padding bg-muted overflow-hidden">
         <div className="container-custom">
-          <div className="flex items-center justify-between mb-12 md:mb-16">
-            <h2 className="font-cursive text-3xl md:text-4xl">Best Sellers</h2>
+          <div className="flex items-center justify-between mb-10">
+            <h2 className="font-cursive text-4xl md:text-5xl">Best Sellers</h2>
             <Link to="/products">
-              <Button variant="outline" className="btn-outline text-xs">View All</Button>
+              <Button variant="outline" className="btn-outline text-sm">View All</Button>
             </Link>
           </div>
-          <div ref={productsRef} className="overflow-hidden">
-            <div className="flex gap-4">
+          <div ref={productsRef} className="overflow-hidden -mx-2">
+            <div className="flex gap-5 px-2">
               {featuredProducts.map((product) => (
-                <div key={product.id} className="flex-[0_0_200px] md:flex-[0_0_240px]">
+                <div key={product.id} className="flex-[0_0_220px] md:flex-[0_0_280px]">
                   <ProductCard product={product} />
                 </div>
               ))}
@@ -206,7 +206,7 @@ const Index = () => {
       </section>
 
       {/* Banner */}
-      <section className="relative h-[350px] md:h-[450px] my-8 md:my-12 overflow-x-hidden">
+      <section className="relative h-[300px] md:h-[400px]">
         <img
           src="https://images.unsplash.com/photo-1558171813-4c088753af8f?w=1400&h=500&fit=crop"
           alt="Customize"
@@ -215,8 +215,8 @@ const Index = () => {
         <div className="absolute inset-0 bg-foreground/50" />
         <div className="absolute inset-0 flex items-center justify-center text-center text-white px-4">
           <div>
-            <h2 className="font-cursive text-3xl md:text-5xl mb-4">Create Your Own Design</h2>
-            <p className="text-sm md:text-base lg:text-lg text-white/80 mb-6 max-w-md mx-auto">
+            <h2 className="font-cursive text-4xl md:text-5xl mb-4">Create Your Own Design</h2>
+            <p className="text-base text-white/80 mb-6 max-w-md mx-auto">
               Choose from 100+ fabrics and 500+ patterns to create something unique
             </p>
             <Link to="/customize">
@@ -229,12 +229,12 @@ const Index = () => {
       </section>
 
       {/* New Arrivals */}
-      <section className="section-padding py-14 md:py-20 overflow-x-hidden">
+      <section className="section-padding">
         <div className="container-custom">
-          <div className="flex items-center justify-between mb-12 md:mb-16">
-            <h2 className="font-cursive text-3xl md:text-4xl">New Arrivals</h2>
+          <div className="flex items-center justify-between mb-10">
+            <h2 className="font-cursive text-4xl md:text-5xl">New Arrivals</h2>
             <Link to="/products?filter=new">
-              <Button variant="outline" className="btn-outline text-xs md:text-sm">View All</Button>
+              <Button variant="outline" className="btn-outline text-sm">View All</Button>
             </Link>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6">
@@ -248,43 +248,43 @@ const Index = () => {
       </section>
 
       {/* Stats */}
-      <section className="bg-primary py-12 md:py-16 my-8 md:my-12 overflow-x-hidden">
+      <section className="bg-primary py-12">
         <div className="container-custom">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center text-white">
             <div>
-              <span className="font-cursive text-4xl md:text-5xl block">500+</span>
-              <span className="text-xs uppercase tracking-wider text-white/70">Designs</span>
+              <span className="font-cursive text-5xl md:text-6xl block">500+</span>
+              <span className="text-sm uppercase tracking-wider text-white/70">Designs</span>
             </div>
             <div>
-              <span className="font-cursive text-4xl md:text-5xl block">50K+</span>
-              <span className="text-xs uppercase tracking-wider text-white/70">Customers</span>
+              <span className="font-cursive text-5xl md:text-6xl block">50K+</span>
+              <span className="text-sm uppercase tracking-wider text-white/70">Customers</span>
             </div>
             <div>
-              <span className="font-cursive text-4xl md:text-5xl block">100+</span>
-              <span className="text-xs uppercase tracking-wider text-white/70">Artisans</span>
+              <span className="font-cursive text-5xl md:text-6xl block">100+</span>
+              <span className="text-sm uppercase tracking-wider text-white/70">Artisans</span>
             </div>
             <div>
-              <span className="font-cursive text-4xl md:text-5xl block">4.9</span>
-              <span className="text-xs uppercase tracking-wider text-white/70">Rating</span>
+              <span className="font-cursive text-5xl md:text-6xl block">4.9</span>
+              <span className="text-sm uppercase tracking-wider text-white/70">Rating</span>
             </div>
           </div>
         </div>
       </section>
 
       {/* Testimonials */}
-      <section className="section-padding py-14 md:py-20 bg-muted overflow-x-hidden">
+      <section className="section-padding bg-muted">
         <div className="container-custom">
-          <h2 className="font-cursive text-3xl md:text-4xl text-center mb-12 md:mb-16">What Customers Say</h2>
-          <div className="grid md:grid-cols-3 gap-8 md:gap-10">
+          <h2 className="font-cursive text-4xl md:text-5xl text-center mb-10">What Customers Say</h2>
+          <div className="grid md:grid-cols-3 gap-5 md:gap-6">
             {testimonials.map((testimonial) => (
-              <div key={testimonial.id} className="bg-white p-6 rounded-lg border border-border">
-                <div className="flex gap-0.5 mb-3">
+              <div key={testimonial.id} className="bg-white p-6 md:p-8 rounded-xl border border-border">
+                <div className="flex gap-1 mb-4">
                   {[...Array(testimonial.rating)].map((_, i) => (
-                    <i key={i} className="fa-solid fa-star text-xs text-primary"></i>
+                    <i key={i} className="fa-solid fa-star text-sm text-primary"></i>
                   ))}
                 </div>
-                <p className="text-sm md:text-base text-muted-foreground mb-4">"{testimonial.text}"</p>
-                <p className="font-semibold text-sm md:text-base">{testimonial.name}</p>
+                <p className="text-base text-muted-foreground mb-5 leading-relaxed">"{testimonial.text}"</p>
+                <p className="font-semibold">{testimonial.name}</p>
               </div>
             ))}
           </div>
@@ -292,23 +292,10 @@ const Index = () => {
       </section>
 
       {/* Why Choose Us - with floral vector bg */}
-      <section className="section-padding py-12 md:py-16 bg-vector-floral relative overflow-hidden">
-        {/* Background Vector Images */}
-        <div className="absolute inset-0 pointer-events-none opacity-10">
-          <img 
-            src="/bg_vectors/scene-with-birds-flying-by-tree.png" 
-            alt="" 
-            className="absolute top-10 right-10 w-64 h-64 object-contain"
-          />
-          <img 
-            src="/bg_vectors/smalls/pngtree-ethnic-dress-drawing-style-vector-icon-png-image_6847204.png" 
-            alt="" 
-            className="absolute bottom-10 left-10 w-48 h-48 object-contain"
-          />
-        </div>
-        <div className="container-custom relative z-10">
-          <h2 className="font-cursive text-3xl md:text-4xl text-center mb-12 md:mb-14">Why Choose Us</h2>
-          <div className="grid md:grid-cols-4 gap-6 md:gap-8">
+      <section className="section-padding bg-vector-floral">
+        <div className="container-custom">
+          <h2 className="font-cursive text-4xl md:text-5xl text-center mb-12">Why Choose Us</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6">
             {[
               { icon: 'fa-hand-holding-heart', title: 'Handcrafted', desc: 'Each piece is carefully handcrafted by skilled artisans' },
               { icon: 'fa-leaf', title: 'Eco-Friendly', desc: 'Sustainable materials and eco-conscious production' },
@@ -316,12 +303,12 @@ const Index = () => {
               { icon: 'fa-truck', title: 'Pan India Delivery', desc: 'Fast & free shipping across India' },
             ].map((item, i) => (
               <ScrollReveal key={item.title} delay={i * 0.1}>
-                <div className="text-center p-6 bg-white/80 backdrop-blur-sm rounded-xl border border-border">
-                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                    <i className={`fa-solid ${item.icon} text-xl text-primary`}></i>
+                <div className="text-center p-5 md:p-8 bg-white/80 backdrop-blur-sm rounded-xl border border-border h-full">
+                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                    <i className={`fa-solid ${item.icon} text-xl md:text-2xl text-primary`}></i>
                   </div>
-                  <h4 className="font-semibold mb-2 text-base md:text-lg">{item.title}</h4>
-                  <p className="text-sm md:text-base text-muted-foreground">{item.desc}</p>
+                  <h4 className="font-semibold text-base md:text-lg mb-2">{item.title}</h4>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
                 </div>
               </ScrollReveal>
             ))}
@@ -330,22 +317,9 @@ const Index = () => {
       </section>
 
       {/* How It Works - with waves vector bg */}
-      <section className="section-padding py-12 md:py-16 bg-muted bg-vector-waves relative overflow-hidden">
-        {/* Background Vector Images */}
-        <div className="absolute inset-0 pointer-events-none opacity-10">
-          <img 
-            src="/bg_vectors/smalls/image-removebg-preview.png" 
-            alt="" 
-            className="absolute top-20 left-20 w-56 h-56 object-contain"
-          />
-          <img 
-            src="/bg_vectors/smalls/image.png" 
-            alt="" 
-            className="absolute bottom-20 right-20 w-52 h-52 object-contain"
-          />
-        </div>
-        <div className="container-custom relative z-10">
-          <h2 className="font-cursive text-3xl md:text-4xl text-center mb-12 md:mb-14">How It Works</h2>
+      <section className="section-padding bg-muted bg-vector-waves">
+        <div className="container-custom">
+          <h2 className="font-cursive text-4xl md:text-5xl text-center mb-12">How It Works</h2>
           <div className="grid md:grid-cols-3 gap-8 md:gap-10">
             {[
               { step: '01', title: 'Browse & Select', desc: 'Explore our curated collection of floral prints and textiles' },
@@ -354,9 +328,9 @@ const Index = () => {
             ].map((item, i) => (
               <ScrollReveal key={item.step} delay={i * 0.15}>
                 <div className="text-center">
-                  <span className="font-cursive text-5xl text-primary/30">{item.step}</span>
-                  <h4 className="font-semibold text-lg md:text-xl mt-2 mb-2">{item.title}</h4>
-                  <p className="text-sm md:text-base text-muted-foreground">{item.desc}</p>
+                  <span className="font-cursive text-6xl text-primary/30">{item.step}</span>
+                  <h4 className="font-semibold text-xl mt-2 mb-3">{item.title}</h4>
+                  <p className="text-base text-muted-foreground leading-relaxed">{item.desc}</p>
                 </div>
               </ScrollReveal>
             ))}
@@ -365,69 +339,50 @@ const Index = () => {
       </section>
 
       {/* Special Offer - with geometric vector bg */}
-      <section className="section-padding py-12 md:py-16 bg-secondary bg-vector-geometric relative overflow-hidden">
-        {/* Background Vector Images */}
-        <div className="absolute inset-0 pointer-events-none opacity-10">
-          <img 
-            src="/bg_vectors/29c6adfd-eab3-4978-86bb-773d20301c4d.jpg" 
-            alt="" 
-            className="absolute top-0 right-0 w-96 h-96 object-cover"
-          />
-          <img 
-            src="/bg_vectors/3e8e84f9-9e4b-4d5b-bbbb-4924f4181ded.jpg" 
-            alt="" 
-            className="absolute bottom-0 left-0 w-80 h-80 object-cover"
-          />
-        </div>
-        <div className="container-custom relative z-10">
+      <section className="section-padding bg-secondary bg-vector-geometric">
+        <div className="container-custom">
           <div className="max-w-2xl mx-auto text-center">
             <ScrollReveal>
-              <span className="inline-block px-4 py-1.5 bg-primary text-white rounded-full text-xs uppercase tracking-wider mb-6">
+              <span className="inline-block px-4 py-1.5 bg-primary text-white rounded-full text-sm uppercase tracking-wider mb-4">
                 Limited Time Offer
               </span>
-              <h2 className="font-cursive text-3xl md:text-5xl text-secondary-foreground mb-6">
+              <h2 className="font-cursive text-4xl md:text-5xl text-secondary-foreground mb-4">
                 Get 20% Off Your First Order
               </h2>
-              <p className="text-secondary-foreground/70 mb-8 text-base md:text-lg">
+              <p className="text-base text-secondary-foreground/70 mb-6 leading-relaxed">
                 Sign up for our newsletter and receive an exclusive discount code for your first purchase.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto">
                 <input
                   type="email"
                   placeholder="Enter your email"
-                  className="flex-1 px-5 py-3 rounded-full border border-border bg-white text-foreground text-sm"
+                  className="flex-1 px-5 py-3 rounded-full border border-border focus:outline-none focus:ring-2 focus:ring-primary text-base"
                 />
-                <Button className="btn-primary">Get Code</Button>
+                <Button className="btn-primary whitespace-nowrap">Subscribe</Button>
               </div>
             </ScrollReveal>
           </div>
         </div>
       </section>
 
-      {/* Instagram */}
-      <section className="section-padding py-12 md:py-16 bg-vector-circles relative overflow-hidden">
-        {/* Background Vector Images */}
-        <div className="absolute inset-0 pointer-events-none opacity-10">
-          <img 
-            src="/bg_vectors/11c9c9f9-3185-4e41-bbd4-487a790c2609-removebg-preview.png" 
-            alt="" 
-            className="absolute top-10 left-10 w-72 h-72 object-contain"
-          />
-        </div>
-        <div className="container-custom relative z-10">
-          <div className="text-center mb-10 md:mb-12">
-            <p className="text-primary font-semibold text-sm md:text-base mb-1">@studiosara</p>
-            <h2 className="font-cursive text-3xl md:text-4xl">Follow Us</h2>
+      {/* Instagram - with circles vector bg */}
+      <section className="section-padding bg-vector-circles">
+        <div className="container-custom">
+          <div className="text-center mb-10">
+            <h2 className="font-cursive text-4xl md:text-5xl">Follow Us on Instagram</h2>
+            <p className="text-muted-foreground mt-2 text-base">@studiosara</p>
           </div>
           <div className="grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-4">
             {instagramPosts.map((post, index) => (
-              <a key={index} href="#" className="group block aspect-square rounded-lg overflow-hidden">
-                <img
-                  src={post}
-                  alt={`Instagram ${index + 1}`}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                />
-              </a>
+              <ScrollReveal key={index} delay={index * 0.05}>
+                <a href="#" className="group block aspect-square overflow-hidden rounded-lg">
+                  <img
+                    src={post}
+                    alt={`Instagram post ${index + 1}`}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                </a>
+              </ScrollReveal>
             ))}
           </div>
         </div>
