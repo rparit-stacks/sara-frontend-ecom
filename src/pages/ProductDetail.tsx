@@ -94,184 +94,183 @@ const ProductDetail = () => {
                   
                   {/* Thumbnails */}
                   <div className="grid grid-cols-4 gap-4 max-w-lg mx-auto">
-                  {product.images.map((image, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setSelectedImage(index)}
-                      className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                        selectedImage === index 
-                          ? 'border-primary' 
-                          : 'border-transparent hover:border-primary/50'
-                      }`}
-                    >
-                      <img
-                        src={image}
-                        alt={`${product.name} ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </button>
-                  ))}
+                    {product.images.map((image, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setSelectedImage(index)}
+                        className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                          selectedImage === index 
+                            ? 'border-primary' 
+                            : 'border-transparent hover:border-primary/50'
+                        }`}
+                      >
+                        <img
+                          src={image}
+                          alt={`${product.name} ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </ScrollReveal>
-
+              </ScrollReveal>
             </div>
 
             {/* Product Info */}
             <div className="lg:col-span-7">
               <ScrollReveal direction="right">
                 <div className="lg:sticky lg:top-24 space-y-8 max-w-2xl">
-                {/* Badges */}
-                <div className="flex gap-3">
-                  {product.isNew && <Badge className="bg-accent text-accent-foreground text-sm px-4 py-1">New Arrival</Badge>}
-                  {product.originalPrice && (
-                    <Badge className="bg-destructive text-destructive-foreground text-sm px-4 py-1">
-                      {Math.round((1 - product.price / product.originalPrice) * 100)}% Off
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Title & Price */}
-                <div>
-                  <p className="text-muted-foreground mb-3 text-lg">{product.category}</p>
-                  <h1 className="font-cursive text-5xl lg:text-6xl mb-5">{product.name}</h1>
-                  
-                  {/* Rating */}
-                  <div className="flex items-center gap-3 mb-5">
-                    <div className="flex gap-1">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-5 h-5 ${i < Math.floor(product.rating) ? 'fill-warm text-warm' : 'text-muted'}`}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-base text-muted-foreground">
-                      {product.rating} ({product.reviewCount} reviews)
-                    </span>
-                  </div>
-
-                  {/* Price */}
-                  <div className="flex items-center gap-4">
-                    <span className="font-cursive text-4xl text-primary">₹{product.price}</span>
+                  {/* Badges */}
+                  <div className="flex gap-3">
+                    {product.isNew && <Badge className="bg-accent text-accent-foreground text-sm px-4 py-1">New Arrival</Badge>}
                     {product.originalPrice && (
-                      <span className="text-2xl text-muted-foreground line-through">
-                        ₹{product.originalPrice}
-                      </span>
+                      <Badge className="bg-destructive text-destructive-foreground text-sm px-4 py-1">
+                        {Math.round((1 - product.price / product.originalPrice) * 100)}% Off
+                      </Badge>
                     )}
                   </div>
-                </div>
 
-                {/* Description */}
-                <p className="text-muted-foreground text-lg leading-relaxed">{product.description}</p>
-
-                {/* Color Selection */}
-                <div>
-                  <h4 className="font-medium mb-4 text-lg">Color: <span className="text-muted-foreground">{selectedColor}</span></h4>
-                  <div className="flex flex-wrap gap-3">
-                    {product.colors.map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => setSelectedColor(color)}
-                        className={`px-5 py-3 rounded-full border-2 transition-all text-base ${
-                          selectedColor === color
-                            ? 'border-primary bg-primary/10'
-                            : 'border-border hover:border-primary/50'
-                        }`}
-                      >
-                        {color}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Quantity */}
-                <div>
-                  <h4 className="font-medium mb-4 text-lg">Quantity</h4>
-                  <div className="flex items-center gap-5">
-                    <div className="flex items-center border border-border rounded-full">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="rounded-full w-12 h-12"
-                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      >
-                        <Minus className="w-5 h-5" />
-                      </Button>
-                      <span className="w-14 text-center font-medium text-lg">{quantity}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="rounded-full w-12 h-12"
-                        onClick={() => setQuantity(quantity + 1)}
-                      >
-                        <Plus className="w-5 h-5" />
-                      </Button>
+                  {/* Title & Price */}
+                  <div>
+                    <p className="text-muted-foreground mb-3 text-lg">{product.category}</p>
+                    <h1 className="font-cursive text-5xl lg:text-6xl mb-5">{product.name}</h1>
+                    
+                    {/* Rating */}
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="flex gap-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-5 h-5 ${i < Math.floor(product.rating) ? 'fill-warm text-warm' : 'text-muted'}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-base text-muted-foreground">
+                        {product.rating} ({product.reviewCount} reviews)
+                      </span>
                     </div>
-                    <span className="text-base text-muted-foreground">
-                      {product.inStock ? 'In Stock' : 'Out of Stock'}
-                    </span>
-                  </div>
-                </div>
 
-                {/* Actions */}
-                <div className="flex gap-4 flex-wrap">
-                  <Button size="lg" className="flex-1 min-w-[220px] btn-primary gap-3 h-14 text-base">
-                    <ShoppingBag className="w-5 h-5" />
-                    Add to Cart
-                  </Button>
-                  <Button size="lg" variant="outline" className="rounded-full w-14 h-14">
-                    <Heart className="w-5 h-5" />
-                  </Button>
-                  <Button size="lg" variant="outline" className="rounded-full w-14 h-14">
-                    <Share2 className="w-5 h-5" />
-                  </Button>
-                </div>
+                    {/* Price */}
+                    <div className="flex items-center gap-4">
+                      <span className="font-cursive text-4xl text-primary">₹{product.price}</span>
+                      {product.originalPrice && (
+                        <span className="text-2xl text-muted-foreground line-through">
+                          ₹{product.originalPrice}
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-                {/* Features */}
-                <div className="grid grid-cols-3 gap-6 pt-6 border-t border-border">
-                  <div className="text-center">
-                    <Truck className="w-7 h-7 mx-auto text-primary mb-3" />
-                    <span className="text-base text-muted-foreground">Free Shipping</span>
-                  </div>
-                  <div className="text-center">
-                    <RotateCcw className="w-7 h-7 mx-auto text-primary mb-3" />
-                    <span className="text-base text-muted-foreground">Easy Returns</span>
-                  </div>
-                  <div className="text-center">
-                    <Shield className="w-7 h-7 mx-auto text-primary mb-3" />
-                    <span className="text-base text-muted-foreground">Secure Payment</span>
-                  </div>
-                </div>
+                  {/* Description */}
+                  <p className="text-muted-foreground text-lg leading-relaxed">{product.description}</p>
 
-                {/* Accordion Details */}
-                <Accordion type="single" collapsible className="border-t border-border pt-6">
-                  <AccordionItem value="details">
-                    <AccordionTrigger className="text-lg">Product Details</AccordionTrigger>
-                    <AccordionContent>
-                      <ul className="space-y-3 text-muted-foreground text-base">
-                        <li><strong>Material:</strong> {product.material}</li>
-                        <li><strong>Care:</strong> {product.care}</li>
-                        <li><strong>Size:</strong> {product.sizes.join(', ')}</li>
-                      </ul>
-                    </AccordionContent>
-                  </AccordionItem>
-                  <AccordionItem value="shipping">
-                    <AccordionTrigger className="text-lg">Shipping & Returns</AccordionTrigger>
-                    <AccordionContent>
-                      <p className="text-muted-foreground text-base leading-relaxed">
-                        Free standard shipping on orders over ₹500. Express shipping available. 
-                        30-day return policy for unused items in original packaging.
-                      </p>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </div>
-            </ScrollReveal>
+                  {/* Color Selection */}
+                  <div>
+                    <h4 className="font-medium mb-4 text-lg">Color: <span className="text-muted-foreground">{selectedColor}</span></h4>
+                    <div className="flex flex-wrap gap-3">
+                      {product.colors.map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => setSelectedColor(color)}
+                          className={`px-5 py-3 rounded-full border-2 transition-all text-base ${
+                            selectedColor === color
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          {color}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Quantity */}
+                  <div>
+                    <h4 className="font-medium mb-4 text-lg">Quantity</h4>
+                    <div className="flex items-center gap-5">
+                      <div className="flex items-center border border-border rounded-full">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-full w-12 h-12"
+                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        >
+                          <Minus className="w-5 h-5" />
+                        </Button>
+                        <span className="w-14 text-center font-medium text-lg">{quantity}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-full w-12 h-12"
+                          onClick={() => setQuantity(quantity + 1)}
+                        >
+                          <Plus className="w-5 h-5" />
+                        </Button>
+                      </div>
+                      <span className="text-base text-muted-foreground">
+                        {product.inStock ? 'In Stock' : 'Out of Stock'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-4 flex-wrap">
+                    <Button size="lg" className="flex-1 min-w-[220px] btn-primary gap-3 h-14 text-base">
+                      <ShoppingBag className="w-5 h-5" />
+                      Add to Cart
+                    </Button>
+                    <Button size="lg" variant="outline" className="rounded-full w-14 h-14">
+                      <Heart className="w-5 h-5" />
+                    </Button>
+                    <Button size="lg" variant="outline" className="rounded-full w-14 h-14">
+                      <Share2 className="w-5 h-5" />
+                    </Button>
+                  </div>
+
+                  {/* Features */}
+                  <div className="grid grid-cols-3 gap-6 pt-6 border-t border-border">
+                    <div className="text-center">
+                      <Truck className="w-7 h-7 mx-auto text-primary mb-3" />
+                      <span className="text-base text-muted-foreground">Free Shipping</span>
+                    </div>
+                    <div className="text-center">
+                      <RotateCcw className="w-7 h-7 mx-auto text-primary mb-3" />
+                      <span className="text-base text-muted-foreground">Easy Returns</span>
+                    </div>
+                    <div className="text-center">
+                      <Shield className="w-7 h-7 mx-auto text-primary mb-3" />
+                      <span className="text-base text-muted-foreground">Secure Payment</span>
+                    </div>
+                  </div>
+
+                  {/* Accordion Details */}
+                  <Accordion type="single" collapsible className="border-t border-border pt-6">
+                    <AccordionItem value="details">
+                      <AccordionTrigger className="text-lg">Product Details</AccordionTrigger>
+                      <AccordionContent>
+                        <ul className="space-y-3 text-muted-foreground text-base">
+                          <li><strong>Material:</strong> {product.material}</li>
+                          <li><strong>Care:</strong> {product.care}</li>
+                          <li><strong>Size:</strong> {product.sizes.join(', ')}</li>
+                        </ul>
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="shipping">
+                      <AccordionTrigger className="text-lg">Shipping & Returns</AccordionTrigger>
+                      <AccordionContent>
+                        <p className="text-muted-foreground text-base leading-relaxed">
+                          Free standard shipping on orders over ₹500. Express shipping available. 
+                          30-day return policy for unused items in original packaging.
+                        </p>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </div>
+              </ScrollReveal>
+            </div>
           </div>
-        </div>
 
-        {/* Reviews Section */}
+          {/* Reviews Section */}
           <div className="mt-20 lg:mt-28">
             <Tabs defaultValue="reviews">
               <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent p-0 gap-10">
