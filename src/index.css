@@ -206,19 +206,19 @@
 
   /* Button styles - no gradients */
   .btn-primary {
-    @apply bg-primary text-primary-foreground px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:bg-primary/90 uppercase tracking-wider text-xs;
+    @apply bg-primary text-primary-foreground px-8 py-4 rounded-full font-semibold transition-all duration-300 hover:bg-primary/90 uppercase tracking-wider text-sm;
   }
 
   .btn-secondary {
-    @apply bg-secondary text-secondary-foreground px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:bg-secondary/80 uppercase tracking-wider text-xs;
+    @apply bg-secondary text-secondary-foreground px-8 py-4 rounded-full font-semibold transition-all duration-300 hover:bg-secondary/80 uppercase tracking-wider text-sm;
   }
 
   .btn-outline {
-    @apply border-2 border-primary text-primary px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:bg-primary hover:text-primary-foreground uppercase tracking-wider text-xs;
+    @apply border-2 border-primary text-primary px-8 py-4 rounded-full font-semibold transition-all duration-300 hover:bg-primary hover:text-primary-foreground uppercase tracking-wider text-sm;
   }
 
   .btn-dark {
-    @apply bg-foreground text-background px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:bg-foreground/90 uppercase tracking-wider text-xs;
+    @apply bg-foreground text-background px-8 py-4 rounded-full font-semibold transition-all duration-300 hover:bg-foreground/90 uppercase tracking-wider text-sm;
   }
 
   /* Link underline animation */
