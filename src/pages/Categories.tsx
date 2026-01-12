@@ -1,0 +1,71 @@
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import Layout from '@/components/layout/Layout';
+import ScrollReveal from '@/components/animations/ScrollReveal';
+
+const categories = [
+  { id: '1', name: 'Floral Prints', image: 'https://images.unsplash.com/photo-1487530811176-3780de880c2d?w=600&h=700&fit=crop', count: 48, description: 'Beautiful floral patterns for every occasion' },
+  { id: '2', name: 'Botanical', image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=600&h=700&fit=crop', count: 36, description: 'Nature-inspired botanical designs' },
+  { id: '3', name: 'Abstract', image: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&h=700&fit=crop', count: 24, description: 'Modern abstract art patterns' },
+  { id: '4', name: 'Geometric', image: 'https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=600&h=700&fit=crop', count: 32, description: 'Clean geometric shapes and lines' },
+  { id: '5', name: 'Tropical', image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&h=700&fit=crop', count: 28, description: 'Exotic tropical prints' },
+  { id: '6', name: 'Vintage', image: 'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?w=600&h=700&fit=crop', count: 42, description: 'Classic vintage-inspired designs' },
+  { id: '7', name: 'Minimalist', image: 'https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?w=600&h=700&fit=crop', count: 20, description: 'Simple and elegant minimal patterns' },
+  { id: '8', name: 'Watercolor', image: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=600&h=700&fit=crop', count: 18, description: 'Soft watercolor artistic prints' },
+];
+
+const Categories = () => {
+  return (
+    <Layout>
+      {/* Hero */}
+      <section className="bg-secondary/30 py-16 md:py-24">
+        <div className="container-custom">
+          <ScrollReveal>
+            <div className="text-center max-w-3xl mx-auto">
+              <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl mb-6">
+                Shop by Category
+              </h1>
+              <p className="text-lg text-muted-foreground">
+                Explore our diverse collection of prints and patterns, each category offering unique designs to match your style.
+              </p>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* Categories Grid */}
+      <section className="section-padding">
+        <div className="container-custom">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {categories.map((category, index) => (
+              <ScrollReveal key={category.id} delay={index * 0.05}>
+                <Link to={`/category/${category.id}`} className="group block">
+                  <motion.div
+                    whileHover={{ y: -5 }}
+                    className="card-floral overflow-hidden"
+                  >
+                    <div className="relative aspect-[4/5] overflow-hidden">
+                      <img
+                        src={category.image}
+                        alt={category.name}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-transparent to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-6">
+                        <h3 className="font-serif text-2xl text-white mb-2">{category.name}</h3>
+                        <p className="text-white/80 text-sm mb-2">{category.description}</p>
+                        <span className="text-white/60 text-sm">{category.count} Products</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                </Link>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+    </Layout>
+  );
+};
+
+export default Categories;
