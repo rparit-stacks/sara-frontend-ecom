@@ -35,6 +35,7 @@ import CustomProductDetail from "./pages/CustomProductDetail";
 import Blog from "./pages/Blog";
 import BlogDetail from "./pages/BlogDetail";
 import AdminBlog from "./pages/admin/AdminBlog";
+import AdminFAQ from "./pages/admin/AdminFAQ";
 
 const queryClient = new QueryClient();
 
@@ -75,6 +76,7 @@ const App = () => (
           <Route path="/admin-sara/designs" element={<AdminDesigns />} />
           <Route path="/admin-sara/cms" element={<AdminCMS />} />
           <Route path="/admin-sara/blog" element={<AdminBlog />} />
+          <Route path="/admin-sara/faq" element={<AdminFAQ />} />
           <Route path="/admin-sara/custom-config" element={<AdminCustomConfig />} />
           <Route path="/admin-sara/categories" element={<AdminCategories />} />
           <Route path="/admin-sara/users" element={<AdminUsers />} />

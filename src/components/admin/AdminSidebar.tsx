@@ -10,7 +10,8 @@ import {
   Settings,
   LogOut,
   Menu,
-  X
+  X,
+  HelpCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
@@ -46,6 +47,11 @@ const adminMenuItems = [
     icon: FileText, 
     label: 'Blog', 
     path: '/admin-sara/blog' 
+  },
+  { 
+    icon: HelpCircle, 
+    label: 'FAQ', 
+    path: '/admin-sara/faq' 
   },
   { 
     icon: FolderTree, 
