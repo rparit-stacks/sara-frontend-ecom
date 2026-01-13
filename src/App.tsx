@@ -31,7 +31,6 @@ import AdminCategories from "./pages/admin/AdminCategories";
 import AdminCustomConfig from "./pages/admin/AdminCustomConfig";
 import AdminUsers from "./pages/admin/AdminUsers";
 import CustomProductDetail from "./pages/CustomProductDetail";
-import MakeYourOwn from "./pages/MakeYourOwn";
 
 const queryClient = new QueryClient();
 
@@ -60,8 +59,6 @@ const App = () => (
           <Route path="/customize" element={<Customize />} />
           <Route path="/custom-design" element={<CustomDesign />} />
           <Route path="/custom-product" element={<CustomProductDetail />} />
-          <Route path="/make-your-own" element={<MakeYourOwn />} />
-          <Route path="/make-your-own-product" element={<CustomProductDetail />} />
           
           {/* Admin Routes */}
           <Route path="/admin-sara/login" element={<AdminLogin />} />

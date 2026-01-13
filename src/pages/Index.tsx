@@ -345,55 +345,17 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Why Choose Us - With Wave Background */}
-      <section className="w-full py-20 lg:py-28 relative overflow-hidden">
-        {/* Wave Background SVG */}
-        <div className="absolute inset-0 w-full h-full opacity-20">
-          <svg
-            className="absolute bottom-0 left-0 w-full h-full"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 1440 320"
-            preserveAspectRatio="none"
-          >
-            <path
-              fill="currentColor"
-              className="text-primary"
-              fillOpacity="0.3"
-              d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1248,160,1344,128,1392,112L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
-            />
-          </svg>
-          <svg
-            className="absolute top-0 left-0 w-full h-full"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 1440 320"
-            preserveAspectRatio="none"
-            style={{ transform: 'rotate(180deg)' }}
-          >
-            <path
-              fill="currentColor"
-              className="text-primary"
-              fillOpacity="0.2"
-              d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1248,160,1344,128,1392,112L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
-            />
-          </svg>
-          {/* Additional decorative waves */}
-          <svg
-            className="absolute bottom-0 left-0 w-full"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 1440 200"
-            preserveAspectRatio="none"
-            style={{ height: '60%' }}
-          >
-            <path
-              fill="currentColor"
-              className="text-accent"
-              fillOpacity="0.15"
-              d="M0,160L60,150C120,140,240,120,360,110C480,100,600,100,720,110C840,120,960,140,1080,150C1200,160,1320,160,1380,160L1440,160L1440,200L1380,200C1320,200,1200,200,1080,200C960,200,840,200,720,200C600,200,480,200,360,200C240,200,120,200,60,200L0,200Z"
-            />
-          </svg>
-        </div>
-        
-        <div className="relative z-10 max-w-[1600px] mx-auto px-6 lg:px-12">
+      {/* Why Choose Us - With Vector Background */}
+      <section 
+        className="w-full py-20 lg:py-28 relative"
+        style={{
+          backgroundImage: 'url(/bg_vectors/11c9c9f9-3185-4e41-bbd4-487a790c2609-removebg-preview.png)',
+          backgroundPosition: 'left bottom',
+          backgroundRepeat: 'no-repeat',
+          backgroundSize: '40%',
+        }}
+      >
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
           <div className="text-center mb-16">
             <ScrollReveal>
               <span className="text-primary uppercase tracking-[0.2em] text-sm font-medium">Our Promise</span>
@@ -408,7 +370,7 @@ const Index = () => {
               { icon: 'fa-truck', title: 'Pan India Delivery', desc: 'Fast and free shipping to every corner of India' },
             ].map((item, i) => (
               <ScrollReveal key={item.title} delay={i * 0.1}>
-                <div className="text-center p-6 lg:p-10 bg-white/90 backdrop-blur-sm rounded-2xl border border-border h-full shadow-sm">
+                <div className="text-center p-6 lg:p-10 bg-white/90 backdrop-blur-sm rounded-2xl border border-border h-full">
                   <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
                     <i className={`fa-solid ${item.icon} text-2xl lg:text-3xl text-primary`}></i>
                   </div>
