@@ -173,17 +173,17 @@ const CustomDesign = () => {
             />
           </motion.div>
 
-          {/* Mobile Flowers - Corners */}
+          {/* Mobile Flowers - Right on top, Left on bottom */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6 }}
-            className="absolute -top-2 -left-2 lg:hidden z-20 pointer-events-none"
+            className="absolute -top-6 -right-4 lg:hidden z-20 pointer-events-none"
           >
             <img 
-              src="/hero_trans/left.png" 
+              src="/hero_trans/right.png" 
               alt="Decorative flower" 
-              className="w-[80px] sm:w-[110px] h-auto object-contain"
+              className="w-[120px] sm:w-[160px] h-auto object-contain"
             />
           </motion.div>
 
@@ -191,12 +191,12 @@ const CustomDesign = () => {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="absolute -bottom-2 -right-2 lg:hidden z-20 pointer-events-none"
+            className="absolute -bottom-6 -left-4 lg:hidden z-20 pointer-events-none"
           >
             <img 
-              src="/hero_trans/right.png" 
+              src="/hero_trans/left.png" 
               alt="Decorative flower" 
-              className="w-[90px] sm:w-[120px] h-auto object-contain"
+              className="w-[120px] sm:w-[160px] h-auto object-contain"
             />
           </motion.div>
         </div>
