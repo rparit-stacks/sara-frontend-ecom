@@ -2,14 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Studio Sara - Light, Minimal, Pink & Black Design System */
+/* Studio Sara - Light, Minimal, Orange & Black Design System */
 
 @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Poppins:wght@300;400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    /* Primary - Dark Pink */
-    --primary: 340 75% 55%;
+    /* Primary - Orange */
+    --primary: 25 95% 53%;
     --primary-foreground: 0 0% 100%;
     
     /* Secondary - Light Teal tint */
@@ -24,8 +24,8 @@
     --dark: 197 72% 15%;
     --dark-foreground: 0 0% 100%;
     
-    /* Warm - Light pink */
-    --warm: 340 60% 92%;
+    /* Warm - Light orange */
+    --warm: 25 60% 92%;
     --warm-foreground: 197 72% 15%;
     
     /* Background - Pure White */
@@ -66,7 +66,7 @@
     /* Sidebar */
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 197 72% 15%;
-    --sidebar-primary: 340 75% 55%;
+    --sidebar-primary: 25 95% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 171 40% 92%;
     --sidebar-accent-foreground: 197 72% 15%;
@@ -75,7 +75,7 @@
   }
 
   .dark {
-    --primary: 340 70% 60%;
+    --primary: 25 90% 58%;
     --primary-foreground: 0 0% 100%;
     
     --secondary: 197 50% 15%;
@@ -87,8 +87,8 @@
     --dark: 0 0% 95%;
     --dark-foreground: 197 72% 15%;
     
-    --warm: 340 40% 25%;
-    --warm-foreground: 340 60% 85%;
+    --warm: 25 40% 25%;
+    --warm-foreground: 25 60% 85%;
     
     --background: 197 72% 8%;
     --foreground: 0 0% 95%;
@@ -114,7 +114,7 @@
     
     --sidebar-background: 197 72% 8%;
     --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 340 70% 60%;
+    --sidebar-primary: 25 90% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 197 40% 18%;
     --sidebar-accent-foreground: 0 0% 95%;
@@ -375,4 +375,14 @@
 /* Selection styling */
 ::selection {
   @apply bg-primary/20 text-foreground;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

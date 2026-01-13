@@ -8,7 +8,16 @@ import { Button } from '@/components/ui/button';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
 
-// Mock data
+// TODO: Replace mock data with API calls to fetch CMS-managed content
+// API endpoints should be:
+// - GET /api/cms/best-sellers - Returns array of product IDs
+// - GET /api/cms/new-arrivals - Returns array of product IDs  
+// - GET /api/cms/testimonials - Returns array of active testimonials (max 10)
+// - GET /api/cms/offers - Returns array of active offers
+// - GET /api/cms/instagram-posts - Returns array of image URLs
+// - GET /api/products - Returns full product data for the IDs above
+
+// Mock data - will be replaced with API calls
 const heroSlides = [
   {
     id: 1,
@@ -43,27 +52,39 @@ const categories = [
   { id: '4', name: 'Traditional', image: 'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?w=600&h=800&fit=crop', count: 40 },
 ];
 
-const featuredProducts: Product[] = [
+// All products - in real app, fetch from API
+const allProducts: Product[] = [
   { id: '1', name: 'Rose Garden Silk Saree', price: 8999, originalPrice: 12000, image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=500&h=650&fit=crop', category: 'Sarees', isNew: true, rating: 5 },
   { id: '2', name: 'Lavender Cushion Set', price: 2500, image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500&h=650&fit=crop', category: 'Home Decor', rating: 4 },
   { id: '3', name: 'Cherry Blossom Kurti', price: 3499, originalPrice: 4999, image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=500&h=650&fit=crop', category: 'Kurtis', isSale: true, rating: 5 },
   { id: '4', name: 'Wildflower Dupatta', price: 1599, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500&h=650&fit=crop', category: 'Dupattas', isNew: true, rating: 4 },
   { id: '5', name: 'Peony Blouse', price: 2199, image: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=500&h=650&fit=crop', category: 'Blouses', rating: 5 },
   { id: '6', name: 'Tropical Bedsheet', price: 3999, image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=500&h=650&fit=crop', category: 'Bedding', rating: 4 },
-];
-
-const newArrivals: Product[] = [
   { id: '9', name: 'Lotus Embroidered Set', price: 6999, image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=500&h=650&fit=crop', category: 'Suits', isNew: true, rating: 4 },
   { id: '10', name: 'Sunflower Table Runner', price: 899, image: 'https://images.unsplash.com/photo-1540932239986-30128078f3c5?w=500&h=650&fit=crop', category: 'Home Decor', isNew: true, rating: 5 },
   { id: '11', name: 'Orchid Silk Blouse', price: 3299, image: 'https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=500&h=650&fit=crop', category: 'Blouses', isNew: true, rating: 5 },
   { id: '12', name: 'Tulip Print Scarf', price: 1299, image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=500&h=650&fit=crop', category: 'Scarves', isNew: true, rating: 4 },
 ];
 
+// CMS-managed data - these should be fetched from API
+// Best Sellers product IDs (managed in AdminCMS)
+const bestSellerIds = ['1', '2', '3'];
+const featuredProducts: Product[] = bestSellerIds
+  .map(id => allProducts.find(p => p.id === id))
+  .filter((p): p is Product => p !== undefined);
+
+// New Arrivals product IDs (managed in AdminCMS)
+const newArrivalIds = ['4', '1'];
+const newArrivals: Product[] = newArrivalIds
+  .map(id => allProducts.find(p => p.id === id))
+  .filter((p): p is Product => p !== undefined);
+
+// Testimonials (managed in AdminCMS, max 10 active)
 const testimonials = [
   { id: 1, name: 'Priya Sharma', text: 'Beautiful quality! The prints are stunning and the fabric is so soft. I received so many compliments on my saree at the wedding.', rating: 5, location: 'Mumbai' },
   { id: 2, name: 'Anita Reddy', text: 'Fast delivery and gorgeous packaging. The kurti fits perfectly and the embroidery work is exquisite. Will definitely order again!', rating: 5, location: 'Bangalore' },
   { id: 3, name: 'Meera Patel', text: 'The customization options are amazing. They helped me create the perfect outfit for my engagement. Highly recommend Studio Sara!', rating: 5, location: 'Ahmedabad' },
-];
+].slice(0, 10); // Limit to 10 as per requirements
 
 const features = [
   { icon: 'fa-truck-fast', title: 'Free Shipping', desc: 'On orders over ₹999' },
@@ -72,6 +93,7 @@ const features = [
   { icon: 'fa-gem', title: 'Premium Quality', desc: 'Handcrafted with love' },
 ];
 
+// Instagram Posts (managed in AdminCMS)
 const instagramPosts = [
   'https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=400&h=400&fit=crop',
   'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=400&h=400&fit=crop',
@@ -184,25 +206,27 @@ const Index = () => {
               <h2 className="font-cursive text-5xl md:text-6xl lg:text-7xl mt-4">Shop by Category</h2>
             </ScrollReveal>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-            {categories.map((category, index) => (
-              <ScrollReveal key={category.id} delay={index * 0.1}>
-                <Link to={`/category/${category.id}`} className="group block">
-                  <div className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-lg">
-                    <img
-                      src={category.image}
-                      alt={category.name}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/20 to-transparent" />
-                    <div className="absolute inset-0 flex flex-col items-center justify-end text-white pb-8 lg:pb-10">
-                      <h3 className="font-cursive text-4xl lg:text-5xl mb-2">{category.name}</h3>
-                      <p className="text-sm lg:text-base text-white/80">{category.count} Products</p>
+          <div className="overflow-x-auto -mx-6 lg:-mx-12 px-6 lg:px-12 scrollbar-hide">
+            <div className="flex gap-6 lg:gap-8 min-w-max pb-4">
+              {categories.map((category, index) => (
+                <ScrollReveal key={category.id} delay={index * 0.1}>
+                  <Link to={`/category/${category.id}`} className="group block flex-shrink-0">
+                    <div className="relative w-[280px] md:w-[320px] lg:w-[360px] aspect-[3/4] rounded-2xl overflow-hidden shadow-lg">
+                      <img
+                        src={category.image}
+                        alt={category.name}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/20 to-transparent" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-end text-white pb-8 lg:pb-10">
+                        <h3 className="font-cursive text-4xl lg:text-5xl mb-2">{category.name}</h3>
+                        <p className="text-sm lg:text-base text-white/80">{category.count} Products</p>
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              </ScrollReveal>
-            ))}
+                  </Link>
+                </ScrollReveal>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -324,23 +348,25 @@ const Index = () => {
               <h2 className="font-cursive text-5xl md:text-6xl lg:text-7xl mt-4">What They Say</h2>
             </ScrollReveal>
           </div>
-          <div className="grid lg:grid-cols-3 gap-8 lg:gap-10">
-            {testimonials.map((testimonial, index) => (
-              <ScrollReveal key={testimonial.id} delay={index * 0.1}>
-                <div className="bg-white p-8 lg:p-10 rounded-2xl border border-border h-full flex flex-col">
-                  <div className="flex gap-1 mb-6">
-                    {[...Array(testimonial.rating)].map((_, i) => (
-                      <i key={i} className="fa-solid fa-star text-lg text-primary"></i>
-                    ))}
+          <div className="overflow-x-auto -mx-6 lg:-mx-12 px-6 lg:px-12 scrollbar-hide">
+            <div className="flex gap-6 lg:gap-8 min-w-max pb-4">
+              {testimonials.map((testimonial, index) => (
+                <ScrollReveal key={testimonial.id} delay={index * 0.1}>
+                  <div className="bg-white p-8 lg:p-10 rounded-2xl border border-border h-full flex flex-col w-[320px] md:w-[380px] lg:w-[420px] flex-shrink-0">
+                    <div className="flex gap-1 mb-6">
+                      {[...Array(testimonial.rating)].map((_, i) => (
+                        <i key={i} className="fa-solid fa-star text-lg text-primary"></i>
+                      ))}
+                    </div>
+                    <p className="text-lg text-muted-foreground mb-8 leading-relaxed flex-1">"{testimonial.text}"</p>
+                    <div>
+                      <p className="font-semibold text-lg">{testimonial.name}</p>
+                      <p className="text-sm text-muted-foreground">{testimonial.location}</p>
+                    </div>
                   </div>
-                  <p className="text-lg text-muted-foreground mb-8 leading-relaxed flex-1">"{testimonial.text}"</p>
-                  <div>
-                    <p className="font-semibold text-lg">{testimonial.name}</p>
-                    <p className="text-sm text-muted-foreground">{testimonial.location}</p>
-                  </div>
-                </div>
-              </ScrollReveal>
-            ))}
+                </ScrollReveal>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -448,32 +474,44 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Newsletter - Full Width */}
-      <section className="w-full py-20 lg:py-28 bg-foreground text-white">
-        <div className="max-w-3xl mx-auto text-center px-6">
-          <ScrollReveal>
-            <span className="inline-block px-5 py-2 bg-primary text-white rounded-full text-sm uppercase tracking-wider mb-6">
-              Limited Time Offer
-            </span>
-            <h2 className="font-cursive text-5xl md:text-6xl lg:text-7xl mb-6">
-              Get 20% Off Your First Order
-            </h2>
-            <p className="text-lg lg:text-xl text-white/70 mb-10 leading-relaxed">
-              Join our community and be the first to know about new collections, exclusive offers, and style inspiration
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-lg mx-auto">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="flex-1 px-6 py-4 rounded-full bg-white/10 border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-primary text-base"
-              />
-              <Button className="bg-primary hover:bg-primary/90 text-white rounded-full px-8 py-4 text-base font-semibold whitespace-nowrap">
-                Subscribe Now
-              </Button>
+      {/* Offer Section - CMS Managed */}
+      {(() => {
+        // TODO: Fetch active offers from API - GET /api/cms/offers?active=true
+        const activeOffers = [
+          { id: '1', title: 'Get 20% Off Your First Order', description: 'Join our community and be the first to know about new collections, exclusive offers, and style inspiration' },
+        ];
+        
+        if (activeOffers.length === 0) return null;
+        
+        const offer = activeOffers[0]; // Display first active offer
+        return (
+          <section className="w-full py-20 lg:py-28 bg-foreground text-white">
+            <div className="max-w-3xl mx-auto text-center px-6">
+              <ScrollReveal>
+                <span className="inline-block px-5 py-2 bg-primary text-white rounded-full text-sm uppercase tracking-wider mb-6">
+                  Limited Time Offer
+                </span>
+                <h2 className="font-cursive text-5xl md:text-6xl lg:text-7xl mb-6">
+                  {offer.title}
+                </h2>
+                <p className="text-lg lg:text-xl text-white/70 mb-10 leading-relaxed">
+                  {offer.description}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-lg mx-auto">
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    className="flex-1 px-6 py-4 rounded-full bg-white/10 border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-primary text-base"
+                  />
+                  <Button className="bg-primary hover:bg-primary/90 text-white rounded-full px-8 py-4 text-base font-semibold whitespace-nowrap">
+                    Subscribe Now
+                  </Button>
+                </div>
+              </ScrollReveal>
             </div>
-          </ScrollReveal>
-        </div>
-      </section>
+          </section>
+        );
+      })()}
 
       {/* Instagram - Full Width Grid */}
       <section className="w-full py-20 lg:py-28">
