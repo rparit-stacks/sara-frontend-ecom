@@ -7,6 +7,7 @@ import {
   FileText, 
   Users, 
   FolderTree,
+  Settings,
   LogOut,
   Menu,
   X
@@ -45,6 +46,11 @@ const adminMenuItems = [
     icon: FolderTree, 
     label: 'Categories', 
     path: '/admin-sara/categories' 
+  },
+  { 
+    icon: Settings, 
+    label: 'Custom Config', 
+    path: '/admin-sara/custom-config' 
   },
   { 
     icon: Users, 

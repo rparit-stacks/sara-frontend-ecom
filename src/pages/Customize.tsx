@@ -1,291 +1,212 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, CheckCircle2 } from 'lucide-react';
-
-const fabrics = [
-  {
-    id: 'silk-pink',
-    name: 'Silk – Blush Pink',
-    description: 'Soft premium mulberry silk with subtle sheen.',
-    image: 'https://images.unsplash.com/photo-1604908176997-1251884b08a3?w=600&h=800&fit=crop',
-  },
-  {
-    id: 'cotton-cream',
-    name: 'Cotton – Warm Cream',
-    description: 'Breathable cotton, perfect for everyday wear.',
-    image: 'https://images.unsplash.com/photo-1600093463592-9f61806a0aab?w=600&h=800&fit=crop',
-  },
-  {
-    id: 'linen-sage',
-    name: 'Linen – Sage Green',
-    description: 'Textured linen with a modern earthy tone.',
-    image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&h=800&fit=crop',
-  },
-];
-
-const designs = [
-  {
-    id: 'rose-garden',
-    name: 'Rose Garden',
-    description: 'Hand-drawn rose motifs inspired by Jaipur gardens.',
-    image: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=600&h=800&fit=crop',
-  },
-  {
-    id: 'paisley-classic',
-    name: 'Classic Paisley',
-    description: 'Timeless paisley pattern for a regal look.',
-    image: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=600&h=800&fit=crop',
-  },
-  {
-    id: 'geometric-modern',
-    name: 'Modern Geometric',
-    description: 'Clean geometric lines for a contemporary feel.',
-    image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=600&h=800&fit=crop',
-  },
-];
+import { Upload, ArrowRight, Palette, Sparkles, ShieldCheck, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Customize = () => {
-  const [selectedFabricId, setSelectedFabricId] = useState(fabrics[0].id);
-  const [selectedDesignId, setSelectedDesignId] = useState(designs[0].id);
-  const [uploadedDesignUrl, setUploadedDesignUrl] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const [isUploading, setIsUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [generatedMockups, setGeneratedMockups] = useState<any[]>([]);
 
-  const selectedFabric = fabrics.find((f) => f.id === selectedFabricId)!;
-  const selectedDesign = designs.find((d) => d.id === selectedDesignId)!;
-
-  const handleUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    setSelectedFile(file);
     const url = URL.createObjectURL(file);
-    setUploadedDesignUrl(url);
+    setPreviewUrl(url);
+    toast.success('Design selected successfully!');
+  };
+
+  const handleProceed = async () => {
+    if (!selectedFile) {
+      toast.error('Please upload your design first.');
+      return;
+    }
+    
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('design', selectedFile);
+
+    try {
+      const response = await fetch('http://localhost:3001/generate', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Failed to generate mockups');
+      }
+
+      const data = await response.json();
+      setGeneratedMockups(data.mockups);
+      
+      toast.success('Mockups generated successfully!');
+      
+      // Proceed to Custom Product Page with the design and generated mockups
+      navigate('/custom-product', { 
+        state: { 
+          designUrl: previewUrl,
+          mockups: data.mockups 
+        } 
+      });
+    } catch (err: any) {
+      console.error('Generation error:', err);
+      toast.error(err.message || 'Error connecting to mockup service. Make sure it is running.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
     <Layout>
-      <section className="w-full py-14 lg:py-20">
-        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
-          {/* Header */}
-          <div className="mb-12 lg:mb-16">
+      <section className="w-full py-14 lg:py-24 relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute top-0 right-0 w-1/3 h-1/3 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-1/4 h-1/4 bg-secondary/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-12 relative z-10">
+          <div className="max-w-4xl mx-auto text-center space-y-6">
             <ScrollReveal>
-              <span className="text-primary uppercase tracking-[0.2em] text-sm font-medium">
-                Custom Mockup
-              </span>
-              <h1 className="font-cursive text-4xl md:text-5xl lg:text-6xl mt-4">
-                Design Your Own <span className="text-primary">Silk Scarf</span>
+              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-4">
+                <Sparkles className="w-4 h-4" />
+                Custom Design Studio
+              </div>
+              <h1 className="font-cursive text-5xl md:text-6xl lg:text-7xl">
+                Turn Your Art into a <span className="text-primary">Masterpiece</span>
               </h1>
-              <p className="text-muted-foreground text-lg mt-4 max-w-2xl">
-                Choose a fabric, pick a design or upload your own artwork and preview your
-                unique Studio Sara piece in real time.
+              <p className="text-muted-foreground text-xl max-w-2xl mx-auto leading-relaxed">
+                Upload your unique design and we'll help you create a premium, 
+                handcrafted silk piece tailored exactly to your preferences.
               </p>
             </ScrollReveal>
           </div>
 
-          {/* Layout: Left (controls) / Right (preview + summary) */}
-          <div className="grid lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-10 lg:gap-14 items-start">
-            {/* Left: Fabric + Design selection */}
-            <div className="space-y-8">
-              <Tabs defaultValue="fabric" className="w-full">
-                <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent p-0 gap-6">
-                  <TabsTrigger
-                    value="fabric"
-                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent pb-3 text-sm md:text-base"
-                  >
-                    Fabrics
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="design"
-                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent pb-3 text-sm md:text-base"
-                  >
-                    Designs
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="upload"
-                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent pb-3 text-sm md:text-base"
-                  >
-                    Upload Your Design
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Fabrics */}
-                <TabsContent value="fabric" className="pt-6">
-                  <div className="grid md:grid-cols-3 gap-5">
-                    {fabrics.map((fabric) => (
-                      <button
-                        key={fabric.id}
-                        type="button"
-                        onClick={() => setSelectedFabricId(fabric.id)}
-                        className={`text-left rounded-xl border transition-all overflow-hidden group ${
-                          selectedFabricId === fabric.id
-                            ? 'border-primary shadow-md shadow-primary/10'
-                            : 'border-border hover:border-primary/40 hover:shadow-sm'
-                        }`}
-                      >
-                        <div className="relative aspect-[3/4] bg-muted overflow-hidden">
-                          <img
-                            src={fabric.image}
-                            alt={fabric.name}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          />
-                          {selectedFabricId === fabric.id && (
-                            <div className="absolute top-2 right-2 bg-primary text-white rounded-full px-2 py-1 text-[10px] flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Selected
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-3">
-                          <p className="font-semibold text-sm md:text-base">{fabric.name}</p>
-                          <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                            {fabric.description}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </TabsContent>
-
-                {/* Designs */}
-                <TabsContent value="design" className="pt-6">
-                  <div className="grid md:grid-cols-3 gap-5">
-                    {designs.map((design) => (
-                      <button
-                        key={design.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedDesignId(design.id);
-                          setUploadedDesignUrl(null);
-                        }}
-                        className={`text-left rounded-xl border transition-all overflow-hidden group ${
-                          selectedDesignId === design.id && !uploadedDesignUrl
-                            ? 'border-primary shadow-md shadow-primary/10'
-                            : 'border-border hover:border-primary/40 hover:shadow-sm'
-                        }`}
-                      >
-                        <div className="relative aspect-square bg-muted overflow-hidden">
-                          <img
-                            src={design.image}
-                            alt={design.name}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          />
-                          {selectedDesignId === design.id && !uploadedDesignUrl && (
-                            <div className="absolute top-2 right-2 bg-primary text-white rounded-full px-2 py-1 text-[10px] flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Selected
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-3">
-                          <p className="font-semibold text-sm md:text-base">{design.name}</p>
-                          <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                            {design.description}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </TabsContent>
-
-                {/* Upload */}
-                <TabsContent value="upload" className="pt-6">
-                  <div className="grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-6 items-start">
-                    <div className="border-2 border-dashed border-border rounded-xl p-6 text-center bg-white">
-                      <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Upload a transparent PNG/JPG design to apply on the fabric.
+          <div className="mt-16 lg:mt-20 max-w-5xl mx-auto">
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+              {/* Left: Upload Area */}
+              <ScrollReveal direction="left">
+                <div className="space-y-8">
+                  <div className="bg-white rounded-3xl border-2 border-dashed border-border p-10 lg:p-16 text-center space-y-6 transition-all hover:border-primary/50 group bg-gradient-to-b from-white to-secondary/5">
+                    <div className="w-20 h-20 bg-primary/5 text-primary rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                      <Upload className="w-10 h-10" />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-2xl font-semibold">Upload Your Artwork</h3>
+                      <p className="text-muted-foreground">
+                        Transparent PNG or high-resolution JPG files work best.
                       </p>
-                      <p className="text-xs text-muted-foreground mb-4">
-                        Recommended: 2000x2000px, less than 5MB.
-                      </p>
+                    </div>
+                    
+                    <div className="flex flex-col gap-4">
                       <input
-                        id="design-upload-input"
+                        id="design-upload"
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        onChange={handleUpload}
+                        onChange={handleFileChange}
                       />
-                      <label htmlFor="design-upload-input">
-                        <Button type="button" variant="outline" className="h-11 px-6 cursor-pointer">
-                          Choose File
+                      <label htmlFor="design-upload">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          disabled={isUploading}
+                          className="h-14 px-10 text-lg rounded-2xl cursor-pointer w-full sm:w-auto"
+                        >
+                          {isUploading ? 'Wait, Processing PSDs...' : 'Choose Design File'}
                         </Button>
                       </label>
-                    </div>
-                    <div className="bg-white rounded-xl border border-border p-4 min-h-[180px] flex items-center justify-center">
-                      {uploadedDesignUrl ? (
-                        <div className="space-y-2 text-center">
-                          <img
-                            src={uploadedDesignUrl}
-                            alt="Uploaded design preview"
-                            className="max-h-40 mx-auto object-contain rounded-lg border border-border"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Your design will be used instead of the predefined patterns.
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">
-                          No file selected yet. Upload a design to see a preview here.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </div>
-
-            {/* Right: Preview + Summary */}
-            <div className="space-y-6">
-              {/* Preview */}
-              <div className="bg-white rounded-2xl border border-border shadow-sm p-4 lg:p-5">
-                <h2 className="font-semibold text-base lg:text-lg mb-3">Live Preview</h2>
-                <div className="aspect-[3/4] rounded-2xl bg-muted relative overflow-hidden">
-                  {/* Fabric layer */}
-                  <img
-                    src={selectedFabric.image}
-                    alt={selectedFabric.name}
-                    className="w-full h-full object-cover"
-                  />
-                  {/* Design overlay */}
-                  <div className="absolute inset-5 rounded-2xl overflow-hidden">
-                    <img
-                      src={uploadedDesignUrl || selectedDesign.image}
-                      alt={selectedDesign.name}
-                      className="w-full h-full object-cover mix-blend-multiply opacity-80"
-                    />
-                  </div>
-                  {/* Soft vignette */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-black/5 pointer-events-none" />
-                </div>
-              </div>
-
-              {/* Summary */}
-              <div className="bg-white rounded-2xl border border-border shadow-sm p-5 space-y-4">
-                <h2 className="font-semibold text-base lg:text-lg mb-1">Selection Summary</h2>
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-medium">Fabric</p>
-                      <p className="text-muted-foreground">{selectedFabric.name}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-medium">Design</p>
-                      <p className="text-muted-foreground">
-                        {uploadedDesignUrl ? 'Custom Upload' : selectedDesign.name}
+                      <p className="text-xs text-muted-foreground">
+                        Maximum file size: 10MB
                       </p>
                     </div>
                   </div>
-                  <div className="pt-2 border-t border-border flex items-center justify-between">
-                    <p className="text-muted-foreground text-sm">Estimated Price</p>
-                    <p className="font-cursive text-2xl text-primary">₹1,899</p>
+
+                  {/* Features */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-3 p-4 rounded-2xl bg-secondary/20">
+                      <Palette className="w-5 h-5 text-primary" />
+                      <span className="text-sm font-medium">Premium Fabrics</span>
+                    </div>
+                    <div className="flex items-center gap-3 p-4 rounded-2xl bg-secondary/20">
+                      <ShieldCheck className="w-5 h-5 text-primary" />
+                      <span className="text-sm font-medium">Handcrafted Quality</span>
+                    </div>
                   </div>
                 </div>
-                <Button className="w-full btn-primary h-12 mt-2 text-base">
-                  Add Mockup to Cart
-                </Button>
-              </div>
+              </ScrollReveal>
+
+              {/* Right: Preview & Proceed */}
+              <ScrollReveal direction="right">
+                <div className="space-y-8">
+                  <div className="aspect-square bg-white rounded-3xl border border-border shadow-2xl relative overflow-hidden flex items-center justify-center p-8 bg-gradient-to-tr from-secondary/10 to-white">
+                    <AnimatePresence mode="wait">
+                      {previewUrl ? (
+                        <motion.div
+                          key="preview"
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          className="w-full h-full flex flex-col items-center justify-center space-y-4"
+                        >
+                          <div className="relative group">
+                            <img
+                              src={previewUrl}
+                              alt="Custom design preview"
+                              className="max-h-[300px] w-auto object-contain rounded-xl shadow-lg border border-border"
+                            />
+                            <div className="absolute inset-0 bg-primary/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                          </div>
+                          <p className="text-sm font-medium text-primary flex items-center gap-2">
+                            <Sparkles className="w-4 h-4" />
+                            Ready to transform into reality
+                          </p>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="placeholder"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="text-center space-y-4"
+                        >
+                          <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mx-auto opacity-20">
+                            <Palette className="w-12 h-12" />
+                          </div>
+                          <p className="text-muted-foreground font-medium">
+                            Preview will appear here after upload
+                          </p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <Button 
+                    size="lg" 
+                    onClick={handleProceed}
+                    disabled={!previewUrl || isUploading}
+                    className="w-full h-16 text-xl rounded-2xl btn-primary gap-3 shadow-xl shadow-primary/20"
+                  >
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                        Generating Mockups...
+                      </>
+                    ) : (
+                      <>
+                        Proceed to Customize
+                        <ArrowRight className="w-6 h-6" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </ScrollReveal>
             </div>
           </div>
         </div>
@@ -295,4 +216,3 @@ const Customize = () => {
 };
 
 export default Customize;
-

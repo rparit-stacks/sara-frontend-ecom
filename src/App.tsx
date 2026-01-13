@@ -27,7 +27,9 @@ import AdminFabrics from "./pages/admin/AdminFabrics";
 import AdminDesigns from "./pages/admin/AdminDesigns";
 import AdminCMS from "./pages/admin/AdminCMS";
 import AdminCategories from "./pages/admin/AdminCategories";
+import AdminCustomConfig from "./pages/admin/AdminCustomConfig";
 import AdminUsers from "./pages/admin/AdminUsers";
+import CustomProductDetail from "./pages/CustomProductDetail";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +56,7 @@ const App = () => (
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/refund" element={<Refund />} />
           <Route path="/customize" element={<Customize />} />
+          <Route path="/custom-product" element={<CustomProductDetail />} />
           
           {/* Admin Routes */}
           <Route path="/admin-sara/login" element={<AdminLogin />} />
@@ -62,6 +65,7 @@ const App = () => (
           <Route path="/admin-sara/fabrics" element={<AdminFabrics />} />
           <Route path="/admin-sara/designs" element={<AdminDesigns />} />
           <Route path="/admin-sara/cms" element={<AdminCMS />} />
+          <Route path="/admin-sara/custom-config" element={<AdminCustomConfig />} />
           <Route path="/admin-sara/categories" element={<AdminCategories />} />
           <Route path="/admin-sara/users" element={<AdminUsers />} />
           
