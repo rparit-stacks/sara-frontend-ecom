@@ -33,13 +33,15 @@ const CustomProductDetail = () => {
   
   const designUrl = (location.state as any)?.designUrl;
   const mockups = (location.state as any)?.mockups || [];
+  const isTemporary = (location.state as any)?.isTemporary || false;
+  const isMakeYourOwn = location.pathname === '/make-your-own-product';
   
   useEffect(() => {
     if (!designUrl) {
       toast.error('Please upload a design first.');
-      navigate('/customize');
+      navigate(isMakeYourOwn ? '/make-your-own' : '/customize');
     }
-  }, [designUrl, navigate]);
+  }, [designUrl, navigate, isMakeYourOwn]);
 
   const customProduct = getCustomProductData(designUrl);
   
@@ -53,7 +55,21 @@ const CustomProductDetail = () => {
   const totalPrice = (customProduct.basePrice + (currentSize?.extraPrice || 0)) * quantity;
 
   const handleAddToCart = () => {
-    toast.success('Custom product added to cart! It will be saved permanently once you purchase.');
+    if (isTemporary || isMakeYourOwn) {
+      toast.success('Product added to cart! It will be saved permanently.');
+    } else {
+      toast.success('Custom product added to cart! It will be saved permanently once you purchase.');
+    }
+    // TODO: Implement actual cart/wishlist save logic here
+  };
+
+  const handleAddToWishlist = () => {
+    if (isTemporary || isMakeYourOwn) {
+      toast.success('Product added to wishlist! It will be saved permanently.');
+    } else {
+      toast.success('Custom product added to wishlist!');
+    }
+    // TODO: Implement actual wishlist save logic here
   };
 
   if (!designUrl) return null;
@@ -63,17 +79,21 @@ const CustomProductDetail = () => {
   return (
     <Layout>
       {/* Session Header */}
-      <section className="w-full bg-primary/5 py-4 border-b border-primary/10">
-        <div className="max-w-[1600px] mx-auto px-6 lg:px-12 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-primary font-medium text-sm">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            Temporary Session: Custom Product Generated from your PSDs
+      {(isTemporary || isMakeYourOwn) && (
+        <section className="w-full bg-primary/5 py-4 border-b border-primary/10">
+          <div className="max-w-[1600px] mx-auto px-6 lg:px-12 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-primary font-medium text-sm">
+              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              Temporary Product: {isMakeYourOwn ? 'Created from your design' : 'Custom Product Generated from your PSDs'}
+            </div>
+            <p className="text-xs text-muted-foreground hidden md:block">
+              {isMakeYourOwn 
+                ? 'This is a temporary product. Add to cart or wishlist to save it permanently.'
+                : 'These mockups were generated in real-time. Complete purchase to save them permanently.'}
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground hidden md:block">
-            These mockups were generated in real-time. Complete purchase to save them permanently.
-          </p>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Breadcrumb */}
       <section className="w-full bg-secondary/30 py-5">
@@ -81,8 +101,17 @@ const CustomProductDetail = () => {
           <nav className="flex items-center text-sm text-muted-foreground flex-wrap">
             <Link to="/" className="hover:text-primary transition-colors">Home</Link>
             <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
-            <Link to="/customize" className="hover:text-primary transition-colors">Custom Design</Link>
-            <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
+            {isMakeYourOwn ? (
+              <>
+                <Link to="/make-your-own" className="hover:text-primary transition-colors">Make Your Own</Link>
+                <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
+              </>
+            ) : (
+              <>
+                <Link to="/customize" className="hover:text-primary transition-colors">Custom Design</Link>
+                <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
+              </>
+            )}
             <span className="text-foreground truncate">{customProduct.name}</span>
           </nav>
         </div>
@@ -140,7 +169,7 @@ const CustomProductDetail = () => {
 
                   <div className="flex justify-center">
                     <button 
-                      onClick={() => navigate('/customize')}
+                      onClick={() => navigate(isMakeYourOwn ? '/make-your-own' : '/customize')}
                       className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
                     >
                       <Info className="w-3 h-3" />
@@ -248,7 +277,12 @@ const CustomProductDetail = () => {
                       <ShoppingBag className="w-5 h-5" />
                       Add Custom Product to Cart
                     </Button>
-                    <Button size="lg" variant="outline" className="rounded-full w-14 h-14">
+                    <Button 
+                      size="lg" 
+                      variant="outline" 
+                      className="rounded-full w-14 h-14"
+                      onClick={handleAddToWishlist}
+                    >
                       <Heart className="w-5 h-5" />
                     </Button>
                     <Button size="lg" variant="outline" className="rounded-full w-14 h-14">
