@@ -105,95 +105,99 @@ const CustomDesign = () => {
 
   return (
     <Layout>
-      {/* Hero Section with Flower Images */}
-      <section className="relative min-h-[85vh] lg:min-h-screen flex items-center justify-center overflow-hidden bg-[#f8c8c8]">
-        {/* Background Pattern - Polka dots and decorative */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23a08050' fill-opacity='0.25'%3E%3Ccircle cx='40' cy='40' r='6'/%3E%3Ccircle cx='10' cy='10' r='3'/%3E%3Ccircle cx='70' cy='70' r='3'/%3E%3Ccircle cx='10' cy='70' r='3'/%3E%3Ccircle cx='70' cy='10' r='3'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }}
-        />
-
-        {/* Left Flower - Desktop - Much larger and overlapping */}
-        <motion.div 
-          initial={{ opacity: 0, x: -150, rotate: -10 }}
-          animate={{ opacity: 1, x: 0, rotate: 0 }}
-          transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
-          className="absolute left-0 bottom-0 hidden lg:block z-30 pointer-events-none"
-        >
-          <img 
-            src="/hero_trans/left.png" 
-            alt="Decorative flower left" 
-            className="w-[450px] xl:w-[550px] 2xl:w-[650px] h-auto object-contain -ml-16 xl:-ml-20"
-          />
-        </motion.div>
-
-        {/* Right Flower - Desktop - Much larger and overlapping */}
-        <motion.div 
-          initial={{ opacity: 0, x: 150, rotate: 10 }}
-          animate={{ opacity: 1, x: 0, rotate: 0 }}
-          transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
-          className="absolute right-0 bottom-0 hidden lg:block z-30 pointer-events-none"
-        >
-          <img 
-            src="/hero_trans/right.png" 
-            alt="Decorative flower right" 
-            className="w-[450px] xl:w-[550px] 2xl:w-[650px] h-auto object-contain -mr-16 xl:-mr-20"
-          />
-        </motion.div>
-
-        {/* Mobile Flowers - Larger */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6 }}
-          className="absolute top-0 left-0 lg:hidden z-20 pointer-events-none"
-        >
-          <img 
-            src="/hero_trans/left.png" 
-            alt="Decorative flower" 
-            className="w-[150px] sm:w-[200px] h-auto object-contain -ml-8"
-          />
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="absolute bottom-0 right-0 lg:hidden z-20 pointer-events-none"
-        >
-          <img 
-            src="/hero_trans/right.png" 
-            alt="Decorative flower" 
-            className="w-[150px] sm:w-[200px] h-auto object-contain -mr-8"
-          />
-        </motion.div>
-
-        {/* Center Content - Larger white card */}
-        <div className="relative z-20 text-center px-4 max-w-xl lg:max-w-2xl mx-auto py-12">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="bg-white/95 backdrop-blur-sm p-10 md:p-14 lg:p-16 shadow-2xl"
+      {/* Hero Section - Banner Style with Flowers Extending Outside */}
+      <section className="relative bg-white py-8 lg:py-12">
+        <div className="relative mx-auto max-w-6xl px-4">
+          {/* Pink Pattern Banner */}
+          <div 
+            className="relative w-full py-16 sm:py-20 md:py-24 lg:py-28 bg-[#f5b5b5]"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Ccircle fill='%23a08050' fill-opacity='0.35' cx='50' cy='50' r='12'/%3E%3Ccircle fill='%23506040' fill-opacity='0.4' cx='15' cy='15' r='5'/%3E%3Ccircle fill='%23506040' fill-opacity='0.4' cx='85' cy='85' r='5'/%3E%3Ccircle fill='%23506040' fill-opacity='0.4' cx='15' cy='85' r='5'/%3E%3Ccircle fill='%23506040' fill-opacity='0.4' cx='85' cy='15' r='5'/%3E%3Ccircle fill='%23a08050' fill-opacity='0.25' cx='50' cy='15' r='8'/%3E%3Ccircle fill='%23a08050' fill-opacity='0.25' cx='50' cy='85' r='8'/%3E%3Ccircle fill='%23a08050' fill-opacity='0.25' cx='15' cy='50' r='8'/%3E%3Ccircle fill='%23a08050' fill-opacity='0.25' cx='85' cy='50' r='8'/%3E%3C/g%3E%3C/svg%3E")`,
+            }}
           >
-            <h1 className="font-cursive text-5xl md:text-6xl lg:text-7xl text-primary mb-6">
-              Welcome
-            </h1>
-            <p className="text-xl md:text-2xl lg:text-3xl text-foreground font-medium mb-2">
-              to the World of Exquisite
-            </p>
-            <p className="text-xl md:text-2xl lg:text-3xl text-foreground font-medium mb-8">
-              Prints and Illustrations
-            </p>
-            <Button 
-              variant="outline"
-              className="px-10 py-6 text-base md:text-lg border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground rounded-none uppercase tracking-wider font-medium transition-all shadow-md hover:shadow-lg"
-              onClick={() => document.getElementById('design-form')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              Print & Illustration Library
-            </Button>
+            {/* Center Content - White Card */}
+            <div className="relative z-10 flex items-center justify-center px-4">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+                className="bg-white p-6 sm:p-8 md:p-10 lg:p-12 shadow-lg max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg mx-auto text-center"
+              >
+                <h1 className="font-cursive text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-primary mb-3 md:mb-4">
+                  Welcome
+                </h1>
+                <p className="text-sm sm:text-base md:text-lg lg:text-xl text-foreground font-medium mb-1">
+                  to the World of Exquisite
+                </p>
+                <p className="text-sm sm:text-base md:text-lg lg:text-xl text-foreground font-medium mb-4 md:mb-6">
+                  Prints and Illustrations
+                </p>
+                <Button 
+                  variant="outline"
+                  className="px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-5 text-xs sm:text-sm md:text-base border-2 border-[#d4a84b] text-[#d4a84b] hover:bg-[#d4a84b] hover:text-white rounded-none uppercase tracking-wider font-medium transition-all"
+                  onClick={() => document.getElementById('design-form')?.scrollIntoView({ behavior: 'smooth' })}
+                >
+                  Print & Illustration Library
+                </Button>
+              </motion.div>
+            </div>
+          </div>
+
+          {/* Left Flower - Desktop - Extending outside pattern */}
+          <motion.div 
+            initial={{ opacity: 0, x: -100 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="absolute left-0 top-1/2 -translate-y-1/2 hidden lg:block z-20 pointer-events-none"
+            style={{ left: '-120px' }}
+          >
+            <img 
+              src="/hero_trans/left.png" 
+              alt="Decorative flower left" 
+              className="w-[350px] xl:w-[420px] 2xl:w-[480px] h-auto object-contain"
+            />
+          </motion.div>
+
+          {/* Right Flower - Desktop - Extending outside pattern */}
+          <motion.div 
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="absolute right-0 top-1/2 -translate-y-1/2 hidden lg:block z-20 pointer-events-none"
+            style={{ right: '-120px' }}
+          >
+            <img 
+              src="/hero_trans/right.png" 
+              alt="Decorative flower right" 
+              className="w-[350px] xl:w-[420px] 2xl:w-[480px] h-auto object-contain"
+            />
+          </motion.div>
+
+          {/* Mobile Flowers - Corners */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6 }}
+            className="absolute -top-2 -left-2 lg:hidden z-20 pointer-events-none"
+          >
+            <img 
+              src="/hero_trans/left.png" 
+              alt="Decorative flower" 
+              className="w-[80px] sm:w-[110px] h-auto object-contain"
+            />
+          </motion.div>
+
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="absolute -bottom-2 -right-2 lg:hidden z-20 pointer-events-none"
+          >
+            <img 
+              src="/hero_trans/right.png" 
+              alt="Decorative flower" 
+              className="w-[90px] sm:w-[120px] h-auto object-contain"
+            />
           </motion.div>
         </div>
       </section>
