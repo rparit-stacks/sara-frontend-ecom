@@ -33,11 +33,12 @@ const CustomProductDetail = () => {
   
   const designUrl = (location.state as any)?.designUrl;
   const mockups = (location.state as any)?.mockups || [];
+  const isTemporary = (location.state as any)?.isTemporary ?? true;
   
   useEffect(() => {
     if (!designUrl) {
       toast.error('Please upload a design first.');
-      navigate('/customize');
+      navigate('/make-your-own');
     }
   }, [designUrl, navigate]);
 
@@ -48,12 +49,55 @@ const CustomProductDetail = () => {
     'v2': 's1'
   });
   const [quantity, setQuantity] = useState(1);
+  const [isSaved, setIsSaved] = useState(false);
 
   const currentSize = customProduct.variants[0].options.find(o => o.id === selectedVariants['v2']) as any;
   const totalPrice = (customProduct.basePrice + (currentSize?.extraPrice || 0)) * quantity;
 
   const handleAddToCart = () => {
-    toast.success('Custom product added to cart! It will be saved permanently once you purchase.');
+    // Save the product to cart (this would typically call an API)
+    // For now, we'll use localStorage to simulate saving
+    const productData = {
+      id: `custom-${Date.now()}`,
+      name: customProduct.name,
+      price: totalPrice,
+      quantity,
+      designUrl,
+      mockups,
+      variants: selectedVariants,
+      isCustom: true,
+      savedAt: new Date().toISOString()
+    };
+    
+    // Get existing cart items
+    const existingCart = JSON.parse(localStorage.getItem('cart') || '[]');
+    existingCart.push(productData);
+    localStorage.setItem('cart', JSON.stringify(existingCart));
+    
+    setIsSaved(true);
+    toast.success('Custom product added to cart and saved!');
+  };
+
+  const handleAddToWishlist = () => {
+    // Save the product to wishlist (this would typically call an API)
+    const productData = {
+      id: `custom-${Date.now()}`,
+      name: customProduct.name,
+      price: totalPrice,
+      designUrl,
+      mockups,
+      variants: selectedVariants,
+      isCustom: true,
+      savedAt: new Date().toISOString()
+    };
+    
+    // Get existing wishlist items
+    const existingWishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
+    existingWishlist.push(productData);
+    localStorage.setItem('wishlist', JSON.stringify(existingWishlist));
+    
+    setIsSaved(true);
+    toast.success('Custom product added to wishlist and saved!');
   };
 
   if (!designUrl) return null;
@@ -63,17 +107,29 @@ const CustomProductDetail = () => {
   return (
     <Layout>
       {/* Session Header */}
-      <section className="w-full bg-primary/5 py-4 border-b border-primary/10">
-        <div className="max-w-[1600px] mx-auto px-6 lg:px-12 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-primary font-medium text-sm">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            Temporary Session: Custom Product Generated from your PSDs
+      {isTemporary && !isSaved && (
+        <section className="w-full bg-primary/5 py-4 border-b border-primary/10">
+          <div className="max-w-[1600px] mx-auto px-6 lg:px-12 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-primary font-medium text-sm">
+              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              Temporary Product: Add to cart or wishlist to save permanently
+            </div>
+            <p className="text-xs text-muted-foreground hidden md:block">
+              This product will only be saved when added to cart or wishlist.
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground hidden md:block">
-            These mockups were generated in real-time. Complete purchase to save them permanently.
-          </p>
-        </div>
-      </section>
+        </section>
+      )}
+      {isSaved && (
+        <section className="w-full bg-green-50 py-4 border-b border-green-200">
+          <div className="max-w-[1600px] mx-auto px-6 lg:px-12 flex items-center justify-center">
+            <div className="flex items-center gap-2 text-green-700 font-medium text-sm">
+              <CheckCircle2 className="w-4 h-4" />
+              Product saved! It has been added to your cart or wishlist.
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Breadcrumb */}
       <section className="w-full bg-secondary/30 py-5">
@@ -81,7 +137,7 @@ const CustomProductDetail = () => {
           <nav className="flex items-center text-sm text-muted-foreground flex-wrap">
             <Link to="/" className="hover:text-primary transition-colors">Home</Link>
             <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
-            <Link to="/customize" className="hover:text-primary transition-colors">Custom Design</Link>
+            <Link to="/make-your-own" className="hover:text-primary transition-colors">Make Your Own</Link>
             <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
             <span className="text-foreground truncate">{customProduct.name}</span>
           </nav>
@@ -140,7 +196,7 @@ const CustomProductDetail = () => {
 
                   <div className="flex justify-center">
                     <button 
-                      onClick={() => navigate('/customize')}
+                      onClick={() => navigate('/make-your-own')}
                       className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
                     >
                       <Info className="w-3 h-3" />
@@ -248,8 +304,14 @@ const CustomProductDetail = () => {
                       <ShoppingBag className="w-5 h-5" />
                       Add Custom Product to Cart
                     </Button>
-                    <Button size="lg" variant="outline" className="rounded-full w-14 h-14">
-                      <Heart className="w-5 h-5" />
+                    <Button 
+                      size="lg" 
+                      variant="outline" 
+                      className="rounded-full w-14 h-14"
+                      onClick={handleAddToWishlist}
+                      disabled={isSaved}
+                    >
+                      <Heart className={`w-5 h-5 ${isSaved ? 'fill-primary text-primary' : ''}`} />
                     </Button>
                     <Button size="lg" variant="outline" className="rounded-full w-14 h-14">
                       <Share2 className="w-5 h-5" />

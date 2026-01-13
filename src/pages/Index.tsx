@@ -371,16 +371,8 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Why Choose Us - With Vector Background */}
-      <section 
-        className="w-full py-20 lg:py-28 relative"
-        style={{
-          backgroundImage: 'url(/bg_vectors/11c9c9f9-3185-4e41-bbd4-487a790c2609-removebg-preview.png)',
-          backgroundPosition: 'left bottom',
-          backgroundRepeat: 'no-repeat',
-          backgroundSize: '40%',
-        }}
-      >
+      {/* Why Choose Us */}
+      <section className="w-full py-20 lg:py-28 relative">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
           <div className="text-center mb-16">
             <ScrollReveal>

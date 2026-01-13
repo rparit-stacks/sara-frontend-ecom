@@ -3,18 +3,19 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import SearchPopup from '@/components/search/SearchPopup';
 
 const navLinks = [
   { name: 'Home', path: '/' },
   { name: 'Shop', path: '/products' },
   { name: 'Categories', path: '/categories' },
   { name: 'Custom Design', path: '/custom-design' },
-  { name: 'About', path: '/about' },
-  { name: 'Contact', path: '/contact' },
+  { name: 'Make Your Own', path: '/make-your-own' },
 ];
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -69,7 +70,12 @@ export const Navbar = () => {
           {/* Right Actions - Compact */}
           <div className="flex items-center gap-2">
             {/* Search */}
-            <Button variant="ghost" size="icon" className="hidden md:flex w-9 h-9 rounded-full hover:bg-secondary">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="hidden md:flex w-9 h-9 rounded-full hover:bg-secondary"
+              onClick={() => setIsSearchOpen(true)}
+            >
               <i className="fa-solid fa-search text-sm"></i>
             </Button>
 
@@ -160,7 +166,14 @@ export const Navbar = () => {
                 transition={{ delay: 0.3 }}
                 className="mt-4 pt-4 border-t border-border flex gap-3"
               >
-                <Button variant="outline" className="flex-1 gap-2 rounded-full text-xs">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 gap-2 rounded-full text-xs"
+                  onClick={() => {
+                    setIsSearchOpen(true);
+                    setIsOpen(false);
+                  }}
+                >
                   <i className="fa-solid fa-search"></i>
                   Search
                 </Button>
@@ -175,6 +188,9 @@ export const Navbar = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Search Popup */}
+      <SearchPopup open={isSearchOpen} onOpenChange={setIsSearchOpen} />
     </header>
   );
 };

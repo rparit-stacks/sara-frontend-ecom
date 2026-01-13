@@ -21,6 +21,7 @@ import Refund from "./pages/Refund";
 import NotFound from "./pages/NotFound";
 import Customize from "./pages/Customize";
 import CustomDesign from "./pages/CustomDesign";
+import MakeYourOwn from "./pages/MakeYourOwn";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
@@ -58,6 +59,7 @@ const App = () => (
           <Route path="/refund" element={<Refund />} />
           <Route path="/customize" element={<Customize />} />
           <Route path="/custom-design" element={<CustomDesign />} />
+          <Route path="/make-your-own" element={<MakeYourOwn />} />
           <Route path="/custom-product" element={<CustomProductDetail />} />
           
           {/* Admin Routes */}
