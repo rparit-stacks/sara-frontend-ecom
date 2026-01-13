@@ -38,47 +38,22 @@ const MakeYourOwn = () => {
     toast.success('Design selected successfully!');
   };
 
-  const handleProceed = async () => {
-    if (!selectedFile) {
+  const handleProceed = () => {
+    if (!selectedFile || !previewUrl) {
       toast.error('Please upload your design first.');
       return;
     }
     
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append('design', selectedFile);
-
-    try {
-      const response = await fetch('http://localhost:3001/generate', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Failed to generate mockups');
-      }
-
-      const data = await response.json();
-      setGeneratedMockups(data.mockups);
-      
-      toast.success('Mockups generated successfully!');
-      
-      // Navigate to Custom Product Page with the design and generated mockups
-      // This creates a temporary product page that will only be saved if added to cart or wishlist
-      navigate('/custom-product', { 
-        state: { 
-          designUrl: previewUrl,
-          mockups: data.mockups,
-          isTemporary: true // Flag to indicate this is a temporary product
-        } 
-      });
-    } catch (err: any) {
-      console.error('Generation error:', err);
-      toast.error(err.message || 'Error connecting to mockup service. Make sure it is running.');
-    } finally {
-      setIsUploading(false);
-    }
+    // Navigate directly to product page (same flow as Design Product)
+    // The product page will handle fabric selection, variants, and custom form
+    navigate('/custom-product', { 
+      state: { 
+        designUrl: previewUrl,
+        designFile: selectedFile,
+        isTemporary: true,
+        isCustomDesign: true, // Flag to indicate this is a user-uploaded design
+      } 
+    });
   };
 
   return (

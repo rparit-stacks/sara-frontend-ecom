@@ -1,39 +1,50 @@
-import { useState, useEffect } from 'react';
-import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, ShoppingBag, Share2, Truck, RotateCcw, Shield, Star, Minus, Plus, ChevronRight, Palette, Info, CheckCircle2 } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Heart, ShoppingBag, Share2, Truck, RotateCcw, Shield, Minus, Plus, ChevronRight, Palette, CheckCircle2, Info } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { IndianRupee } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import PlainProductSelectionPopup from '@/components/products/PlainProductSelectionPopup';
+import FabricVariantPopup from '@/components/products/FabricVariantPopup';
+import DynamicForm from '@/components/products/DynamicForm';
+import { FormField } from '@/components/admin/FormBuilder';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { IndianRupee } from 'lucide-react';
 
-// Conceptual Custom Product State
-const getCustomProductData = (designUrl: string | null) => ({
-  id: 'temp-custom-product',
-  name: 'Your Custom Studio Sara Piece',
-  basePrice: 1499,
-  description: 'A one-of-a-kind Studio Sara product created with your unique design. Premium quality, handcrafted specifically for you.',
-  variants: [
-    {
-      id: 'v2',
-      name: 'Size',
-      options: [
-        { id: 's1', name: '45x45 cm', extraPrice: 0 },
-        { id: 's2', name: '90x90 cm', extraPrice: 500 }
-      ]
-    }
-  ]
-});
+// Mock custom form fields from admin config - In real app, fetch from API: GET /api/admin/custom-config
+const getCustomFormFields = (): FormField[] => [
+  {
+    id: 'field-1',
+    type: 'text',
+    label: 'Product Name',
+    placeholder: 'Enter a name for your custom product',
+    required: true,
+    min: 3,
+    max: 50,
+  },
+  {
+    id: 'field-2',
+    type: 'dropdown',
+    label: 'Product Category',
+    required: true,
+    options: ['Home Decor', 'Fashion', 'Accessories'],
+  },
+];
+
+// Mock design price - In real app, this would come from config
+const DESIGN_PRICE = 1000;
 
 const CustomProductDetail = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
   const designUrl = (location.state as any)?.designUrl;
-  const mockups = (location.state as any)?.mockups || [];
   const isTemporary = (location.state as any)?.isTemporary ?? true;
+  const isCustomDesign = (location.state as any)?.isCustomDesign ?? true;
   
   useEffect(() => {
     if (!designUrl) {
@@ -42,34 +53,72 @@ const CustomProductDetail = () => {
     }
   }, [designUrl, navigate]);
 
-  const customProduct = getCustomProductData(designUrl);
-  
   const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({
-    'v2': 's1'
-  });
-  const [quantity, setQuantity] = useState(1);
   const [isSaved, setIsSaved] = useState(false);
+  
+  // Design Product States (same as normal Design Product)
+  const [showPlainProductSelection, setShowPlainProductSelection] = useState(false);
+  const [showFabricVariant, setShowFabricVariant] = useState(false);
+  const [selectedPlainProductId, setSelectedPlainProductId] = useState<string | null>(null);
+  const [fabricSelectionData, setFabricSelectionData] = useState<any>(null);
+  
+  // Custom Form State
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customFormData, setCustomFormData] = useState<Record<string, any>>({});
+  const customFormFields = getCustomFormFields();
 
-  const currentSize = customProduct.variants[0].options.find(o => o.id === selectedVariants['v2']) as any;
-  const totalPrice = (customProduct.basePrice + (currentSize?.extraPrice || 0)) * quantity;
+  // Calculate combined price (Design Price + Fabric Price)
+  const combinedPrice = useMemo(() => {
+    if (!fabricSelectionData) return DESIGN_PRICE;
+    return DESIGN_PRICE + fabricSelectionData.totalPrice;
+  }, [fabricSelectionData]);
+
+  const handlePlainProductSelect = (productId: string) => {
+    setSelectedPlainProductId(productId);
+    setShowPlainProductSelection(false);
+    setShowFabricVariant(true);
+  };
+
+  const handleFabricVariantComplete = (data: any) => {
+    setFabricSelectionData(data);
+    setShowFabricVariant(false);
+    // After fabric selection, show custom form
+    setShowCustomForm(true);
+  };
+
+  const handleCustomFormSubmit = (formData: Record<string, any>) => {
+    setCustomFormData(formData);
+    setShowCustomForm(false);
+    toast.success('Custom information saved!');
+  };
 
   const handleAddToCart = () => {
-    // Save the product to cart (this would typically call an API)
-    // For now, we'll use localStorage to simulate saving
+    if (!fabricSelectionData) {
+      toast.error('Please select a fabric first');
+      return;
+    }
+    if (customFormFields.length > 0 && Object.keys(customFormData).length === 0) {
+      toast.error('Please fill the custom form first');
+      setShowCustomForm(true);
+      return;
+    }
+
     const productData = {
       id: `custom-${Date.now()}`,
-      name: customProduct.name,
-      price: totalPrice,
-      quantity,
+      type: 'CUSTOM',
+      name: customFormData['field-1'] || 'Custom Studio Sara Piece',
       designUrl,
-      mockups,
-      variants: selectedVariants,
+      designPrice: DESIGN_PRICE,
+      fabricId: fabricSelectionData.fabricId,
+      fabricPrice: fabricSelectionData.totalPrice,
+      variants: fabricSelectionData.selectedVariants,
+      quantity: fabricSelectionData.quantity,
+      customFormData,
+      totalPrice: combinedPrice,
       isCustom: true,
       savedAt: new Date().toISOString()
     };
     
-    // Get existing cart items
     const existingCart = JSON.parse(localStorage.getItem('cart') || '[]');
     existingCart.push(productData);
     localStorage.setItem('cart', JSON.stringify(existingCart));
@@ -79,19 +128,26 @@ const CustomProductDetail = () => {
   };
 
   const handleAddToWishlist = () => {
-    // Save the product to wishlist (this would typically call an API)
+    if (!fabricSelectionData) {
+      toast.error('Please select a fabric first');
+      return;
+    }
+
     const productData = {
       id: `custom-${Date.now()}`,
-      name: customProduct.name,
-      price: totalPrice,
+      type: 'CUSTOM',
+      name: customFormData['field-1'] || 'Custom Studio Sara Piece',
       designUrl,
-      mockups,
-      variants: selectedVariants,
+      designPrice: DESIGN_PRICE,
+      fabricId: fabricSelectionData.fabricId,
+      fabricPrice: fabricSelectionData.totalPrice,
+      variants: fabricSelectionData.selectedVariants,
+      customFormData,
+      totalPrice: combinedPrice,
       isCustom: true,
       savedAt: new Date().toISOString()
     };
     
-    // Get existing wishlist items
     const existingWishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
     existingWishlist.push(productData);
     localStorage.setItem('wishlist', JSON.stringify(existingWishlist));
@@ -102,7 +158,7 @@ const CustomProductDetail = () => {
 
   if (!designUrl) return null;
 
-  const displayImages = mockups.length > 0 ? mockups.map((m: any) => m.url) : [designUrl];
+  const displayImages = [designUrl]; // Just the uploaded design
 
   return (
     <Layout>
@@ -114,9 +170,6 @@ const CustomProductDetail = () => {
               <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               Temporary Product: Add to cart or wishlist to save permanently
             </div>
-            <p className="text-xs text-muted-foreground hidden md:block">
-              This product will only be saved when added to cart or wishlist.
-            </p>
           </div>
         </section>
       )}
@@ -139,12 +192,12 @@ const CustomProductDetail = () => {
             <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
             <Link to="/make-your-own" className="hover:text-primary transition-colors">Make Your Own</Link>
             <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
-            <span className="text-foreground truncate">{customProduct.name}</span>
+            <span className="text-foreground truncate">Custom Product</span>
           </nav>
         </div>
       </section>
 
-      {/* Product Section */}
+      {/* Product Section - Same as Design Product */}
       <section className="w-full py-14 lg:py-20">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
           <div className="grid lg:grid-cols-12 gap-10 lg:gap-16">
@@ -152,48 +205,19 @@ const CustomProductDetail = () => {
             <div className="lg:col-span-5">
               <ScrollReveal direction="left">
                 <div className="space-y-5">
-                  {/* Main Preview */}
                   <motion.div
                     key={selectedImage}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="aspect-square rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-md mx-auto max-w-lg relative"
+                    className="aspect-square rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-md"
                   >
                     <img
                       src={displayImages[selectedImage]}
-                      alt="Product mockup"
+                      alt="Your custom design"
                       className="w-full h-full object-cover"
                     />
-                    
-                    <div className="absolute bottom-4 left-4">
-                      <Badge className="bg-white/90 text-primary border-primary/20 backdrop-blur-sm gap-1">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Generated Mockup
-                      </Badge>
-                    </div>
                   </motion.div>
                   
-                  {/* Gallery Thumbnails */}
-                  <div className="grid grid-cols-4 gap-4 max-w-lg mx-auto">
-                    {displayImages.map((img: string, index: number) => (
-                      <button
-                        key={index}
-                        onClick={() => setSelectedImage(index)}
-                        className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                          selectedImage === index 
-                            ? 'border-primary shadow-sm' 
-                            : 'border-transparent hover:border-primary/50'
-                        }`}
-                      >
-                        <img
-                          src={img}
-                          alt={`Mockup ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </button>
-                    ))}
-                  </div>
-
                   <div className="flex justify-center">
                     <button 
                       onClick={() => navigate('/make-your-own')}
@@ -211,105 +235,128 @@ const CustomProductDetail = () => {
             <div className="lg:col-span-7">
               <ScrollReveal direction="right">
                 <div className="lg:sticky lg:top-24 space-y-8 max-w-2xl">
-                  {/* Badges */}
                   <div className="flex gap-3">
-                    <Badge className="bg-primary text-white text-sm px-4 py-1 border-none shadow-sm">Custom Creation</Badge>
-                    <Badge variant="outline" className="text-sm px-4 py-1">Headless Generated</Badge>
+                    <Badge className="bg-primary text-white">Custom Design</Badge>
+                    <Badge variant="outline">Your Upload</Badge>
                   </div>
 
-                  {/* Title & Price */}
                   <div>
-                    <p className="text-muted-foreground mb-3 text-lg">Personalized Product</p>
-                    <h1 className="font-cursive text-5xl lg:text-6xl mb-5">{customProduct.name}</h1>
+                    <h1 className="font-cursive text-5xl lg:text-6xl mb-5">Your Custom Design</h1>
                     
-                    {/* Price */}
-                    <div className="flex items-center gap-4">
-                      <span className="font-cursive text-4xl text-primary">₹{totalPrice}</span>
-                      <span className="text-sm text-muted-foreground mt-2">Incl. all custom processing</span>
+                    {/* Price Display */}
+                    <div className="space-y-2 mb-6">
+                      <div className="flex items-center gap-4">
+                        <span className="font-cursive text-4xl text-primary">₹{combinedPrice}</span>
+                      </div>
+                      {fabricSelectionData && (
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <p>Design Price: ₹{DESIGN_PRICE}</p>
+                          <p>Fabric Price: ₹{fabricSelectionData.totalPrice}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Description */}
-                  <p className="text-muted-foreground text-lg leading-relaxed">{customProduct.description}</p>
+                  <p className="text-muted-foreground text-lg leading-relaxed">
+                    Create a one-of-a-kind Studio Sara product with your unique design. Select your preferred fabric and customize your product.
+                  </p>
 
-                  {/* Dynamic Variants */}
-                  {customProduct.variants.map((variant) => (
-                    <div key={variant.id} className="space-y-4">
-                      <h4 className="font-medium text-lg flex items-center gap-2">
-                        {variant.name}: 
-                        <span className="text-muted-foreground">
-                          {variant.options.find(o => o.id === selectedVariants[variant.id])?.name}
-                        </span>
-                      </h4>
-                      <div className="flex flex-wrap gap-3">
-                        {variant.options.map((option) => (
-                          <button
-                            key={option.id}
-                            onClick={() => setSelectedVariants({
-                              ...selectedVariants,
-                              [variant.id]: option.id
-                            })}
-                            className={`px-5 py-3 rounded-full border-2 transition-all text-base flex items-center gap-2 ${
-                              selectedVariants[variant.id] === option.id
-                                ? 'border-primary bg-primary/10'
-                                : 'border-border hover:border-primary/50'
-                            }`}
-                          >
-                            {option.name}
-                            {option.extraPrice > 0 && (
-                              <span className="text-xs text-primary font-bold">(+₹{option.extraPrice})</span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Quantity */}
-                  <div>
-                    <h4 className="font-medium mb-4 text-lg">Quantity (Pieces)</h4>
-                    <div className="flex items-center gap-5">
-                      <div className="flex items-center border border-border rounded-full">
+                  {/* Fabric Selection - Same as Design Product */}
+                  {!fabricSelectionData ? (
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-medium mb-4 text-lg flex items-center gap-2">
+                          <Palette className="w-5 h-5 text-primary" />
+                          Select Plain Product (Fabric)
+                        </h4>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Choose a fabric for your custom design. You can browse all available options.
+                        </p>
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="rounded-full w-12 h-12"
-                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                          onClick={() => setShowPlainProductSelection(true)}
+                          variant="outline"
+                          className="w-full h-12 text-base gap-2"
                         >
-                          <Minus className="w-5 h-5" />
-                        </Button>
-                        <span className="w-14 text-center font-medium text-lg">{quantity}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="rounded-full w-12 h-12"
-                          onClick={() => setQuantity(quantity + 1)}
-                        >
-                          <Plus className="w-5 h-5" />
+                          <Palette className="w-5 h-5" />
+                          Browse All Plain Products
                         </Button>
                       </div>
-                      <span className="text-base text-muted-foreground">
-                        Custom processing time: 5-7 days
-                      </span>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/30">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-lg">Selected Fabric</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Quantity: {fabricSelectionData.quantity} meters
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setFabricSelectionData(null);
+                            setSelectedPlainProductId(null);
+                            setCustomFormData({});
+                          }}
+                        >
+                          Change
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Custom Form Section */}
+                  {fabricSelectionData && customFormFields.length > 0 && !showCustomForm && Object.keys(customFormData).length === 0 && (
+                    <div className="space-y-4 p-4 border border-border rounded-lg">
+                      <h4 className="font-medium text-lg">Additional Information</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Please provide some additional details about your custom product.
+                      </p>
+                      <Button
+                        onClick={() => setShowCustomForm(true)}
+                        variant="outline"
+                        className="w-full"
+                      >
+                        Fill Custom Form
+                      </Button>
+                    </div>
+                  )}
+
+                  {showCustomForm && (
+                    <div className="space-y-4 p-6 border border-border rounded-lg bg-white">
+                      <h4 className="font-medium text-lg">Custom Product Information</h4>
+                      <DynamicForm
+                        fields={customFormFields}
+                        onSubmit={handleCustomFormSubmit}
+                        initialData={customFormData}
+                      />
+                    </div>
+                  )}
+
+                  {customFormData && Object.keys(customFormData).length > 0 && (
+                    <div className="space-y-2 p-4 border border-border rounded-lg bg-green-50">
+                      <p className="text-sm font-medium text-green-700">Custom information saved ✓</p>
+                    </div>
+                  )}
 
                   {/* Actions */}
                   <div className="flex gap-4 flex-wrap pt-4">
                     <Button 
                       size="lg" 
                       onClick={handleAddToCart}
+                      disabled={!fabricSelectionData || (customFormFields.length > 0 && Object.keys(customFormData).length === 0)}
                       className="flex-1 min-w-[220px] btn-primary gap-3 h-14 text-base"
                     >
                       <ShoppingBag className="w-5 h-5" />
-                      Add Custom Product to Cart
+                      Add to Cart
                     </Button>
                     <Button 
                       size="lg" 
                       variant="outline" 
                       className="rounded-full w-14 h-14"
                       onClick={handleAddToWishlist}
-                      disabled={isSaved}
+                      disabled={isSaved || !fabricSelectionData}
                     >
                       <Heart className={`w-5 h-5 ${isSaved ? 'fill-primary text-primary' : ''}`} />
                     </Button>
@@ -339,6 +386,34 @@ const CustomProductDetail = () => {
           </div>
         </div>
       </section>
+
+      {/* Popups - Same as Design Product */}
+      {isCustomDesign && (
+        <>
+          <PlainProductSelectionPopup
+            open={showPlainProductSelection}
+            onOpenChange={setShowPlainProductSelection}
+            recommendedPlainProductIds={[]} // No recommendations for custom designs
+            onPlainProductSelect={handlePlainProductSelect}
+          />
+          
+          {selectedPlainProductId && (
+            <FabricVariantPopup
+              open={showFabricVariant}
+              onOpenChange={setShowFabricVariant}
+              fabric={{
+                id: selectedPlainProductId,
+                name: 'Selected Plain Product',
+                image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=300&h=300&fit=crop',
+                pricePerMeter: 100,
+                status: 'active',
+              }}
+              variants={[]}
+              onComplete={handleFabricVariantComplete}
+            />
+          )}
+        </>
+      )}
     </Layout>
   );
 };

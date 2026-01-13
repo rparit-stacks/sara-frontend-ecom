@@ -3,49 +3,41 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, Palette, Settings2, IndianRupee, Type, Plus, Trash2 } from 'lucide-react';
+import { Save, Type, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
-import FabricSelector, { Fabric } from '@/components/admin/FabricSelector';
-import VariantBuilder, { VariantType, VariantCombination } from '@/components/admin/VariantBuilder';
+import FormBuilder, { FormField } from '@/components/admin/FormBuilder';
 import { toast } from 'sonner';
 
-// Mock fabrics for selection
-const mockFabrics: Fabric[] = [
-  { id: 'f1', name: 'Silk Pink', image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=200', status: 'active' },
-  { id: 'f2', name: 'Cotton Blue', image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=200', status: 'active' },
-  { id: 'f3', name: 'Linen Cream', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=200', status: 'active' },
-  { id: 'f4', name: 'Cotton White', image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=200', status: 'inactive' },
-];
-
 const AdminCustomConfig = () => {
-  const [selectedFabricIds, setSelectedFabricIds] = useState<string[]>(['f1', 'f2']);
-  const [variants, setVariants] = useState<VariantType[]>([
+  const [formFields, setFormFields] = useState<FormField[]>([
     {
-      id: 'v1',
-      name: 'Size',
-      values: [
-        { id: 's1', value: '45x45 cm' },
-        { id: 's2', value: '90x90 cm' }
-      ]
-    }
+      id: 'field-1',
+      type: 'text',
+      label: 'Product Name',
+      placeholder: 'Enter a name for your custom product',
+      required: true,
+      min: 3,
+      max: 50,
+    },
+    {
+      id: 'field-2',
+      type: 'dropdown',
+      label: 'Product Category',
+      required: true,
+      options: ['Home Decor', 'Fashion', 'Accessories'],
+    },
   ]);
-  const [combinations, setCombinations] = useState<VariantCombination[]>([]);
   
   const [pageConfig, setPageConfig] = useState({
     title: 'Design Your Custom Piece',
     description: 'Upload your unique artwork and choose from our premium fabrics to create a one-of-a-kind Studio Sara product.',
     uploadLabel: 'Upload Design (PNG/JPG)',
-    fabricLabel: 'Select Premium Fabric',
-    quantityLabel: 'Quantity (Pieces)',
-    basePrice: 1499
   });
 
   const handleSave = () => {
-    // Conceptual save logic
+    // TODO: Call API to save config
     console.log('Saving Custom Product Config:', {
-      selectedFabricIds,
-      variants,
-      combinations,
+      formFields,
       pageConfig
     });
     toast.success('Custom product configuration saved successfully!');
@@ -103,60 +95,22 @@ const AdminCustomConfig = () => {
                     onChange={(e) => setPageConfig({...pageConfig, description: e.target.value})}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Fabric Selection Label</Label>
-                  <Input 
-                    value={pageConfig.fabricLabel} 
-                    onChange={(e) => setPageConfig({...pageConfig, fabricLabel: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Base Price (₹)</Label>
-                  <div className="relative">
-                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input 
-                      type="number"
-                      className="pl-10"
-                      value={pageConfig.basePrice} 
-                      onChange={(e) => setPageConfig({...pageConfig, basePrice: parseInt(e.target.value)})}
-                    />
-                  </div>
-                </div>
               </div>
             </section>
 
-            {/* Fabrics Selection */}
+            {/* Form Builder */}
             <section className="bg-white rounded-xl border border-border p-6 shadow-sm space-y-6">
               <h2 className="text-xl font-semibold flex items-center gap-2">
-                <Palette className="w-5 h-5 text-primary" />
-                Available Fabrics
+                <FileText className="w-5 h-5 text-primary" />
+                Custom Form Builder
               </h2>
-              <p className="text-sm text-muted-foreground italic">
-                Select which fabrics should be available for custom designs.
+              <p className="text-sm text-muted-foreground">
+                Define the custom fields that users will fill after uploading their design. 
+                These fields will appear on the product page along with fabric selection.
               </p>
-              <FabricSelector 
-                fabrics={mockFabrics}
-                selectedFabricIds={selectedFabricIds}
-                onChange={setSelectedFabricIds}
-              />
-            </section>
-
-            {/* Variant Builder */}
-            <section className="bg-white rounded-xl border border-border p-6 shadow-sm space-y-6">
-              <h2 className="text-xl font-semibold flex items-center gap-2">
-                <Settings2 className="w-5 h-5 text-primary" />
-                Custom Product Variants
-              </h2>
-              <p className="text-sm text-muted-foreground italic">
-                Define the options users can choose after uploading their design.
-              </p>
-              <VariantBuilder 
-                initialVariants={variants}
-                initialCombinations={combinations}
-                onChange={(v, c) => {
-                  setVariants(v);
-                  setCombinations(c);
-                }}
+              <FormBuilder 
+                fields={formFields}
+                onChange={setFormFields}
               />
             </section>
           </div>
@@ -166,21 +120,28 @@ const AdminCustomConfig = () => {
             <div className="bg-primary/5 rounded-xl p-6 border border-primary/10">
               <h3 className="font-semibold text-primary mb-2">How it works</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                When a user uploads a design on the Custom page, we create a temporary product session. 
-                This session uses the configurations defined here.
+                When a user uploads a design, they'll go through the same flow as a Design Product:
               </p>
               <ul className="mt-4 space-y-2 text-xs text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <span className="w-1 h-1 rounded-full bg-primary mt-1.5" />
-                  Only selected fabrics will appear.
+                  User uploads design
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="w-1 h-1 rounded-full bg-primary mt-1.5" />
-                  Variants define the final price.
+                  Product page opens (same as Design Product)
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="w-1 h-1 rounded-full bg-primary mt-1.5" />
-                  Labels update dynamically on the user page.
+                  User selects fabric + variants
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-1 h-1 rounded-full bg-primary mt-1.5" />
+                  Custom form appears for additional info
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-1 h-1 rounded-full bg-primary mt-1.5" />
+                  Price = Design Price + Fabric Price
                 </li>
               </ul>
             </div>
