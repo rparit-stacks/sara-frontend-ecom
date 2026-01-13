@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import ScrollReveal from '@/components/animations/ScrollReveal';
+import AnimatedWaveBackground from '@/components/animations/AnimatedWaveBackground';
 import { toast } from 'sonner';
 
 const steps = [
@@ -105,8 +106,11 @@ const CustomDesign = () => {
 
   return (
     <Layout>
+      {/* Animated Wave Background */}
+      <AnimatedWaveBackground />
+      
       {/* Hero Section - Banner Style with Flowers Extending Outside */}
-      <section className="relative bg-white py-8 lg:py-12">
+      <section className="relative bg-white/80 backdrop-blur-sm py-8 lg:py-12">
         <div className="relative mx-auto max-w-6xl px-4">
           {/* Pink Pattern Banner */}
           <div 
@@ -117,14 +121,19 @@ const CustomDesign = () => {
           >
             <div className="relative z-20 flex items-center justify-center px-4">
               <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="bg-white p-6 sm:p-8 md:p-10 lg:p-12 shadow-lg max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg mx-auto text-center"
+                initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                className="bg-white/95 backdrop-blur-sm p-6 sm:p-8 md:p-10 lg:p-12 shadow-xl max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg mx-auto text-center"
               >
-                <h1 className="font-cursive text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-primary mb-3 md:mb-4">
+                <motion.h1 
+                  className="font-cursive text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-primary mb-3 md:mb-4"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.3 }}
+                >
                   Welcome
-                </h1>
+                </motion.h1>
                 <p className="text-sm sm:text-base md:text-lg lg:text-xl text-foreground font-medium mb-1">
                   to the World of Exquisite
                 </p>
@@ -202,11 +211,19 @@ const CustomDesign = () => {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-16 md:py-24 bg-white">
+      <section className="py-16 md:py-24 bg-white/90 backdrop-blur-sm relative z-10">
         <div className="container-custom">
           <ScrollReveal>
             <div className="text-center mb-12">
-              <h2 className="font-cursive text-3xl md:text-4xl text-primary mb-4">How It Works</h2>
+              <motion.h2 
+                className="font-cursive text-4xl md:text-5xl lg:text-6xl text-primary mb-4"
+                whileInView={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.6 }}
+                viewport={{ once: true }}
+              >
+                How It Works
+              </motion.h2>
               <p className="text-muted-foreground max-w-xl mx-auto">
                 Getting your custom design is simple and straightforward
               </p>
@@ -215,8 +232,12 @@ const CustomDesign = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {steps.map((step, index) => (
-              <ScrollReveal key={index} delay={index * 0.1}>
-                <div className="relative text-center p-8 rounded-2xl bg-gradient-to-b from-pink-50 to-white border border-pink-100 hover:shadow-lg transition-shadow">
+              <ScrollReveal key={index} delay={index * 0.15}>
+                <motion.div 
+                  className="relative text-center p-8 rounded-2xl bg-gradient-to-b from-warm to-white border border-primary/10 hover:shadow-xl transition-all duration-300"
+                  whileHover={{ y: -8, scale: 1.02 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-12 h-12 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold text-lg">
                     {step.number}
                   </div>
@@ -227,7 +248,7 @@ const CustomDesign = () => {
                     <h3 className="text-lg font-semibold text-foreground mb-2">{step.title}</h3>
                     <p className="text-sm text-muted-foreground">{step.description}</p>
                   </div>
-                </div>
+                </motion.div>
               </ScrollReveal>
             ))}
           </div>
@@ -235,7 +256,7 @@ const CustomDesign = () => {
       </section>
 
       {/* Design Request Form Section */}
-      <section id="design-form" className="py-16 md:py-24 bg-gradient-to-b from-pink-50 to-white relative overflow-hidden">
+      <section id="design-form" className="py-16 md:py-24 bg-gradient-to-b from-warm to-white/90 backdrop-blur-sm relative overflow-hidden z-10">
         {/* Decorative Elements */}
         <div className="absolute top-0 left-0 w-32 h-32 bg-primary/5 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
         <div className="absolute bottom-0 right-0 w-48 h-48 bg-accent/5 rounded-full translate-x-1/2 translate-y-1/2"></div>
@@ -243,7 +264,15 @@ const CustomDesign = () => {
         <div className="container-custom relative z-10">
           <ScrollReveal>
             <div className="text-center mb-12">
-              <h2 className="font-cursive text-3xl md:text-4xl text-primary mb-4">Request Your Design</h2>
+              <motion.h2 
+                className="font-cursive text-4xl md:text-5xl lg:text-6xl text-primary mb-4"
+                whileInView={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.6 }}
+                viewport={{ once: true }}
+              >
+                Request Your Design
+              </motion.h2>
               <p className="text-muted-foreground max-w-xl mx-auto">
                 Tell us about your vision and we'll bring it to life
               </p>
@@ -256,7 +285,8 @@ const CustomDesign = () => {
                 <motion.div 
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="text-center p-12 bg-white rounded-2xl shadow-lg border border-pink-100"
+                  transition={{ duration: 0.5 }}
+                  className="text-center p-12 bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-primary/10"
                 >
                   <div className="w-20 h-20 mx-auto bg-accent/10 rounded-full flex items-center justify-center mb-6">
                     <i className="fa-solid fa-check text-3xl text-accent"></i>
@@ -279,7 +309,14 @@ const CustomDesign = () => {
               </ScrollReveal>
             ) : (
               <ScrollReveal>
-                <form onSubmit={handleSubmit} className="bg-white p-8 md:p-10 rounded-2xl shadow-lg border border-pink-100">
+                <motion.form 
+                  onSubmit={handleSubmit} 
+                  className="bg-white/95 backdrop-blur-sm p-8 md:p-10 rounded-2xl shadow-xl border border-primary/10"
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
+                  viewport={{ once: true }}
+                >
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
                       <Label htmlFor="fullName" className="text-foreground font-medium mb-2 block">
@@ -291,7 +328,7 @@ const CustomDesign = () => {
                         value={formData.fullName}
                         onChange={(e) => handleInputChange('fullName', e.target.value)}
                         required
-                        className="rounded-lg border-pink-200 focus:border-primary"
+                        className="rounded-lg border-primary/20 focus:border-primary transition-colors"
                       />
                     </div>
                     <div>
@@ -305,7 +342,7 @@ const CustomDesign = () => {
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         required
-                        className="rounded-lg border-pink-200 focus:border-primary"
+                        className="rounded-lg border-primary/20 focus:border-primary transition-colors"
                       />
                     </div>
                   </div>
@@ -322,7 +359,7 @@ const CustomDesign = () => {
                         value={formData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
                         required
-                        className="rounded-lg border-pink-200 focus:border-primary"
+                        className="rounded-lg border-primary/20 focus:border-primary transition-colors"
                       />
                     </div>
                     <div>
@@ -334,7 +371,7 @@ const CustomDesign = () => {
                         onValueChange={(value) => handleInputChange('designType', value)}
                         required
                       >
-                        <SelectTrigger className="rounded-lg border-pink-200 focus:border-primary">
+                        <SelectTrigger className="rounded-lg border-primary/20 focus:border-primary transition-colors">
                           <SelectValue placeholder="Select design type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -359,7 +396,7 @@ const CustomDesign = () => {
                       onChange={(e) => handleInputChange('description', e.target.value)}
                       required
                       rows={5}
-                      className="rounded-lg border-pink-200 focus:border-primary resize-none"
+                      className="rounded-lg border-primary/20 focus:border-primary resize-none transition-colors"
                     />
                   </div>
 
@@ -367,7 +404,7 @@ const CustomDesign = () => {
                     <Label className="text-foreground font-medium mb-2 block">
                       Reference Image (Optional)
                     </Label>
-                    <div className="border-2 border-dashed border-pink-200 rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
+                    <div className="border-2 border-dashed border-primary/20 rounded-lg p-6 text-center hover:border-primary hover:bg-primary/5 transition-all cursor-pointer">
                       <i className="fa-solid fa-cloud-upload text-3xl text-muted-foreground mb-2"></i>
                       <p className="text-sm text-muted-foreground">
                         Click to upload or drag and drop
@@ -396,7 +433,7 @@ const CustomDesign = () => {
                       </>
                     )}
                   </Button>
-                </form>
+                </motion.form>
               </ScrollReveal>
             )}
           </div>
@@ -404,11 +441,19 @@ const CustomDesign = () => {
       </section>
 
       {/* Design Specialties Section */}
-      <section className="py-16 md:py-24 bg-white">
+      <section className="py-16 md:py-24 bg-white/90 backdrop-blur-sm relative z-10">
         <div className="container-custom">
           <ScrollReveal>
             <div className="text-center mb-12">
-              <h2 className="font-cursive text-3xl md:text-4xl text-primary mb-4">Our Design Specialties</h2>
+              <motion.h2 
+                className="font-cursive text-4xl md:text-5xl lg:text-6xl text-primary mb-4"
+                whileInView={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.6 }}
+                viewport={{ once: true }}
+              >
+                Our Design Specialties
+              </motion.h2>
               <p className="text-muted-foreground max-w-xl mx-auto">
                 We specialize in creating beautiful, custom designs across various categories
               </p>
@@ -418,13 +463,17 @@ const CustomDesign = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {specialties.map((specialty, index) => (
               <ScrollReveal key={index} delay={index * 0.1}>
-                <div className="group p-6 rounded-2xl bg-gradient-to-b from-pink-50 to-white border border-pink-100 hover:shadow-lg hover:border-primary/30 transition-all text-center">
+                <motion.div 
+                  className="group p-6 rounded-2xl bg-gradient-to-b from-warm to-white border border-primary/10 hover:shadow-xl hover:border-primary/30 transition-all text-center"
+                  whileHover={{ y: -6, scale: 1.02 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
                   <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
                     <i className={`fa-solid ${specialty.icon} text-2xl text-primary`}></i>
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">{specialty.title}</h3>
                   <p className="text-sm text-muted-foreground">{specialty.description}</p>
-                </div>
+                </motion.div>
               </ScrollReveal>
             ))}
           </div>
@@ -432,11 +481,19 @@ const CustomDesign = () => {
       </section>
 
       {/* Why Choose Us Section */}
-      <section className="py-16 md:py-24 bg-gradient-to-b from-pink-50 to-white">
+      <section className="py-16 md:py-24 bg-gradient-to-b from-warm to-white/90 backdrop-blur-sm relative z-10">
         <div className="container-custom">
           <ScrollReveal>
             <div className="text-center mb-12">
-              <h2 className="font-cursive text-3xl md:text-4xl text-primary mb-4">Why Choose Us</h2>
+              <motion.h2 
+                className="font-cursive text-4xl md:text-5xl lg:text-6xl text-primary mb-4"
+                whileInView={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.6 }}
+                viewport={{ once: true }}
+              >
+                Why Choose Us
+              </motion.h2>
               <p className="text-muted-foreground max-w-xl mx-auto">
                 We're committed to delivering exceptional design experiences
               </p>
@@ -446,13 +503,17 @@ const CustomDesign = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {whyChooseUs.map((item, index) => (
               <ScrollReveal key={index} delay={index * 0.1}>
-                <div className="group p-6 rounded-2xl bg-white border border-pink-100 hover:shadow-lg transition-all text-center">
+                <motion.div 
+                  className="group p-6 rounded-2xl bg-white/95 backdrop-blur-sm border border-primary/10 hover:shadow-xl transition-all text-center"
+                  whileHover={{ y: -6, scale: 1.02 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
                   <div className="w-14 h-14 mx-auto bg-accent/10 rounded-full flex items-center justify-center mb-4 group-hover:bg-accent/20 transition-colors">
                     <i className={`fa-solid ${item.icon} text-xl text-accent`}></i>
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">{item.title}</h3>
                   <p className="text-sm text-muted-foreground">{item.description}</p>
-                </div>
+                </motion.div>
               </ScrollReveal>
             ))}
           </div>
@@ -460,28 +521,60 @@ const CustomDesign = () => {
       </section>
 
       {/* Final CTA Section */}
-      <section className="py-16 md:py-24 bg-gradient-to-r from-primary/90 to-primary relative overflow-hidden">
+      <section className="py-16 md:py-24 bg-gradient-to-r from-primary/90 to-primary relative overflow-hidden z-10">
         {/* Decorative Background */}
         <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-10 w-40 h-40 bg-white rounded-full"></div>
-          <div className="absolute bottom-0 right-10 w-60 h-60 bg-white rounded-full"></div>
+          <motion.div 
+            className="absolute top-0 left-10 w-40 h-40 bg-white rounded-full"
+            animate={{ y: [0, -15, 0], x: [0, 10, 0] }}
+            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div 
+            className="absolute bottom-0 right-10 w-60 h-60 bg-white rounded-full"
+            animate={{ y: [0, 20, 0], x: [0, -15, 0] }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div 
+            className="absolute top-1/2 left-1/4 w-32 h-32 bg-white rounded-full"
+            animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0.8, 0.5] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          />
         </div>
 
         <div className="container-custom relative z-10 text-center">
           <ScrollReveal>
-            <h2 className="font-cursive text-3xl md:text-4xl lg:text-5xl text-white mb-4">
-              Ready to Create Something Beautiful?
-            </h2>
-            <p className="text-white/90 text-lg mb-8 max-w-xl mx-auto">
-              Let's bring your creative vision to life. Our team is ready to help you create stunning designs.
-            </p>
-            <Button 
-              className="bg-white text-primary hover:bg-white/90 px-8 py-6 text-lg rounded-full shadow-lg hover:shadow-xl transition-all"
-              onClick={() => document.getElementById('design-form')?.scrollIntoView({ behavior: 'smooth' })}
+            <motion.h2 
+              className="font-cursive text-4xl md:text-5xl lg:text-6xl text-white mb-4"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              viewport={{ once: true }}
             >
-              <i className="fa-solid fa-sparkles mr-2"></i>
-              Request Your Design Now
-            </Button>
+              Ready to Create Something Beautiful?
+            </motion.h2>
+            <motion.p 
+              className="text-white/90 text-lg mb-8 max-w-xl mx-auto"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              viewport={{ once: true }}
+            >
+              Let's bring your creative vision to life. Our team is ready to help you create stunning designs.
+            </motion.p>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              viewport={{ once: true }}
+            >
+              <Button 
+                className="bg-white text-primary hover:bg-white/90 px-8 py-6 text-lg rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all"
+                onClick={() => document.getElementById('design-form')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                <i className="fa-solid fa-sparkles mr-2"></i>
+                Request Your Design Now
+              </Button>
+            </motion.div>
           </ScrollReveal>
         </div>
       </section>
