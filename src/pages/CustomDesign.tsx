@@ -115,8 +115,7 @@ const CustomDesign = () => {
               backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Ccircle fill='%23a08050' fill-opacity='0.35' cx='50' cy='50' r='12'/%3E%3Ccircle fill='%23506040' fill-opacity='0.4' cx='15' cy='15' r='5'/%3E%3Ccircle fill='%23506040' fill-opacity='0.4' cx='85' cy='85' r='5'/%3E%3Ccircle fill='%23506040' fill-opacity='0.4' cx='15' cy='85' r='5'/%3E%3Ccircle fill='%23506040' fill-opacity='0.4' cx='85' cy='15' r='5'/%3E%3Ccircle fill='%23a08050' fill-opacity='0.25' cx='50' cy='15' r='8'/%3E%3Ccircle fill='%23a08050' fill-opacity='0.25' cx='50' cy='85' r='8'/%3E%3Ccircle fill='%23a08050' fill-opacity='0.25' cx='15' cy='50' r='8'/%3E%3Ccircle fill='%23a08050' fill-opacity='0.25' cx='85' cy='50' r='8'/%3E%3C/g%3E%3C/svg%3E")`,
             }}
           >
-            {/* Center Content - White Card */}
-            <div className="relative z-10 flex items-center justify-center px-4">
+            <div className="relative z-20 flex items-center justify-center px-4">
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -191,7 +190,7 @@ const CustomDesign = () => {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="absolute -bottom-6 -left-4 lg:hidden z-20 pointer-events-none"
+            className="absolute -bottom-6 -left-4 lg:hidden z-5 pointer-events-none"
           >
             <img 
               src="/hero_trans/left.png" 
