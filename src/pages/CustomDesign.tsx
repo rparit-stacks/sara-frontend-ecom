@@ -106,54 +106,54 @@ const CustomDesign = () => {
   return (
     <Layout>
       {/* Hero Section with Flower Images */}
-      <section className="relative min-h-[70vh] lg:min-h-[80vh] flex items-center justify-center overflow-hidden bg-gradient-to-b from-pink-100 via-pink-50 to-white">
-        {/* Background Pattern */}
+      <section className="relative min-h-[85vh] lg:min-h-screen flex items-center justify-center overflow-hidden bg-[#f8c8c8]">
+        {/* Background Pattern - Polka dots and decorative */}
         <div 
-          className="absolute inset-0 opacity-30"
+          className="absolute inset-0"
           style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23c9a45a' fill-opacity='0.15'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23a08050' fill-opacity='0.25'%3E%3Ccircle cx='40' cy='40' r='6'/%3E%3Ccircle cx='10' cy='10' r='3'/%3E%3Ccircle cx='70' cy='70' r='3'/%3E%3Ccircle cx='10' cy='70' r='3'/%3E%3Ccircle cx='70' cy='10' r='3'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           }}
         />
 
-        {/* Left Flower - Desktop */}
+        {/* Left Flower - Desktop - Much larger and overlapping */}
         <motion.div 
-          initial={{ opacity: 0, x: -100 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="absolute left-0 top-1/2 -translate-y-1/2 hidden lg:block z-10 pointer-events-none"
+          initial={{ opacity: 0, x: -150, rotate: -10 }}
+          animate={{ opacity: 1, x: 0, rotate: 0 }}
+          transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
+          className="absolute left-0 bottom-0 hidden lg:block z-30 pointer-events-none"
         >
           <img 
             src="/hero_trans/left.png" 
             alt="Decorative flower left" 
-            className="w-[280px] xl:w-[350px] 2xl:w-[400px] h-auto object-contain -ml-10"
+            className="w-[450px] xl:w-[550px] 2xl:w-[650px] h-auto object-contain -ml-16 xl:-ml-20"
           />
         </motion.div>
 
-        {/* Right Flower - Desktop */}
+        {/* Right Flower - Desktop - Much larger and overlapping */}
         <motion.div 
-          initial={{ opacity: 0, x: 100 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="absolute right-0 top-1/2 -translate-y-1/2 hidden lg:block z-10 pointer-events-none"
+          initial={{ opacity: 0, x: 150, rotate: 10 }}
+          animate={{ opacity: 1, x: 0, rotate: 0 }}
+          transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
+          className="absolute right-0 bottom-0 hidden lg:block z-30 pointer-events-none"
         >
           <img 
             src="/hero_trans/right.png" 
             alt="Decorative flower right" 
-            className="w-[280px] xl:w-[350px] 2xl:w-[400px] h-auto object-contain -mr-10"
+            className="w-[450px] xl:w-[550px] 2xl:w-[650px] h-auto object-contain -mr-16 xl:-mr-20"
           />
         </motion.div>
 
-        {/* Mobile Flowers */}
+        {/* Mobile Flowers - Larger */}
         <motion.div 
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6 }}
-          className="absolute top-4 left-0 lg:hidden z-10 pointer-events-none"
+          className="absolute top-0 left-0 lg:hidden z-20 pointer-events-none"
         >
           <img 
             src="/hero_trans/left.png" 
             alt="Decorative flower" 
-            className="w-[100px] sm:w-[130px] h-auto object-contain -ml-4"
+            className="w-[150px] sm:w-[200px] h-auto object-contain -ml-8"
           />
         </motion.div>
 
@@ -161,38 +161,38 @@ const CustomDesign = () => {
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="absolute bottom-8 right-0 lg:hidden z-10 pointer-events-none"
+          className="absolute bottom-0 right-0 lg:hidden z-20 pointer-events-none"
         >
           <img 
             src="/hero_trans/right.png" 
             alt="Decorative flower" 
-            className="w-[100px] sm:w-[130px] h-auto object-contain -mr-4"
+            className="w-[150px] sm:w-[200px] h-auto object-contain -mr-8"
           />
         </motion.div>
 
-        {/* Center Content */}
-        <div className="relative z-20 text-center px-4 max-w-3xl mx-auto">
+        {/* Center Content - Larger white card */}
+        <div className="relative z-20 text-center px-4 max-w-xl lg:max-w-2xl mx-auto py-12">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="bg-white/80 backdrop-blur-sm p-8 md:p-12 rounded-2xl shadow-lg"
+            className="bg-white/95 backdrop-blur-sm p-10 md:p-14 lg:p-16 shadow-2xl"
           >
-            <h1 className="font-cursive text-4xl md:text-5xl lg:text-6xl text-primary mb-4">
+            <h1 className="font-cursive text-5xl md:text-6xl lg:text-7xl text-primary mb-6">
               Welcome
             </h1>
-            <p className="text-lg md:text-xl lg:text-2xl text-foreground font-medium mb-2">
+            <p className="text-xl md:text-2xl lg:text-3xl text-foreground font-medium mb-2">
               to the World of Exquisite
             </p>
-            <p className="text-lg md:text-xl lg:text-2xl text-foreground font-medium mb-6">
+            <p className="text-xl md:text-2xl lg:text-3xl text-foreground font-medium mb-8">
               Prints and Illustrations
             </p>
             <Button 
-              className="btn-primary px-8 py-6 text-base md:text-lg rounded-full shadow-lg hover:shadow-xl transition-all"
+              variant="outline"
+              className="px-10 py-6 text-base md:text-lg border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground rounded-none uppercase tracking-wider font-medium transition-all shadow-md hover:shadow-lg"
               onClick={() => document.getElementById('design-form')?.scrollIntoView({ behavior: 'smooth' })}
             >
-              <i className="fa-solid fa-palette mr-2"></i>
-              Request a Custom Design
+              Print & Illustration Library
             </Button>
           </motion.div>
         </div>
