@@ -20,6 +20,7 @@ import Privacy from "./pages/Privacy";
 import Refund from "./pages/Refund";
 import NotFound from "./pages/NotFound";
 import Customize from "./pages/Customize";
+import CustomDesign from "./pages/CustomDesign";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
@@ -56,6 +57,7 @@ const App = () => (
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/refund" element={<Refund />} />
           <Route path="/customize" element={<Customize />} />
+          <Route path="/custom-design" element={<CustomDesign />} />
           <Route path="/custom-product" element={<CustomProductDetail />} />
           
           {/* Admin Routes */}
