@@ -491,6 +491,61 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      {/* Blog Section - Horizontal Scroll */}
+      <section className="w-full py-20 lg:py-28 bg-muted">
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-14">
+            <div>
+              <ScrollReveal>
+                <span className="text-primary uppercase tracking-[0.2em] text-sm font-medium">Latest Stories</span>
+                <h2 className="font-cursive text-5xl md:text-6xl lg:text-7xl mt-4">From Our Blog</h2>
+              </ScrollReveal>
+            </div>
+            <Link to="/blog">
+              <Button variant="outline" className="btn-outline text-sm">
+                View All Posts
+              </Button>
+            </Link>
+          </div>
+          
+          {/* Horizontal Scroll Blog Cards */}
+          <div className="overflow-x-auto -mx-6 lg:-mx-12 px-6 lg:px-12 scrollbar-hide">
+            <div className="flex gap-6 lg:gap-8 min-w-max pb-4">
+              {[
+                { id: 1, title: 'The Art of Floral Design in Indian Textiles', image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=400&h=500&fit=crop', date: 'Jan 15, 2024' },
+                { id: 2, title: 'Sustainable Fabric Choices for Modern Living', image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&h=500&fit=crop', date: 'Jan 20, 2024' },
+                { id: 3, title: 'Custom Design Tips for Your Home', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&h=500&fit=crop', date: 'Jan 25, 2024' },
+                { id: 4, title: 'Traditional Patterns Meet Modern Aesthetics', image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=400&h=500&fit=crop', date: 'Feb 1, 2024' },
+                { id: 5, title: 'Caring for Your Handcrafted Textiles', image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=400&h=500&fit=crop', date: 'Feb 5, 2024' },
+              ].map((blog, index) => (
+                <ScrollReveal key={blog.id} delay={index * 0.1}>
+                  <Link to={`/blog/${blog.id}`} className="group block flex-shrink-0">
+                    <div className="relative w-[280px] md:w-[320px] lg:w-[360px] aspect-[3/4] rounded-2xl overflow-hidden shadow-lg">
+                      <img
+                        src={blog.image}
+                        alt={blog.title}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-foreground/80 via-foreground/30 to-transparent" />
+                      <div className="absolute inset-0 flex flex-col items-start justify-end text-white p-6 lg:p-8">
+                        <span className="text-xs text-white/80 mb-2">{blog.date}</span>
+                        <h3 className="font-semibold text-lg lg:text-xl mb-3 line-clamp-2 group-hover:text-primary transition-colors">
+                          {blog.title}
+                        </h3>
+                        <span className="text-sm text-white/80 flex items-center gap-2 group-hover:text-primary transition-colors">
+                          Read More
+                          <i className="fa-solid fa-arrow-right text-xs"></i>
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                </ScrollReveal>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
     </Layout>
   );
 };

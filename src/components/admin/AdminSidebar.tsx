@@ -28,19 +28,24 @@ const adminMenuItems = [
     path: '/admin-sara/products' 
   },
   { 
-    icon: Palette, 
-    label: 'Fabrics', 
-    path: '/admin-sara/fabrics' 
-  },
-  { 
     icon: Image, 
     label: 'Designs', 
-    path: '/admin-sara/designs' 
+    path: '/admin-sara/products?type=DESIGNED' 
+  },
+  { 
+    icon: Palette, 
+    label: 'Fabrics', 
+    path: '/admin-sara/products?type=PLAIN' 
   },
   { 
     icon: FileText, 
     label: 'CMS', 
     path: '/admin-sara/cms' 
+  },
+  { 
+    icon: FileText, 
+    label: 'Blog', 
+    path: '/admin-sara/blog' 
   },
   { 
     icon: FolderTree, 

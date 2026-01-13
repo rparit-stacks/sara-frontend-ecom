@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, Eye, EyeOff, Save, X, Upload, IndianRupee, Image as ImageIcon, FileJson, Package, Palette } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Package, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dialog,
@@ -10,22 +14,32 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import ProductTypeSelector, { ProductType } from '@/components/admin/ProductTypeSelector';
-import RichTextEditor from '@/components/admin/RichTextEditor';
-import VariantBuilder, { VariantType, VariantCombination } from '@/components/admin/VariantBuilder';
-import FabricSelector, { Fabric } from '@/components/admin/FabricSelector';
+import ProductFormDialog from '@/components/admin/ProductFormDialog';
+import { PlainProduct } from '@/components/admin/PlainProductSelector';
+import { ProductType } from '@/components/admin/ProductTypeSelector';
+import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
-// Mock data
-const mockFabrics: Fabric[] = [
-  { id: 'f1', name: 'Silk Pink', image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=200', status: 'active' },
-  { id: 'f2', name: 'Cotton Blue', image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=200', status: 'active' },
-  { id: 'f3', name: 'Linen Cream', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=200', status: 'active' },
-  { id: 'f4', name: 'Cotton White', image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=200', status: 'inactive' },
+// Mock plain products - in real app, fetch from API: GET /api/products?type=PLAIN
+const mockPlainProducts: PlainProduct[] = [
+  { id: 'p1', name: 'Premium Silk Fabric', image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=200', pricePerMeter: 100, status: 'active' },
+  { id: 'p2', name: 'Cotton Blue Fabric', image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=200', pricePerMeter: 80, status: 'active' },
+  { id: 'p3', name: 'Linen Cream Fabric', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=200', pricePerMeter: 120, status: 'active' },
+  { id: 'p4', name: 'Cotton White Fabric', image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=200', pricePerMeter: 75, status: 'active' },
+  { id: 'p5', name: 'Silk Gold Fabric', image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=200', pricePerMeter: 150, status: 'active' },
 ];
 
 const mockCategories = [
@@ -36,28 +50,31 @@ const mockCategories = [
 const mockProducts = [
   { id: 1, name: 'Floral Block Print Quilt', type: 'DESIGNED', category: 'Bedding', status: 'active', createdAt: '2024-01-15' },
   { id: 2, name: 'Botanical Cushion Cover', type: 'DESIGNED', category: 'Cushions', status: 'active', createdAt: '2024-01-20' },
-  { id: 3, name: 'Plain Silk Scarf', type: 'PLAIN', category: 'Scarves', status: 'inactive', createdAt: '2024-01-25' },
-  { id: 4, name: 'Digital Scarf Pattern', type: 'DIGITAL', category: 'Templates', status: 'active', createdAt: '2024-02-01' },
+  { id: 3, name: 'Premium Silk Fabric', type: 'PLAIN', category: 'Fabrics', status: 'active', createdAt: '2024-01-25' },
+  { id: 4, name: 'Cotton Blue Fabric', type: 'PLAIN', category: 'Fabrics', status: 'active', createdAt: '2024-01-26' },
+  { id: 5, name: 'Digital Pattern Pack', type: 'DIGITAL', category: 'Templates', status: 'active', createdAt: '2024-02-01' },
 ];
 
+
 const AdminProducts = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [activeType, setActiveType] = useState<ProductType>('PLAIN');
-  
-  // Form State
-  const [formData, setFormData] = useState({
-    name: '',
-    categoryId: '',
-    subcategoryId: '',
-    description: '',
-    basePrice: 0,
-    images: [] as string[],
-    digitalFile: null as File | null,
-    selectedFabrics: [] as string[],
-    variants: [] as VariantType[],
-    combinations: [] as VariantCombination[]
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [deleteProductId, setDeleteProductId] = useState<number | null>(null);
+  const [filterType, setFilterType] = useState<'ALL' | ProductType>(() => {
+    const typeParam = searchParams.get('type') as ProductType | null;
+    return typeParam || 'ALL';
   });
+
+  // Update filter when URL param changes
+  useEffect(() => {
+    const typeParam = searchParams.get('type') as ProductType | null;
+    if (typeParam) {
+      setFilterType(typeParam);
+    }
+  }, [searchParams]);
 
   const getTypeBadge = (type: string) => {
     switch (type) {
@@ -67,21 +84,45 @@ const AdminProducts = () => {
     }
   };
 
-  const handleResetForm = () => {
-    setFormData({
-      name: '',
-      categoryId: '',
-      subcategoryId: '',
-      description: '',
-      basePrice: 0,
-      images: [],
-      digitalFile: null,
-      selectedFabrics: [],
-      variants: [],
-      combinations: []
-    });
-    setActiveType('PLAIN');
+  // Handle form submission
+  const handleSaveProduct = (payload: any) => {
+    // TODO: Call API
+    // if (payload.id) {
+    //   // Update
+    //   await fetch(`/api/admin/products/${payload.id}`, { method: 'PUT', ... });
+    // } else {
+    //   // Create
+    //   await fetch('/api/admin/products', { method: 'POST', ... });
+    // }
+    
+    console.log('Product Payload:', payload);
+    toast.success(payload.id ? 'Product updated successfully!' : 'Product created successfully!');
   };
+
+  const handleEdit = (product: any) => {
+    setEditingProduct(product);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDelete = (productId: number) => {
+    setDeleteProductId(productId);
+  };
+
+  const confirmDelete = () => {
+    // TODO: Call API
+    // await fetch(`/api/admin/products/${deleteProductId}`, { method: 'DELETE' });
+    toast.success('Product deleted successfully!');
+    setDeleteProductId(null);
+  };
+
+  // Filter products by type
+  const filteredProducts = mockProducts.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = filterType === 'ALL' || product.type === filterType;
+    return matchesSearch && matchesType;
+  });
+
+  // Add custom field
 
   return (
     <AdminLayout>
@@ -97,222 +138,33 @@ const AdminProducts = () => {
             <h1 className="font-cursive text-4xl lg:text-5xl font-bold mb-2">
               Product <span className="text-primary">Management</span>
             </h1>
-            <p className="text-muted-foreground text-lg">Create and manage physical and digital products</p>
+            <p className="text-muted-foreground text-lg">Create and manage all product types</p>
           </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-            setIsAddDialogOpen(open);
-            if (!open) handleResetForm();
-          }}>
-            <DialogTrigger asChild>
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button className="btn-primary gap-2">
-                  <Plus className="w-4 h-4" />
-                  Add New Product
-                </Button>
-              </motion.div>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 gap-0 border-none shadow-2xl">
-              <div className="sticky top-0 bg-white z-10 px-6 py-4 border-b border-border flex items-center justify-between">
-                <DialogHeader>
-                  <DialogTitle className="font-cursive text-3xl">Create Product</DialogTitle>
-                </DialogHeader>
-                <Button variant="ghost" size="icon" onClick={() => setIsAddDialogOpen(false)}>
-                  <X className="w-5 h-5" />
-                </Button>
-              </div>
-
-              <div className="p-6 space-y-10">
-                {/* Step 1: Product Type */}
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">1</span>
-                    Product Type
-                  </div>
-                  <ProductTypeSelector selected={activeType} onChange={setActiveType} />
-                </section>
-
-                {/* Step 2: Basic Info */}
-                <section className="space-y-6">
-                  <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">2</span>
-                    Basic Information
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="p-name">Product Name</Label>
-                      <Input 
-                        id="p-name" 
-                        placeholder="e.g. Vintage Floral Scarf" 
-                        className="h-11"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="p-price">Base Price (₹)</Label>
-                      <div className="relative">
-                        <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input 
-                          id="p-price" 
-                          type="number" 
-                          placeholder="0.00" 
-                          className="h-11 pl-10"
-                          value={formData.basePrice}
-                          onChange={(e) => setFormData({ ...formData, basePrice: parseFloat(e.target.value) })}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Category</Label>
-                      <Select value={formData.categoryId} onValueChange={(v) => setFormData({ ...formData, categoryId: v })}>
-                        <SelectTrigger className="h-11">
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {mockCategories.map(cat => (
-                            <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Subcategory</Label>
-                      <Select 
-                        value={formData.subcategoryId} 
-                        onValueChange={(v) => setFormData({ ...formData, subcategoryId: v })}
-                        disabled={!formData.categoryId}
-                      >
-                        <SelectTrigger className="h-11">
-                          <SelectValue placeholder="Select subcategory" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {mockCategories.find(c => c.id === formData.categoryId)?.subcategories.map(sub => (
-                            <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Product Description</Label>
-                    <RichTextEditor 
-                      value={formData.description} 
-                      onChange={(content) => setFormData({ ...formData, description: content })}
-                      placeholder="Write rich description with details, care instructions, etc..."
-                    />
-                  </div>
-                </section>
-
-                {/* Type Specific Sections */}
-                <AnimatePresence mode="wait">
-                  {activeType === 'DESIGNED' && (
-                    <motion.section
-                      key="designed-fields"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="space-y-6 pt-6 border-t border-border"
-                    >
-                      <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                        <span className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-[10px]">3</span>
-                        Design & Fabric Mapping
-                      </div>
-                      
-                      <div className="space-y-4">
-                        <Label>Available Fabrics for this Product</Label>
-                        <FabricSelector 
-                          fabrics={mockFabrics}
-                          selectedFabricIds={formData.selectedFabrics}
-                          onChange={(ids) => setFormData({ ...formData, selectedFabrics: ids })}
-                        />
-                      </div>
-
-                      <div className="p-4 bg-pink-50 border border-pink-100 rounded-xl flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-lg bg-white flex items-center justify-center shadow-sm">
-                          <Palette className="w-6 h-6 text-pink-600" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-pink-900">Mockup System Active</h4>
-                          <p className="text-xs text-pink-700">Customers will be able to preview this design on the selected fabrics.</p>
-                        </div>
-                      </div>
-                    </motion.section>
-                  )}
-
-                  {activeType === 'DIGITAL' && (
-                    <motion.section
-                      key="digital-fields"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="space-y-6 pt-6 border-t border-border"
-                    >
-                      <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                        <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-[10px]">3</span>
-                        Digital Asset
-                      </div>
-                      
-                      <div className="border-2 border-dashed border-border rounded-xl p-8 text-center space-y-4 hover:bg-muted/30 transition-colors group cursor-pointer">
-                        <div className="w-16 h-16 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
-                          <Upload className="w-8 h-8" />
-                        </div>
-                        <div className="space-y-1">
-                          <p className="font-semibold">Upload Digital File</p>
-                          <p className="text-xs text-muted-foreground text-center max-w-[200px] mx-auto">
-                            PDF, JPG, PNG, or ZIP files supported. Max size 50MB.
-                          </p>
-                        </div>
-                        <input type="file" className="hidden" id="digital-upload" onChange={(e) => setFormData({ ...formData, digitalFile: e.target.files?.[0] || null })} />
-                        <Button type="button" variant="outline" onClick={() => document.getElementById('digital-upload')?.click()}>
-                          {formData.digitalFile ? formData.digitalFile.name : 'Choose File'}
-                        </Button>
-                      </div>
-                    </motion.section>
-                  )}
-                </AnimatePresence>
-
-                {/* Step 4: Variants */}
-                <section className="space-y-6 pt-6 border-t border-border">
-                  <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">{activeType === 'PLAIN' ? '3' : '4'}</span>
-                    Product Variants
-                  </div>
-                  <VariantBuilder 
-                    onChange={(variants, combos) => setFormData({ ...formData, variants, combinations: combos })}
-                    initialVariants={formData.variants}
-                    initialCombinations={formData.combinations}
-                  />
-                </section>
-
-                {/* Step 5: Images */}
-                <section className="space-y-6 pt-6 border-t border-border">
-                  <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">{activeType === 'PLAIN' ? '4' : '5'}</span>
-                    Product Gallery
-                  </div>
-                  
-                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
-                    <button className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 hover:bg-muted/30 transition-colors group">
-                      <ImageIcon className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Add Image</span>
-                    </button>
-                  </div>
-                </section>
-              </div>
-
-              <div className="sticky bottom-0 bg-white px-6 py-4 border-t border-border flex items-center justify-between shadow-up">
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="gap-2 h-11 px-6">
-                  <X className="w-4 h-4" />
-                  Cancel
-                </Button>
-                <Button className="btn-primary gap-2 h-11 px-8">
-                  <Save className="w-4 h-4" />
-                  Create Product
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button className="btn-primary gap-2" onClick={() => setIsAddDialogOpen(true)}>
+              <Plus className="w-4 h-4" />
+              Add New Product
+            </Button>
+          </motion.div>
+          
+          <ProductFormDialog
+            open={isAddDialogOpen}
+            onOpenChange={setIsAddDialogOpen}
+            mode="create"
+            plainProducts={mockPlainProducts}
+            categories={mockCategories}
+            onSave={handleSaveProduct}
+          />
+          <ProductFormDialog
+            open={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            mode="edit"
+            productId={editingProduct?.id}
+            initialData={editingProduct}
+            plainProducts={mockPlainProducts}
+            categories={mockCategories}
+            onSave={handleSaveProduct}
+          />
         </motion.div>
 
         {/* Search & Filters */}
@@ -331,6 +183,27 @@ const AdminProducts = () => {
               className="pl-10 h-11"
             />
           </div>
+          <Select 
+            value={filterType} 
+            onValueChange={(v) => {
+              setFilterType(v as any);
+              if (v === 'ALL') {
+                setSearchParams({});
+              } else {
+                setSearchParams({ type: v });
+              }
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-[180px] h-11">
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Products</SelectItem>
+              <SelectItem value="PLAIN">Plain Products (Fabrics)</SelectItem>
+              <SelectItem value="DESIGNED">Design Products</SelectItem>
+              <SelectItem value="DIGITAL">Digital Products</SelectItem>
+            </SelectContent>
+          </Select>
         </motion.div>
 
         {/* Products Table */}
@@ -342,13 +215,13 @@ const AdminProducts = () => {
                   <th className="text-left p-4 font-semibold text-sm">Product</th>
                   <th className="text-left p-4 font-semibold text-sm">Type</th>
                   <th className="text-left p-4 font-semibold text-sm">Category</th>
-                  <th className="text-left p-4 font-semibold text-sm">Base Price</th>
+                  <th className="text-left p-4 font-semibold text-sm">Price</th>
                   <th className="text-left p-4 font-semibold text-sm">Status</th>
                   <th className="text-left p-4 font-semibold text-sm">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {mockProducts.map((product, index) => (
+                {filteredProducts.map((product, index) => (
                   <motion.tr
                     key={product.id}
                     initial={{ opacity: 0, x: -20 }}
@@ -361,7 +234,16 @@ const AdminProducts = () => {
                         <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
                           <Package className="w-5 h-5 text-muted-foreground" />
                         </div>
-                        <p className="font-semibold">{product.name}</p>
+                        <div className="flex items-center gap-2">
+                          <Link 
+                            to={`/product/${product.id}?type=${product.type}`}
+                            target="_blank"
+                            className="font-semibold hover:text-primary transition-colors"
+                          >
+                            {product.name}
+                          </Link>
+                          <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                        </div>
                       </div>
                     </td>
                     <td className="p-4">
@@ -371,7 +253,7 @@ const AdminProducts = () => {
                       <Badge variant="secondary">{product.category}</Badge>
                     </td>
                     <td className="p-4 font-medium">
-                      ₹{product.id === 1 ? '899' : '450'}
+                      ₹{product.type === 'PLAIN' ? '100/m' : product.type === 'DESIGNED' ? '1000' : '500'}
                     </td>
                     <td className="p-4">
                       <Badge 
@@ -383,12 +265,22 @@ const AdminProducts = () => {
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                          <Button variant="ghost" size="icon" className="h-9 w-9">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-9 w-9"
+                            onClick={() => handleEdit(product)}
+                          >
                             <Edit className="w-4 h-4" />
                           </Button>
                         </motion.div>
                         <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                          <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:text-destructive">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-9 w-9 text-destructive hover:text-destructive"
+                            onClick={() => handleDelete(product.id)}
+                          >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </motion.div>
@@ -400,6 +292,24 @@ const AdminProducts = () => {
             </table>
           </div>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteProductId !== null} onOpenChange={(open) => !open && setDeleteProductId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Product</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this product? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   );

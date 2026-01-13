@@ -32,6 +32,9 @@ import AdminCategories from "./pages/admin/AdminCategories";
 import AdminCustomConfig from "./pages/admin/AdminCustomConfig";
 import AdminUsers from "./pages/admin/AdminUsers";
 import CustomProductDetail from "./pages/CustomProductDetail";
+import Blog from "./pages/Blog";
+import BlogDetail from "./pages/BlogDetail";
+import AdminBlog from "./pages/admin/AdminBlog";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +64,8 @@ const App = () => (
           <Route path="/custom-design" element={<CustomDesign />} />
           <Route path="/make-your-own" element={<MakeYourOwn />} />
           <Route path="/custom-product" element={<CustomProductDetail />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:id" element={<BlogDetail />} />
           
           {/* Admin Routes */}
           <Route path="/admin-sara/login" element={<AdminLogin />} />
@@ -69,6 +74,7 @@ const App = () => (
           <Route path="/admin-sara/fabrics" element={<AdminFabrics />} />
           <Route path="/admin-sara/designs" element={<AdminDesigns />} />
           <Route path="/admin-sara/cms" element={<AdminCMS />} />
+          <Route path="/admin-sara/blog" element={<AdminBlog />} />
           <Route path="/admin-sara/custom-config" element={<AdminCustomConfig />} />
           <Route path="/admin-sara/categories" element={<AdminCategories />} />
           <Route path="/admin-sara/users" element={<AdminUsers />} />
