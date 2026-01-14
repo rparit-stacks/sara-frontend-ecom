@@ -75,25 +75,25 @@ export const ProductCard = ({ product, className }: ProductCardProps) => {
       </div>
 
       {/* Content */}
-      <Link to={`/product/${product.id}`} className="block p-4">
-        <p className="text-xs text-muted-foreground uppercase tracking-wider">{product.category}</p>
-        <h3 className="font-medium text-base text-foreground mt-1.5 group-hover:text-primary transition-colors line-clamp-1">
+      <Link to={`/product/${product.id}`} className="block p-2 xs:p-3 sm:p-4">
+        <p className="text-[10px] xs:text-xs text-muted-foreground uppercase tracking-wider">{product.category}</p>
+        <h3 className="font-medium text-xs xs:text-sm sm:text-base text-foreground mt-1 xs:mt-1.5 group-hover:text-primary transition-colors line-clamp-1">
           {product.name}
         </h3>
-        <div className="flex items-center gap-2 mt-2">
-          <span className="font-bold text-base text-primary">
+        <div className="flex items-center gap-1 xs:gap-2 mt-1 xs:mt-2">
+          <span className="font-bold text-xs xs:text-sm sm:text-base text-primary">
             ₹{product.price.toLocaleString('en-IN')}
           </span>
           {product.originalPrice && (
-            <span className="text-sm text-muted-foreground line-through">
+            <span className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground line-through">
               ₹{product.originalPrice.toLocaleString('en-IN')}
             </span>
           )}
         </div>
         {/* Rating */}
-        <div className="flex items-center gap-1 mt-2">
+        <div className="flex items-center gap-0.5 xs:gap-1 mt-1 xs:mt-2">
           {[...Array(5)].map((_, i) => (
-            <i key={i} className={`fa-solid fa-star text-xs ${i < (product.rating || 4) ? 'text-primary' : 'text-muted'}`}></i>
+            <i key={i} className={`fa-solid fa-star text-[8px] xs:text-[10px] sm:text-xs ${i < (product.rating || 4) ? 'text-primary' : 'text-muted'}`}></i>
           ))}
         </div>
       </Link>
