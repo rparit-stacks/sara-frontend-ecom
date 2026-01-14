@@ -43,7 +43,7 @@ export const Navbar = () => {
         <nav className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo - Text only, dual color */}
           <Link to="/" className="flex items-center z-10">
-            <span className="font-cursive text-2xl md:text-3xl font-bold">
+            <span className="font-cursive text-xl xs:text-2xl md:text-3xl font-bold">
               <span className="text-primary">Studio</span>
               <span className="text-foreground"> Sara</span>
             </span>
@@ -68,7 +68,7 @@ export const Navbar = () => {
           </div>
 
           {/* Right Actions - Compact */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 xs:gap-2">
             {/* Search */}
             <Button 
               variant="ghost" 
@@ -81,10 +81,10 @@ export const Navbar = () => {
 
             {/* Wishlist */}
             <Link to="/wishlist" className="relative">
-              <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full hover:bg-secondary">
-                <i className="fa-regular fa-heart text-sm"></i>
+              <Button variant="ghost" size="icon" className="w-8 h-8 xs:w-9 xs:h-9 rounded-full hover:bg-secondary">
+                <i className="fa-regular fa-heart text-xs xs:text-sm"></i>
                 {wishlistCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 xs:w-4 xs:h-4 bg-primary text-primary-foreground text-[8px] xs:text-[10px] font-bold rounded-full flex items-center justify-center">
                     {wishlistCount}
                   </span>
                 )}
@@ -93,10 +93,10 @@ export const Navbar = () => {
 
             {/* Cart */}
             <Link to="/cart" className="relative">
-              <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full hover:bg-secondary">
-                <i className="fa-solid fa-bag-shopping text-sm"></i>
+              <Button variant="ghost" size="icon" className="w-8 h-8 xs:w-9 xs:h-9 rounded-full hover:bg-secondary">
+                <i className="fa-solid fa-bag-shopping text-xs xs:text-sm"></i>
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 xs:w-4 xs:h-4 bg-primary text-primary-foreground text-[8px] xs:text-[10px] font-bold rounded-full flex items-center justify-center">
                     {cartItemCount}
                   </span>
                 )}
@@ -114,10 +114,10 @@ export const Navbar = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden w-9 h-9 rounded-full hover:bg-secondary"
+              className="lg:hidden w-8 h-8 xs:w-9 xs:h-9 rounded-full hover:bg-secondary"
               onClick={() => setIsOpen(!isOpen)}
             >
-              <i className={`fa-solid ${isOpen ? 'fa-xmark' : 'fa-bars'} text-base`}></i>
+              <i className={`fa-solid ${isOpen ? 'fa-xmark' : 'fa-bars'} text-sm xs:text-base`}></i>
             </Button>
           </div>
         </nav>
