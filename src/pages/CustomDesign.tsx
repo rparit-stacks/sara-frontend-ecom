@@ -116,11 +116,13 @@ const CustomDesign = () => {
           <div 
             className="relative w-full py-10 xs:py-12 sm:py-16 md:py-20 lg:py-24 xl:py-28 bg-[#f5b5b5] overflow-hidden"
             style={{
-              backgroundImage: 'url(/bg_images/68fccd394db41a54b986a269033bf872%20copy.png)',
+              backgroundImage: 'url(/bg_images/661653d7e241afba33eeb02dc6a09f9e%20copy.png)',
               backgroundPosition: 'center',
               backgroundSize: 'cover',
             }}
           >
+            {/* subtle overlay to reduce background image opacity */}
+            <div className="absolute inset-0 bg-white/40 pointer-events-none" />
             <div className="relative z-20 flex items-center justify-center px-2 xs:px-3 sm:px-4">
               <motion.div
                 initial={{ opacity: 0, y: 30, scale: 0.95 }}

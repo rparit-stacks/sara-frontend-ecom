@@ -188,15 +188,20 @@ const Index = () => {
       {/* Features Bar - Full Width */}
       <section className="w-full bg-muted py-4 xs:py-6 sm:py-8 lg:py-10 xl:py-12 border-y border-border overflow-x-auto">
         <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
-          <div className="flex flex-row sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-2 xs:gap-3 sm:gap-4 lg:gap-8 xl:gap-12 min-w-max sm:min-w-0">
+          <div className="flex flex-row sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3 xs:gap-4 sm:gap-6 lg:gap-8 xl:gap-12 min-w-max sm:min-w-0">
             {features.map((feature) => (
-              <div key={feature.title} className="flex flex-row items-center gap-2 xs:gap-3 sm:gap-5 justify-start text-left min-w-[140px] xs:min-w-[160px] sm:min-w-0 sm:justify-center lg:justify-start">
+              <div
+                key={feature.title}
+                className="flex flex-col items-center justify-center text-center gap-2 xs:gap-3 sm:gap-4 min-w-[150px] xs:min-w-[170px] sm:min-w-0"
+              >
                 <div className="w-8 h-8 xs:w-10 xs:h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 xl:w-16 xl:h-16 rounded-full bg-[#2b9d8f]/10 flex items-center justify-center flex-shrink-0">
                   <i className={`fa-solid ${feature.icon} text-xs xs:text-sm sm:text-base lg:text-lg xl:text-xl text-[#2b9d8f]`}></i>
                 </div>
                 <div className="min-w-0">
                   <h4 className="font-semibold text-[10px] xs:text-xs sm:text-sm lg:text-base xl:text-lg truncate">{feature.title}</h4>
-                  <p className="text-[9px] xs:text-[10px] sm:text-xs lg:text-sm text-muted-foreground hidden xs:block truncate">{feature.desc}</p>
+                  <p className="text-[9px] xs:text-[10px] sm:text-xs lg:text-sm text-muted-foreground hidden xs:block truncate">
+                    {feature.desc}
+                  </p>
                 </div>
               </div>
             ))}
@@ -286,7 +291,7 @@ const Index = () => {
           backgroundSize: 'cover',
         }}
       >
-        <div className="absolute inset-0 bg-foreground/60" />
+        <div className="absolute inset-0 bg-foreground/75" />
         <div className="relative max-w-4xl mx-auto text-center text-white px-3 xs:px-4 sm:px-6">
           <ScrollReveal>
             <span className="text-xs xs:text-sm uppercase tracking-[0.15em] xs:tracking-[0.2em] sm:tracking-[0.3em] text-white/80 mb-2 xs:mb-3 sm:mb-4 block">
@@ -300,7 +305,7 @@ const Index = () => {
             </p>
             <Link to="/customize">
               <Button className="bg-white text-foreground hover:bg-white/90 rounded-full px-6 xs:px-8 sm:px-10 py-2.5 xs:py-3 sm:py-4 text-xs xs:text-sm sm:text-base font-semibold">
-                Customise design-page
+                Custom Design
               </Button>
             </Link>
           </ScrollReveal>
@@ -355,7 +360,7 @@ const Index = () => {
               <div className="bg-white rounded-xl border border-border py-4 xs:py-5 sm:py-6 px-2">
                 <div className="font-cursive text-2xl xs:text-3xl sm:text-4xl text-primary mb-1">150+</div>
                 <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground uppercase tracking-[0.12em]">
-                  Fabrics to select from
+                  Fabrics
                 </p>
               </div>
             </ScrollReveal>
@@ -366,38 +371,6 @@ const Index = () => {
                   Transparency
                 </p>
               </div>
-            </ScrollReveal>
-          </div>
-        </div>
-      </section>
-
-      {/* Brand Numbers - Full Width with Background Image */}
-      <section 
-        className="w-full py-10 xs:py-14 sm:py-20 lg:py-24 relative"
-        style={{
-          backgroundImage: 'url(/bg_images/6be0f0ce2c11383d352bd0828a354dba%20copy.png)',
-          backgroundPosition: 'center',
-          backgroundSize: 'cover',
-        }}
-      >
-        <div className="absolute inset-0 bg-primary/90" />
-        <div className="relative max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 xs:gap-6 sm:gap-10 lg:gap-16 text-center text-white">
-            <ScrollReveal>
-              <span className="font-cursive text-3xl xs:text-4xl sm:text-6xl lg:text-7xl xl:text-8xl block">500+</span>
-              <span className="text-[10px] xs:text-xs sm:text-base lg:text-lg uppercase tracking-[0.1em] xs:tracking-[0.15em] text-white/80 mt-1 xs:mt-2 sm:mt-3 block">Unique Designs</span>
-            </ScrollReveal>
-            <ScrollReveal delay={0.1}>
-              <span className="font-cursive text-3xl xs:text-4xl sm:text-6xl lg:text-7xl xl:text-8xl block">50K+</span>
-              <span className="text-[10px] xs:text-xs sm:text-base lg:text-lg uppercase tracking-[0.1em] xs:tracking-[0.15em] text-white/80 mt-1 xs:mt-2 sm:mt-3 block">Happy Customers</span>
-            </ScrollReveal>
-            <ScrollReveal delay={0.2}>
-              <span className="font-cursive text-3xl xs:text-4xl sm:text-6xl lg:text-7xl xl:text-8xl block">100+</span>
-              <span className="text-[10px] xs:text-xs sm:text-base lg:text-lg uppercase tracking-[0.1em] xs:tracking-[0.15em] text-white/80 mt-1 xs:mt-2 sm:mt-3 block">Skilled Artisans</span>
-            </ScrollReveal>
-            <ScrollReveal delay={0.3}>
-              <span className="font-cursive text-3xl xs:text-4xl sm:text-6xl lg:text-7xl xl:text-8xl block">4.9</span>
-              <span className="text-[10px] xs:text-xs sm:text-base lg:text-lg uppercase tracking-[0.1em] xs:tracking-[0.15em] text-white/80 mt-1 xs:mt-2 sm:mt-3 block">Average Rating</span>
             </ScrollReveal>
           </div>
         </div>
@@ -482,7 +455,7 @@ const Index = () => {
               <h2 className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl mt-2 xs:mt-3 sm:mt-4">How It Works</h2>
             </ScrollReveal>
           </div>
-          <div className="grid grid-cols-1 xs:grid-cols-3 gap-6 xs:gap-4 sm:gap-12 lg:gap-16">
+          <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-6 xs:gap-4 sm:gap-12 lg:gap-16">
             {[
               {
                 step: '01',
@@ -498,6 +471,11 @@ const Index = () => {
                 step: '03',
                 title: 'Choose quantity',
                 desc: 'Order with low minimums and full transparency at every stage of production.',
+              },
+              {
+                step: '04',
+                title: 'Get your order at your doorstep',
+                desc: 'Receive your beautifully crafted order delivered safely to your doorstep.',
               },
             ].map((item, i) => (
               <ScrollReveal key={item.step} delay={i * 0.15}>

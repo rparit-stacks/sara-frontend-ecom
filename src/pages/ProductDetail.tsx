@@ -645,9 +645,9 @@ const ProductDetail = () => {
                     <Accordion type="single" collapsible className="border-t border-border pt-6">
                       {product.detailSections.map((section: DetailSection) => (
                         <AccordionItem key={section.id} value={section.id}>
-                          <AccordionTrigger className="text-lg">{section.title}</AccordionTrigger>
+                          <AccordionTrigger className="text-sm sm:text-lg">{section.title}</AccordionTrigger>
                           <AccordionContent>
-                            <p className="text-muted-foreground text-base leading-relaxed">
+                            <p className="text-muted-foreground text-sm sm:text-base leading-relaxed">
                               {section.content}
                             </p>
                           </AccordionContent>
