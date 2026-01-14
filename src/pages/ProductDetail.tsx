@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, ShoppingBag, Share2, Truck, RotateCcw, Shield, Minus, Plus, ChevronRight, Download, Palette, Package, FileJson, IndianRupee } from 'lucide-react';
+import { Heart, ShoppingBag, Share2, Minus, Plus, ChevronRight, Download, Palette, Package, FileJson, IndianRupee } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
@@ -151,7 +151,10 @@ const ProductDetail = () => {
   // Design Product States
   const [showPlainProductSelection, setShowPlainProductSelection] = useState(false);
   const [showFabricVariant, setShowFabricVariant] = useState(false);
-  const [selectedPlainProductId, setSelectedPlainProductId] = useState<string | null>(null);
+  const [selectedFabricId, setSelectedFabricId] = useState<string | null>(null);
+  const [selectedFabricVariants, setSelectedFabricVariants] = useState<Record<string, string>>({});
+  const [fabricQuantity, setFabricQuantity] = useState(1);
+  const [fabricPricePerMeter, setFabricPricePerMeter] = useState<number>(0);
   const [combinedPrice, setCombinedPrice] = useState<number | null>(null);
 
   // Plain Product States
@@ -186,9 +189,18 @@ const ProductDetail = () => {
     return basePrice * quantity;
   }, [product, selectedVariants, quantity]);
 
-  const handlePlainProductSelect = (productId: string) => {
-    setSelectedPlainProductId(productId);
-    // Open variant popup for the selected plain product
+  const handleFabricSelect = (fabricId: string) => {
+    setSelectedFabricId(fabricId);
+    // Mock fabric data - in real app, fetch from API
+    const fabricPrices: Record<string, number> = {
+      'p1': 100,
+      'p2': 80,
+      'p3': 120,
+      'p4': 75,
+    };
+    setFabricPricePerMeter(fabricPrices[fabricId] || 100);
+    setSelectedFabricVariants({});
+    setFabricQuantity(1);
     setShowFabricVariant(true);
   };
 
@@ -198,21 +210,37 @@ const ProductDetail = () => {
     quantity: number;
     totalPrice: number;
   }) => {
-    // Calculate combined price: Design Price + Plain Product Price
+    setSelectedFabricId(data.fabricId);
+    setSelectedFabricVariants(data.selectedVariants);
+    setFabricQuantity(data.quantity);
+    // Calculate combined price: Design Price + Fabric Price
     const totalPrice = (product.designPrice || 0) + data.totalPrice;
     setCombinedPrice(totalPrice);
-    setSelectedPlainProductId(data.fabricId);
+    setFabricPricePerMeter(data.totalPrice / data.quantity);
+    setShowFabricVariant(false);
+  };
+
+  const handleAddToCart = () => {
+    if (!selectedFabricId) {
+      setShowPlainProductSelection(true);
+      return;
+    }
+    
+    // Calculate combined price
+    const fabricTotalPrice = fabricPricePerMeter * fabricQuantity;
+    const totalPrice = (product.designPrice || 0) + fabricTotalPrice;
     
     // Add to cart
     const cartItem = {
-      id: `design-${product.id}-plain-${data.fabricId}-${Date.now()}`,
+      id: `design-${product.id}-fabric-${selectedFabricId}-${Date.now()}`,
       type: 'DESIGNED',
       designId: product.id,
       designPrice: product.designPrice,
-      plainProductId: data.fabricId,
-      plainProductPrice: data.totalPrice,
-      variants: data.selectedVariants,
-      quantity: data.quantity,
+      fabricId: selectedFabricId,
+      fabricPrice: fabricTotalPrice,
+      fabricPricePerMeter: fabricPricePerMeter,
+      variants: selectedFabricVariants,
+      quantity: fabricQuantity,
       totalPrice: totalPrice,
     };
     
@@ -253,7 +281,7 @@ const ProductDetail = () => {
       case 'DESIGNED':
         return <Badge className="bg-pink-100 text-pink-700 border-pink-200 gap-1"><Palette className="w-3 h-3" /> Design Product</Badge>;
       case 'PLAIN':
-        return <Badge className="bg-blue-100 text-blue-700 border-blue-200 gap-1"><Package className="w-3 h-3" /> Plain Fabric</Badge>;
+        return <Badge className="bg-blue-100 text-blue-700 border-blue-200 gap-1"><Package className="w-3 h-3" /> Fabric</Badge>;
       case 'DIGITAL':
         return <Badge className="bg-purple-100 text-purple-700 border-purple-200 gap-1"><FileJson className="w-3 h-3" /> Digital Product</Badge>;
     }
@@ -324,7 +352,7 @@ const ProductDetail = () => {
             {/* Product Info */}
             <div className="lg:col-span-7">
               <ScrollReveal direction="right">
-                <div className="lg:sticky lg:top-24 space-y-8 max-w-2xl">
+                <div className="lg:sticky lg:top-24 space-y-5 sm:space-y-6 lg:space-y-8 max-w-2xl">
                   {/* Badges */}
                   <div className="flex gap-3 flex-wrap">
                     {getTypeBadge()}
@@ -332,29 +360,38 @@ const ProductDetail = () => {
                   </div>
 
                   {/* Title & Price */}
-                  <div>
-                    <p className="text-muted-foreground mb-2 sm:mb-3 text-sm sm:text-lg">{product.category}</p>
-                    <h1 className="font-cursive text-2xl xs:text-3xl sm:text-4xl lg:text-5xl xl:text-6xl mb-3 sm:mb-5 break-words">{product.name}</h1>
+                  <div className="space-y-2 sm:space-y-3">
+                    <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">{product.category}</p>
+                    <h1 className="font-cursive text-2xl xs:text-3xl sm:text-4xl lg:text-5xl xl:text-6xl break-words">{product.name}</h1>
 
                     {/* Price Display */}
                     {product.type === 'DESIGNED' && (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-4">
-                          <div>
-                            <p className="text-sm text-muted-foreground">Design Price</p>
-                            <span className="font-cursive text-4xl text-primary">₹{product.designPrice}</span>
-                          </div>
-                          {combinedPrice && (
+                      <div className="space-y-3">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-4 flex-wrap">
                             <div>
-                              <p className="text-sm text-muted-foreground">Total (with fabric)</p>
-                              <span className="font-cursive text-3xl text-primary">₹{combinedPrice}</span>
+                              <p className="text-xs sm:text-sm text-muted-foreground">Design Price</p>
+                              <span className="font-cursive text-2xl sm:text-3xl lg:text-4xl text-primary">₹{product.designPrice}</span>
                             </div>
-                          )}
+                            {selectedFabricId && (
+                              <div>
+                                <p className="text-xs sm:text-sm text-muted-foreground">Fabric Price</p>
+                                <span className="font-cursive text-2xl sm:text-3xl text-primary">₹{fabricPricePerMeter * fabricQuantity}</span>
+                              </div>
+                            )}
+                            {combinedPrice && (
+                              <div>
+                                <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
+                                <span className="font-cursive text-3xl sm:text-4xl text-primary">₹{combinedPrice}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        {selectedPlainProductId && (
-                          <p className="text-sm text-muted-foreground">
-                            Plain product selected
-                          </p>
+                        {selectedFabricId && (
+                          <div className="text-xs sm:text-sm text-muted-foreground space-y-1">
+                            <p>Fabric: {fabricPricePerMeter}/meter × {fabricQuantity} meter{fabricQuantity !== 1 ? 's' : ''}</p>
+                            <p className="text-[10px] sm:text-xs">Design: ₹{product.designPrice} + Fabric: ₹{fabricPricePerMeter * fabricQuantity} = ₹{combinedPrice}</p>
+                          </div>
                         )}
                       </div>
                     )}
@@ -383,7 +420,7 @@ const ProductDetail = () => {
                   </div>
 
                   {/* Description */}
-                  <p className="text-muted-foreground text-sm sm:text-base lg:text-lg leading-relaxed">{product.description}</p>
+                  <p className="text-muted-foreground text-sm sm:text-base lg:text-lg leading-relaxed mt-2 sm:mt-3">{product.description}</p>
 
                   {/* Custom Fields */}
                   {product.customFields && product.customFields.length > 0 && (
@@ -397,77 +434,70 @@ const ProductDetail = () => {
                     </div>
                   )}
 
-                  {/* DESIGN PRODUCT: Recommended Plain Products with Checkboxes */}
+                  {/* DESIGN PRODUCT: Select Fabric Button & Recommended Fabrics */}
                   {product.type === 'DESIGNED' && (
                     <div className="space-y-4">
+                      {/* Select Fabric Button - First */}
                       <div>
-                        <h4 className="font-medium mb-4 text-lg flex items-center gap-2">
-                          <Palette className="w-5 h-5 text-primary" />
-                          Recommended Plain Products
-                        </h4>
-                        {product.recommendedPlainProductIds && product.recommendedPlainProductIds.length > 0 ? (
-                          <div className="space-y-3 mb-4">
-                            <p className="text-sm text-muted-foreground">
-                              Select from recommended options or browse all:
-                            </p>
-                            <div className="flex flex-wrap gap-3">
-                              {product.recommendedPlainProductIds.slice(0, 3).map((productId: string, index: number) => {
-                                // Mock product names - in real app, fetch from API
-                                const productNames: Record<string, string> = {
-                                  'p1': 'Premium Silk Fabric',
-                                  'p2': 'Cotton Blue Fabric',
-                                  'p3': 'Linen Cream Fabric',
-                                  'p4': 'Cotton White Fabric',
-                                };
-                                const productName = productNames[productId] || `Plain Product ${index + 1}`;
-                                const isSelected = selectedPlainProductId === productId;
-                                
-                                return (
-                                  <button
-                                    key={productId}
-                                    onClick={() => {
-                                      if (isSelected) {
-                                        setSelectedPlainProductId(null);
-                                      } else {
-                                        setSelectedPlainProductId(productId);
-                                        setShowFabricVariant(true);
-                                      }
-                                    }}
-                                    className={cn(
-                                      "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full border-2 transition-all text-xs sm:text-sm",
-                                      isSelected
-                                        ? "border-[#2b9d8f] bg-[#2b9d8f]/10 text-[#2b9d8f]"
-                                        : "border-border hover:border-[#2b9d8f]/50 text-foreground"
-                                    )}
-                                  >
-                                    <div className={cn(
-                                      "w-3.5 h-3.5 sm:w-4 sm:h-4 rounded border-2 flex items-center justify-center transition-all flex-shrink-0",
-                                      isSelected
-                                        ? "border-[#2b9d8f] bg-[#2b9d8f]"
-                                        : "border-border"
-                                    )}>
-                                      {isSelected && (
-                                        <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                        </svg>
-                                      )}
-                                    </div>
-                                    <span className="font-medium truncate">{productName}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ) : null}
                         <Button
                           onClick={() => setShowPlainProductSelection(true)}
                           variant="outline"
                           className="w-full h-11 sm:h-12 text-sm sm:text-base gap-2"
                         >
                           <Palette className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                          <span className="truncate">{selectedPlainProductId ? 'Change Product' : 'Browse All Products'}</span>
+                          <span className="truncate">{selectedFabricId ? 'Change Fabric' : 'Select Fabric'}</span>
                         </Button>
                       </div>
+
+                      {/* Recommended Fabrics - Grid Layout */}
+                      {product.recommendedPlainProductIds && product.recommendedPlainProductIds.length > 0 && (
+                        <div>
+                          <h4 className="font-medium mb-3 sm:mb-4 text-base sm:text-lg flex items-center gap-2">
+                            <Palette className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                            Recommended Fabrics
+                          </h4>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
+                            {product.recommendedPlainProductIds.slice(0, 3).map((fabricId: string, index: number) => {
+                              // Mock fabric names - in real app, fetch from API
+                              const fabricNames: Record<string, string> = {
+                                'p1': 'Premium Silk Fabric',
+                                'p2': 'Cotton Blue Fabric',
+                                'p3': 'Linen Cream Fabric',
+                                'p4': 'Cotton White Fabric',
+                              };
+                              const fabricName = fabricNames[fabricId] || `Fabric ${index + 1}`;
+                              const isSelected = selectedFabricId === fabricId;
+                              
+                              return (
+                                <button
+                                  key={fabricId}
+                                  onClick={() => handleFabricSelect(fabricId)}
+                                  className={cn(
+                                    "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-full border-2 transition-all text-xs sm:text-sm h-full min-h-[44px] sm:min-h-[48px]",
+                                    isSelected
+                                      ? "border-[#2b9d8f] bg-[#2b9d8f]/10 text-[#2b9d8f]"
+                                      : "border-border hover:border-[#2b9d8f]/50 text-foreground"
+                                  )}
+                                >
+                                  <div className={cn(
+                                    "w-3.5 h-3.5 sm:w-4 sm:h-4 rounded border-2 flex items-center justify-center transition-all flex-shrink-0",
+                                    isSelected
+                                      ? "border-[#2b9d8f] bg-[#2b9d8f]"
+                                      : "border-border"
+                                  )}>
+                                    {isSelected && (
+                                      <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                  <span className="font-medium truncate text-left">{fabricName}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -553,31 +583,38 @@ const ProductDetail = () => {
                   )}
 
                   {/* Actions */}
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-wrap pt-4">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-wrap pt-2 sm:pt-3">
                     {product.type === 'DESIGNED' && (
-                      <Button
-                        size="lg"
-                        onClick={() => {
-                          if (!selectedPlainProductId) {
-                            setShowPlainProductSelection(true);
-                          } else {
-                            setShowFabricVariant(true);
-                          }
-                        }}
-                        className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-12 sm:h-14 text-sm sm:text-base px-4 sm:px-6"
-                      >
-                        <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                        <span className="truncate">{selectedPlainProductId ? 'Add to Cart' : 'Select Product First'}</span>
-                      </Button>
+                      <>
+                        {selectedFabricId ? (
+                          <Button
+                            size="lg"
+                            onClick={handleAddToCart}
+                            className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-14 sm:h-16 text-base sm:text-lg px-6 sm:px-8 font-semibold"
+                          >
+                            <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+                            <span className="truncate">Add to Cart</span>
+                          </Button>
+                        ) : (
+                          <Button
+                            size="lg"
+                            onClick={() => setShowPlainProductSelection(true)}
+                            className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-14 sm:h-16 text-base sm:text-lg px-6 sm:px-8 font-semibold"
+                          >
+                            <Palette className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+                            <span className="truncate">Select Fabric First</span>
+                          </Button>
+                        )}
+                      </>
                     )}
                     
                     {product.type === 'PLAIN' && (
                       <Button
                         size="lg"
                         onClick={handlePlainProductAddToCart}
-                        className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-12 sm:h-14 text-sm sm:text-base px-4 sm:px-6"
+                        className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-14 sm:h-16 text-base sm:text-lg px-6 sm:px-8 font-semibold"
                       >
-                        <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                        <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
                         <span className="truncate">Add to Cart</span>
                       </Button>
                     )}
@@ -586,9 +623,9 @@ const ProductDetail = () => {
                       <Button
                         size="lg"
                         onClick={handleDigitalDownload}
-                        className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-12 sm:h-14 text-sm sm:text-base px-4 sm:px-6"
+                        className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-14 sm:h-16 text-base sm:text-lg px-6 sm:px-8 font-semibold"
                       >
-                        <Download className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                        <Download className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
                         <span className="truncate">Download Now</span>
                       </Button>
                     )}
@@ -600,22 +637,6 @@ const ProductDetail = () => {
                       <Button size="lg" variant="outline" className="rounded-full w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0">
                         <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
                       </Button>
-                    </div>
-                  </div>
-
-                  {/* Features */}
-                  <div className="grid grid-cols-3 gap-6 pt-6 border-t border-border">
-                    <div className="text-center">
-                      <Truck className="w-7 h-7 mx-auto text-primary mb-3" />
-                      <span className="text-base text-muted-foreground">Free Shipping</span>
-                    </div>
-                    <div className="text-center">
-                      <RotateCcw className="w-7 h-7 mx-auto text-primary mb-3" />
-                      <span className="text-base text-muted-foreground">Easy Returns</span>
-                    </div>
-                    <div className="text-center">
-                      <Shield className="w-7 h-7 mx-auto text-primary mb-3" />
-                      <span className="text-base text-muted-foreground">Secure Payment</span>
                     </div>
                   </div>
 
@@ -664,18 +685,18 @@ const ProductDetail = () => {
             open={showPlainProductSelection}
             onOpenChange={setShowPlainProductSelection}
             recommendedPlainProductIds={product.recommendedPlainProductIds}
-            onPlainProductSelect={handlePlainProductSelect}
+            onPlainProductSelect={handleFabricSelect}
           />
           
-          {selectedPlainProductId && (
+          {selectedFabricId && (
             <FabricVariantPopup
               open={showFabricVariant}
               onOpenChange={setShowFabricVariant}
               fabric={{
-                id: selectedPlainProductId,
-                name: 'Selected Plain Product',
+                id: selectedFabricId,
+                name: 'Selected Fabric',
                 image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=300&h=300&fit=crop',
-                pricePerMeter: 100,
+                pricePerMeter: fabricPricePerMeter || 100,
                 status: 'active',
               }}
               variants={[]}

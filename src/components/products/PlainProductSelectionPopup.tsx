@@ -77,10 +77,10 @@ const PlainProductSelectionPopup: React.FC<PlainProductSelectionPopupProps> = ({
         <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border flex-shrink-0">
           <DialogTitle className="font-semibold text-lg sm:text-xl md:text-2xl lg:text-3xl flex items-center gap-2 sm:gap-3">
             <Package className="w-5 h-5 sm:w-6 sm:h-6 text-[#2b9d8f] flex-shrink-0" />
-            <span className="break-words">Select Plain Product (Fabric)</span>
+            <span className="break-words">Select Fabric</span>
           </DialogTitle>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2">
-            Choose a plain product to combine with this design
+            Choose a fabric to combine with this design
           </p>
         </DialogHeader>
 
@@ -89,7 +89,7 @@ const PlainProductSelectionPopup: React.FC<PlainProductSelectionPopupProps> = ({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
             <Input
-              placeholder="Search plain products..."
+              placeholder="Search fabrics..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -120,7 +120,7 @@ const PlainProductSelectionPopup: React.FC<PlainProductSelectionPopupProps> = ({
           {!showAllProducts && !searchQuery && (
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Recommended Plain Products</h3>
+                <h3 className="text-lg font-semibold">Recommended Fabrics</h3>
                 <Badge variant="secondary" className="text-xs">
                   {recommendedProducts.length} Options
                 </Badge>
@@ -154,7 +154,7 @@ const PlainProductSelectionPopup: React.FC<PlainProductSelectionPopupProps> = ({
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No recommended products available</p>
+                  <p>No recommended fabrics available</p>
                 </div>
               )}
 
@@ -166,7 +166,7 @@ const PlainProductSelectionPopup: React.FC<PlainProductSelectionPopupProps> = ({
                   className="w-full h-11 sm:h-12 text-sm sm:text-base gap-2"
                 >
                   <Search className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                  <span className="truncate">Browse All Plain Products</span>
+                  <span className="truncate">Browse All Fabrics</span>
                 </Button>
               </div>
             </div>
@@ -176,7 +176,7 @@ const PlainProductSelectionPopup: React.FC<PlainProductSelectionPopupProps> = ({
           {(showAllProducts || searchQuery) && (
             <div>
               <h3 className="text-lg font-semibold mb-4">
-                {searchQuery ? 'Search Results' : 'All Plain Products'}
+                {searchQuery ? 'Search Results' : 'All Fabrics'}
               </h3>
               
               {allProducts.length === 0 ? (

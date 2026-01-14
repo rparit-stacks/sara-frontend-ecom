@@ -105,12 +105,6 @@ export const ProductCard = ({ product, className }: ProductCardProps) => {
               </span>
             )}
           </div>
-          {/* Rating */}
-          <div className="flex items-center gap-0.5 xs:gap-1 mt-1 xs:mt-2">
-            {[...Array(5)].map((_, i) => (
-              <i key={i} className={`fa-solid fa-star text-[7px] xs:text-[8px] sm:text-[10px] md:text-xs ${i < (product.rating || 4) ? 'text-[#2b9d8f]' : 'text-muted'}`}></i>
-            ))}
-          </div>
         </div>
       </motion.div>
     </Link>
