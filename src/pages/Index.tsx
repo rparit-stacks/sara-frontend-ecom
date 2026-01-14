@@ -188,14 +188,14 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Categories - With Background Vector */}
+      {/* Categories - With Background Image */}
       <section 
         className="w-full py-12 xs:py-16 sm:py-20 lg:py-28 relative"
         style={{
-          backgroundImage: 'url(/bg_vectors/scene-with-birds-flying-by-tree.png)',
-          backgroundPosition: 'right center',
+          backgroundImage: 'url(/bg_images/thumbnail.png)',
+          backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          backgroundSize: 'contain',
+          backgroundSize: 'cover',
         }}
       >
         <div className="absolute inset-0 bg-background/90" />
@@ -257,11 +257,11 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Full Width Banner with Vector BG */}
+      {/* Full Width Banner with Background Image */}
       <section 
         className="relative w-full py-16 xs:py-20 sm:py-32 lg:py-44"
         style={{
-          backgroundImage: 'url(/bg_vectors/29c6adfd-eab3-4978-86bb-773d20301c4d.jpg)',
+          backgroundImage: 'url(/bg_images/661653d7e241afba33eeb02dc6a09f9e%20copy.png)',
           backgroundPosition: 'center',
           backgroundSize: 'cover',
         }}
@@ -307,11 +307,11 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Stats - Full Width with Vector */}
+      {/* Stats - Full Width with Background Image */}
       <section 
         className="w-full py-10 xs:py-14 sm:py-20 lg:py-24 relative"
         style={{
-          backgroundImage: 'url(/bg_vectors/3e8e84f9-9e4b-4d5b-bbbb-4924f4181ded.jpg)',
+          backgroundImage: 'url(/bg_images/6be0f0ce2c11383d352bd0828a354dba%20copy.png)',
           backgroundPosition: 'center',
           backgroundSize: 'cover',
         }}
