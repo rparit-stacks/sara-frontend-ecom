@@ -4,14 +4,62 @@ import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 
 const categories = [
-  { id: '1', name: 'Floral Prints', image: 'https://images.unsplash.com/photo-1487530811176-3780de880c2d?w=600&h=700&fit=crop', count: 48, description: 'Beautiful floral patterns for every occasion' },
-  { id: '2', name: 'Botanical', image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=600&h=700&fit=crop', count: 36, description: 'Nature-inspired botanical designs' },
-  { id: '3', name: 'Abstract', image: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&h=700&fit=crop', count: 24, description: 'Modern abstract art patterns' },
-  { id: '4', name: 'Geometric', image: 'https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=600&h=700&fit=crop', count: 32, description: 'Clean geometric shapes and lines' },
-  { id: '5', name: 'Tropical', image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&h=700&fit=crop', count: 28, description: 'Exotic tropical prints' },
-  { id: '6', name: 'Vintage', image: 'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?w=600&h=700&fit=crop', count: 42, description: 'Classic vintage-inspired designs' },
-  { id: '7', name: 'Minimalist', image: 'https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?w=600&h=700&fit=crop', count: 20, description: 'Simple and elegant minimal patterns' },
-  { id: '8', name: 'Watercolor', image: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=600&h=700&fit=crop', count: 18, description: 'Soft watercolor artistic prints' },
+  {
+    id: '1',
+    name: 'Floral Prints',
+    image: 'https://images.unsplash.com/photo-1487530811176-3780de880c2d?w=600&h=700&fit=crop',
+    count: 48,
+    description: 'Hand-drawn floral prints and embroideries for every occasion',
+  },
+  {
+    id: '2',
+    name: 'Botanical',
+    image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=600&h=700&fit=crop',
+    count: 36,
+    description: 'Nature-inspired botanical prints and thread embroideries',
+  },
+  {
+    id: '3',
+    name: 'Abstract',
+    image: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&h=700&fit=crop',
+    count: 24,
+    description: 'Modern abstract prints and experimental embroideries',
+  },
+  {
+    id: '4',
+    name: 'Geometric',
+    image: 'https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=600&h=700&fit=crop',
+    count: 32,
+    description: 'Clean geometric prints and structured embroideries',
+  },
+  {
+    id: '5',
+    name: 'Tropical',
+    image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&h=700&fit=crop',
+    count: 28,
+    description: 'Exotic tropical prints and lush embroideries',
+  },
+  {
+    id: '6',
+    name: 'Vintage',
+    image: 'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?w=600&h=700&fit=crop',
+    count: 42,
+    description: 'Classic vintage-inspired prints and heirloom embroideries',
+  },
+  {
+    id: '7',
+    name: 'Minimalist',
+    image: 'https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?w=600&h=700&fit=crop',
+    count: 20,
+    description: 'Simple, modern prints and subtle stitch details',
+  },
+  {
+    id: '8',
+    name: 'Watercolor',
+    image: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=600&h=700&fit=crop',
+    count: 18,
+    description: 'Soft watercolor-style prints and painterly embroideries',
+  },
 ];
 
 const Categories = () => {

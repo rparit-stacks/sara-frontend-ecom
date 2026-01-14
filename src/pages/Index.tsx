@@ -87,10 +87,26 @@ const testimonials = [
 ].slice(0, 10); // Limit to 10 as per requirements
 
 const features = [
-  { icon: 'fa-truck-fast', title: 'Free Shipping', desc: 'On orders over ₹999' },
-  { icon: 'fa-rotate-left', title: 'Easy Returns', desc: '15-day return policy' },
-  { icon: 'fa-shield-halved', title: 'Secure Payment', desc: '100% protected' },
-  { icon: 'fa-gem', title: 'Premium Quality', desc: 'Handcrafted with love' },
+  {
+    icon: 'fa-pen-fancy',
+    title: 'Artisanal prints & embroideries',
+    desc: 'Hand-drawn motifs carefully developed by expert designers',
+  },
+  {
+    icon: 'fa-scissors',
+    title: 'Made to order',
+    desc: 'Each piece is produced on demand for you',
+  },
+  {
+    icon: 'fa-feather-pointed',
+    title: 'Premium pure fabrics',
+    desc: 'A curated selection of premium silks, cottons and blends',
+  },
+  {
+    icon: 'fa-layer-group',
+    title: 'Low minimum order quantity',
+    desc: 'Start small without compromising on craftsmanship',
+  },
 ];
 
 // Instagram Posts (managed in AdminCMS)
@@ -188,7 +204,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Categories - With Background Image */}
+      {/* Categories - Signature Prints & Embroideries */}
       <section 
         className="w-full py-12 xs:py-16 sm:py-20 lg:py-28 relative"
         style={{
@@ -202,8 +218,12 @@ const Index = () => {
         <div className="relative max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
           <div className="text-center mb-8 xs:mb-10 sm:mb-16">
             <ScrollReveal>
-              <span className="text-primary uppercase tracking-[0.1em] xs:tracking-[0.15em] sm:tracking-[0.2em] text-xs xs:text-sm font-medium">Browse Collection</span>
-              <h2 className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl mt-2 xs:mt-3 sm:mt-4">Shop by Category</h2>
+              <span className="text-primary uppercase tracking-[0.1em] xs:tracking-[0.15em] sm:tracking-[0.2em] text-xs xs:text-sm font-medium">
+                Signature Collections
+              </span>
+              <h2 className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl mt-2 xs:mt-3 sm:mt-4">
+                Prints &amp; Embroideries
+              </h2>
             </ScrollReveal>
           </div>
           <div className="overflow-x-auto -mx-3 xs:-mx-4 sm:-mx-6 lg:-mx-12 px-3 xs:px-4 sm:px-6 lg:px-12 scrollbar-hide">
@@ -257,7 +277,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Full Width Banner with Background Image */}
+      {/* Full Width Banner - Create Your Own Design */}
       <section 
         className="relative w-full py-16 xs:py-20 sm:py-32 lg:py-44"
         style={{
@@ -269,14 +289,18 @@ const Index = () => {
         <div className="absolute inset-0 bg-foreground/60" />
         <div className="relative max-w-4xl mx-auto text-center text-white px-3 xs:px-4 sm:px-6">
           <ScrollReveal>
-            <span className="text-xs xs:text-sm uppercase tracking-[0.15em] xs:tracking-[0.2em] sm:tracking-[0.3em] text-white/80 mb-2 xs:mb-3 sm:mb-4 block">Personalized For You</span>
-            <h2 className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl mb-3 xs:mb-4 sm:mb-6">Create Your Own Design</h2>
+            <span className="text-xs xs:text-sm uppercase tracking-[0.15em] xs:tracking-[0.2em] sm:tracking-[0.3em] text-white/80 mb-2 xs:mb-3 sm:mb-4 block">
+              Personalized for you
+            </span>
+            <h2 className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl mb-3 xs:mb-4 sm:mb-6">
+              <span className="block">Create your own design</span>
+            </h2>
             <p className="text-sm xs:text-base sm:text-lg lg:text-xl text-white/80 mb-6 xs:mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed">
-              Choose from 100+ premium fabrics and 500+ exclusive patterns to create something truly unique and personal
+              Get personalized print and embroidery design services from a team of professionals with motifs and colour palette of your choice.
             </p>
             <Link to="/customize">
               <Button className="bg-white text-foreground hover:bg-white/90 rounded-full px-6 xs:px-8 sm:px-10 py-2.5 xs:py-3 sm:py-4 text-xs xs:text-sm sm:text-base font-semibold">
-                Start Customizing
+                Customise design-page
               </Button>
             </Link>
           </ScrollReveal>
@@ -307,7 +331,47 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Stats - Full Width with Background Image */}
+      {/* Brand Highlights - Stats Block */}
+      <section className="w-full py-10 xs:py-12 sm:py-16 lg:py-20 bg-secondary/40">
+        <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 xs:gap-6 sm:gap-8 text-center">
+            <ScrollReveal>
+              <div className="bg-white rounded-xl border border-border py-4 xs:py-5 sm:py-6 px-2">
+                <div className="font-cursive text-2xl xs:text-3xl sm:text-4xl text-primary mb-1">50+</div>
+                <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground uppercase tracking-[0.12em]">
+                  Brands served
+                </p>
+              </div>
+            </ScrollReveal>
+            <ScrollReveal delay={0.05}>
+              <div className="bg-white rounded-xl border border-border py-4 xs:py-5 sm:py-6 px-2">
+                <div className="font-cursive text-2xl xs:text-3xl sm:text-4xl text-primary mb-1">1000+</div>
+                <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground uppercase tracking-[0.12em]">
+                  Orders delivered
+                </p>
+              </div>
+            </ScrollReveal>
+            <ScrollReveal delay={0.1}>
+              <div className="bg-white rounded-xl border border-border py-4 xs:py-5 sm:py-6 px-2">
+                <div className="font-cursive text-2xl xs:text-3xl sm:text-4xl text-primary mb-1">150+</div>
+                <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground uppercase tracking-[0.12em]">
+                  Fabrics to select from
+                </p>
+              </div>
+            </ScrollReveal>
+            <ScrollReveal delay={0.15}>
+              <div className="bg-white rounded-xl border border-border py-4 xs:py-5 sm:py-6 px-2">
+                <div className="font-cursive text-2xl xs:text-3xl sm:text-4xl text-primary mb-1">100%</div>
+                <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground uppercase tracking-[0.12em]">
+                  Transparency
+                </p>
+              </div>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
+      {/* Brand Numbers - Full Width with Background Image */}
       <section 
         className="w-full py-10 xs:py-14 sm:py-20 lg:py-24 relative"
         style={{
@@ -382,10 +446,18 @@ const Index = () => {
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 xs:gap-3 sm:gap-6 lg:gap-10">
             {[
-              { icon: 'fa-hand-holding-heart', title: 'Handcrafted', desc: 'Each piece is carefully handcrafted by our skilled artisans with love and dedication' },
-              { icon: 'fa-leaf', title: 'Eco-Friendly', desc: 'We use sustainable materials and eco-conscious production methods' },
+              {
+                icon: 'fa-hand-holding-heart',
+                title: 'Crafted with love',
+                desc: 'Each piece is carefully crafted by our skilled artisans with care and attention to detail.',
+              },
+              {
+                icon: 'fa-leaf',
+                title: 'Eco-Friendly',
+                desc: 'We use sustainable materials, eco-conscious processes and azo-free dyes for printing.',
+              },
               { icon: 'fa-medal', title: 'Premium Quality', desc: 'Only the finest fabrics and materials make it to your wardrobe' },
-              { icon: 'fa-truck', title: 'Pan India Delivery', desc: 'Fast and free shipping to every corner of India' },
+              { icon: 'fa-truck', title: 'Pan India Delivery', desc: 'Reliable delivery to every corner of India' },
             ].map((item, i) => (
               <ScrollReveal key={item.title} delay={i * 0.1}>
                 <div className="text-center p-3 xs:p-4 sm:p-6 lg:p-10 bg-white/90 backdrop-blur-sm rounded-xl xs:rounded-2xl border border-border h-full">
@@ -412,9 +484,21 @@ const Index = () => {
           </div>
           <div className="grid grid-cols-1 xs:grid-cols-3 gap-6 xs:gap-4 sm:gap-12 lg:gap-16">
             {[
-              { step: '01', title: 'Browse & Select', desc: 'Explore our curated collection of floral prints, traditional designs, and contemporary patterns' },
-              { step: '02', title: 'Customize', desc: 'Personalize your design with our easy-to-use customization tools - choose fabric, size, and style' },
-              { step: '03', title: 'Receive', desc: 'Sit back and relax while we handcraft your piece and deliver it safely to your doorstep' },
+              {
+                step: '01',
+                title: 'Choose a ready design or make your own',
+                desc: 'Start with our curated collections or upload your own artwork for a fully custom journey.',
+              },
+              {
+                step: '02',
+                title: 'Select fabric quality',
+                desc: 'Pick from a range of premium base fabrics tailored to your product and budget.',
+              },
+              {
+                step: '03',
+                title: 'Choose quantity',
+                desc: 'Order with low minimums and full transparency at every stage of production.',
+              },
             ].map((item, i) => (
               <ScrollReveal key={item.step} delay={i * 0.15}>
                 <div className="text-center">
@@ -518,7 +602,7 @@ const Index = () => {
                 { id: 2, title: 'Sustainable Fabric Choices for Modern Living', image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&h=500&fit=crop', date: 'Jan 20, 2024' },
                 { id: 3, title: 'Custom Design Tips for Your Home', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&h=500&fit=crop', date: 'Jan 25, 2024' },
                 { id: 4, title: 'Traditional Patterns Meet Modern Aesthetics', image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=400&h=500&fit=crop', date: 'Feb 1, 2024' },
-                { id: 5, title: 'Caring for Your Handcrafted Textiles', image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=400&h=500&fit=crop', date: 'Feb 5, 2024' },
+                { id: 5, title: 'Caring for Your Crafted Textiles', image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=400&h=500&fit=crop', date: 'Feb 5, 2024' },
               ].map((blog, index) => (
                 <ScrollReveal key={blog.id} delay={index * 0.1}>
                   <Link to={`/blog/${blog.id}`} className="group block flex-shrink-0">

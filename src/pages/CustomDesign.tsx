@@ -137,17 +137,17 @@ const CustomDesign = () => {
                   Welcome
                 </motion.h1>
                 <p className="text-xs xs:text-sm sm:text-base md:text-lg lg:text-xl text-foreground font-medium mb-1">
-                  to the World of Exquisite
+                  Welcome to the world of exquisite
                 </p>
                 <p className="text-xs xs:text-sm sm:text-base md:text-lg lg:text-xl text-foreground font-medium mb-3 xs:mb-4 md:mb-6">
-                  Prints and Illustrations
+                  prints and embroideries.
                 </p>
                 <Button 
                   variant="outline"
                   className="px-3 xs:px-4 sm:px-6 md:px-8 py-2 xs:py-2.5 sm:py-3 md:py-4 lg:py-5 text-[10px] xs:text-xs sm:text-sm md:text-base border-2 border-[#d4a84b] text-[#d4a84b] hover:bg-[#d4a84b] hover:text-white rounded-none uppercase tracking-wider font-medium transition-all w-full sm:w-auto"
                   onClick={() => document.getElementById('design-form')?.scrollIntoView({ behavior: 'smooth' })}
                 >
-                  <span className="truncate">Print & Illustration Library</span>
+                  <span className="truncate">Begin your custom design</span>
                 </Button>
               </motion.div>
             </div>
@@ -377,11 +377,8 @@ const CustomDesign = () => {
                           <SelectValue placeholder="Select design type" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="fabric-print">Fabric Print</SelectItem>
-                          <SelectItem value="illustration">Illustration</SelectItem>
-                          <SelectItem value="logo">Logo Design</SelectItem>
-                          <SelectItem value="pattern">Pattern Design</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
+                          <SelectItem value="print-design">Print design</SelectItem>
+                          <SelectItem value="embroidery-design">Embroidery design</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

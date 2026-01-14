@@ -64,6 +64,9 @@ export const Footer = () => {
                 <span className="text-white"> Sara</span>
               </span>
             </Link>
+            <p className="text-white/70 text-xs sm:text-sm mb-2">
+              Premium textiles, prints and embroideries
+            </p>
             <p className="text-white/60 text-sm leading-relaxed mb-4">
               Premium floral textiles and prints. Handcrafted with love in India.
             </p>

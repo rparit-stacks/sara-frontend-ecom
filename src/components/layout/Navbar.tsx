@@ -39,6 +39,15 @@ export const Navbar = () => {
 
   return (
     <header className="sticky top-0 left-0 right-0 z-50 bg-white border-b border-border">
+      {/* Global marquee */}
+      <div className="bg-foreground text-background text-[10px] xs:text-[11px] sm:text-xs">
+        <div className="container-custom overflow-hidden">
+          <div className="marquee py-1">
+            <span className="mx-6">Made to order · Shipping takes 5–6 days</span>
+            <span className="mx-6">Made to order · Shipping takes 5–6 days</span>
+          </div>
+        </div>
+      </div>
       <div className="container-custom">
         <nav className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo - Text only, dual color */}
