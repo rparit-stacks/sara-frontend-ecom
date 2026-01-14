@@ -110,7 +110,7 @@ const CustomDesign = () => {
       <AnimatedWaveBackground />
       
       {/* Hero Section - Banner Style with Background Image & Flowers */}
-      <section className="relative bg-white/80 backdrop-blur-sm py-6 sm:py-8 lg:py-12 overflow-hidden">
+      <section className="relative bg-white/80 backdrop-blur-sm py-6 sm:py-8 lg:py-12 overflow-hidden z-20">
         <div className="relative mx-auto max-w-6xl px-3 xs:px-4 sm:px-6 lg:px-12">
           {/* Banner with custom background image */}
           <div 
@@ -153,46 +153,46 @@ const CustomDesign = () => {
             </div>
           </div>
 
-          {/* Left Flower - Desktop - Extending outside pattern */}
+          {/* Left Background Image - Desktop - Extending outside pattern */}
           <motion.div 
             initial={{ opacity: 0, x: -100 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="absolute left-0 top-1/2 -translate-y-1/2 hidden lg:block z-20 pointer-events-none"
+            className="absolute left-0 top-1/2 -translate-y-1/2 hidden lg:block z-30 pointer-events-none"
             style={{ left: '-120px' }}
           >
             <img 
-              src="/hero_trans/left.png" 
-              alt="Decorative flower left" 
+              src="/bg_images/6be0f0ce2c11383d352bd0828a354dba%20copy.png" 
+              alt="Decorative background left" 
               className="w-[350px] xl:w-[420px] 2xl:w-[480px] h-auto object-contain max-w-none"
             />
           </motion.div>
 
-          {/* Right Flower - Desktop - Extending outside pattern */}
+          {/* Right Background Image - Desktop - Extending outside pattern */}
           <motion.div 
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="absolute right-0 top-1/2 -translate-y-1/2 hidden lg:block z-20 pointer-events-none"
+            className="absolute right-0 top-1/2 -translate-y-1/2 hidden lg:block z-30 pointer-events-none"
             style={{ right: '-120px' }}
           >
             <img 
-              src="/hero_trans/right.png" 
-              alt="Decorative flower right" 
+              src="/bg_images/c71febdd919ac8f0010cd96003e2ff7d%20copy.png" 
+              alt="Decorative background right" 
               className="w-[350px] xl:w-[420px] 2xl:w-[480px] h-auto object-contain max-w-none"
             />
           </motion.div>
 
-          {/* Mobile Flowers - Right on top, Left on bottom */}
+          {/* Mobile Background Images - Right on top, Left on bottom */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6 }}
-            className="absolute -top-4 xs:-top-6 -right-2 xs:-right-4 lg:hidden z-20 pointer-events-none"
+            className="absolute -top-4 xs:-top-6 -right-2 xs:-right-4 lg:hidden z-30 pointer-events-none"
           >
             <img 
-              src="/hero_trans/right.png" 
-              alt="Decorative flower" 
+              src="/bg_images/c71febdd919ac8f0010cd96003e2ff7d%20copy.png" 
+              alt="Decorative background" 
               className="w-[80px] xs:w-[100px] sm:w-[120px] md:w-[160px] h-auto object-contain"
             />
           </motion.div>
@@ -201,11 +201,11 @@ const CustomDesign = () => {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="absolute -bottom-4 xs:-bottom-6 -left-2 xs:-left-4 lg:hidden z-5 pointer-events-none"
+            className="absolute -bottom-4 xs:-bottom-6 -left-2 xs:-left-4 lg:hidden z-30 pointer-events-none"
           >
             <img 
-              src="/hero_trans/left.png" 
-              alt="Decorative flower" 
+              src="/bg_images/6be0f0ce2c11383d352bd0828a354dba%20copy.png" 
+              alt="Decorative background" 
               className="w-[80px] xs:w-[100px] sm:w-[120px] md:w-[160px] h-auto object-contain"
             />
           </motion.div>
@@ -213,7 +213,7 @@ const CustomDesign = () => {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-white/90 backdrop-blur-sm relative z-10">
+      <section className="py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-white/90 backdrop-blur-sm relative z-0">
         <div className="container-custom">
           <ScrollReveal>
             <div className="text-center mb-8 xs:mb-10 sm:mb-12">
