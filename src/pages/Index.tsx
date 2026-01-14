@@ -170,17 +170,17 @@ const Index = () => {
       </section>
 
       {/* Features Bar - Full Width */}
-      <section className="w-full bg-muted py-6 xs:py-8 sm:py-10 lg:py-12 border-y border-border">
+      <section className="w-full bg-muted py-4 xs:py-6 sm:py-8 lg:py-10 xl:py-12 border-y border-border overflow-x-auto">
         <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 xs:gap-4 sm:gap-8 lg:gap-12">
+          <div className="flex flex-row sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-2 xs:gap-3 sm:gap-4 lg:gap-8 xl:gap-12 min-w-max sm:min-w-0">
             {features.map((feature) => (
-              <div key={feature.title} className="flex flex-col xs:flex-row items-center gap-2 xs:gap-3 sm:gap-5 justify-center lg:justify-start text-center xs:text-left">
-                <div className="w-10 h-10 xs:w-12 xs:h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <i className={`fa-solid ${feature.icon} text-sm xs:text-base sm:text-lg lg:text-xl text-primary`}></i>
+              <div key={feature.title} className="flex flex-row items-center gap-2 xs:gap-3 sm:gap-5 justify-start text-left min-w-[140px] xs:min-w-[160px] sm:min-w-0 sm:justify-center lg:justify-start">
+                <div className="w-8 h-8 xs:w-10 xs:h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 xl:w-16 xl:h-16 rounded-full bg-[#2b9d8f]/10 flex items-center justify-center flex-shrink-0">
+                  <i className={`fa-solid ${feature.icon} text-xs xs:text-sm sm:text-base lg:text-lg xl:text-xl text-[#2b9d8f]`}></i>
                 </div>
-                <div>
-                  <h4 className="font-semibold text-xs xs:text-sm sm:text-base lg:text-lg">{feature.title}</h4>
-                  <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground hidden xs:block">{feature.desc}</p>
+                <div className="min-w-0">
+                  <h4 className="font-semibold text-[10px] xs:text-xs sm:text-sm lg:text-base xl:text-lg truncate">{feature.title}</h4>
+                  <p className="text-[9px] xs:text-[10px] sm:text-xs lg:text-sm text-muted-foreground hidden xs:block truncate">{feature.desc}</p>
                 </div>
               </div>
             ))}

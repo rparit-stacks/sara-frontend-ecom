@@ -74,20 +74,20 @@ const PlainProductSelectionPopup: React.FC<PlainProductSelectionPopupProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 py-4 border-b border-border flex-shrink-0">
-          <DialogTitle className="font-cursive text-3xl flex items-center gap-3">
-            <Package className="w-6 h-6 text-primary" />
-            Select Plain Product (Fabric)
+        <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border flex-shrink-0">
+          <DialogTitle className="font-semibold text-lg sm:text-xl md:text-2xl lg:text-3xl flex items-center gap-2 sm:gap-3">
+            <Package className="w-5 h-5 sm:w-6 sm:h-6 text-[#2b9d8f] flex-shrink-0" />
+            <span className="break-words">Select Plain Product (Fabric)</span>
           </DialogTitle>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2">
             Choose a plain product to combine with this design
           </p>
         </DialogHeader>
 
         {/* Search Input */}
-        <div className="px-6 py-4 border-b border-border flex-shrink-0">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border flex-shrink-0">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
             <Input
               placeholder="Search plain products..."
               value={searchQuery}
@@ -97,7 +97,7 @@ const PlainProductSelectionPopup: React.FC<PlainProductSelectionPopupProps> = ({
                   setShowAllProducts(true);
                 }
               }}
-              className="pl-10 pr-10 h-12 text-base"
+              className="pl-9 sm:pl-10 pr-9 sm:pr-10 h-10 sm:h-12 text-sm sm:text-base"
               autoFocus
             />
             {searchQuery && (
@@ -163,10 +163,10 @@ const PlainProductSelectionPopup: React.FC<PlainProductSelectionPopupProps> = ({
                 <Button
                   onClick={() => setShowAllProducts(true)}
                   variant="outline"
-                  className="w-full h-12 text-base gap-2"
+                  className="w-full h-11 sm:h-12 text-sm sm:text-base gap-2"
                 >
-                  <Search className="w-5 h-5" />
-                  Browse All Plain Products
+                  <Search className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                  <span className="truncate">Browse All Plain Products</span>
                 </Button>
               </div>
             </div>
@@ -221,14 +221,14 @@ const PlainProductSelectionPopup: React.FC<PlainProductSelectionPopupProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-border flex-shrink-0 flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border flex-shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             {showAllProducts || searchQuery 
               ? `${allProducts.length} product${allProducts.length !== 1 ? 's' : ''} found`
               : `${recommendedProducts.length} recommended product${recommendedProducts.length !== 1 ? 's' : ''}`
             }
           </p>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base">
             Cancel
           </Button>
         </div>

@@ -262,9 +262,9 @@ const ProductDetail = () => {
   return (
     <Layout>
       {/* Breadcrumb */}
-      <section className="w-full bg-secondary/30 py-5">
-        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
-          <nav className="flex items-center text-sm text-muted-foreground flex-wrap">
+      <section className="w-full bg-secondary/30 py-3 sm:py-5">
+        <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
+          <nav className="flex items-center text-xs sm:text-sm text-muted-foreground flex-wrap gap-1 sm:gap-0">
             <Link to="/" className="hover:text-primary transition-colors">Home</Link>
             <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
             <Link to="/products" className="hover:text-primary transition-colors">Products</Link>
@@ -277,18 +277,18 @@ const ProductDetail = () => {
       </section>
 
       {/* Product Section */}
-      <section className="w-full py-14 lg:py-20">
-        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
-          <div className="grid lg:grid-cols-12 gap-10 lg:gap-16">
+      <section className="w-full py-8 sm:py-14 lg:py-20">
+        <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
+          <div className="grid lg:grid-cols-12 gap-6 sm:gap-10 lg:gap-16">
             {/* Images */}
             <div className="lg:col-span-5">
               <ScrollReveal direction="left">
-                <div className="space-y-5">
+                <div className="space-y-3 sm:space-y-5">
                   <motion.div
                     key={selectedImage}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="aspect-square rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-sm mx-auto max-w-lg"
+                    className="aspect-square rounded-xl sm:rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-sm mx-auto w-full max-w-full sm:max-w-lg"
                   >
                     <img
                       src={product.images[selectedImage]}
@@ -297,13 +297,13 @@ const ProductDetail = () => {
                     />
                   </motion.div>
                   
-                  <div className="grid grid-cols-4 gap-4 max-w-lg mx-auto">
+                  <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-full sm:max-w-lg mx-auto">
                     {product.images.map((image: string, index: number) => (
                       <button
                         key={index}
                         onClick={() => setSelectedImage(index)}
                         className={cn(
-                          "aspect-square rounded-xl overflow-hidden border-2 transition-all",
+                          "aspect-square rounded-lg sm:rounded-xl overflow-hidden border-2 transition-all",
                           selectedImage === index 
                             ? 'border-primary' 
                             : 'border-transparent hover:border-primary/50'
@@ -333,8 +333,8 @@ const ProductDetail = () => {
 
                   {/* Title & Price */}
                   <div>
-                    <p className="text-muted-foreground mb-3 text-lg">{product.category}</p>
-                    <h1 className="font-cursive text-5xl lg:text-6xl mb-5">{product.name}</h1>
+                    <p className="text-muted-foreground mb-2 sm:mb-3 text-sm sm:text-lg">{product.category}</p>
+                    <h1 className="font-cursive text-2xl xs:text-3xl sm:text-4xl lg:text-5xl xl:text-6xl mb-3 sm:mb-5 break-words">{product.name}</h1>
 
                     {/* Price Display */}
                     {product.type === 'DESIGNED' && (
@@ -383,15 +383,15 @@ const ProductDetail = () => {
                   </div>
 
                   {/* Description */}
-                  <p className="text-muted-foreground text-lg leading-relaxed">{product.description}</p>
+                  <p className="text-muted-foreground text-sm sm:text-base lg:text-lg leading-relaxed">{product.description}</p>
 
                   {/* Custom Fields */}
                   {product.customFields && product.customFields.length > 0 && (
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       {product.customFields.map((field: CustomField) => (
-                        <div key={field.id} className="flex items-center gap-3">
-                          <span className="text-sm font-medium text-muted-foreground min-w-[120px]">{field.label}:</span>
-                          <span className="text-base">{field.value}</span>
+                        <div key={field.id} className="flex flex-col xs:flex-row items-start xs:items-center gap-1 xs:gap-3">
+                          <span className="text-xs sm:text-sm font-medium text-muted-foreground xs:min-w-[120px]">{field.label}:</span>
+                          <span className="text-sm sm:text-base break-words">{field.value}</span>
                         </div>
                       ))}
                     </div>
@@ -434,25 +434,25 @@ const ProductDetail = () => {
                                       }
                                     }}
                                     className={cn(
-                                      "flex items-center gap-2 px-4 py-2.5 rounded-full border-2 transition-all text-sm",
+                                      "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full border-2 transition-all text-xs sm:text-sm",
                                       isSelected
-                                        ? "border-primary bg-primary/10 text-primary"
-                                        : "border-border hover:border-primary/50 text-foreground"
+                                        ? "border-[#2b9d8f] bg-[#2b9d8f]/10 text-[#2b9d8f]"
+                                        : "border-border hover:border-[#2b9d8f]/50 text-foreground"
                                     )}
                                   >
                                     <div className={cn(
-                                      "w-4 h-4 rounded border-2 flex items-center justify-center transition-all",
+                                      "w-3.5 h-3.5 sm:w-4 sm:h-4 rounded border-2 flex items-center justify-center transition-all flex-shrink-0",
                                       isSelected
-                                        ? "border-primary bg-primary"
+                                        ? "border-[#2b9d8f] bg-[#2b9d8f]"
                                         : "border-border"
                                     )}>
                                       {isSelected && (
-                                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                                         </svg>
                                       )}
                                     </div>
-                                    <span className="font-medium">{productName}</span>
+                                    <span className="font-medium truncate">{productName}</span>
                                   </button>
                                 );
                               })}
@@ -462,10 +462,10 @@ const ProductDetail = () => {
                         <Button
                           onClick={() => setShowPlainProductSelection(true)}
                           variant="outline"
-                          className="w-full h-12 text-base gap-2"
+                          className="w-full h-11 sm:h-12 text-sm sm:text-base gap-2"
                         >
-                          <Palette className="w-5 h-5" />
-                          {selectedPlainProductId ? 'Change Plain Product' : 'Browse All Plain Products'}
+                          <Palette className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                          <span className="truncate">{selectedPlainProductId ? 'Change Product' : 'Browse All Products'}</span>
                         </Button>
                       </div>
                     </div>
@@ -492,15 +492,15 @@ const ProductDetail = () => {
                                     [variant.id]: option.id
                                   })}
                                   className={cn(
-                                    "px-5 py-3 rounded-full border-2 transition-all text-base",
+                                    "px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 md:py-3 rounded-full border-2 transition-all text-xs sm:text-sm md:text-base",
                                     selectedOptionId === option.id
-                                      ? 'border-primary bg-primary/10'
-                                      : 'border-border hover:border-primary/50'
+                                      ? 'border-[#2b9d8f] bg-[#2b9d8f]/10 text-[#2b9d8f]'
+                                      : 'border-border hover:border-[#2b9d8f]/50'
                                   )}
                                 >
-                                  {option.value}
+                                  <span className="truncate">{option.value}</span>
                                   {option.priceModifier && option.priceModifier > 0 && (
-                                    <span className="text-xs text-primary ml-2">(+₹{option.priceModifier})</span>
+                                    <span className="text-[10px] sm:text-xs text-[#2b9d8f] ml-1 sm:ml-2 whitespace-nowrap">(+₹{option.priceModifier})</span>
                                   )}
                                 </button>
                               ))}
@@ -553,7 +553,7 @@ const ProductDetail = () => {
                   )}
 
                   {/* Actions */}
-                  <div className="flex gap-4 flex-wrap pt-4">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-wrap pt-4">
                     {product.type === 'DESIGNED' && (
                       <Button
                         size="lg"
@@ -564,10 +564,10 @@ const ProductDetail = () => {
                             setShowFabricVariant(true);
                           }
                         }}
-                        className="flex-1 min-w-[220px] btn-primary gap-3 h-14 text-base"
+                        className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-12 sm:h-14 text-sm sm:text-base px-4 sm:px-6"
                       >
-                        <ShoppingBag className="w-5 h-5" />
-                        {selectedPlainProductId ? 'Add to Cart' : 'Select Plain Product First'}
+                        <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                        <span className="truncate">{selectedPlainProductId ? 'Add to Cart' : 'Select Product First'}</span>
                       </Button>
                     )}
                     
@@ -575,10 +575,10 @@ const ProductDetail = () => {
                       <Button
                         size="lg"
                         onClick={handlePlainProductAddToCart}
-                        className="flex-1 min-w-[220px] btn-primary gap-3 h-14 text-base"
+                        className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-12 sm:h-14 text-sm sm:text-base px-4 sm:px-6"
                       >
-                        <ShoppingBag className="w-5 h-5" />
-                        Add to Cart
+                        <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                        <span className="truncate">Add to Cart</span>
                       </Button>
                     )}
                     
@@ -586,19 +586,21 @@ const ProductDetail = () => {
                       <Button
                         size="lg"
                         onClick={handleDigitalDownload}
-                        className="flex-1 min-w-[220px] btn-primary gap-3 h-14 text-base"
+                        className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-12 sm:h-14 text-sm sm:text-base px-4 sm:px-6"
                       >
-                        <Download className="w-5 h-5" />
-                        Download Now
+                        <Download className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                        <span className="truncate">Download Now</span>
                       </Button>
                     )}
                     
-                    <Button size="lg" variant="outline" className="rounded-full w-14 h-14">
-                      <Heart className="w-5 h-5" />
-                    </Button>
-                    <Button size="lg" variant="outline" className="rounded-full w-14 h-14">
-                      <Share2 className="w-5 h-5" />
-                    </Button>
+                    <div className="flex gap-3 sm:gap-4 w-full sm:w-auto">
+                      <Button size="lg" variant="outline" className="rounded-full w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0">
+                        <Heart className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </Button>
+                      <Button size="lg" variant="outline" className="rounded-full w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0">
+                        <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Features */}

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Grid, List, SlidersHorizontal } from 'lucide-react';
+import { Grid, List, SlidersHorizontal, Search } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -28,32 +29,52 @@ const CategoryProducts = () => {
   const { id } = useParams();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState('featured');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Filter products by search query
+  const filteredProducts = products.filter(product =>
+    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    product.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <Layout>
       {/* Hero */}
-      <section className="w-full bg-secondary/30 py-14 lg:py-20">
-        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
+      <section className="w-full bg-secondary/30 py-8 sm:py-12 lg:py-16 xl:py-20">
+        <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
           <ScrollReveal>
-            <nav className="text-sm text-muted-foreground mb-4">
+            <nav className="text-xs xs:text-sm text-muted-foreground mb-3 xs:mb-4 flex flex-wrap gap-1 sm:gap-0">
               <span>Home</span>
-              <span className="mx-2">/</span>
+              <span className="mx-1 sm:mx-2">/</span>
               <span>Categories</span>
-              <span className="mx-2">/</span>
+              <span className="mx-1 sm:mx-2">/</span>
               <span className="text-foreground">Floral Prints</span>
             </nav>
-            <h1 className="font-cursive text-5xl lg:text-6xl">Floral Prints</h1>
-            <p className="text-muted-foreground mt-3 text-lg">48 Products</p>
+            <h1 className="font-cursive text-3xl xs:text-4xl sm:text-5xl lg:text-6xl">Floral Prints</h1>
+            <p className="text-muted-foreground mt-2 xs:mt-3 text-sm xs:text-base sm:text-lg">48 Products</p>
           </ScrollReveal>
         </div>
       </section>
 
       {/* Products Section */}
-      <section className="w-full py-14 lg:py-20">
-        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
+      <section className="w-full py-8 sm:py-12 lg:py-16 xl:py-20">
+        <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
+          {/* Search Bar */}
+          <div className="mb-4 sm:mb-6">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+              <Input
+                placeholder="Search products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 sm:pl-10 pr-4 h-10 sm:h-11 text-sm sm:text-base"
+              />
+            </div>
+          </div>
+          
           {/* Toolbar */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-6 sm:mb-8 lg:mb-10">
+            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
               {/* Mobile Filter */}
               <Sheet>
                 <SheetTrigger asChild>
@@ -116,7 +137,7 @@ const CategoryProducts = () => {
 
             {/* Sort */}
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[200px] h-11">
+              <SelectTrigger className="w-full sm:w-[180px] lg:w-[200px] h-10 sm:h-11 text-sm sm:text-base">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
@@ -160,27 +181,33 @@ const CategoryProducts = () => {
 
             {/* Products Grid */}
             <div className="flex-1 min-w-0">
-              <div className={`grid gap-6 lg:gap-8 ${
-                viewMode === 'grid' 
-                  ? 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
-                  : 'grid-cols-1'
-              }`}>
-                {products.map((product, index) => (
-                  <ScrollReveal key={product.id} delay={index * 0.05}>
-                    <ProductCard product={product} />
-                  </ScrollReveal>
-                ))}
-              </div>
+              {filteredProducts.length === 0 ? (
+                <div className="text-center py-12 sm:py-16">
+                  <p className="text-muted-foreground text-sm sm:text-base">No products found matching "{searchQuery}"</p>
+                </div>
+              ) : (
+                <div className={`grid gap-3 xs:gap-4 sm:gap-6 lg:gap-8 ${
+                  viewMode === 'grid' 
+                    ? 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
+                    : 'grid-cols-1'
+                }`}>
+                  {filteredProducts.map((product, index) => (
+                    <ScrollReveal key={product.id} delay={index * 0.05}>
+                      <ProductCard product={product} />
+                    </ScrollReveal>
+                  ))}
+                </div>
+              )}
 
               {/* Pagination */}
-              <div className="flex justify-center items-center gap-3 mt-16">
-                <Button variant="outline" disabled className="h-11">Previous</Button>
-                <Button variant="secondary" className="w-11 h-11">1</Button>
-                <Button variant="ghost" className="w-11 h-11">2</Button>
-                <Button variant="ghost" className="w-11 h-11">3</Button>
-                <span className="px-2">...</span>
-                <Button variant="ghost" className="w-11 h-11">10</Button>
-                <Button variant="outline" className="h-11">Next</Button>
+              <div className="flex justify-center items-center gap-2 sm:gap-3 mt-8 sm:mt-12 lg:mt-16 flex-wrap">
+                <Button variant="outline" disabled className="h-9 sm:h-10 lg:h-11 text-xs sm:text-sm px-3 sm:px-4">Previous</Button>
+                <Button variant="secondary" className="w-9 h-9 sm:w-10 sm:h-10 lg:w-11 lg:h-11 text-xs sm:text-sm">1</Button>
+                <Button variant="ghost" className="w-9 h-9 sm:w-10 sm:h-10 lg:w-11 lg:h-11 text-xs sm:text-sm">2</Button>
+                <Button variant="ghost" className="w-9 h-9 sm:w-10 sm:h-10 lg:w-11 lg:h-11 text-xs sm:text-sm">3</Button>
+                <span className="px-1 sm:px-2 text-xs sm:text-sm">...</span>
+                <Button variant="ghost" className="w-9 h-9 sm:w-10 sm:h-10 lg:w-11 lg:h-11 text-xs sm:text-sm">10</Button>
+                <Button variant="outline" className="h-9 sm:h-10 lg:h-11 text-xs sm:text-sm px-3 sm:px-4">Next</Button>
               </div>
             </div>
           </div>

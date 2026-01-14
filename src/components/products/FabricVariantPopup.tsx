@@ -129,31 +129,31 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 py-4 border-b border-border flex-shrink-0">
-          <DialogTitle className="font-cursive text-3xl flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg overflow-hidden">
+        <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border flex-shrink-0">
+          <DialogTitle className="font-semibold text-lg sm:text-xl md:text-2xl lg:text-3xl flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg overflow-hidden flex-shrink-0">
               <img src={fabric.image} alt={fabric.name} className="w-full h-full object-cover" />
             </div>
-            <div>
-              <div>{fabric.name}</div>
-              <p className="text-sm font-normal text-muted-foreground mt-1">
+            <div className="min-w-0">
+              <div className="break-words">{fabric.name}</div>
+              <p className="text-xs sm:text-sm font-normal text-muted-foreground mt-1">
                 Select variants and quantity
               </p>
             </div>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Fabric Preview */}
-          <div className="flex gap-4 items-center p-4 bg-secondary/30 rounded-xl border border-border">
+          <div className="flex gap-3 sm:gap-4 items-center p-3 sm:p-4 bg-secondary/30 rounded-lg sm:rounded-xl border border-border">
             <img
               src={fabric.image}
               alt={fabric.name}
-              className="w-20 h-20 rounded-lg object-cover"
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover flex-shrink-0"
             />
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg">{fabric.name}</h3>
-              <p className="text-sm text-muted-foreground">Base Price: ₹{fabric.pricePerMeter}/meter</p>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-sm sm:text-base lg:text-lg truncate">{fabric.name}</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">Base Price: ₹{fabric.pricePerMeter}/meter</p>
             </div>
           </div>
 
@@ -187,15 +187,15 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
                         key={option.id}
                         onClick={() => handleVariantChange(variant.id, option.id)}
                         className={cn(
-                          "px-4 py-2.5 rounded-full border-2 transition-all text-sm flex items-center gap-2",
+                          "px-3 sm:px-4 py-2 sm:py-2.5 rounded-full border-2 transition-all text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2",
                           isSelected
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border hover:border-primary/50"
+                            ? "border-[#2b9d8f] bg-[#2b9d8f]/10 text-[#2b9d8f]"
+                            : "border-border hover:border-[#2b9d8f]/50"
                         )}
                       >
-                        {option.value}
+                        <span className="truncate">{option.value}</span>
                         {option.priceModifier && option.priceModifier > 0 && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
                             (+₹{option.priceModifier})
                           </span>
                         )}
@@ -237,15 +237,15 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
           </div>
 
           {/* Price Summary */}
-          <div className="p-4 bg-primary/5 rounded-xl border border-primary/20">
+          <div className="p-3 sm:p-4 bg-[#2b9d8f]/5 rounded-lg sm:rounded-xl border border-[#2b9d8f]/20">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Price</p>
-                <p className="text-2xl font-cursive text-primary mt-1">
-                  <IndianRupee className="w-5 h-5 inline" />
+                <p className="text-xs sm:text-sm text-muted-foreground">Total Price</p>
+                <p className="text-xl sm:text-2xl font-semibold text-[#2b9d8f] mt-1">
+                  <IndianRupee className="w-4 h-4 sm:w-5 sm:h-5 inline" />
                   {totalPrice.toLocaleString('en-IN')}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
                   {quantity} meter{quantity !== 1 ? 's' : ''} × ₹{pricePerMeter}/meter
                 </p>
               </div>
@@ -254,13 +254,13 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-border flex-shrink-0 flex items-center justify-between gap-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border flex-shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base">
             Cancel
           </Button>
-          <Button onClick={handleAddToCart} className="btn-primary gap-2 flex-1 max-w-xs">
-            <Plus className="w-4 h-4" />
-            Add to Cart
+          <Button onClick={handleAddToCart} className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 flex-1 sm:max-w-xs h-10 sm:h-11 text-sm sm:text-base">
+            <Plus className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">Add to Cart</span>
           </Button>
         </div>
       </DialogContent>
