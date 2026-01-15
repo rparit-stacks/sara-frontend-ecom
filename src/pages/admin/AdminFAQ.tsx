@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, Save, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Save, X, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dialog,
@@ -26,42 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import RichTextEditor from '@/components/admin/RichTextEditor';
 import { toast } from 'sonner';
-
-// Mock FAQ data - in real app, fetch from API: GET /api/admin/faqs
-const mockFAQs = [
-  { 
-    id: 1, 
-    question: 'What is the return policy?', 
-    answer: 'We offer a 30-day return policy for unused items in original packaging. Items must be in their original condition.',
-    category: 'Returns',
-    order: 1,
-    status: 'active'
-  },
-  { 
-    id: 2, 
-    question: 'How long does shipping take?', 
-    answer: 'Standard shipping takes 5-7 business days. Express shipping is available and takes 2-3 business days.',
-    category: 'Shipping',
-    order: 2,
-    status: 'active'
-  },
-  { 
-    id: 3, 
-    question: 'Can I customize my order?', 
-    answer: 'Yes! You can upload your own design through our "Make Your Own" feature and create custom products.',
-    category: 'Customization',
-    order: 3,
-    status: 'active'
-  },
-  { 
-    id: 4, 
-    question: 'What payment methods do you accept?', 
-    answer: 'We accept all major credit cards, debit cards, UPI, and cash on delivery.',
-    category: 'Payment',
-    order: 4,
-    status: 'inactive'
-  },
-];
+import { faqApi } from '@/lib/api';
 
 const categories = ['All', 'Shipping', 'Returns', 'Payment', 'Customization', 'Products', 'General'];
 
@@ -72,6 +38,56 @@ const AdminFAQ = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingFAQ, setEditingFAQ] = useState<any>(null);
   const [deleteFAQId, setDeleteFAQId] = useState<number | null>(null);
+  
+  const queryClient = useQueryClient();
+  
+  // Fetch FAQs from API
+  const { data: faqs = [], isLoading, error } = useQuery({
+    queryKey: ['faqs'],
+    queryFn: () => faqApi.getAllAdmin(),
+  });
+  
+  // Create mutation
+  const createMutation = useMutation({
+    mutationFn: faqApi.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['faqs'] });
+      toast.success('FAQ created successfully!');
+      setIsAddDialogOpen(false);
+      handleResetForm();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to create FAQ');
+    },
+  });
+  
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => faqApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['faqs'] });
+      toast.success('FAQ updated successfully!');
+      setIsEditDialogOpen(false);
+      setEditingFAQ(null);
+      handleResetForm();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update FAQ');
+    },
+  });
+  
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: faqApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['faqs'] });
+      toast.success('FAQ deleted successfully!');
+      setDeleteFAQId(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to delete FAQ');
+    },
+  });
   
   const [formData, setFormData] = useState({
     question: '',
@@ -113,13 +129,16 @@ const AdminFAQ = () => {
       return;
     }
 
-    // TODO: Call API
-    console.log('FAQ Payload:', formData);
-    toast.success(editingFAQ ? 'FAQ updated successfully!' : 'FAQ created successfully!');
-    setIsAddDialogOpen(false);
-    setIsEditDialogOpen(false);
-    handleResetForm();
-    setEditingFAQ(null);
+    const payload = {
+      ...formData,
+      status: formData.status.toUpperCase(),
+    };
+
+    if (editingFAQ) {
+      updateMutation.mutate({ id: editingFAQ.id, data: payload });
+    } else {
+      createMutation.mutate(payload);
+    }
   };
 
   const handleDelete = (faqId: number) => {
@@ -127,27 +146,51 @@ const AdminFAQ = () => {
   };
 
   const confirmDelete = () => {
-    // TODO: Call API
-    toast.success('FAQ deleted successfully!');
-    setDeleteFAQId(null);
+    if (deleteFAQId) {
+      deleteMutation.mutate(deleteFAQId);
+    }
   };
 
   const handleMoveUp = (faq: any) => {
-    // TODO: Call API to update order
-    toast.success('Order updated');
+    // Reorder mutation
+    const newOrder = (faq.order || 0) - 1;
+    if (newOrder >= 0) {
+      updateMutation.mutate({ id: faq.id, data: { ...faq, order: newOrder } });
+    }
   };
 
   const handleMoveDown = (faq: any) => {
-    // TODO: Call API to update order
-    toast.success('Order updated');
+    // Reorder mutation
+    const newOrder = (faq.order || 0) + 1;
+    updateMutation.mutate({ id: faq.id, data: { ...faq, order: newOrder } });
   };
 
-  const filteredFAQs = mockFAQs.filter(faq => {
+  const filteredFAQs = faqs.filter((faq: any) => {
     const matchesCategory = selectedCategory === 'All' || faq.category === selectedCategory;
-    const matchesSearch = faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = faq.question?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         faq.answer?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
-  }).sort((a, b) => a.order - b.order);
+  }).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+  
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
+    );
+  }
+  
+  if (error) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-destructive">Failed to load FAQs. Please try again.</p>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>

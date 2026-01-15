@@ -1,61 +1,76 @@
+import { useQuery } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { Package, Palette, Image, Users, Activity, TrendingUp } from 'lucide-react';
+import { Package, Palette, Image, Users, Activity, TrendingUp, ShoppingBag, Loader2, IndianRupee } from 'lucide-react';
 import { motion } from 'framer-motion';
-
-const stats = [
-  { 
-    icon: Package, 
-    label: 'Total Products', 
-    value: '48', 
-    change: '+12%', 
-    color: 'text-primary' 
-  },
-  { 
-    icon: Palette, 
-    label: 'Total Fabrics', 
-    value: '156', 
-    change: '+8%', 
-    color: 'text-pink-600' 
-  },
-  { 
-    icon: Image, 
-    label: 'Total Designs', 
-    value: '324', 
-    change: '+15%', 
-    color: 'text-purple-600' 
-  },
-  { 
-    icon: Users, 
-    label: 'Total Users', 
-    value: '1,234', 
-    change: '+23%', 
-    color: 'text-blue-600' 
-  },
-  { 
-    icon: Activity, 
-    label: 'Mockups Created', 
-    value: '5,678', 
-    change: '+18%', 
-    color: 'text-green-600' 
-  },
-  { 
-    icon: TrendingUp, 
-    label: 'Active Sessions', 
-    value: '89', 
-    change: '+5%', 
-    color: 'text-orange-600' 
-  },
-];
-
-const recentMockups = [
-  { id: 1, user: 'Priya Sharma', product: 'Floral Scarf', fabric: 'Silk Pink', design: 'Rose Pattern', time: '2 mins ago' },
-  { id: 2, user: 'Rajesh Kumar', product: 'Cushion Cover', fabric: 'Cotton Blue', design: 'Custom Upload', time: '15 mins ago' },
-  { id: 3, user: 'Anita Reddy', product: 'Table Runner', fabric: 'Linen Cream', design: 'Paisley', time: '32 mins ago' },
-  { id: 4, user: 'Meera Kapoor', product: 'Bedspread', fabric: 'Cotton White', design: 'Floral', time: '1 hour ago' },
-  { id: 5, user: 'Vikram Singh', product: 'Scarf', fabric: 'Silk Indigo', design: 'Geometric', time: '2 hours ago' },
-];
+import { dashboardApi } from '@/lib/api';
 
 const AdminDashboard = () => {
+  // Fetch dashboard stats from API
+  const { data: statsData, isLoading, error } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: () => dashboardApi.getStats(),
+  });
+  
+  // Build stats from API data
+  const stats = [
+    { 
+      icon: Users, 
+      label: 'Total Users', 
+      value: statsData?.totalUsers?.toLocaleString() || '0', 
+      change: `${statsData?.activeUsers || 0} active`, 
+      color: 'text-blue-600' 
+    },
+    { 
+      icon: ShoppingBag, 
+      label: 'Total Orders', 
+      value: statsData?.totalOrders?.toLocaleString() || '0', 
+      change: `${statsData?.pendingOrders || 0} pending`, 
+      color: 'text-green-600' 
+    },
+    { 
+      icon: IndianRupee, 
+      label: 'Total Revenue', 
+      value: `₹${(statsData?.totalRevenue || 0).toLocaleString('en-IN')}`, 
+      change: 'Paid orders', 
+      color: 'text-primary' 
+    },
+    { 
+      icon: Package, 
+      label: 'Total Products', 
+      value: statsData?.totalProducts?.toLocaleString() || '0', 
+      change: '', 
+      color: 'text-pink-600' 
+    },
+    { 
+      icon: Palette, 
+      label: 'Total Categories', 
+      value: statsData?.totalCategories?.toLocaleString() || '0', 
+      change: '', 
+      color: 'text-purple-600' 
+    },
+  ];
+
+  const recentOrders = statsData?.recentOrders || [];
+  
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
+    );
+  }
+  
+  if (error) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-destructive">Failed to load dashboard stats. Please try again.</p>
+        </div>
+      </AdminLayout>
+    );
+  }
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -94,36 +109,42 @@ const AdminDashboard = () => {
 
         {/* Recent Activity */}
         <div className="grid lg:grid-cols-2 gap-6">
-          {/* Recent Mockups */}
+          {/* Recent Orders */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.6, duration: 0.4 }}
             className="bg-white rounded-xl p-6 border border-border shadow-sm"
           >
-            <h2 className="font-cursive text-2xl font-bold mb-4">Recent Mockups</h2>
+            <h2 className="font-cursive text-2xl font-bold mb-4">Recent Orders</h2>
             <div className="space-y-4">
-              {recentMockups.map((mockup, index) => (
-                <motion.div
-                  key={mockup.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.7 + index * 0.1, duration: 0.3 }}
-                  whileHover={{ x: 5, scale: 1.02 }}
-                  className="flex items-start gap-4 p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <Activity className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm">{mockup.user}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {mockup.product} • {mockup.fabric} • {mockup.design}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">{mockup.time}</p>
-                  </div>
-                </motion.div>
-              ))}
+              {recentOrders.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No recent orders</p>
+              ) : (
+                recentOrders.map((order: any, index: number) => (
+                  <motion.div
+                    key={order.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.7 + index * 0.1, duration: 0.3 }}
+                    whileHover={{ x: 5, scale: 1.02 }}
+                    className="flex items-start gap-4 p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <ShoppingBag className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm">{order.userName || order.userEmail}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Order #{order.orderNumber} • ₹{order.total?.toLocaleString('en-IN') || 0}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {order.status} • {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : ''}
+                      </p>
+                    </div>
+                  </motion.div>
+                ))
+              )}
             </div>
           </motion.div>
 

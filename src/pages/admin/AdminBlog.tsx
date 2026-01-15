@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, Save, X, Upload, Image as ImageIcon, Calendar, Eye, EyeOff } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, Search, Edit, Trash2, Save, X, Upload, Calendar, Eye, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
@@ -24,42 +25,10 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import RichTextEditor from '@/components/admin/RichTextEditor';
 import { toast } from 'sonner';
-
-// Mock blog posts
-const mockBlogs = [
-  { 
-    id: 1, 
-    title: 'The Art of Floral Design in Indian Textiles', 
-    excerpt: 'Explore the rich tradition of floral patterns in Indian textile design...',
-    image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=600&h=400&fit=crop',
-    author: 'Studio Sara',
-    publishedAt: '2024-01-15',
-    status: 'active',
-    views: 1250
-  },
-  { 
-    id: 2, 
-    title: 'Sustainable Fabric Choices for Modern Living', 
-    excerpt: 'Learn about eco-friendly fabric options that combine style with sustainability...',
-    image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&h=400&fit=crop',
-    author: 'Studio Sara',
-    publishedAt: '2024-01-20',
-    status: 'active',
-    views: 890
-  },
-  { 
-    id: 3, 
-    title: 'Custom Design Tips for Your Home', 
-    excerpt: 'Discover how to create personalized home decor with our custom design tools...',
-    image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=600&h=400&fit=crop',
-    author: 'Studio Sara',
-    publishedAt: '2024-01-25',
-    status: 'inactive',
-    views: 450
-  },
-];
+import { blogApi } from '@/lib/api';
 
 const AdminBlog = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,13 +37,84 @@ const AdminBlog = () => {
   const [editingBlog, setEditingBlog] = useState<any>(null);
   const [deleteBlogId, setDeleteBlogId] = useState<number | null>(null);
   
+  const queryClient = useQueryClient();
+  
   const [formData, setFormData] = useState({
     title: '',
     excerpt: '',
     content: '',
     image: '',
     author: 'Studio Sara',
-    status: 'active' as 'active' | 'inactive',
+    category: '',
+    status: 'ACTIVE',
+  });
+  
+  // Fetch blogs from API
+  const { data: blogs = [], isLoading, error } = useQuery({
+    queryKey: ['blogs-admin'],
+    queryFn: () => blogApi.getAllAdmin(),
+  });
+  
+  // Fetch blog categories
+  const { data: categories = [] } = useQuery({
+    queryKey: ['blog-categories'],
+    queryFn: () => blogApi.getCategories(),
+  });
+  
+  // Fetch full blog data when editing
+  const { data: fullBlogData, isLoading: isLoadingBlog } = useQuery({
+    queryKey: ['blog-admin', editingBlog?.id],
+    queryFn: () => blogApi.getByIdAdmin(editingBlog.id),
+    enabled: !!editingBlog?.id && isEditDialogOpen,
+  });
+  
+  // Create mutation
+  const createMutation = useMutation({
+    mutationFn: blogApi.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blogs'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs-admin'] });
+      queryClient.invalidateQueries({ queryKey: ['blog-categories'] });
+      toast.success('Blog created successfully!');
+      setIsAddDialogOpen(false);
+      handleResetForm();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to create blog');
+    },
+  });
+  
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => blogApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blogs'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs-admin'] });
+      queryClient.invalidateQueries({ queryKey: ['blog'] });
+      queryClient.invalidateQueries({ queryKey: ['blog-categories'] });
+      toast.success('Blog updated successfully!');
+      setIsEditDialogOpen(false);
+      setEditingBlog(null);
+      handleResetForm();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update blog');
+    },
+  });
+  
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: blogApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blogs'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs-admin'] });
+      queryClient.invalidateQueries({ queryKey: ['blog-categories'] });
+      toast.success('Blog deleted successfully!');
+      setDeleteBlogId(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to delete blog');
+    },
   });
 
   const handleResetForm = () => {
@@ -84,22 +124,39 @@ const AdminBlog = () => {
       content: '',
       image: '',
       author: 'Studio Sara',
-      status: 'active',
+      category: '',
+      status: 'ACTIVE',
     });
   };
 
   const handleEdit = (blog: any) => {
     setEditingBlog(blog);
     setFormData({
-      title: blog.title,
-      excerpt: blog.excerpt,
+      title: blog.title || '',
+      excerpt: blog.excerpt || '',
       content: blog.content || '',
-      image: blog.image,
-      author: blog.author,
-      status: blog.status,
+      image: blog.image || '',
+      author: blog.author || 'Studio Sara',
+      category: blog.category || '',
+      status: blog.status || 'ACTIVE',
     });
     setIsEditDialogOpen(true);
   };
+  
+  // Update form when full blog data is loaded
+  useEffect(() => {
+    if (fullBlogData && isEditDialogOpen && editingBlog) {
+      setFormData({
+        title: fullBlogData.title || '',
+        excerpt: fullBlogData.excerpt || '',
+        content: fullBlogData.content || '',
+        image: fullBlogData.image || '',
+        author: fullBlogData.author || 'Studio Sara',
+        category: fullBlogData.category || '',
+        status: fullBlogData.status || 'ACTIVE',
+      });
+    }
+  }, [fullBlogData, isEditDialogOpen, editingBlog]);
 
   const handleSave = () => {
     if (!formData.title.trim()) {
@@ -115,13 +172,11 @@ const AdminBlog = () => {
       return;
     }
 
-    // TODO: Call API
-    console.log('Blog Payload:', formData);
-    toast.success(editingBlog ? 'Blog updated successfully!' : 'Blog created successfully!');
-    setIsAddDialogOpen(false);
-    setIsEditDialogOpen(false);
-    handleResetForm();
-    setEditingBlog(null);
+    if (editingBlog) {
+      updateMutation.mutate({ id: editingBlog.id, data: formData });
+    } else {
+      createMutation.mutate(formData);
+    }
   };
 
   const handleDelete = (blogId: number) => {
@@ -129,15 +184,35 @@ const AdminBlog = () => {
   };
 
   const confirmDelete = () => {
-    // TODO: Call API
-    toast.success('Blog deleted successfully!');
-    setDeleteBlogId(null);
+    if (deleteBlogId) {
+      deleteMutation.mutate(deleteBlogId);
+    }
   };
 
-  const filteredBlogs = mockBlogs.filter(blog =>
-    blog.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    blog.excerpt.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredBlogs = blogs.filter((blog: any) =>
+    blog.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    blog.excerpt?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
+    );
+  }
+  
+  if (error) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-destructive">Failed to load blogs. Please try again.</p>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -184,68 +259,81 @@ const AdminBlog = () => {
 
         {/* Blogs Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredBlogs.map((blog, index) => (
-            <motion.div
-              key={blog.id}
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ delay: index * 0.1, duration: 0.4 }}
-              whileHover={{ y: -5, scale: 1.02 }}
-              className="bg-white rounded-xl border border-border shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-            >
-              <div className="relative aspect-video bg-muted">
-                <img
-                  src={blog.image}
-                  alt={blog.title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute top-2 right-2">
-                  <Badge 
-                    className={blog.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}
-                  >
-                    {blog.status}
-                  </Badge>
-                </div>
-              </div>
-              <div className="p-5">
-                <h3 className="font-semibold text-lg mb-2 line-clamp-2">{blog.title}</h3>
-                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{blog.excerpt}</p>
-                <div className="flex items-center justify-between text-xs text-muted-foreground mb-4">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-3 h-3" />
-                    <span>{new Date(blog.publishedAt).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Eye className="w-3 h-3" />
-                    <span>{blog.views} views</span>
+          {filteredBlogs.length === 0 ? (
+            <div className="col-span-full text-center py-12 text-muted-foreground">
+              No blog posts found. Create your first blog!
+            </div>
+          ) : (
+            filteredBlogs.map((blog: any, index: number) => (
+              <motion.div
+                key={blog.id}
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ delay: Math.min(index * 0.05, 0.5), duration: 0.4 }}
+                whileHover={{ y: -5, scale: 1.02 }}
+                className="bg-white rounded-xl border border-border shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+              >
+                <div className="relative aspect-video bg-muted">
+                  {blog.image ? (
+                    <img
+                      src={blog.image}
+                      alt={blog.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                      No Image
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2">
+                    <Badge 
+                      className={blog.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}
+                    >
+                      {blog.status?.toLowerCase() || 'active'}
+                    </Badge>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => handleEdit(blog)}
-                      className="flex-1"
-                    >
-                      <Edit className="w-4 h-4 mr-1" />
-                      Edit
-                    </Button>
-                  </motion.div>
-                  <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => handleDelete(blog.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </motion.div>
+                <div className="p-5">
+                  <h3 className="font-semibold text-lg mb-2 line-clamp-2">{blog.title}</h3>
+                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{blog.excerpt}</p>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-3 h-3" />
+                      <span>{blog.createdAt ? new Date(blog.createdAt).toLocaleDateString() : '-'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Eye className="w-3 h-3" />
+                      <span>{blog.views || 0} views</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleEdit(blog)}
+                        className="flex-1"
+                      >
+                        <Edit className="w-4 h-4 mr-1" />
+                        Edit
+                      </Button>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDelete(blog.id)}
+                        className="text-destructive hover:text-destructive"
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </motion.div>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))
+          )}
         </div>
 
         {/* Add/Edit Dialog */}
@@ -257,14 +345,19 @@ const AdminBlog = () => {
             setEditingBlog(null);
           }
         }}>
-          <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="font-cursive text-3xl">
+          <DialogContent className="max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
+            <DialogHeader className="flex-shrink-0">
+              <DialogTitle className="font-semibold text-2xl">
                 {editingBlog ? 'Edit Blog Post' : 'Create Blog Post'}
               </DialogTitle>
             </DialogHeader>
             
-            <div className="space-y-6 mt-4">
+            {isLoadingBlog && isEditDialogOpen ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+            <div className="space-y-6 mt-4 overflow-y-auto flex-1">
               <div className="space-y-2">
                 <Label>Blog Title</Label>
                 <Input
@@ -347,6 +440,34 @@ const AdminBlog = () => {
               </div>
 
               <div className="space-y-2">
+                <Label>Category</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  >
+                    <SelectTrigger className="h-11 flex-1">
+                      <SelectValue placeholder="Select or enter category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((cat: string) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="Or enter new category"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="h-11 flex-1"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Select from existing categories or enter a new one
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <Label>Author</Label>
                 <Input
                   placeholder="Author name"
@@ -360,28 +481,39 @@ const AdminBlog = () => {
                 <div>
                   <Label className="text-base font-medium">Publish Status</Label>
                   <p className="text-sm text-muted-foreground">
-                    {formData.status === 'active' ? 'Blog will be visible to visitors' : 'Blog will be hidden'}
+                    {formData.status === 'ACTIVE' ? 'Blog will be visible to visitors' : 'Blog will be hidden'}
                   </p>
                 </div>
                 <Switch
-                  checked={formData.status === 'active'}
-                  onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'active' : 'inactive' })}
+                  checked={formData.status === 'ACTIVE'}
+                  onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'ACTIVE' : 'INACTIVE' })}
                 />
               </div>
             </div>
+            )}
 
-            <div className="flex items-center justify-between mt-6 pt-6 border-t border-border">
-              <Button variant="outline" onClick={() => {
-                setIsAddDialogOpen(false);
-                setIsEditDialogOpen(false);
-                handleResetForm();
-                setEditingBlog(null);
-              }}>
+            <div className="flex items-center justify-between mt-6 pt-6 border-t border-border flex-shrink-0">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setIsAddDialogOpen(false);
+                  setIsEditDialogOpen(false);
+                  handleResetForm();
+                  setEditingBlog(null);
+                }}
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
                 Cancel
               </Button>
-              <Button className="btn-primary gap-2" onClick={handleSave}>
+              <Button 
+                className="btn-primary gap-2" 
+                onClick={handleSave}
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
                 <Save className="w-4 h-4" />
-                {editingBlog ? 'Update Blog' : 'Create Blog'}
+                {createMutation.isPending || updateMutation.isPending 
+                  ? 'Saving...' 
+                  : editingBlog ? 'Update Blog' : 'Create Blog'}
               </Button>
             </div>
           </DialogContent>
@@ -397,9 +529,13 @@ const AdminBlog = () => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
-                Delete
+              <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmDelete} 
+                className="bg-destructive text-destructive-foreground"
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

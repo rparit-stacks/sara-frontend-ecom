@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Grid, List, SlidersHorizontal, X } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Grid, List, SlidersHorizontal, X, Loader2 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
@@ -10,24 +11,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { productsApi, categoriesApi } from '@/lib/api';
 
-// Mock all products
-const allProducts: Product[] = [
-  { id: '1', name: 'Rose Garden Silk Scarf', price: 899, originalPrice: 1200, image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=400&h=500&fit=crop', category: 'Scarves', isNew: true },
-  { id: '2', name: 'Lavender Fields Cushion', price: 450, image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&h=500&fit=crop', category: 'Home Decor' },
-  { id: '3', name: 'Cherry Blossom Dress', price: 1599, originalPrice: 1999, image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400&h=500&fit=crop', category: 'Clothing', isSale: true },
-  { id: '4', name: 'Wildflower Print Tote', price: 350, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&h=500&fit=crop', category: 'Bags', isNew: true },
-  { id: '5', name: 'Peony Paradise Blouse', price: 799, image: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=400&h=500&fit=crop', category: 'Clothing' },
-  { id: '6', name: 'Tropical Leaf Throw', price: 680, image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=400&h=500&fit=crop', category: 'Home Decor' },
-  { id: '7', name: 'Daisy Chain Earrings', price: 280, image: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=400&h=500&fit=crop', category: 'Jewelry', isNew: true },
-  { id: '8', name: 'Sunflower Print Skirt', price: 650, image: 'https://images.unsplash.com/photo-1583496661160-fb5886a0unk?w=400&h=500&fit=crop', category: 'Clothing' },
-  { id: '9', name: 'Orchid Silk Blouse', price: 1250, image: 'https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=400&h=500&fit=crop', category: 'Clothing' },
-  { id: '10', name: 'Botanical Print Cushion Set', price: 890, originalPrice: 1100, image: 'https://images.unsplash.com/photo-1540574163026-643ea20ade25?w=400&h=500&fit=crop', category: 'Home Decor', isSale: true },
-  { id: '11', name: 'Floral Pendant Necklace', price: 480, image: 'https://images.unsplash.com/photo-1599643477877-530eb83abc8e?w=400&h=500&fit=crop', category: 'Jewelry', isNew: true },
-  { id: '12', name: 'Garden Party Maxi Dress', price: 1890, image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&h=500&fit=crop', category: 'Clothing' },
-];
-
-const categories = ['All', 'Clothing', 'Home Decor', 'Bags', 'Jewelry', 'Scarves'];
 const priceRanges = ['Under ₹500', '₹500 - ₹1000', '₹1000 - ₹2000', 'Over ₹2000'];
 const colors = ['White', 'Pink', 'Green', 'Blue', 'Yellow', 'Multi'];
 
@@ -36,8 +21,38 @@ const Products = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState('featured');
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const filter = searchParams.get('filter');
+  
+  // Fetch products from API
+  const { data: apiProducts = [], isLoading } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => productsApi.getAll(),
+  });
+  
+  // Fetch categories
+  const { data: apiCategories = [] } = useQuery({
+    queryKey: ['categoriesActive'],
+    queryFn: () => categoriesApi.getAll(true),
+  });
+  
+  // Transform products
+  const allProducts: Product[] = apiProducts.map((p: any) => ({
+    id: String(p.id),
+    slug: p.slug,
+    name: p.name,
+    price: p.price || p.basePrice || 0,
+    originalPrice: p.originalPrice,
+    image: p.images?.[0] || '',
+    category: p.categoryName || '',
+    isNew: p.isNew,
+    isSale: p.isSale,
+    rating: p.rating || 4,
+  }));
+  
+  // Get category names
+  const categories = ['All', ...apiCategories.map((c: any) => c.name)];
   
   const getPageTitle = () => {
     switch (filter) {
@@ -51,6 +66,13 @@ const Products = () => {
   const removeFilter = (filter: string) => {
     setSelectedFilters(prev => prev.filter(f => f !== filter));
   };
+  
+  // Filter products by search query and selected filters
+  const filteredProducts = allProducts.filter((product) => {
+    const matchesSearch = !searchQuery || product.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedFilters.length === 0 || selectedFilters.some(f => product.category === f);
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <Layout>
@@ -66,13 +88,17 @@ const Products = () => {
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
               <div>
                 <h1 className="font-cursive text-5xl lg:text-6xl">{getPageTitle()}</h1>
-                <p className="text-muted-foreground mt-3 text-lg">{allProducts.length} Products</p>
+                <p className="text-muted-foreground mt-3 text-lg">
+                  {isLoading ? 'Loading...' : `${filteredProducts.length} Products`}
+                </p>
               </div>
               <div className="w-full lg:w-auto lg:min-w-[320px]">
                 <Input 
                   type="search" 
                   placeholder="Search products..." 
                   className="rounded-full h-12 text-base"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
             </div>
@@ -237,11 +263,21 @@ const Products = () => {
                   ? 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
                   : 'grid-cols-1'
               }`}>
-                {allProducts.map((product, index) => (
-                  <ScrollReveal key={product.id} delay={index * 0.03}>
-                    <ProductCard product={product} />
-                  </ScrollReveal>
-                ))}
+                {isLoading ? (
+                  <div className="col-span-full flex justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                ) : filteredProducts.length === 0 ? (
+                  <div className="col-span-full text-center py-12 text-muted-foreground">
+                    No products found.
+                  </div>
+                ) : (
+                  filteredProducts.map((product, index) => (
+                    <ScrollReveal key={product.id} delay={Math.min(index * 0.03, 0.3)}>
+                      <ProductCard product={product} />
+                    </ScrollReveal>
+                  ))
+                )}
               </div>
 
               {/* Pagination */}

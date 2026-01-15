@@ -7,6 +7,7 @@ import ScrollToTop from "./components/ScrollToTop";
 import Index from "./pages/Index";
 import Categories from "./pages/Categories";
 import CategoryProducts from "./pages/CategoryProducts";
+import CategoryHierarchy from "./pages/CategoryHierarchy";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
@@ -23,6 +24,11 @@ import NotFound from "./pages/NotFound";
 import Customize from "./pages/Customize";
 import CustomDesign from "./pages/CustomDesign";
 import MakeYourOwn from "./pages/MakeYourOwn";
+import Dashboard from "./pages/Dashboard";
+import OrderDetail from "./pages/OrderDetail";
+import OrderConfirmation from "./pages/OrderConfirmation";
+import TestimonialSubmit from "./pages/TestimonialSubmit";
+import AuthCallback from "./pages/AuthCallback";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
@@ -32,11 +38,16 @@ import AdminCMS from "./pages/admin/AdminCMS";
 import AdminCategories from "./pages/admin/AdminCategories";
 import AdminCustomConfig from "./pages/admin/AdminCustomConfig";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminAdmins from "./pages/admin/AdminAdmins";
 import CustomProductDetail from "./pages/CustomProductDetail";
 import Blog from "./pages/Blog";
 import BlogDetail from "./pages/BlogDetail";
 import AdminBlog from "./pages/admin/AdminBlog";
 import AdminFAQ from "./pages/admin/AdminFAQ";
+import AdminCoupons from "./pages/admin/AdminCoupons";
+import AdminShipping from "./pages/admin/AdminShipping";
+import AdminContactSubmissions from "./pages/admin/AdminContactSubmissions";
+import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
 
 const queryClient = new QueryClient();
 
@@ -50,13 +61,18 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/categories" element={<Categories />} />
-          <Route path="/category/:id" element={<CategoryProducts />} />
+          <Route path="/category/*" element={<CategoryHierarchy />} />
           <Route path="/products" element={<Products />} />
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/orders/:id" element={<OrderDetail />} />
+          <Route path="/order-confirmation/:id" element={<OrderConfirmation />} />
+          <Route path="/testimonial/:linkId" element={<TestimonialSubmit />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/about" element={<About />} />
           <Route path="/faq" element={<FAQ />} />
@@ -72,16 +88,118 @@ const App = () => (
           
           {/* Admin Routes */}
           <Route path="/admin-sara/login" element={<AdminLogin />} />
-          <Route path="/admin-sara" element={<AdminDashboard />} />
-          <Route path="/admin-sara/products" element={<AdminProducts />} />
-          <Route path="/admin-sara/fabrics" element={<AdminFabrics />} />
-          <Route path="/admin-sara/designs" element={<AdminDesigns />} />
-          <Route path="/admin-sara/cms" element={<AdminCMS />} />
-          <Route path="/admin-sara/blog" element={<AdminBlog />} />
-          <Route path="/admin-sara/faq" element={<AdminFAQ />} />
-          <Route path="/admin-sara/custom-config" element={<AdminCustomConfig />} />
-          <Route path="/admin-sara/categories" element={<AdminCategories />} />
-          <Route path="/admin-sara/users" element={<AdminUsers />} />
+          <Route 
+            path="/admin-sara" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminDashboard />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/products" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminProducts />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/fabrics" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminFabrics />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/designs" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminDesigns />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/cms" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminCMS />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/blog" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminBlog />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/faq" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminFAQ />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/custom-config" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminCustomConfig />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/categories" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminCategories />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/users" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminUsers />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/admins" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminAdmins />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/coupons" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminCoupons />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/shipping" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminShipping />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/contact-submissions" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminContactSubmissions />
+              </ProtectedAdminRoute>
+            } 
+          />
           
           <Route path="*" element={<NotFound />} />
         </Routes>

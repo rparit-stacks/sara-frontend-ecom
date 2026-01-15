@@ -1,0 +1,191 @@
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import Layout from '@/components/layout/Layout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, ArrowLeft, Package, Download } from 'lucide-react';
+import { orderApi, productsApi } from '@/lib/api';
+import { format } from 'date-fns';
+
+const OrderDetail = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+
+  const { data: order, isLoading } = useQuery({
+    queryKey: ['order', id],
+    queryFn: () => orderApi.getOrderById(Number(id)),
+    enabled: !!id,
+  });
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!order) {
+    return (
+      <Layout>
+        <div className="text-center py-12">
+          <p className="text-lg mb-4">Order not found</p>
+          <Button onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <section className="section-padding min-h-[calc(100vh-200px)] bg-muted/40">
+        <div className="container-custom max-w-4xl mx-auto py-6 md:py-10">
+          <Button variant="ghost" onClick={() => navigate('/dashboard')} className="mb-6">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
+          </Button>
+
+          <div className="space-y-6">
+            {/* Order Header */}
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle>Order #{order.id}</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Placed on {order.createdAt ? format(new Date(order.createdAt), 'MMMM dd, yyyy') : 'N/A'}
+                    </p>
+                  </div>
+                  <Badge variant={order.status === 'DELIVERED' ? 'default' : 'secondary'}>
+                    {order.status}
+                  </Badge>
+                </div>
+              </CardHeader>
+            </Card>
+
+            {/* Order Items */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Items</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {order.items?.map((item: any, index: number) => (
+                    <div key={index} className="flex gap-4 pb-4 border-b last:border-0">
+                      <img
+                        src={item.image || '/placeholder-product.jpg'}
+                        alt={item.name}
+                        className="w-20 h-20 object-cover rounded"
+                      />
+                      <div className="flex-1">
+                        <p className="font-semibold">{item.name}</p>
+                        <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
+                        <p className="text-sm text-muted-foreground">Price: ₹{item.price?.toLocaleString('en-IN')}</p>
+                        {item.productType === 'DIGITAL' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2 gap-2"
+                            onClick={async () => {
+                              try {
+                                const product = await productsApi.getById(item.productId);
+                                if (product.fileUrl) {
+                                  window.open(product.fileUrl, '_blank');
+                                } else {
+                                  alert('Download file not available');
+                                }
+                              } catch (error) {
+                                alert('Failed to load download link');
+                              }
+                            }}
+                          >
+                            <Download className="w-4 h-4" />
+                            Download
+                          </Button>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">₹{item.totalPrice?.toLocaleString('en-IN')}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Order Summary */}
+            <div className="grid md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Shipping Address</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {order.shippingAddress ? (
+                    <div className="text-sm space-y-1">
+                      {typeof order.shippingAddress === 'string' ? (
+                        <pre className="whitespace-pre-wrap">{order.shippingAddress}</pre>
+                      ) : (
+                        <>
+                          <p className="font-semibold">
+                            {order.shippingAddress.firstName} {order.shippingAddress.lastName}
+                          </p>
+                          <p>{order.shippingAddress.address}</p>
+                          <p>
+                            {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}
+                          </p>
+                          <p>Phone: {order.shippingAddress.phone}</p>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No address available</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Order Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Subtotal</span>
+                      <span>₹{order.subtotal?.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Shipping</span>
+                      <span>{order.shipping === 0 ? 'Free' : `₹${order.shipping?.toLocaleString('en-IN')}`}</span>
+                    </div>
+                    {order.couponCode && order.couponDiscount && order.couponDiscount > 0 && (
+                      <div className="flex justify-between text-primary">
+                        <span>Coupon ({order.couponCode})</span>
+                        <span>-₹{order.couponDiscount?.toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-semibold text-lg pt-2 border-t">
+                      <span>Total</span>
+                      <span>₹{order.total?.toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                  {order.paymentMethod && (
+                    <div className="mt-4 pt-4 border-t">
+                      <p className="text-sm">
+                        <span className="font-medium">Payment Method:</span> {order.paymentMethod}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+    </Layout>
+  );
+};
+
+export default OrderDetail;

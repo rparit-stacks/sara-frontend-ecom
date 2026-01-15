@@ -1,27 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, Package, ExternalLink } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Package, ExternalLink, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Switch } from '@/components/ui/switch';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ProductFormDialog from '@/components/admin/ProductFormDialog';
 import { PlainProduct } from '@/components/admin/PlainProductSelector';
 import { ProductType } from '@/components/admin/ProductTypeSelector';
-import { cn } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,28 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-
-// Mock plain products - in real app, fetch from API: GET /api/products?type=PLAIN
-const mockPlainProducts: PlainProduct[] = [
-  { id: 'p1', name: 'Premium Silk Fabric', image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=200', pricePerMeter: 100, status: 'active' },
-  { id: 'p2', name: 'Cotton Blue Fabric', image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=200', pricePerMeter: 80, status: 'active' },
-  { id: 'p3', name: 'Linen Cream Fabric', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=200', pricePerMeter: 120, status: 'active' },
-  { id: 'p4', name: 'Cotton White Fabric', image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=200', pricePerMeter: 75, status: 'active' },
-  { id: 'p5', name: 'Silk Gold Fabric', image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=200', pricePerMeter: 150, status: 'active' },
-];
-
-const mockCategories = [
-  { id: '1', name: 'Clothing', subcategories: [{ id: '1-1', name: 'Menswear' }, { id: '1-2', name: 'Womenswear' }] },
-  { id: '2', name: 'Home Decor', subcategories: [{ id: '2-1', name: 'Cushions' }, { id: '2-2', name: 'Bedding' }] },
-];
-
-const mockProducts = [
-  { id: 1, name: 'Floral Block Print Quilt', type: 'DESIGNED', category: 'Bedding', status: 'active', createdAt: '2024-01-15' },
-  { id: 2, name: 'Botanical Cushion Cover', type: 'DESIGNED', category: 'Cushions', status: 'active', createdAt: '2024-01-20' },
-  { id: 3, name: 'Premium Silk Fabric', type: 'PLAIN', category: 'Fabrics', status: 'active', createdAt: '2024-01-25' },
-  { id: 4, name: 'Cotton Blue Fabric', type: 'PLAIN', category: 'Fabrics', status: 'active', createdAt: '2024-01-26' },
-  { id: 5, name: 'Digital Pattern Pack', type: 'DIGITAL', category: 'Templates', status: 'active', createdAt: '2024-02-01' },
-];
+import { productsApi, plainProductsApi, categoriesApi } from '@/lib/api';
 
 
 const AdminProducts = () => {
@@ -66,6 +36,110 @@ const AdminProducts = () => {
   const [filterType, setFilterType] = useState<'ALL' | ProductType>(() => {
     const typeParam = searchParams.get('type') as ProductType | null;
     return typeParam || 'ALL';
+  });
+  
+  const queryClient = useQueryClient();
+
+  // Fetch products from API
+  const { data: products = [], isLoading: productsLoading, error: productsError } = useQuery({
+    queryKey: ['products', filterType],
+    queryFn: () => productsApi.getAll(filterType !== 'ALL' ? { type: filterType } : undefined),
+  });
+
+  // Fetch plain products (fabrics) for the form dialog
+  const { data: plainProducts = [], isLoading: plainProductsLoading, error: plainProductsError } = useQuery({
+    queryKey: ['plainProducts', 'active'],
+    queryFn: () => plainProductsApi.getActive(),
+  });
+
+  // Debug logging
+  useEffect(() => {
+    if (plainProductsError) {
+      console.error('Error fetching plain products:', plainProductsError);
+      toast.error('Failed to load plain products. Please refresh the page.');
+    }
+    if (plainProducts.length > 0) {
+      console.log('Plain products loaded:', plainProducts.length, plainProducts);
+    } else if (!plainProductsLoading) {
+      console.warn('No plain products found. Make sure you have created plain products first.');
+    }
+  }, [plainProducts, plainProductsLoading, plainProductsError]);
+
+  // Fetch only leaf categories (categories without subcategories) for product creation
+  const { data: categories = [] } = useQuery({
+    queryKey: ['leafCategories'],
+    queryFn: () => categoriesApi.getLeafCategories(),
+  });
+
+  // Create mutation
+  const createMutation = useMutation({
+    mutationFn: (data: any) => {
+      if (data.type === 'PLAIN') return productsApi.createPlain(data);
+      if (data.type === 'DESIGNED') return productsApi.createDesigned(data);
+      if (data.type === 'DIGITAL') return productsApi.createDigital(data);
+      return productsApi.create(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['plainProducts'] }); // Invalidate plain products for popup
+      toast.success('Product created successfully!');
+      setIsAddDialogOpen(false);
+    },
+    onError: (error: any) => {
+      // Handle user-friendly error messages
+      let errorMessage = 'Failed to create product';
+      if (error?.response?.data?.error) {
+        const backendError = error.response.data.error;
+        if (typeof backendError === 'string') {
+          errorMessage = backendError;
+        } else if (backendError.error) {
+          errorMessage = backendError.error;
+        }
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      toast.error(errorMessage);
+    },
+  });
+
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => productsApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['plainProducts'] }); // Invalidate plain products for popup
+      toast.success('Product updated successfully!');
+      setIsEditDialogOpen(false);
+      setEditingProduct(null);
+    },
+    onError: (error: any) => {
+      // Handle user-friendly error messages
+      let errorMessage = 'Failed to update product';
+      if (error?.response?.data?.error) {
+        const backendError = error.response.data.error;
+        if (typeof backendError === 'string') {
+          errorMessage = backendError;
+        } else if (backendError.error) {
+          errorMessage = backendError.error;
+        }
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      toast.error(errorMessage);
+    },
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: productsApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Product deleted successfully!');
+      setDeleteProductId(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to delete product');
+    },
   });
 
   // Update filter when URL param changes
@@ -86,17 +160,31 @@ const AdminProducts = () => {
 
   // Handle form submission
   const handleSaveProduct = (payload: any) => {
-    // TODO: Call API
-    // if (payload.id) {
-    //   // Update
-    //   await fetch(`/api/admin/products/${payload.id}`, { method: 'PUT', ... });
-    // } else {
-    //   // Create
-    //   await fetch('/api/admin/products', { method: 'POST', ... });
-    // }
-    
-    console.log('Product Payload:', payload);
-    toast.success(payload.id ? 'Product updated successfully!' : 'Product created successfully!');
+    // Validate payload before submission
+    if (!payload.name || !payload.name.trim()) {
+      toast.error('Product name is required');
+      return;
+    }
+    if (!payload.categoryId) {
+      toast.error('Category is required');
+      return;
+    }
+
+    if (payload.id) {
+      updateMutation.mutate({ id: payload.id, data: payload }, {
+        onError: () => {
+          // Keep dialog open on error so user can fix issues
+          // Dialog will only close on success
+        }
+      });
+    } else {
+      createMutation.mutate(payload, {
+        onError: () => {
+          // Keep dialog open on error so user can fix issues
+          // Dialog will only close on success
+        }
+      });
+    }
   };
 
   const handleEdit = (product: any) => {
@@ -109,20 +197,55 @@ const AdminProducts = () => {
   };
 
   const confirmDelete = () => {
-    // TODO: Call API
-    // await fetch(`/api/admin/products/${deleteProductId}`, { method: 'DELETE' });
-    toast.success('Product deleted successfully!');
-    setDeleteProductId(null);
+    if (deleteProductId) {
+      deleteMutation.mutate(deleteProductId);
+    }
   };
 
-  // Filter products by type
-  const filteredProducts = mockProducts.filter(product => {
+  // Transform plain products for the form dialog
+  const plainProductsForForm: PlainProduct[] = plainProducts
+    .filter((p: any) => p && p.id) // Filter out any null/undefined products
+    .map((p: any) => ({
+      id: String(p.id),
+      name: p.name || 'Unnamed Product',
+      image: p.image || '',
+      pricePerMeter: Number(p.pricePerMeter) || 0,
+      status: (p.status?.toLowerCase() === 'active' ? 'active' : 'inactive') as 'active' | 'inactive',
+    }));
+
+  // Transform categories for the form dialog
+  // Leaf categories don't have subcategories, so we just map them directly
+  const categoriesForForm = categories.map((c: any) => ({
+    id: String(c.id),
+    name: c.name,
+    subcategories: [], // Leaf categories have no subcategories
+  }));
+
+  // Filter products by search
+  const filteredProducts = products.filter((product: any) => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = filterType === 'ALL' || product.type === filterType;
-    return matchesSearch && matchesType;
+    return matchesSearch;
   });
 
-  // Add custom field
+  if (productsLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (productsError) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-destructive">Failed to load products. Please try again.</p>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -151,8 +274,8 @@ const AdminProducts = () => {
             open={isAddDialogOpen}
             onOpenChange={setIsAddDialogOpen}
             mode="create"
-            plainProducts={mockPlainProducts}
-            categories={mockCategories}
+            plainProducts={plainProductsForForm}
+            categories={categoriesForForm}
             onSave={handleSaveProduct}
           />
           <ProductFormDialog
@@ -161,8 +284,8 @@ const AdminProducts = () => {
             mode="edit"
             productId={editingProduct?.id}
             initialData={editingProduct}
-            plainProducts={mockPlainProducts}
-            categories={mockCategories}
+            plainProducts={plainProductsForForm}
+            categories={categoriesForForm}
             onSave={handleSaveProduct}
           />
         </motion.div>
@@ -221,73 +344,90 @@ const AdminProducts = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredProducts.map((product, index) => (
-                  <motion.tr
-                    key={product.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1, duration: 0.3 }}
-                    className="border-t border-border hover:bg-muted/50 transition-colors"
-                  >
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
-                          <Package className="w-5 h-5 text-muted-foreground" />
+                {filteredProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                      No products found. Create your first product!
+                    </td>
+                  </tr>
+                ) : (
+                  filteredProducts.map((product: any, index: number) => (
+                    <motion.tr
+                      key={product.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: Math.min(index * 0.05, 0.5), duration: 0.3 }}
+                      className="border-t border-border hover:bg-muted/50 transition-colors"
+                    >
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          {product.images?.[0] ? (
+                            <img 
+                              src={product.images[0]} 
+                              alt={product.name}
+                              className="w-10 h-10 rounded object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                              <Package className="w-5 h-5 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <Link 
+                              to={`/product/${product.slug || product.id}`}
+                              target="_blank"
+                              className="font-semibold hover:text-primary transition-colors"
+                            >
+                              {product.name}
+                            </Link>
+                            <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                          </div>
                         </div>
+                      </td>
+                      <td className="p-4">
+                        {getTypeBadge(product.type)}
+                      </td>
+                      <td className="p-4">
+                        <Badge variant="secondary">{product.categoryName || 'Uncategorized'}</Badge>
+                      </td>
+                      <td className="p-4 font-medium">
+                        ₹{product.price || product.basePrice || 0}
+                      </td>
+                      <td className="p-4">
+                        <Badge 
+                          className={product.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}
+                        >
+                          {product.status?.toLowerCase() || 'active'}
+                        </Badge>
+                      </td>
+                      <td className="p-4">
                         <div className="flex items-center gap-2">
-                          <Link 
-                            to={`/product/${product.id}?type=${product.type}`}
-                            target="_blank"
-                            className="font-semibold hover:text-primary transition-colors"
-                          >
-                            {product.name}
-                          </Link>
-                          <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-9 w-9"
+                              onClick={() => handleEdit(product)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          </motion.div>
+                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-9 w-9 text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(product.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </motion.div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      {getTypeBadge(product.type)}
-                    </td>
-                    <td className="p-4">
-                      <Badge variant="secondary">{product.category}</Badge>
-                    </td>
-                    <td className="p-4 font-medium">
-                      ₹{product.type === 'PLAIN' ? '100/m' : product.type === 'DESIGNED' ? '1000' : '500'}
-                    </td>
-                    <td className="p-4">
-                      <Badge 
-                        className={product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}
-                      >
-                        {product.status}
-                      </Badge>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-9 w-9"
-                            onClick={() => handleEdit(product)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </motion.div>
-                        <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-9 w-9 text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(product.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </motion.div>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
+                      </td>
+                    </motion.tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -303,9 +443,13 @@ const AdminProducts = () => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
-                Delete
+              <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmDelete} 
+                className="bg-destructive text-destructive-foreground"
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

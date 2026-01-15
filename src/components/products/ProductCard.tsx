@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 
 export interface Product {
   id: string;
+  slug?: string;
   name: string;
   price: number;
   originalPrice?: number;
@@ -27,7 +28,7 @@ export const ProductCard = ({ product, className }: ProductCardProps) => {
     : 0;
 
   return (
-    <Link to={`/product/${product.id}`} className="block">
+    <Link to={`/product/${product.slug || product.id}`} className="block">
       <motion.div
         whileHover={{ y: -4 }}
         className={cn('group card-floral w-full cursor-pointer', className)}

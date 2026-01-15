@@ -40,7 +40,7 @@ const PlainProductSelector: React.FC<PlainProductSelectorProps> = ({
 
   const filteredProducts = useMemo(() => {
     return plainProducts.filter(p => 
-      p.status === 'active' &&
+      p.status?.toLowerCase() === 'active' &&
       p.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [plainProducts, searchQuery]);
@@ -84,7 +84,19 @@ const PlainProductSelector: React.FC<PlainProductSelectorProps> = ({
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-[400px] overflow-y-auto p-1">
-        {filteredProducts.map((product) => {
+        {filteredProducts.length === 0 ? (
+          <div className="col-span-full text-center py-8 text-muted-foreground">
+            <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">
+              {plainProducts.length === 0 
+                ? 'No plain products available. Please create plain products first.' 
+                : searchQuery 
+                  ? `No products found matching "${searchQuery}"`
+                  : 'No active plain products available.'}
+            </p>
+          </div>
+        ) : (
+          filteredProducts.map((product) => {
           const isSelected = selectedProductIds.includes(product.id);
           const isDisabled = !isSelected && selectedProductIds.length >= maxSelection;
           
@@ -132,7 +144,7 @@ const PlainProductSelector: React.FC<PlainProductSelectorProps> = ({
               )}
             </motion.button>
           );
-        })}
+        }))}
       </div>
     </div>
   );

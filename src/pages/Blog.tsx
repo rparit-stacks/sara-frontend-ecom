@@ -1,89 +1,38 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Calendar, User, ArrowRight, ChevronRight } from 'lucide-react';
+import { Calendar, User, ArrowRight, ChevronRight, Loader2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-
-// Mock blog posts - in real app, fetch from API: GET /api/blogs
-const mockBlogs = [
-  { 
-    id: 1, 
-    title: 'The Art of Floral Design in Indian Textiles', 
-    excerpt: 'Explore the rich tradition of floral patterns in Indian textile design and how they continue to inspire modern fashion.',
-    image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=800&h=500&fit=crop',
-    author: 'Studio Sara',
-    publishedAt: '2024-01-15',
-    category: 'Design',
-    readTime: '5 min read'
-  },
-  { 
-    id: 2, 
-    title: 'Sustainable Fabric Choices for Modern Living', 
-    excerpt: 'Learn about eco-friendly fabric options that combine style with sustainability for your home and wardrobe.',
-    image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&h=500&fit=crop',
-    author: 'Studio Sara',
-    publishedAt: '2024-01-20',
-    category: 'Sustainability',
-    readTime: '7 min read'
-  },
-  { 
-    id: 3, 
-    title: 'Custom Design Tips for Your Home', 
-    excerpt: 'Discover how to create personalized home decor with our custom design tools and expert tips.',
-    image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&h=500&fit=crop',
-    author: 'Studio Sara',
-    publishedAt: '2024-01-25',
-    category: 'Tips',
-    readTime: '6 min read'
-  },
-  { 
-    id: 4, 
-    title: 'Traditional Patterns Meet Modern Aesthetics', 
-    excerpt: 'How traditional Indian patterns are being reimagined for contemporary interior design.',
-    image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=800&h=500&fit=crop',
-    author: 'Studio Sara',
-    publishedAt: '2024-02-01',
-    category: 'Design',
-    readTime: '8 min read'
-  },
-  { 
-    id: 5, 
-    title: 'Caring for Your Handcrafted Textiles', 
-    excerpt: 'Essential care instructions to keep your handcrafted textiles looking beautiful for years to come.',
-    image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=800&h=500&fit=crop',
-    author: 'Studio Sara',
-    publishedAt: '2024-02-05',
-    category: 'Care',
-    readTime: '4 min read'
-  },
-  { 
-    id: 6, 
-    title: 'The Story Behind Our Artisan Collection', 
-    excerpt: 'Meet the skilled artisans who bring our designs to life and learn about their craft traditions.',
-    image: 'https://images.unsplash.com/photo-1487530811176-3780de880c2d?w=800&h=500&fit=crop',
-    author: 'Studio Sara',
-    publishedAt: '2024-02-10',
-    category: 'Story',
-    readTime: '10 min read'
-  },
-];
+import { blogApi } from '@/lib/api';
 
 const Blog = () => {
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const categories = ['All', 'Design', 'Sustainability', 'Tips', 'Care', 'Story'];
+  // Fetch blogs from API
+  const { data: blogs = [], isLoading } = useQuery({
+    queryKey: ['blogs', category],
+    queryFn: () => blogApi.getAll(category && category !== 'All' ? category : undefined),
+  });
+
+  // Fetch categories from API
+  const { data: categoriesFromApi = [] } = useQuery({
+    queryKey: ['blog-categories'],
+    queryFn: () => blogApi.getCategories(),
+  });
+
+  const categories = ['All', ...categoriesFromApi];
   
-  const filteredBlogs = mockBlogs.filter(blog => {
-    const matchesCategory = !category || category === 'All' || blog.category === category;
+  const filteredBlogs = blogs.filter((blog: any) => {
     const matchesSearch = blog.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         blog.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+                         (blog.excerpt && blog.excerpt.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesSearch;
   });
 
   return (
@@ -142,43 +91,62 @@ const Blog = () => {
           </div>
 
           {/* Blog Grid */}
+          {isLoading ? (
+            <div className="flex justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredBlogs.map((blog, index) => (
+            {filteredBlogs.map((blog: any, index: number) => (
               <ScrollReveal key={blog.id} delay={index * 0.1}>
                 <Link to={`/blog/${blog.id}`}>
                   <motion.article
                     whileHover={{ y: -5 }}
                     className="bg-white rounded-2xl border border-border overflow-hidden shadow-sm hover:shadow-lg transition-shadow h-full flex flex-col group"
                   >
-                    <div className="relative aspect-video overflow-hidden">
-                      <img
-                        src={blog.image}
-                        alt={blog.title}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      />
-                      <div className="absolute top-4 left-4">
-                        <Badge className="bg-white/90 text-foreground">{blog.category}</Badge>
-                      </div>
+                    <div className="relative aspect-video overflow-hidden bg-muted">
+                      {blog.image ? (
+                        <img
+                          src={blog.image}
+                          alt={blog.title}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                          No Image
+                        </div>
+                      )}
+                      {blog.category && (
+                        <div className="absolute top-4 left-4">
+                          <Badge className="bg-white/90 text-foreground">{blog.category}</Badge>
+                        </div>
+                      )}
                     </div>
                     <div className="p-6 flex-1 flex flex-col">
                       <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
                         <div className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
-                          <span>{new Date(blog.publishedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          <span>
+                            {blog.publishedAt 
+                              ? new Date(blog.publishedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                              : blog.createdAt 
+                                ? new Date(blog.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                                : 'Recently'}
+                          </span>
                         </div>
                         <div className="flex items-center gap-1">
                           <User className="w-4 h-4" />
-                          <span>{blog.author}</span>
+                          <span>{blog.author || 'Studio Sara'}</span>
                         </div>
                       </div>
                       <h2 className="font-semibold text-xl mb-3 group-hover:text-primary transition-colors line-clamp-2">
                         {blog.title}
                       </h2>
                       <p className="text-muted-foreground mb-4 line-clamp-3 flex-1">
-                        {blog.excerpt}
+                        {blog.excerpt || 'No excerpt available'}
                       </p>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">{blog.readTime}</span>
+                        <span className="text-sm text-muted-foreground">{blog.readTime || '1 min read'}</span>
                         <Button variant="ghost" className="gap-2 group-hover:text-primary">
                           Read More
                           <ArrowRight className="w-4 h-4" />
@@ -191,7 +159,9 @@ const Blog = () => {
             ))}
           </div>
 
-          {filteredBlogs.length === 0 && (
+          )}
+
+          {!isLoading && filteredBlogs.length === 0 && (
             <div className="text-center py-20">
               <p className="text-lg text-muted-foreground">No blog posts found</p>
             </div>

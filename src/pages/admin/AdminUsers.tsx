@@ -1,21 +1,68 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Eye, EyeOff, Mail, Calendar } from 'lucide-react';
+import { Search, Eye, EyeOff, Mail, Calendar, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
-
-// Mock users data
-const mockUsers = [
-  { id: 1, name: 'Priya Sharma', email: 'priya@example.com', status: 'active', mockups: 12, joined: '2024-01-15' },
-  { id: 2, name: 'Rajesh Kumar', email: 'rajesh@example.com', status: 'active', mockups: 8, joined: '2024-01-20' },
-  { id: 3, name: 'Anita Reddy', email: 'anita@example.com', status: 'inactive', mockups: 5, joined: '2024-02-01' },
-  { id: 4, name: 'Meera Kapoor', email: 'meera@example.com', status: 'active', mockups: 15, joined: '2024-02-10' },
-];
+import { toast } from 'sonner';
+import { adminUsersApi } from '@/lib/api';
 
 const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const queryClient = useQueryClient();
+  
+  // Fetch users from API
+  const { data: users = [], isLoading, error } = useQuery({
+    queryKey: ['adminUsers'],
+    queryFn: () => adminUsersApi.getAll(),
+  });
+  
+  // Update status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ email, status }: { email: string; status: string }) => 
+      adminUsersApi.updateStatus(email, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+      toast.success('User status updated successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update user status');
+    },
+  });
+  
+  const toggleUserStatus = (user: any) => {
+    const newStatus = user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    updateStatusMutation.mutate({ email: user.email, status: newStatus });
+  };
+  
+  // Filter users
+  const filteredUsers = users.filter((user: any) =>
+    user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.lastName?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
+    );
+  }
+  
+  if (error) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-destructive">Failed to load users. Please try again.</p>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -63,71 +110,91 @@ const AdminUsers = () => {
                 </tr>
               </thead>
               <tbody>
-                {mockUsers.map((user, index) => (
-                  <motion.tr
-                    key={user.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1, duration: 0.3 }}
-                    className="border-t border-border hover:bg-muted/50 transition-colors"
-                  >
-                    <td className="p-4">
-                      <motion.div
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ delay: index * 0.1 + 0.2 }}
-                        className="flex items-center gap-3"
-                      >
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                      No users found.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUsers.map((user: any, index: number) => (
+                    <motion.tr
+                      key={user.email}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: Math.min(index * 0.05, 0.5), duration: 0.3 }}
+                      className="border-t border-border hover:bg-muted/50 transition-colors"
+                    >
+                      <td className="p-4">
                         <motion.div
-                          whileHover={{ scale: 1.1, rotate: 5 }}
-                          className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center"
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ delay: Math.min(index * 0.05, 0.5) + 0.1 }}
+                          className="flex items-center gap-3"
                         >
-                          <span className="text-primary font-semibold">{user.name.charAt(0)}</span>
+                          <motion.div
+                            whileHover={{ scale: 1.1, rotate: 5 }}
+                            className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center"
+                          >
+                            <span className="text-primary font-semibold">
+                              {(user.firstName || user.email || 'U').charAt(0).toUpperCase()}
+                            </span>
+                          </motion.div>
+                          <div>
+                            <p className="font-semibold">
+                              {user.firstName || user.lastName 
+                                ? `${user.firstName || ''} ${user.lastName || ''}`.trim() 
+                                : user.email}
+                            </p>
+                          </div>
                         </motion.div>
-                        <div>
-                          <p className="font-semibold">{user.name}</p>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Mail className="w-4 h-4" />
+                          {user.email}
                         </div>
-                      </motion.div>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Mail className="w-4 h-4" />
-                        {user.email}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <span className="font-medium">{user.mockups}</span>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="w-4 h-4" />
-                        {user.joined}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <Badge 
-                        className={user.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}
-                      >
-                        {user.status}
-                      </Badge>
-                    </td>
-                    <td className="p-4">
-                      <motion.div
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        className="flex items-center gap-2"
-                      >
-                        <Button variant="ghost" size="icon" className="h-9 w-9">
-                          {user.status === 'active' ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </Button>
-                      </motion.div>
-                    </td>
-                  </motion.tr>
-                ))}
+                      </td>
+                      <td className="p-4">
+                        <span className="font-medium">{user.authProvider || '-'}</span>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Calendar className="w-4 h-4" />
+                          {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <Badge 
+                          className={user.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}
+                        >
+                          {user.status?.toLowerCase() || 'active'}
+                        </Badge>
+                      </td>
+                      <td className="p-4">
+                        <motion.div
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          className="flex items-center gap-2"
+                        >
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-9 w-9"
+                            onClick={() => toggleUserStatus(user)}
+                            disabled={updateStatusMutation.isPending}
+                          >
+                            {user.status === 'ACTIVE' ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </motion.div>
+                      </td>
+                    </motion.tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

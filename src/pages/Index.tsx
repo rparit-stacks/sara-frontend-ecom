@@ -3,22 +3,16 @@ import { motion } from 'framer-motion';
 import useEmblaCarousel from 'embla-carousel-react';
 import Autoplay from 'embla-carousel-autoplay';
 import { useCallback, useEffect, useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
+import { cmsApi, productsApi, categoriesApi, subscribeEmail } from '@/lib/api';
+import { toast } from 'sonner';
 
-// TODO: Replace mock data with API calls to fetch CMS-managed content
-// API endpoints should be:
-// - GET /api/cms/best-sellers - Returns array of product IDs
-// - GET /api/cms/new-arrivals - Returns array of product IDs  
-// - GET /api/cms/testimonials - Returns array of active testimonials (max 10)
-// - GET /api/cms/offers - Returns array of active offers
-// - GET /api/cms/instagram-posts - Returns array of image URLs
-// - GET /api/products - Returns full product data for the IDs above
-
-// Mock data - will be replaced with API calls
-const heroSlides = [
+// Default hero slides
+const defaultHeroSlides = [
   {
     id: 1,
     title: 'New Collection 2024',
@@ -45,47 +39,6 @@ const heroSlides = [
   },
 ];
 
-const categories = [
-  { id: '1', name: 'Floral', image: 'https://images.unsplash.com/photo-1487530811176-3780de880c2d?w=600&h=800&fit=crop', count: 48 },
-  { id: '2', name: 'Botanical', image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=600&h=800&fit=crop', count: 36 },
-  { id: '3', name: 'Abstract', image: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&h=800&fit=crop', count: 24 },
-  { id: '4', name: 'Traditional', image: 'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?w=600&h=800&fit=crop', count: 40 },
-];
-
-// All products - in real app, fetch from API
-const allProducts: Product[] = [
-  { id: '1', name: 'Rose Garden Silk Saree', price: 8999, originalPrice: 12000, image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=500&h=650&fit=crop', category: 'Sarees', isNew: true, rating: 5 },
-  { id: '2', name: 'Lavender Cushion Set', price: 2500, image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500&h=650&fit=crop', category: 'Home Decor', rating: 4 },
-  { id: '3', name: 'Cherry Blossom Kurti', price: 3499, originalPrice: 4999, image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=500&h=650&fit=crop', category: 'Kurtis', isSale: true, rating: 5 },
-  { id: '4', name: 'Wildflower Dupatta', price: 1599, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500&h=650&fit=crop', category: 'Dupattas', isNew: true, rating: 4 },
-  { id: '5', name: 'Peony Blouse', price: 2199, image: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=500&h=650&fit=crop', category: 'Blouses', rating: 5 },
-  { id: '6', name: 'Tropical Bedsheet', price: 3999, image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=500&h=650&fit=crop', category: 'Bedding', rating: 4 },
-  { id: '9', name: 'Lotus Embroidered Set', price: 6999, image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=500&h=650&fit=crop', category: 'Suits', isNew: true, rating: 4 },
-  { id: '10', name: 'Sunflower Table Runner', price: 899, image: 'https://images.unsplash.com/photo-1540932239986-30128078f3c5?w=500&h=650&fit=crop', category: 'Home Decor', isNew: true, rating: 5 },
-  { id: '11', name: 'Orchid Silk Blouse', price: 3299, image: 'https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=500&h=650&fit=crop', category: 'Blouses', isNew: true, rating: 5 },
-  { id: '12', name: 'Tulip Print Scarf', price: 1299, image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=500&h=650&fit=crop', category: 'Scarves', isNew: true, rating: 4 },
-];
-
-// CMS-managed data - these should be fetched from API
-// Best Sellers product IDs (managed in AdminCMS)
-const bestSellerIds = ['1', '2', '3'];
-const featuredProducts: Product[] = bestSellerIds
-  .map(id => allProducts.find(p => p.id === id))
-  .filter((p): p is Product => p !== undefined);
-
-// New Arrivals product IDs (managed in AdminCMS)
-const newArrivalIds = ['4', '1'];
-const newArrivals: Product[] = newArrivalIds
-  .map(id => allProducts.find(p => p.id === id))
-  .filter((p): p is Product => p !== undefined);
-
-// Testimonials (managed in AdminCMS, max 10 active)
-const testimonials = [
-  { id: 1, name: 'Priya Sharma', text: 'Beautiful quality! The prints are stunning and the fabric is so soft. I received so many compliments on my saree at the wedding.', rating: 5, location: 'Mumbai' },
-  { id: 2, name: 'Anita Reddy', text: 'Fast delivery and gorgeous packaging. The kurti fits perfectly and the embroidery work is exquisite. Will definitely order again!', rating: 5, location: 'Bangalore' },
-  { id: 3, name: 'Meera Patel', text: 'The customization options are amazing. They helped me create the perfect outfit for my engagement. Highly recommend Studio Sara!', rating: 5, location: 'Ahmedabad' },
-].slice(0, 10); // Limit to 10 as per requirements
-
 const features = [
   {
     icon: 'fa-pen-fancy',
@@ -109,20 +62,26 @@ const features = [
   },
 ];
 
-// Instagram Posts (managed in AdminCMS)
-const instagramPosts = [
+// Default Instagram Posts
+const defaultInstagramPosts = [
   'https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=400&h=400&fit=crop',
   'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=400&h=400&fit=crop',
   'https://images.unsplash.com/photo-1487530811176-3780de880c2d?w=400&h=400&fit=crop',
   'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=400&h=400&fit=crop',
+];
+
+// Default testimonials
+const defaultTestimonials = [
+  { id: 1, name: 'Priya Sharma', text: 'Beautiful quality! The prints are stunning and the fabric is so soft.', rating: 5, location: 'Mumbai' },
+  { id: 2, name: 'Anita Reddy', text: 'Fast delivery and gorgeous packaging. The kurti fits perfectly.', rating: 5, location: 'Bangalore' },
+  { id: 3, name: 'Meera Patel', text: 'The customization options are amazing. Highly recommend!', rating: 5, location: 'Ahmedabad' },
 ];
 
 const Index = () => {
   const [heroRef, heroApi] = useEmblaCarousel({ loop: true }, [Autoplay({ delay: 5000 })]);
   const [productsRef] = useEmblaCarousel({ loop: true, align: 'start' }, [Autoplay({ delay: 4000 })]);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [email, setEmail] = useState('');
 
   const scrollTo = useCallback((index: number) => heroApi?.scrollTo(index), [heroApi]);
 
@@ -130,6 +89,146 @@ const Index = () => {
     if (!heroApi) return;
     heroApi.on('select', () => setCurrentSlide(heroApi.selectedScrollSnap()));
   }, [heroApi]);
+  
+  // Fetch CMS homepage data
+  const { data: cmsData } = useQuery({
+    queryKey: ['cmsHomepage'],
+    queryFn: () => cmsApi.getHomepage(),
+  });
+  
+  // Fetch products for best sellers and new arrivals
+  const { data: apiProducts = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => productsApi.getAll(),
+  });
+  
+  // Fetch categories
+  const { data: apiCategories = [] } = useQuery({
+    queryKey: ['categoriesActive'],
+    queryFn: () => categoriesApi.getAll(true),
+  });
+  
+  // Email subscription mutation
+  const subscribeMutation = useMutation({
+    mutationFn: (email: string) => subscribeEmail(email),
+    onSuccess: () => {
+      toast.success('Successfully subscribed!');
+      setEmail('');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to subscribe. Please try again.');
+    },
+  });
+  
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.trim()) {
+      toast.error('Please enter your email address');
+      return;
+    }
+    subscribeMutation.mutate(email);
+  };
+  
+  // Transform products for display
+  const transformProduct = (p: any): Product => ({
+    id: String(p.id),
+    slug: p.slug,
+    name: p.name,
+    price: p.price || p.basePrice || 0,
+    originalPrice: p.originalPrice,
+    image: p.images?.[0] || '',
+    category: p.categoryName || '',
+    isNew: p.isNew,
+    isSale: p.isSale,
+    rating: p.rating || 4,
+  });
+  
+  // Get featured products (best sellers) - use DB data if available, otherwise use mock
+  const bestSellerIds = cmsData?.bestSellerIds || cmsData?.bestSellers || [];
+  let featuredProducts: Product[] = [];
+  
+  // Always prioritize DB data if it exists
+  if (bestSellerIds && bestSellerIds.length > 0) {
+    // Use DB data - map product IDs to actual products
+    // Handle both number and string IDs
+    featuredProducts = bestSellerIds
+      .map((id: number | string) => {
+        const productId = typeof id === 'string' ? Number(id) : id;
+        return apiProducts.find((p: any) => p.id === productId || String(p.id) === String(id));
+      })
+      .filter(Boolean)
+      .map(transformProduct);
+  }
+  
+  // Only fallback to mock data if DB is truly empty (no IDs set in admin panel)
+  if (featuredProducts.length === 0 && apiProducts.length > 0) {
+    // Show first 8 products as fallback
+    featuredProducts = apiProducts
+      .slice(0, 8)
+      .map(transformProduct);
+  }
+  
+  // Get new arrivals - use DB data if available, otherwise use mock
+  const newArrivalIds = cmsData?.newArrivalIds || cmsData?.newArrivals || [];
+  let newArrivals: Product[] = [];
+  
+  // Always prioritize DB data if it exists
+  if (newArrivalIds && newArrivalIds.length > 0) {
+    // Use DB data - map product IDs to actual products
+    // Handle both number and string IDs
+    newArrivals = newArrivalIds
+      .map((id: number | string) => {
+        const productId = typeof id === 'string' ? Number(id) : id;
+        return apiProducts.find((p: any) => p.id === productId || String(p.id) === String(id));
+      })
+      .filter(Boolean)
+      .map(transformProduct);
+  }
+  
+  // Only fallback to mock data if DB is truly empty (no IDs set in admin panel)
+  if (newArrivals.length === 0 && apiProducts.length > 0) {
+    // Show first 8 products as fallback
+    newArrivals = apiProducts
+      .slice(0, 8)
+      .map(transformProduct);
+  }
+  
+  // Get testimonials from CMS or use defaults
+  const testimonials = (cmsData?.testimonials || defaultTestimonials)
+    .filter((t: any) => t.isActive !== false)
+    .slice(0, 10);
+  
+  // Get Instagram posts from CMS or use defaults
+  const instagramPosts = cmsData?.instagramPosts?.length ? cmsData.instagramPosts : defaultInstagramPosts;
+  
+  // Get categories from API - only parent categories (no parentId)
+  const categories = apiCategories.length 
+    ? apiCategories
+        .filter((c: any) => !c.parentId) // Only parent categories
+        .map((c: any) => ({
+          id: String(c.id),
+          slug: c.slug || '',
+          name: c.name,
+          image: c.image || 'https://images.unsplash.com/photo-1487530811176-3780de880c2d?w=600&h=800&fit=crop',
+          count: c.subcategories?.length || 0, // Count of subcategories
+        }))
+    : [
+        { id: '1', name: 'Floral', image: 'https://images.unsplash.com/photo-1487530811176-3780de880c2d?w=600&h=800&fit=crop', count: 48 },
+        { id: '2', name: 'Botanical', image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=600&h=800&fit=crop', count: 36 },
+      ];
+  
+  // Hero slides - use banners from CMS if available, otherwise use defaults
+  const banners = cmsData?.banners || [];
+  const heroSlides = banners.length > 0 
+    ? banners.map((banner: any, index: number) => ({
+        id: banner.id || index + 1,
+        title: banner.title || '',
+        subtitle: banner.subtitle || '',
+        image: banner.image || '',
+        cta: banner.buttonText || 'Shop Now',
+        link: banner.link || '/products',
+      }))
+    : defaultHeroSlides;
 
   return (
     <Layout>
@@ -235,7 +334,7 @@ const Index = () => {
             <div className="flex gap-3 xs:gap-4 sm:gap-6 lg:gap-8 min-w-max pb-4">
               {categories.map((category, index) => (
                 <ScrollReveal key={category.id} delay={index * 0.1}>
-                  <Link to={`/category/${category.id}`} className="group block flex-shrink-0">
+                  <Link to={`/category/${category.slug}`} className="group block flex-shrink-0">
                     <div className="relative w-[180px] xs:w-[220px] sm:w-[280px] md:w-[320px] lg:w-[360px] aspect-[3/4] rounded-xl xs:rounded-2xl overflow-hidden shadow-lg">
                       <img
                         src={category.image}
@@ -245,7 +344,7 @@ const Index = () => {
                       <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/20 to-transparent" />
                       <div className="absolute inset-0 flex flex-col items-center justify-end text-white pb-4 xs:pb-6 sm:pb-8 lg:pb-10">
                         <h3 className="font-cursive text-2xl xs:text-3xl sm:text-4xl lg:text-5xl mb-1 xs:mb-2">{category.name}</h3>
-                        <p className="text-xs xs:text-sm lg:text-base text-white/80">{category.count} Products</p>
+                        <p className="text-xs xs:text-sm lg:text-base text-white/80">{category.count} {category.count === 1 ? 'Category' : 'Categories'}</p>
                       </div>
                     </div>
                   </Link>
@@ -493,14 +592,17 @@ const Index = () => {
 
       {/* Offer Section - CMS Managed */}
       {(() => {
-        // TODO: Fetch active offers from API - GET /api/cms/offers?active=true
-        const activeOffers = [
-          { id: '1', title: 'Get 20% Off Your First Order', description: 'Join our community and be the first to know about new collections, exclusive offers, and style inspiration' },
-        ];
+        // Fetch active offers from CMS API
+        const activeOffers = cmsData?.offers || [];
         
-        if (activeOffers.length === 0) return null;
+        // Fallback to mock data if DB is empty
+        const mockOffer = { id: '1', title: 'Get 20% Off Your First Order', description: 'Join our community and be the first to know about new collections, exclusive offers, and style inspiration' };
+        const offersToDisplay = activeOffers.length > 0 ? activeOffers : [mockOffer];
         
-        const offer = activeOffers[0]; // Display first active offer
+        if (offersToDisplay.length === 0) return null;
+        
+        const offer = offersToDisplay[0]; // Display first active offer
+        
         return (
           <section className="w-full py-12 xs:py-16 sm:py-20 lg:py-28 bg-foreground text-white">
             <div className="max-w-3xl mx-auto text-center px-3 xs:px-4 sm:px-6">
@@ -512,18 +614,26 @@ const Index = () => {
                   {offer.title}
                 </h2>
                 <p className="text-xs xs:text-sm sm:text-lg lg:text-xl text-white/70 mb-6 xs:mb-8 sm:mb-10 leading-relaxed">
-                  {offer.description}
+                  {offer.description?.replace(/<[^>]*>/g, '') || offer.description}
                 </p>
-                <div className="flex flex-col sm:flex-row gap-2 xs:gap-3 sm:gap-4 justify-center max-w-lg mx-auto">
+                <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-2 xs:gap-3 sm:gap-4 justify-center max-w-lg mx-auto">
                   <input
                     type="email"
                     placeholder="Enter your email"
-                    className="flex-1 px-4 xs:px-5 sm:px-6 py-2.5 xs:py-3 sm:py-4 rounded-full bg-white/10 border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-primary text-sm xs:text-base"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={subscribeMutation.isPending}
+                    className="flex-1 px-4 xs:px-5 sm:px-6 py-2.5 xs:py-3 sm:py-4 rounded-full bg-white/10 border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-primary text-sm xs:text-base disabled:opacity-50"
+                    required
                   />
-                  <Button className="bg-primary hover:bg-primary/90 text-white rounded-full px-5 xs:px-6 sm:px-8 py-2.5 xs:py-3 sm:py-4 text-xs xs:text-sm sm:text-base font-semibold whitespace-nowrap">
-                    Subscribe Now
+                  <Button 
+                    type="submit"
+                    disabled={subscribeMutation.isPending}
+                    className="bg-primary hover:bg-primary/90 text-white rounded-full px-5 xs:px-6 sm:px-8 py-2.5 xs:py-3 sm:py-4 text-xs xs:text-sm sm:text-base font-semibold whitespace-nowrap disabled:opacity-50"
+                  >
+                    {subscribeMutation.isPending ? 'Subscribing...' : 'Subscribe Now'}
                   </Button>
-                </div>
+                </form>
               </ScrollReveal>
             </div>
           </section>

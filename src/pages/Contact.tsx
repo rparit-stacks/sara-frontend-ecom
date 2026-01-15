@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { Mail, Phone, MapPin, Clock } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { Mail, Phone, MapPin, Clock, Loader2 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { contactApi, cmsApi } from '@/lib/api';
+import { toast } from 'sonner';
 
 // Country codes list
 const countryCodes = [
@@ -218,6 +221,52 @@ const countryCodes = [
 const Contact = () => {
   const [countryCode, setCountryCode] = useState('+91');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    subject: '',
+    message: '',
+  });
+  
+  // Fetch contact info from CMS
+  const { data: contactInfo } = useQuery({
+    queryKey: ['contactInfo'],
+    queryFn: () => cmsApi.getContactInfo(),
+  });
+  
+  // Submit contact form
+  const submitMutation = useMutation({
+    mutationFn: (data: any) => contactApi.submit(data),
+    onSuccess: () => {
+      toast.success('Thank you for contacting us! We\'ll get back to you soon.');
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        subject: '',
+        message: '',
+      });
+      setPhoneNumber('');
+      setCountryCode('+91');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to send message. Please try again.');
+    },
+  });
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || !formData.subject.trim() || !formData.message.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    submitMutation.mutate({
+      ...formData,
+      countryCode,
+      phoneNumber,
+    });
+  };
 
   return (
   <Layout>
@@ -244,12 +293,12 @@ const Contact = () => {
                 <h2 className="font-cursive text-3xl lg:text-4xl mb-8">Contact Information</h2>
                 <div className="space-y-6">
                   {[
-                    { icon: Mail, title: 'Email', text: 'hello@studiosara.in' },
-                    { icon: Phone, title: 'Phone', text: '+91 98765 43210' },
-                    { icon: MapPin, title: 'Address', text: '123 Fashion Street, Mumbai, MH 400001' },
-                    { icon: Clock, title: 'Hours', text: 'Mon-Sat: 10AM-7PM' },
+                    { icon: Mail, title: 'Email', text: contactInfo?.email || 'hello@studiosara.in', key: 'email' },
+                    { icon: Phone, title: 'Phone', text: contactInfo?.phone || '+91 98765 43210', key: 'phone' },
+                    { icon: MapPin, title: 'Address', text: contactInfo?.address || '123 Fashion Street, Mumbai, MH 400001', key: 'address' },
+                    { icon: Clock, title: 'Hours', text: contactInfo?.hours || 'Mon-Sat: 10AM-7PM', key: 'hours' },
                   ].map(item => (
-                    <div key={item.title} className="flex gap-5">
+                    <div key={item.key} className="flex gap-5">
                       <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <item.icon className="w-6 h-6 text-primary" />
                       </div>
@@ -267,12 +316,31 @@ const Contact = () => {
           <ScrollReveal direction="right">
             <div className="bg-card p-8 lg:p-10 rounded-2xl border border-border">
               <h3 className="font-cursive text-2xl lg:text-3xl mb-8">Send us a Message</h3>
-              <form className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-2 gap-5">
-                  <Input placeholder="First name" className="h-12" />
-                  <Input placeholder="Last name" className="h-12" />
+                  <Input 
+                    placeholder="First name" 
+                    className="h-12" 
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    required
+                  />
+                  <Input 
+                    placeholder="Last name" 
+                    className="h-12" 
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    required
+                  />
                 </div>
-                <Input placeholder="Email" type="email" className="h-12" />
+                <Input 
+                  placeholder="Email" 
+                  type="email" 
+                  className="h-12" 
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                />
                 <div className="flex gap-3">
                   <Select value={countryCode} onValueChange={setCountryCode}>
                     <SelectTrigger className="w-[140px] h-12 flex-shrink-0">
@@ -294,9 +362,35 @@ const Contact = () => {
                     className="h-12 flex-1"
                   />
                 </div>
-                <Input placeholder="Subject" className="h-12" />
-                <Textarea placeholder="Your message" rows={6} className="resize-none" />
-                <Button className="w-full btn-primary h-14 text-base">Send Message</Button>
+                <Input 
+                  placeholder="Subject" 
+                  className="h-12" 
+                  value={formData.subject}
+                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                  required
+                />
+                <Textarea 
+                  placeholder="Your message" 
+                  rows={6} 
+                  className="resize-none" 
+                  value={formData.message}
+                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                  required
+                />
+                <Button 
+                  type="submit" 
+                  className="w-full btn-primary h-14 text-base" 
+                  disabled={submitMutation.isPending}
+                >
+                  {submitMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Send Message'
+                  )}
+                </Button>
               </form>
             </div>
           </ScrollReveal>

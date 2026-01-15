@@ -169,7 +169,7 @@ export const SearchPopup = ({ open, onOpenChange }: SearchPopupProps) => {
                             transition={{ duration: 0.2 }}
                           >
                             <Link
-                              to={`/product/${product.id}`}
+                              to={`/product/${product.slug || product.id}`}
                               onClick={() => onOpenChange(false)}
                               className="flex gap-3 md:gap-4 p-3 md:p-4 rounded-lg border border-border hover:bg-secondary/50 active:bg-secondary/70 transition-colors group touch-manipulation"
                             >

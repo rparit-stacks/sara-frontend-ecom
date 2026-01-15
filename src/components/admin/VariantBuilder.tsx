@@ -40,6 +40,7 @@ const VariantBuilder: React.FC<VariantBuilderProps> = ({
 }) => {
   const [variants, setVariants] = useState<VariantType[]>(initialVariants);
   const [combinations, setCombinations] = useState<VariantCombination[]>(initialCombinations);
+  const [touchedVariants, setTouchedVariants] = useState<Record<string, boolean>>({});
 
   const addVariantType = () => {
     const newVariant: VariantType = {
@@ -56,6 +57,7 @@ const VariantBuilder: React.FC<VariantBuilderProps> = ({
 
   const updateVariantName = (id: string, name: string) => {
     setVariants(variants.map(v => v.id === id ? { ...v, name } : v));
+    setTouchedVariants({ ...touchedVariants, [id]: true });
   };
 
   const updateVariantUnit = (id: string, unit: string) => {

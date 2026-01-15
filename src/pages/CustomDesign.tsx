@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useMutation } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import AnimatedWaveBackground from '@/components/animations/AnimatedWaveBackground';
 import { toast } from 'sonner';
+import { customConfigApi } from '@/lib/api';
 
 const steps = [
   {
@@ -86,23 +88,29 @@ const CustomDesign = () => {
     description: '',
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Submit design request mutation
+  const submitMutation = useMutation({
+    mutationFn: customConfigApi.submitDesignRequest,
+    onSuccess: () => {
+      setIsSubmitted(true);
+      toast.success('Request submitted successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to submit request');
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsSubmitting(false);
-    setIsSubmitted(true);
-    toast.success('Request submitted successfully!');
+    submitMutation.mutate(formData);
   };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+  
+  const isSubmitting = submitMutation.isPending;
 
   return (
     <Layout>

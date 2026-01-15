@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Category, CategoryTree } from '@/components/admin/CategoryTree';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, FolderTree, Search, Save, X } from 'lucide-react';
+import { Plus, FolderTree, Search, Save, Loader2, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -21,147 +23,229 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-
-const mockCategories: Category[] = [
-  {
-    id: '1',
-    name: 'Clothing',
-    parentId: null,
-    status: 'active',
-    subcategories: [
-      { id: '1-1', name: 'Menswear', parentId: '1', status: 'active' },
-      { id: '1-2', name: 'Womenswear', parentId: '1', status: 'active' },
-      { id: '1-3', name: 'Kids', parentId: '1', status: 'active' },
-    ]
-  },
-  {
-    id: '2',
-    name: 'Home Decor',
-    parentId: null,
-    status: 'active',
-    subcategories: [
-      { id: '2-1', name: 'Cushions', parentId: '2', status: 'active' },
-      { id: '2-2', name: 'Bedding', parentId: '2', status: 'active' },
-      { id: '2-3', name: 'Table Linens', parentId: '2', status: 'active' },
-    ]
-  },
-  {
-    id: '3',
-    name: 'Accessories',
-    parentId: null,
-    status: 'active',
-    subcategories: [
-      { id: '3-1', name: 'Bags', parentId: '3', status: 'active' },
-      { id: '3-2', name: 'Scarves', parentId: '3', status: 'active' },
-      { id: '3-3', name: 'Jewelry', parentId: '3', status: 'inactive' },
-    ]
-  }
-];
+import { Textarea } from '@/components/ui/textarea';
+import { categoriesApi } from '@/lib/api';
 
 const AdminCategories = () => {
-  const [categories, setCategories] = useState<Category[]>(mockCategories);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  
+  const queryClient = useQueryClient();
+  
+  // Fetch categories from API
+  const { data: apiCategories = [], isLoading, error } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => categoriesApi.getAll(),
+  });
+  
+  // Transform API response to Category[] format for CategoryTree
+  const transformCategories = (cats: any[]): Category[] => {
+    return cats.map((c: any) => ({
+      id: String(c.id),
+      name: c.name,
+      parentId: c.parentId ? String(c.parentId) : null,
+      status: c.status?.toLowerCase() === 'active' ? 'active' : 'inactive',
+      subcategories: c.subcategories ? transformCategories(c.subcategories) : [],
+      image: c.image || '',
+    } as Category & { image?: string }));
+  };
+  
+  const categories = transformCategories(apiCategories);
+  
+  // Create mutation
+  const createMutation = useMutation({
+    mutationFn: categoriesApi.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      toast.success('Category created successfully!');
+      setIsAddDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to create category');
+    },
+  });
+  
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => categoriesApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      toast.success('Category updated successfully!');
+      setIsAddDialogOpen(false);
+      setEditingCategory(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update category');
+    },
+  });
+  
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: categoriesApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      toast.success('Category deleted successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to delete category');
+    },
+  });
   
   // Form State
   const [formData, setFormData] = useState<{
     name: string;
     parentId: string | 'none';
     status: 'active' | 'inactive';
+    image: string;
+    description: string;
+    displayOrder: string;
+    isFabric: boolean;
   }>({
     name: '',
     parentId: 'none',
-    status: 'active'
+    status: 'active',
+    image: '',
+    description: '',
+    displayOrder: '',
+    isFabric: false
+  });
+  
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch full category details when editing
+  const { data: fullCategoryData, isLoading: isLoadingCategory } = useQuery({
+    queryKey: ['category', editingCategory?.id],
+    queryFn: () => categoriesApi.getById(Number(editingCategory?.id)),
+    enabled: !!editingCategory?.id && isDialogOpen,
   });
 
   const handleAddMain = () => {
     setEditingCategory(null);
-    setFormData({ name: '', parentId: 'none', status: 'active' });
+    setFormData({ name: '', parentId: 'none', status: 'active', image: '', description: '', displayOrder: '', isFabric: false });
+    setImageFile(null);
+    setImagePreview('');
     setIsAddDialogOpen(true);
   };
 
   const handleAddSub = (parentId: string) => {
     setEditingCategory(null);
-    setFormData({ name: '', parentId, status: 'active' });
+    setFormData({ name: '', parentId, status: 'active', image: '', description: '', displayOrder: '', isFabric: false });
+    setImageFile(null);
+    setImagePreview('');
     setIsAddDialogOpen(true);
   };
 
   const handleEdit = (category: Category) => {
     setEditingCategory(category);
-    setFormData({ 
-      name: category.name, 
-      parentId: category.parentId || 'none', 
-      status: category.status 
-    });
     setIsAddDialogOpen(true);
+  };
+
+  // Load full category data when editing
+  useEffect(() => {
+    if (isDialogOpen && editingCategory && fullCategoryData) {
+      setFormData({ 
+        name: fullCategoryData.name || '', 
+        parentId: fullCategoryData.parentId ? String(fullCategoryData.parentId) : 'none', 
+        status: fullCategoryData.status?.toLowerCase() === 'active' ? 'active' : 'inactive',
+        image: fullCategoryData.image || '',
+        description: fullCategoryData.description || '',
+        displayOrder: fullCategoryData.displayOrder ? String(fullCategoryData.displayOrder) : '',
+        isFabric: fullCategoryData.isFabric || false
+      });
+      setImageFile(null);
+      setImagePreview(fullCategoryData.image || '');
+    } else if (isDialogOpen && !editingCategory) {
+      // Reset form when adding new category
+      setFormData({ name: '', parentId: 'none', status: 'active', image: '', description: '', displayOrder: '', isFabric: false });
+      setImageFile(null);
+      setImagePreview('');
+    }
+  }, [isDialogOpen, editingCategory, fullCategoryData]);
+  
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+        console.log('[Category Image] File selected, preview ready');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  
+  const handleImageUpload = async () => {
+    if (!imageFile) return;
+    
+    setIsUploadingImage(true);
+    try {
+      console.log('[Category Image] Uploading image...');
+      const imageUrl = await categoriesApi.uploadImage(imageFile);
+      setFormData({ ...formData, image: imageUrl });
+      setImagePreview(imageUrl);
+      toast.success('Image uploaded successfully!');
+      // Clear the file input after successful upload
+      setImageFile(null);
+    } catch (error: any) {
+      console.error('[Category Image] Upload failed:', error);
+      toast.error(error.message || 'Failed to upload image');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+  
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview('');
+    setFormData({ ...formData, image: '' });
   };
 
   const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this category? This will not affect products assigned to it.')) {
-      // Logic to delete category
-      const removeCategory = (list: Category[]): Category[] => {
-        return list
-          .filter(c => c.id !== id)
-          .map(c => ({
-            ...c,
-            subcategories: c.subcategories ? removeCategory(c.subcategories) : []
-          }));
-      };
-      setCategories(removeCategory(categories));
+      deleteMutation.mutate(Number(id));
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
-
-    if (editingCategory) {
-      // Update logic
-      const updateCategory = (list: Category[]): Category[] => {
-        return list.map(c => {
-          if (c.id === editingCategory.id) {
-            return { ...c, name: formData.name, status: formData.status };
-          }
-          return {
-            ...c,
-            subcategories: c.subcategories ? updateCategory(c.subcategories) : []
-          };
-        });
-      };
-      setCategories(updateCategory(categories));
-    } else {
-      // Add logic
-      const newCategory: Category = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: formData.name,
-        parentId: formData.parentId === 'none' ? null : formData.parentId,
-        status: formData.status,
-        subcategories: []
-      };
-
-      if (newCategory.parentId === null) {
-        setCategories([...categories, newCategory]);
-      } else {
-        const addSub = (list: Category[]): Category[] => {
-          return list.map(c => {
-            if (c.id === newCategory.parentId) {
-              return {
-                ...c,
-                subcategories: [...(c.subcategories || []), newCategory]
-              };
-            }
-            return {
-              ...c,
-              subcategories: c.subcategories ? addSub(c.subcategories) : []
-            };
-          });
-        };
-        setCategories(addSub(categories));
+    
+    // Upload image if file is selected but not uploaded yet
+    let imageUrl = formData.image;
+    if (imageFile && !imageUrl) {
+      try {
+        setIsUploadingImage(true);
+        imageUrl = await categoriesApi.uploadImage(imageFile);
+        setFormData({ ...formData, image: imageUrl });
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to upload image');
+        setIsUploadingImage(false);
+        return;
+      } finally {
+        setIsUploadingImage(false);
       }
     }
 
-    setIsAddDialogOpen(false);
+    const payload = {
+      name: formData.name,
+      parentId: formData.parentId === 'none' ? null : Number(formData.parentId),
+      status: formData.status.toUpperCase(),
+      image: imageUrl || null,
+      description: formData.description || null,
+      displayOrder: formData.displayOrder ? Number(formData.displayOrder) : null,
+      isFabric: formData.isFabric || false,
+    };
+
+    if (editingCategory) {
+      updateMutation.mutate({ id: Number(editingCategory.id), data: payload });
+    } else {
+      createMutation.mutate(payload);
+    }
   };
 
   const getAllParentOptions = () => {
@@ -180,6 +264,26 @@ const AdminCategories = () => {
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (c.subcategories && c.subcategories.some(s => s.name.toLowerCase().includes(searchQuery.toLowerCase())))
   );
+  
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
+    );
+  }
+  
+  if (error) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-destructive">Failed to load categories. Please try again.</p>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -246,13 +350,18 @@ const AdminCategories = () => {
         </div>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle className="font-cursive text-2xl">
                 {editingCategory ? 'Edit Category' : 'Add New Category'}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-6 py-4">
+            {isLoadingCategory && editingCategory ? (
+              <div className="flex items-center justify-center min-h-[200px] flex-1">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+            <form onSubmit={handleSubmit} className="space-y-6 py-4 overflow-y-auto flex-1">
               <div className="space-y-2">
                 <Label htmlFor="name">Category Name</Label>
                 <Input
@@ -262,6 +371,86 @@ const AdminCategories = () => {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="image">Category Image</Label>
+                {imagePreview ? (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.3 }}
+                    className="relative"
+                  >
+                    <img 
+                      src={imagePreview} 
+                      alt="Preview" 
+                      className="w-full h-48 object-cover rounded-lg border border-border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2"
+                      onClick={handleRemoveImage}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </motion.div>
+                ) : (
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                    <ImageIcon className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
+                    <Input
+                      ref={fileInputRef}
+                      id="image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="gap-2"
+                      onClick={() => {
+                        console.log('[Category Image] Opening file selector...');
+                        fileInputRef.current?.click();
+                      }}
+                    >
+                      <Upload className="w-4 h-4" />
+                      Upload Image
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Recommended: 800x800px, JPG or PNG
+                    </p>
+                  </div>
+                )}
+                {imageFile && !imagePreview && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Button
+                      type="button"
+                      onClick={handleImageUpload}
+                      disabled={isUploadingImage}
+                      className="w-full gap-2"
+                    >
+                      {isUploadingImage ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          Upload to Cloudinary
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -290,6 +479,47 @@ const AdminCategories = () => {
                 )}
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Category description (optional)"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="displayOrder">Display Order</Label>
+                <Input
+                  id="displayOrder"
+                  type="number"
+                  placeholder="e.g. 1, 2, 3..."
+                  value={formData.displayOrder}
+                  onChange={(e) => setFormData({ ...formData, displayOrder: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Lower numbers appear first in category listings
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+                <div className="space-y-0.5">
+                  <Label htmlFor="isFabric">This is a Fabric Category</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Products in this category will appear in fabric selection for design products
+                  </p>
+                </div>
+                <Switch
+                  id="isFabric"
+                  checked={formData.isFabric}
+                  onCheckedChange={(checked) => 
+                    setFormData({ ...formData, isFabric: checked })
+                  }
+                />
+              </div>
+
               <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
                 <div className="space-y-0.5">
                   <Label htmlFor="status">Status</Label>
@@ -306,16 +536,28 @@ const AdminCategories = () => {
                 />
               </div>
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <DialogFooter className="flex-shrink-0 border-t pt-4 mt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsAddDialogOpen(false)}
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" className="btn-primary gap-2">
+                <Button 
+                  type="submit" 
+                  className="btn-primary gap-2"
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                >
                   <Save className="w-4 h-4" />
-                  {editingCategory ? 'Update' : 'Create'} Category
+                  {createMutation.isPending || updateMutation.isPending 
+                    ? 'Saving...' 
+                    : `${editingCategory ? 'Update' : 'Create'} Category`}
                 </Button>
               </DialogFooter>
             </form>
+            )}
           </DialogContent>
         </Dialog>
       </div>

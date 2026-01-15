@@ -1,47 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, Type, FileText } from 'lucide-react';
+import { Save, Type, FileText, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import FormBuilder, { FormField } from '@/components/admin/FormBuilder';
 import { toast } from 'sonner';
+import { customConfigApi } from '@/lib/api';
 
 const AdminCustomConfig = () => {
-  const [formFields, setFormFields] = useState<FormField[]>([
-    {
-      id: 'field-1',
-      type: 'text',
-      label: 'Product Name',
-      placeholder: 'Enter a name for your custom product',
-      required: true,
-      min: 3,
-      max: 50,
-    },
-    {
-      id: 'field-2',
-      type: 'dropdown',
-      label: 'Product Category',
-      required: true,
-      options: ['Home Decor', 'Fashion', 'Accessories'],
-    },
-  ]);
+  const queryClient = useQueryClient();
+  
+  const [formFields, setFormFields] = useState<FormField[]>([]);
   
   const [pageConfig, setPageConfig] = useState({
     title: 'Design Your Custom Piece',
     description: 'Upload your unique artwork and choose from our premium fabrics to create a one-of-a-kind Studio Sara product.',
     uploadLabel: 'Upload Design (PNG/JPG)',
   });
+  
+  // Fetch config from API
+  const { data: configData, isLoading, error } = useQuery({
+    queryKey: ['customConfig'],
+    queryFn: () => customConfigApi.getAdminConfig(),
+  });
+  
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: customConfigApi.updateConfig,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customConfig'] });
+      toast.success('Custom product configuration saved successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to save configuration');
+    },
+  });
+  
+  // Update local state when data loads
+  useEffect(() => {
+    if (configData) {
+      if (configData.formFields) setFormFields(configData.formFields);
+      if (configData.pageConfig) setPageConfig(configData.pageConfig);
+    }
+  }, [configData]);
 
   const handleSave = () => {
-    // TODO: Call API to save config
-    console.log('Saving Custom Product Config:', {
+    updateMutation.mutate({
       formFields,
       pageConfig
     });
-    toast.success('Custom product configuration saved successfully!');
   };
+  
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
+    );
+  }
+  
+  if (error) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-destructive">Failed to load configuration. Please try again.</p>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -58,9 +89,9 @@ const AdminCustomConfig = () => {
             </h1>
             <p className="text-muted-foreground text-lg">Configure the flow and options for user-uploaded designs</p>
           </div>
-          <Button onClick={handleSave} className="btn-primary gap-2 h-11 px-8">
+          <Button onClick={handleSave} className="btn-primary gap-2 h-11 px-8" disabled={updateMutation.isPending}>
             <Save className="w-4 h-4" />
-            Save Configuration
+            {updateMutation.isPending ? 'Saving...' : 'Save Configuration'}
           </Button>
         </motion.div>
 

@@ -1,0 +1,236 @@
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import Layout from '@/components/layout/Layout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, CheckCircle2, Package, ArrowRight, LogIn, Download } from 'lucide-react';
+import { orderApi, productsApi } from '@/lib/api';
+import { format } from 'date-fns';
+import ScrollReveal from '@/components/animations/ScrollReveal';
+
+const OrderConfirmation = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Get order ID from URL params or location state
+  const orderId = id || (location.state as any)?.orderId;
+  
+  const isLoggedIn = !!localStorage.getItem('authToken');
+
+  const { data: order, isLoading } = useQuery({
+    queryKey: ['order', orderId],
+    queryFn: () => orderApi.getOrderById(Number(orderId)),
+    enabled: !!orderId,
+  });
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!order) {
+    return (
+      <Layout>
+        <div className="text-center py-12">
+          <p className="text-lg mb-4">Order not found</p>
+          <Button onClick={() => navigate('/')}>Go to Home</Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <section className="w-full bg-secondary/30 py-14 lg:py-20">
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
+          <ScrollReveal>
+            <div className="text-center">
+              <div className="flex justify-center mb-6">
+                <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle2 className="w-12 h-12 text-green-600" />
+                </div>
+              </div>
+              <h1 className="font-cursive text-5xl lg:text-6xl mb-3">Order Confirmed!</h1>
+              <p className="text-muted-foreground mt-3 text-lg">
+                Thank you for your purchase. Your order has been placed successfully.
+              </p>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      <section className="w-full py-14 lg:py-20">
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
+          <div className="max-w-3xl mx-auto space-y-6">
+            {/* Order Summary Card */}
+            <ScrollReveal>
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-2xl">Order #{order.id}</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Placed on {order.createdAt ? format(new Date(order.createdAt), 'MMMM dd, yyyy') : 'N/A'}
+                      </p>
+                    </div>
+                    <Badge variant={order.status === 'DELIVERED' ? 'default' : 'secondary'} className="text-sm">
+                      {order.status}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Order Items */}
+                    <div>
+                      <h3 className="font-semibold mb-3">Order Items</h3>
+                      <div className="space-y-3">
+                        {order.items?.map((item: any, index: number) => (
+                          <div key={index} className="flex items-center gap-4 p-3 border rounded-lg">
+                            {item.image && (
+                              <img
+                                src={item.image}
+                                alt={item.name || item.productName}
+                                className="w-16 h-16 object-cover rounded"
+                              />
+                            )}
+                            <div className="flex-1">
+                              <p className="font-medium">{item.name || item.productName}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Quantity: {item.quantity} × ₹{(item.price || item.unitPrice)?.toLocaleString('en-IN')}
+                              </p>
+                              {item.productType === 'DIGITAL' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="mt-2 gap-2"
+                                  onClick={async () => {
+                                    try {
+                                      const product = await productsApi.getById(item.productId);
+                                      if (product.fileUrl) {
+                                        window.open(product.fileUrl, '_blank');
+                                      } else {
+                                        alert('Download file not available');
+                                      }
+                                    } catch (error) {
+                                      alert('Failed to load download link');
+                                    }
+                                  }}
+                                >
+                                  <Download className="w-4 h-4" />
+                                  Download
+                                </Button>
+                              )}
+                            </div>
+                            <p className="font-semibold">₹{item.totalPrice?.toLocaleString('en-IN')}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Order Summary */}
+                    <div className="border-t pt-4 space-y-2">
+                      <div className="flex justify-between">
+                        <span>Subtotal</span>
+                        <span>₹{order.subtotal?.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Shipping</span>
+                        <span>{order.shipping === 0 ? 'Free' : `₹${order.shipping?.toLocaleString('en-IN')}`}</span>
+                      </div>
+                      {order.couponDiscount && order.couponDiscount > 0 && (
+                        <div className="flex justify-between text-primary">
+                          <span>Coupon Discount</span>
+                          <span>-₹{order.couponDiscount?.toLocaleString('en-IN')}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-semibold text-lg pt-2 border-t">
+                        <span>Total</span>
+                        <span>₹{order.total?.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+
+            {/* Shipping Address */}
+            {order.shippingAddress && (
+              <ScrollReveal>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Shipping Address</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-1">
+                      <p className="font-medium">
+                        {order.shippingAddress.firstName} {order.shippingAddress.lastName}
+                      </p>
+                      <p className="text-muted-foreground">{order.shippingAddress.address}</p>
+                      <p className="text-muted-foreground">
+                        {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}
+                      </p>
+                      <p className="text-muted-foreground">Phone: {order.shippingAddress.phone}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
+            )}
+
+            {/* Action Buttons */}
+            <ScrollReveal>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                {isLoggedIn ? (
+                  <>
+                    <Button
+                      onClick={() => navigate('/dashboard')}
+                      className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white"
+                      size="lg"
+                    >
+                      <Package className="w-4 h-4 mr-2" />
+                      Go to My Orders
+                    </Button>
+                    <Button
+                      onClick={() => navigate(`/orders/${order.id}`)}
+                      variant="outline"
+                      size="lg"
+                    >
+                      View Order Details
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      onClick={() => navigate('/login')}
+                      className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white"
+                      size="lg"
+                    >
+                      <LogIn className="w-4 h-4 mr-2" />
+                      Login to Check Your Order
+                    </Button>
+                    <Button
+                      onClick={() => navigate('/')}
+                      variant="outline"
+                      size="lg"
+                    >
+                      Continue Shopping
+                    </Button>
+                  </>
+                )}
+              </div>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+    </Layout>
+  );
+};
+
+export default OrderConfirmation;

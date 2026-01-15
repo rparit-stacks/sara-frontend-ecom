@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import SearchPopup from '@/components/search/SearchPopup';
+import { cartApi, wishlistApi } from '@/lib/api';
+import { guestCart } from '@/lib/guestCart';
 
 const navLinks = [
   { name: 'Home', path: '/' },
@@ -17,6 +20,7 @@ export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const location = useLocation();
+  const isAuthenticated = typeof window !== 'undefined' && !!localStorage.getItem('authToken');
 
   useEffect(() => {
     setIsOpen(false);
@@ -34,8 +38,36 @@ export const Navbar = () => {
     };
   }, [isOpen]);
 
-  const cartItemCount = 3;
-  const wishlistCount = 2;
+  // Fetch cart count (for logged-in users)
+  const { data: cartCountData } = useQuery({
+    queryKey: ['cart-count'],
+    queryFn: () => cartApi.getCartCount(),
+    enabled: isAuthenticated,
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  // Fetch wishlist count
+  const { data: wishlistData } = useQuery({
+    queryKey: ['wishlist'],
+    queryFn: () => wishlistApi.getWishlist(),
+    enabled: isAuthenticated,
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  // Get guest cart count
+  const [guestCartCount, setGuestCartCount] = useState(0);
+  
+  useEffect(() => {
+    const updateGuestCartCount = () => {
+      setGuestCartCount(guestCart.getCount());
+    };
+    updateGuestCartCount();
+    window.addEventListener('guestCartUpdated', updateGuestCartCount);
+    return () => window.removeEventListener('guestCartUpdated', updateGuestCartCount);
+  }, []);
+
+  const cartItemCount = isAuthenticated ? (cartCountData?.count || 0) : guestCartCount;
+  const wishlistCount = wishlistData?.length || 0;
 
   return (
     <header className="sticky top-0 left-0 right-0 z-50 bg-white border-b border-border">
@@ -77,24 +109,24 @@ export const Navbar = () => {
           </div>
 
           {/* Right Actions - Compact */}
-          <div className="flex items-center gap-1 xs:gap-2">
+          <div className="flex items-center gap-2 xs:gap-3">
             {/* Search */}
             <Button 
               variant="ghost" 
               size="icon" 
-              className="hidden md:flex w-9 h-9 rounded-full hover:bg-secondary"
+              className="hidden md:flex w-11 h-11 rounded-full hover:bg-secondary"
               onClick={() => setIsSearchOpen(true)}
             >
-              <i className="fa-solid fa-search text-sm"></i>
+              <i className="fa-solid fa-search text-base"></i>
             </Button>
 
             {/* Wishlist */}
             <Link to="/wishlist" className="relative">
-              <Button variant="ghost" size="icon" className="w-8 h-8 xs:w-9 xs:h-9 rounded-full hover:bg-secondary">
-                <i className="fa-regular fa-heart text-xs xs:text-sm"></i>
+              <Button variant="ghost" size="icon" className="w-10 h-10 xs:w-11 xs:h-11 rounded-full hover:bg-secondary">
+                <i className="fa-regular fa-heart text-sm xs:text-base"></i>
                 {wishlistCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 xs:w-4 xs:h-4 bg-primary text-primary-foreground text-[8px] xs:text-[10px] font-bold rounded-full flex items-center justify-center">
-                    {wishlistCount}
+                  <span className="absolute -top-1 -right-1 w-5 h-5 xs:w-5.5 xs:h-5.5 bg-primary text-primary-foreground text-[10px] xs:text-[11px] font-bold rounded-full flex items-center justify-center">
+                    {wishlistCount > 99 ? '99+' : wishlistCount}
                   </span>
                 )}
               </Button>
@@ -102,20 +134,20 @@ export const Navbar = () => {
 
             {/* Cart */}
             <Link to="/cart" className="relative">
-              <Button variant="ghost" size="icon" className="w-8 h-8 xs:w-9 xs:h-9 rounded-full hover:bg-secondary">
-                <i className="fa-solid fa-bag-shopping text-xs xs:text-sm"></i>
+              <Button variant="ghost" size="icon" className="w-10 h-10 xs:w-11 xs:h-11 rounded-full hover:bg-secondary">
+                <i className="fa-solid fa-bag-shopping text-sm xs:text-base"></i>
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 xs:w-4 xs:h-4 bg-primary text-primary-foreground text-[8px] xs:text-[10px] font-bold rounded-full flex items-center justify-center">
-                    {cartItemCount}
+                  <span className="absolute -top-1 -right-1 w-5 h-5 xs:w-5.5 xs:h-5.5 bg-primary text-primary-foreground text-[10px] xs:text-[11px] font-bold rounded-full flex items-center justify-center">
+                    {cartItemCount > 99 ? '99+' : cartItemCount}
                   </span>
                 )}
               </Button>
             </Link>
 
             {/* User/Login */}
-            <Link to="/login" className="hidden md:block">
-              <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full hover:bg-secondary">
-                <i className="fa-regular fa-user text-sm"></i>
+            <Link to={isAuthenticated ? "/dashboard" : "/login"} className="hidden md:block">
+              <Button variant="ghost" size="icon" className="w-11 h-11 rounded-full hover:bg-secondary">
+                <i className="fa-regular fa-user text-base"></i>
               </Button>
             </Link>
 
@@ -186,10 +218,10 @@ export const Navbar = () => {
                   <i className="fa-solid fa-search"></i>
                   Search
                 </Button>
-                <Link to="/login" onClick={() => setIsOpen(false)} className="flex-1">
+                <Link to={isAuthenticated ? "/dashboard" : "/login"} onClick={() => setIsOpen(false)} className="flex-1">
                   <Button className="w-full btn-primary gap-2">
                     <i className="fa-regular fa-user"></i>
-                    Login
+                    {isAuthenticated ? 'Dashboard' : 'Login'}
                   </Button>
                 </Link>
               </motion.div>

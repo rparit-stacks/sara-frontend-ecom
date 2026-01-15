@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,22 +6,187 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { X, Save, Upload, IndianRupee, Image as ImageIcon, Plus } from 'lucide-react';
+import { X, Save, Upload, IndianRupee, Image as ImageIcon, Plus, Video, Loader2, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProductTypeSelector, { ProductType } from '@/components/admin/ProductTypeSelector';
 import RichTextEditor from '@/components/admin/RichTextEditor';
-import VariantBuilder, { VariantType, VariantCombination } from '@/components/admin/VariantBuilder';
 import PlainProductSelector, { PlainProduct } from '@/components/admin/PlainProductSelector';
 import { toast } from 'sonner';
+import { productsApi } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
 
-// Custom Field Types
-export interface CustomField {
-  id: string;
-  type: 'text' | 'image' | 'input' | 'dropdown';
-  label: string;
-  value?: string;
-  options?: string[];
-}
+// Media Upload Component
+const MediaUploadSection: React.FC<{
+  media: Array<{ url: string; type: 'image' | 'video'; displayOrder: number }>;
+  onMediaChange: (media: Array<{ url: string; type: 'image' | 'video'; displayOrder: number }>) => void;
+}> = ({ media, onMediaChange }) => {
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      console.log('[Product Media] Uploading', files.length, 'files...');
+      const uploadedFiles = await productsApi.uploadMedia(files, 'products');
+      
+      const newMedia = uploadedFiles.map((file: any, idx: number) => ({
+        url: file.url,
+        type: file.type === 'video' ? 'video' as const : 'image' as const,
+        displayOrder: media.length + idx
+      }));
+      
+      onMediaChange([...media, ...newMedia]);
+      toast.success(`Successfully uploaded ${uploadedFiles.length} file(s)`);
+    } catch (error: any) {
+      console.error('[Product Media] Upload failed:', error);
+      toast.error(error.message || 'Failed to upload media');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const removeMedia = (index: number) => {
+    const newMedia = media.filter((_, i) => i !== index).map((m, idx) => ({
+      ...m,
+      displayOrder: idx
+    }));
+    onMediaChange(newMedia);
+  };
+
+  const moveMedia = (index: number, direction: 'up' | 'down') => {
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === media.length - 1)) {
+      return;
+    }
+    const newMedia = [...media];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    [newMedia[index], newMedia[newIndex]] = [newMedia[newIndex], newMedia[index]];
+    newMedia.forEach((m, idx) => m.displayOrder = idx);
+    onMediaChange(newMedia);
+  };
+
+  return (
+    <section className="space-y-6 pt-6 border-t border-border">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">6</span>
+          Product Gallery (Images & Videos)
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+          className="gap-2"
+        >
+          {isUploading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Uploading...
+            </>
+          ) : (
+            <>
+              <Upload className="w-4 h-4" />
+              Upload Media
+            </>
+          )}
+        </Button>
+      </div>
+      
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*,video/*"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
+        {media.map((item, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative aspect-square rounded-xl overflow-hidden border border-border group"
+          >
+            {item.type === 'video' ? (
+              <video
+                src={item.url}
+                className="w-full h-full object-cover"
+                controls={false}
+                muted
+                playsInline
+              />
+            ) : (
+              <img 
+                src={item.url} 
+                alt={`Product media ${index + 1}`} 
+                className="w-full h-full object-cover" 
+              />
+            )}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center gap-1">
+              <button
+                onClick={() => moveMedia(index, 'up')}
+                disabled={index === 0}
+                className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 bg-white/90 rounded flex items-center justify-center disabled:opacity-30 text-xs"
+                title="Move up"
+              >
+                ↑
+              </button>
+              <button
+                onClick={() => removeMedia(index)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center"
+                title="Remove"
+              >
+                <X className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => moveMedia(index, 'down')}
+                disabled={index === media.length - 1}
+                className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 bg-white/90 rounded flex items-center justify-center disabled:opacity-30 text-xs"
+                title="Move down"
+              >
+                ↓
+              </button>
+            </div>
+            <div className="absolute top-1 left-1">
+              <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                {item.type === 'video' ? <Video className="w-3 h-3" /> : <ImageIcon className="w-3 h-3" />}
+              </Badge>
+            </div>
+          </motion.div>
+        ))}
+        
+        <motion.button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+          className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 hover:bg-muted/30 transition-colors group disabled:opacity-50"
+        >
+          {isUploading ? (
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          ) : (
+            <>
+              <ImageIcon className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+              <span className="text-[10px] font-bold text-muted-foreground uppercase">Add Media</span>
+              <span className="text-[9px] text-muted-foreground">Images & Videos</span>
+            </>
+          )}
+        </motion.button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Upload multiple images and videos at once. Drag to reorder. First item will be the main image.
+      </p>
+    </section>
+  );
+};
 
 // Detail Section
 export interface DetailSection {
@@ -57,44 +222,76 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
     categoryId: '',
     subcategoryId: '',
     description: '',
-    basePrice: 0,
-    pricePerMeter: 0,
-    designPrice: 0,
-    images: [] as string[],
+    basePrice: '' as string | number,
+    pricePerMeter: '' as string | number,
+    designPrice: '' as string | number,
+    gstRate: '' as string | number,
+    images: [] as string[], // Deprecated - use media
+    media: [] as Array<{ url: string; type: 'image' | 'video'; displayOrder: number }>,
     digitalFile: null as File | null,
+    plainProductId: null as string | null,
     recommendedPlainProductIds: [] as string[],
-    variants: [] as VariantType[],
-    combinations: [] as VariantCombination[],
-    customFields: [] as CustomField[],
     detailSections: [] as DetailSection[],
+    customFields: [] as Array<{
+      id: string;
+      label: string;
+      fieldType: string;
+      placeholder: string;
+      isRequired: boolean;
+    }>,
+    variants: [] as Array<{
+      id: string;
+      name: string;
+      type: string;
+      unit: string;
+      options: Array<{ id: string; value: string; priceModifier: number }>;
+    }>,
     status: 'active' as 'active' | 'inactive',
+  });
+
+  // Error state for real-time validation
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Fetch full product details when editing
+  const { data: fullProductData, isLoading: isLoadingProduct } = useQuery({
+    queryKey: ['product', productId],
+    queryFn: () => productsApi.getById(Number(productId)),
+    enabled: mode === 'edit' && !!productId && open,
   });
 
   // Load initial data when editing
   useEffect(() => {
-    if (mode === 'edit' && initialData) {
-      setActiveType(initialData.type || 'PLAIN');
-      setFormData({
-        name: initialData.name || '',
-        categoryId: initialData.categoryId || '',
-        subcategoryId: initialData.subcategoryId || '',
-        description: initialData.description || '',
-        basePrice: initialData.basePrice || initialData.price || 0,
-        pricePerMeter: initialData.pricePerMeter || 0,
-        designPrice: initialData.designPrice || 0,
-        images: initialData.images || [],
-        digitalFile: null,
-        recommendedPlainProductIds: initialData.recommendedPlainProductIds || [],
-        variants: initialData.variants || [],
-        combinations: initialData.combinations || [],
-        customFields: initialData.customFields || [],
-        detailSections: initialData.detailSections || [],
-        status: initialData.status || 'active',
-      });
-    } else {
+    if (mode === 'edit' && open) {
+      // Use full product data if available, otherwise fallback to initialData
+      const productData = fullProductData || initialData;
+      
+      if (productData) {
+        setActiveType(productData.type || 'PLAIN');
+        setFormData({
+          name: productData.name || '',
+          categoryId: productData.categoryId ? String(productData.categoryId) : '',
+          subcategoryId: productData.subcategoryId ? String(productData.subcategoryId) : '',
+          description: productData.description || '',
+          basePrice: productData.basePrice || productData.price || 0,
+          pricePerMeter: productData.pricePerMeter ?? productData.price ?? 0,
+          designPrice: productData.designPrice || 0,
+          gstRate: productData.gstRate ?? 0,
+          images: productData.images || [],
+          media: productData.media || (productData.images ? productData.images.map((url: string, idx: number) => ({ url, type: 'image' as const, displayOrder: idx })) : []),
+          digitalFile: null,
+          plainProductId: productData.plainProductId ? String(productData.plainProductId) : null,
+          recommendedPlainProductIds: productData.recommendedPlainProductIds ? productData.recommendedPlainProductIds.map((id: any) => String(id)) : [],
+          detailSections: productData.detailSections || [],
+          customFields: productData.customFields || [],
+          variants: productData.variants || [],
+          status: productData.status?.toLowerCase() === 'active' ? 'active' : 'inactive',
+        });
+      }
+    } else if (mode === 'create' || !open) {
       handleResetForm();
     }
-  }, [mode, initialData, open]);
+  }, [mode, initialData, fullProductData, open, productId]);
 
   const handleResetForm = () => {
     setFormData({
@@ -102,104 +299,196 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       categoryId: '',
       subcategoryId: '',
       description: '',
-      basePrice: 0,
-      pricePerMeter: 0,
-      designPrice: 0,
+      basePrice: '' as string | number,
+      pricePerMeter: '' as string | number,
+      designPrice: '' as string | number,
+      gstRate: '' as string | number,
       images: [],
+      media: [],
       digitalFile: null,
+      plainProductId: null,
       recommendedPlainProductIds: [],
-      variants: [],
-      combinations: [],
-      customFields: [],
       detailSections: [],
+      customFields: [],
+      variants: [],
       status: 'active',
     });
     setActiveType('PLAIN');
   };
 
+  // Real-time validation function
+  const validateField = (fieldName: string, value: any): string => {
+    switch (fieldName) {
+      case 'name':
+        if (!value?.toString().trim()) {
+          return 'Product name is required';
+        }
+        return '';
+      case 'categoryId':
+        if (!value) {
+          return 'Please select a category';
+        }
+        return '';
+      case 'pricePerMeter':
+        if (activeType === 'PLAIN') {
+          const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+          if (!value || isNaN(num) || num <= 0) {
+            return 'Price per meter must be greater than 0';
+          }
+        }
+        return '';
+      case 'designPrice':
+        if (activeType === 'DESIGNED') {
+          const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+          if (!value || isNaN(num) || num <= 0) {
+            return 'Design price must be greater than 0';
+          }
+        }
+        return '';
+      case 'basePrice':
+        if (activeType === 'DIGITAL') {
+          const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+          if (!value || isNaN(num) || num <= 0) {
+            return 'Price must be greater than 0';
+          }
+        }
+        return '';
+      case 'digitalFile':
+        if (activeType === 'DIGITAL' && mode === 'create' && !value) {
+          return 'Digital file is required';
+        }
+        return '';
+      default:
+        return '';
+    }
+  };
+
+
+  // Handle field blur for validation
+  const handleBlur = (fieldName: string, value: any) => {
+    setTouched({ ...touched, [fieldName]: true });
+    const error = validateField(fieldName, value);
+    setErrors({ ...errors, [fieldName]: error });
+  };
+
   const validateForm = (): boolean => {
-    if (!formData.name.trim()) {
-      toast.error('Product name is required');
-      return false;
-    }
-    if (!formData.categoryId) {
-      toast.error('Category is required');
-      return false;
-    }
-    if (activeType === 'PLAIN' && formData.pricePerMeter <= 0) {
-      toast.error('Price per meter must be greater than 0');
-      return false;
-    }
-    if (activeType === 'DESIGNED' && formData.designPrice <= 0) {
-      toast.error('Design price must be greater than 0');
-      return false;
-    }
-    if (activeType === 'DIGITAL' && formData.basePrice <= 0) {
-      toast.error('Price must be greater than 0');
-      return false;
-    }
-    if (activeType === 'DIGITAL' && !formData.digitalFile && mode === 'create') {
-      toast.error('Digital file is required');
+    const newErrors: Record<string, string> = {};
+    
+    // Validate all fields
+    newErrors.name = validateField('name', formData.name);
+    newErrors.categoryId = validateField('categoryId', formData.categoryId);
+    newErrors.pricePerMeter = validateField('pricePerMeter', formData.pricePerMeter);
+    newErrors.designPrice = validateField('designPrice', formData.designPrice);
+    newErrors.basePrice = validateField('basePrice', formData.basePrice);
+    newErrors.digitalFile = validateField('digitalFile', formData.digitalFile);
+
+    setErrors(newErrors);
+    setTouched({
+      name: true,
+      categoryId: true,
+      pricePerMeter: true,
+      designPrice: true,
+      basePrice: true,
+      digitalFile: true,
+    });
+
+    const hasErrors = Object.values(newErrors).some(err => err !== '');
+    if (hasErrors) {
+      toast.error('Please fix the errors in the form');
       return false;
     }
     return true;
   };
 
-  const handleSubmit = () => {
-    if (!validateForm()) return;
+  const handleSubmit = async () => {
+    // Mark all fields as touched to show all errors
+    setTouched({
+      name: true,
+      categoryId: true,
+      pricePerMeter: true,
+      designPrice: true,
+      basePrice: true,
+      digitalFile: true,
+    });
+
+    // Validate form - prevent submission if errors exist
+    if (!validateForm()) {
+      // Scroll to first error
+      const firstErrorField = document.querySelector('.border-red-500');
+      if (firstErrorField) {
+        firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
 
     const payload: any = {
       name: formData.name,
       type: activeType,
-      categoryId: formData.categoryId,
-      subcategoryId: formData.subcategoryId,
+      categoryId: formData.categoryId ? Number(formData.categoryId) : null,
       description: formData.description,
-      images: formData.images,
-      customFields: formData.customFields,
+      images: formData.media.map(m => m.url), // For backward compatibility
+      media: formData.media.map((m, idx) => ({
+        url: m.url,
+        type: m.type,
+        displayOrder: m.displayOrder !== undefined ? m.displayOrder : idx
+      })),
       detailSections: formData.detailSections,
+      customFields: formData.customFields.map(field => ({
+        label: field.label,
+        fieldType: field.fieldType,
+        placeholder: field.placeholder,
+        isRequired: field.isRequired
+      })),
+      variants: formData.variants.map(variant => ({
+        name: variant.name,
+        type: variant.type,
+        unit: variant.unit,
+        options: variant.options.map(opt => ({
+          value: opt.value,
+          priceModifier: opt.priceModifier
+        }))
+      })),
       status: formData.status,
     };
 
+    // Keep a single selling price and mirror it to originalPrice for backend
     if (activeType === 'PLAIN') {
-      payload.pricePerMeter = formData.pricePerMeter;
-      payload.variants = formData.variants;
-      payload.variantCombinations = formData.combinations;
+      const sellingPrice = formData.pricePerMeter;
+      payload.plainProductId = formData.plainProductId || null;
+      payload.price = sellingPrice;
+      payload.pricePerMeter = sellingPrice;
+      payload.originalPrice = sellingPrice;
     } else if (activeType === 'DESIGNED') {
+      const sellingPrice = formData.designPrice ?? formData.basePrice;
       payload.designPrice = formData.designPrice;
+      payload.price = sellingPrice;
+      payload.originalPrice = sellingPrice;
       payload.recommendedPlainProductIds = formData.recommendedPlainProductIds;
     } else if (activeType === 'DIGITAL') {
-      payload.price = formData.basePrice;
-      payload.digitalFileUrl = formData.digitalFile ? 'uploaded-file-url' : initialData?.digitalFileUrl || '';
+      const sellingPrice = formData.basePrice;
+      payload.price = sellingPrice;
+      payload.originalPrice = sellingPrice;
+      payload.fileUrl = formData.digitalFile ? 'uploaded-file-url' : initialData?.fileUrl || '';
+    }
+
+    // Add GST rate
+    if (formData.gstRate !== '' && formData.gstRate !== null && formData.gstRate !== undefined) {
+      payload.gstRate = Number(formData.gstRate);
     }
 
     if (mode === 'edit' && productId) {
       payload.id = productId;
     }
 
-    onSave(payload);
-    onOpenChange(false);
-    handleResetForm();
-  };
-
-  const addCustomField = () => {
-    const newField: CustomField = {
-      id: `cf-${Date.now()}`,
-      type: 'text',
-      label: '',
-      value: '',
-    };
-    setFormData({ ...formData, customFields: [...formData.customFields, newField] });
-  };
-
-  const removeCustomField = (id: string) => {
-    setFormData({ ...formData, customFields: formData.customFields.filter(f => f.id !== id) });
-  };
-
-  const updateCustomField = (id: string, updates: Partial<CustomField>) => {
-    setFormData({
-      ...formData,
-      customFields: formData.customFields.map(f => f.id === id ? { ...f, ...updates } : f)
-    });
+    // Call onSave - parent component will handle API call and errors
+    try {
+      onSave(payload);
+      // Don't close dialog immediately - let parent handle success/error
+      // Dialog will close on success via parent component
+    } catch (error: any) {
+      // Error handling is done in parent component's mutation
+      console.error('Error submitting product:', error);
+    }
   };
 
   const addDetailSection = () => {
@@ -222,24 +511,117 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
     });
   };
 
+  // Custom Fields helpers
+  const addCustomField = () => {
+    const newField = {
+      id: `cf-${Date.now()}`,
+      label: '',
+      fieldType: 'text',
+      placeholder: '',
+      isRequired: false,
+    };
+    setFormData({ ...formData, customFields: [...formData.customFields, newField] });
+  };
+
+  const removeCustomField = (id: string) => {
+    setFormData({ ...formData, customFields: formData.customFields.filter(f => f.id !== id) });
+  };
+
+  const updateCustomField = (id: string, updates: Partial<typeof formData.customFields[0]>) => {
+    setFormData({
+      ...formData,
+      customFields: formData.customFields.map(f => f.id === id ? { ...f, ...updates } : f)
+    });
+  };
+
+  // Variants helpers
+  const addVariant = () => {
+    const newVariant = {
+      id: `v-${Date.now()}`,
+      name: '',
+      type: '',
+      unit: '',
+      options: [],
+    };
+    setFormData({ ...formData, variants: [...formData.variants, newVariant] });
+  };
+
+  const removeVariant = (id: string) => {
+    setFormData({ ...formData, variants: formData.variants.filter(v => v.id !== id) });
+  };
+
+  const updateVariant = (id: string, updates: Partial<typeof formData.variants[0]>) => {
+    setFormData({
+      ...formData,
+      variants: formData.variants.map(v => v.id === id ? { ...v, ...updates } : v)
+    });
+  };
+
+  const addVariantOption = (variantId: string) => {
+    const newOption = {
+      id: `vo-${Date.now()}`,
+      value: '',
+      priceModifier: 0,
+    };
+    setFormData({
+      ...formData,
+      variants: formData.variants.map(v =>
+        v.id === variantId
+          ? { ...v, options: [...v.options, newOption] }
+          : v
+      )
+    });
+  };
+
+  const removeVariantOption = (variantId: string, optionId: string) => {
+    setFormData({
+      ...formData,
+      variants: formData.variants.map(v =>
+        v.id === variantId
+          ? { ...v, options: v.options.filter(o => o.id !== optionId) }
+          : v
+      )
+    });
+  };
+
+  const updateVariantOption = (variantId: string, optionId: string, updates: Partial<{ value: string; priceModifier: number }>) => {
+    setFormData({
+      ...formData,
+      variants: formData.variants.map(v =>
+        v.id === variantId
+          ? {
+              ...v,
+              options: v.options.map(o => o.id === optionId ? { ...o, ...updates } : o)
+            }
+          : v
+      )
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={(open) => {
       onOpenChange(open);
       if (!open) handleResetForm();
     }}>
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto p-0 gap-0 border-none shadow-2xl">
-        <div className="sticky top-0 bg-white z-10 px-6 py-4 border-b border-border flex items-center justify-between">
-          <DialogHeader>
-            <DialogTitle className="font-cursive text-3xl">
-              {mode === 'edit' ? 'Edit Product' : 'Create Product'}
-            </DialogTitle>
-          </DialogHeader>
-          <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
-            <X className="w-5 h-5" />
-          </Button>
-        </div>
+      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden p-0 gap-0 border-none shadow-2xl flex flex-col">
+        {mode === 'edit' && isLoadingProduct ? (
+          <div className="flex items-center justify-center min-h-[400px]">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <>
+            <div className="sticky top-0 bg-white z-10 px-6 py-4 border-b border-border flex items-center justify-between flex-shrink-0">
+              <DialogHeader>
+                <DialogTitle className="font-cursive text-3xl">
+                  {mode === 'edit' ? 'Edit Product' : 'Create Product'}
+                </DialogTitle>
+              </DialogHeader>
+              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
 
-        <div className="p-6 space-y-10">
+        <div className="p-6 space-y-10 overflow-y-auto flex-1">
           {/* Step 1: Product Type */}
           <section className="space-y-4">
             <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
@@ -257,18 +639,31 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="p-name">Product Name</Label>
+                <Label htmlFor="p-name">Product Name *</Label>
                 <Input 
                   id="p-name" 
                   placeholder="e.g. Premium Silk Fabric" 
-                  className="h-11"
+                  className={`h-11 ${touched.name && errors.name ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    if (touched.name) {
+                      const error = validateField('name', e.target.value);
+                      setErrors({ ...errors, name: error });
+                    }
+                  }}
+                  onBlur={() => handleBlur('name', formData.name)}
                 />
+                {touched.name && errors.name && (
+                  <p className="text-sm text-red-500">{errors.name}</p>
+                )}
+                {!touched.name && (
+                  <p className="text-xs text-muted-foreground">Enter a descriptive product name</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="p-price">
-                  {activeType === 'PLAIN' ? 'Price per Meter (₹)' : activeType === 'DESIGNED' ? 'Design Price (₹)' : 'Price (₹)'}
+                  {activeType === 'PLAIN' ? 'Price per Meter (₹) *' : activeType === 'DESIGNED' ? 'Design Price (₹) *' : 'Price (₹) *'}
                 </Label>
                 <div className="relative">
                   <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -276,50 +671,101 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                     id="p-price" 
                     type="number" 
                     placeholder="0.00" 
-                    className="h-11 pl-10"
+                    className={`h-11 pl-10 ${touched[activeType === 'PLAIN' ? 'pricePerMeter' : activeType === 'DESIGNED' ? 'designPrice' : 'basePrice'] && errors[activeType === 'PLAIN' ? 'pricePerMeter' : activeType === 'DESIGNED' ? 'designPrice' : 'basePrice'] ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                     value={activeType === 'PLAIN' ? formData.pricePerMeter : activeType === 'DESIGNED' ? formData.designPrice : formData.basePrice}
                     onChange={(e) => {
-                      const value = parseFloat(e.target.value) || 0;
+                      const inputValue = e.target.value;
+                      const numValue = inputValue === '' ? '' : (isNaN(parseFloat(inputValue)) ? '' : parseFloat(inputValue));
+                      const fieldName = activeType === 'PLAIN' ? 'pricePerMeter' : activeType === 'DESIGNED' ? 'designPrice' : 'basePrice';
+                      
                       if (activeType === 'PLAIN') {
-                        setFormData({ ...formData, pricePerMeter: value });
+                        setFormData({ ...formData, pricePerMeter: numValue });
                       } else if (activeType === 'DESIGNED') {
-                        setFormData({ ...formData, designPrice: value });
+                        setFormData({ ...formData, designPrice: numValue });
                       } else {
-                        setFormData({ ...formData, basePrice: value });
+                        setFormData({ ...formData, basePrice: numValue });
                       }
+                      
+                      if (touched[fieldName]) {
+                        const error = validateField(fieldName, numValue);
+                        setErrors({ ...errors, [fieldName]: error });
+                      }
+                    }}
+                    onBlur={() => {
+                      const fieldName = activeType === 'PLAIN' ? 'pricePerMeter' : activeType === 'DESIGNED' ? 'designPrice' : 'basePrice';
+                      const value = activeType === 'PLAIN' ? formData.pricePerMeter : activeType === 'DESIGNED' ? formData.designPrice : formData.basePrice;
+                      handleBlur(fieldName, value);
                     }}
                   />
                 </div>
+                {touched[activeType === 'PLAIN' ? 'pricePerMeter' : activeType === 'DESIGNED' ? 'designPrice' : 'basePrice'] && errors[activeType === 'PLAIN' ? 'pricePerMeter' : activeType === 'DESIGNED' ? 'designPrice' : 'basePrice'] && (
+                  <p className="text-sm text-red-500">{errors[activeType === 'PLAIN' ? 'pricePerMeter' : activeType === 'DESIGNED' ? 'designPrice' : 'basePrice']}</p>
+                )}
+                {!touched[activeType === 'PLAIN' ? 'pricePerMeter' : activeType === 'DESIGNED' ? 'designPrice' : 'basePrice'] && (
+                  <p className="text-xs text-muted-foreground">Enter a valid price greater than 0</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label>Category</Label>
-                <Select value={formData.categoryId} onValueChange={(v) => setFormData({ ...formData, categoryId: v })}>
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="p-gst">GST Rate (%)</Label>
+                <Input 
+                  id="p-gst" 
+                  type="number" 
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  placeholder="e.g. 18.00" 
+                  className="h-11"
+                  value={formData.gstRate}
+                  onChange={(e) => {
+                    const inputValue = e.target.value;
+                    const numValue = inputValue === '' ? '' : (isNaN(parseFloat(inputValue)) ? '' : parseFloat(inputValue));
+                    setFormData({ ...formData, gstRate: numValue });
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  GST rate applied to this product at checkout (leave empty or 0 for no GST)
+                </p>
               </div>
               <div className="space-y-2">
-                <Label>Subcategory</Label>
+                <Label>Category *</Label>
                 <Select 
-                  value={formData.subcategoryId} 
-                  onValueChange={(v) => setFormData({ ...formData, subcategoryId: v })}
-                  disabled={!formData.categoryId}
+                  value={formData.categoryId} 
+                  onValueChange={(v) => {
+                    setFormData({ ...formData, categoryId: v, subcategoryId: '' });
+                    if (touched.categoryId) {
+                      const error = validateField('categoryId', v);
+                      setErrors({ ...errors, categoryId: error });
+                    }
+                  }}
+                  onOpenChange={(open) => {
+                    if (!open && !touched.categoryId) {
+                      setTouched({ ...touched, categoryId: true });
+                      const error = validateField('categoryId', formData.categoryId);
+                      setErrors({ ...errors, categoryId: error });
+                    }
+                  }}
                 >
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Select subcategory" />
+                  <SelectTrigger className={`h-11 ${touched.categoryId && errors.categoryId ? 'border-red-500 focus-visible:ring-red-500' : ''}`}>
+                    <SelectValue placeholder="Select category (only leaf categories shown)" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.find(c => c.id === formData.categoryId)?.subcategories.map(sub => (
-                      <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
-                    ))}
+                    {categories.length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">No categories available. Please create a category first.</div>
+                    ) : (
+                      categories.map(cat => (
+                        <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
+                {touched.categoryId && errors.categoryId && (
+                  <p className="text-sm text-red-500">{errors.categoryId}</p>
+                )}
+                {!touched.categoryId && (
+                  <p className="text-xs text-muted-foreground">
+                    Only categories without subcategories can have products. Create subcategories first if needed.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -376,119 +822,49 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                   <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-[10px]">3</span>
                   Digital Asset
                 </div>
-                <div className="border-2 border-dashed border-border rounded-xl p-8 text-center space-y-4 hover:bg-muted/30 transition-colors group cursor-pointer">
+                <div className={`border-2 border-dashed rounded-xl p-8 text-center space-y-4 hover:bg-muted/30 transition-colors group cursor-pointer ${touched.digitalFile && errors.digitalFile ? 'border-red-500 bg-red-50/30' : 'border-border'}`}>
                   <div className="w-16 h-16 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
                     <Upload className="w-8 h-8" />
                   </div>
                   <div className="space-y-1">
-                    <p className="font-semibold">Upload Digital File</p>
+                    <p className="font-semibold">Upload Digital File *</p>
                     <p className="text-xs text-muted-foreground text-center max-w-[200px] mx-auto">
                       PDF, JPG, PNG, or ZIP files supported. Max size 50MB.
                     </p>
                   </div>
-                  <input type="file" className="hidden" id="digital-upload" onChange={(e) => setFormData({ ...formData, digitalFile: e.target.files?.[0] || null })} />
+                  <input 
+                    type="file" 
+                    className="hidden" 
+                    id="digital-upload" 
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setFormData({ ...formData, digitalFile: file });
+                      if (touched.digitalFile) {
+                        const error = validateField('digitalFile', file);
+                        setErrors({ ...errors, digitalFile: error });
+                      }
+                    }}
+                    onBlur={() => handleBlur('digitalFile', formData.digitalFile)}
+                  />
                   <Button type="button" variant="outline" onClick={() => document.getElementById('digital-upload')?.click()}>
-                    {formData.digitalFile ? formData.digitalFile.name : initialData?.digitalFileUrl ? 'File Uploaded' : 'Choose File'}
+                    {formData.digitalFile ? formData.digitalFile.name : initialData?.fileUrl ? 'File Uploaded' : 'Choose File'}
                   </Button>
+                  {touched.digitalFile && errors.digitalFile && (
+                    <p className="text-sm text-red-500">{errors.digitalFile}</p>
+                  )}
+                  {!touched.digitalFile && mode === 'create' && (
+                    <p className="text-xs text-muted-foreground">Digital file is required for digital products</p>
+                  )}
                 </div>
               </motion.section>
             )}
           </AnimatePresence>
 
-          {/* Step 4: Variants (Only for Plain products) */}
-          {activeType === 'PLAIN' && (
-            <section className="space-y-6 pt-6 border-t border-border">
-              <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">3</span>
-                Product Variants
-              </div>
-              <VariantBuilder 
-                onChange={(variants, combos) => setFormData({ ...formData, variants, combinations: combos })}
-                initialVariants={formData.variants}
-                initialCombinations={formData.combinations}
-              />
-            </section>
-          )}
-
-          {/* Step 5: Custom Fields */}
+          {/* Step 4: Detail Sections */}
           <section className="space-y-6 pt-6 border-t border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">{activeType === 'PLAIN' ? '4' : '4'}</span>
-                Custom Fields
-              </div>
-              <Button type="button" variant="outline" size="sm" onClick={addCustomField}>
-                <Plus className="w-4 h-4 mr-1" />
-                Add Field
-              </Button>
-            </div>
-            <div className="space-y-4">
-              {formData.customFields.map((field) => (
-                <div key={field.id} className="p-4 border border-border rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Custom Field</Label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeCustomField(field.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs">Field Type</Label>
-                      <Select
-                        value={field.type}
-                        onValueChange={(value: CustomField['type']) => updateCustomField(field.id, { type: value })}
-                      >
-                        <SelectTrigger className="h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="text">Text</SelectItem>
-                          <SelectItem value="image">Image</SelectItem>
-                          <SelectItem value="input">Input</SelectItem>
-                          <SelectItem value="dropdown">Dropdown</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Label</Label>
-                      <Input
-                        value={field.label}
-                        onChange={(e) => updateCustomField(field.id, { label: e.target.value })}
-                        placeholder="e.g. Material"
-                        className="h-9"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-xs">Value</Label>
-                    <Input
-                      value={field.value || ''}
-                      onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
-                      placeholder="Enter value"
-                      className="h-9"
-                    />
-                  </div>
-                </div>
-              ))}
-              {formData.customFields.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No custom fields added. Click "Add Field" to create one.
-                </p>
-              )}
-            </div>
-          </section>
-
-          {/* Step 6: Detail Sections */}
-          <section className="space-y-6 pt-6 border-t border-border">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">5</span>
                 Detail Sections
               </div>
               <Button type="button" variant="outline" size="sm" onClick={addDetailSection}>
@@ -539,60 +915,227 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
             </div>
           </section>
 
-          {/* Step 7: Images */}
+          {/* Step 5: Custom Fields */}
           <section className="space-y-6 pt-6 border-t border-border">
-            <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">6</span>
-              Product Gallery
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">5</span>
+                Custom Fields (Admin Defined → Customer Filled)
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addCustomField}>
+                <Plus className="w-4 h-4 mr-1" />
+                Add Field
+              </Button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
-              {formData.images.map((image, index) => (
-                <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-border group">
-                  <img src={image} alt={`Product ${index + 1}`} className="w-full h-full object-cover" />
-                  <button
-                    onClick={() => setFormData({ ...formData, images: formData.images.filter((_, i) => i !== index) })}
-                    className="absolute top-1 right-1 w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+            <div className="space-y-4">
+              {formData.customFields.map((field) => (
+                <div key={field.id} className="p-4 border border-border rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Custom Field</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeCustomField(field.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Field Name (shown to customer) *</Label>
+                      <Input
+                        value={field.label}
+                        onChange={(e) => updateCustomField(field.id, { label: e.target.value })}
+                        placeholder="e.g. Upload Design"
+                        className="h-9"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Field Type *</Label>
+                      <Select
+                        value={field.fieldType}
+                        onValueChange={(value) => updateCustomField(field.id, { fieldType: value })}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="text">Text</SelectItem>
+                          <SelectItem value="number">Number</SelectItem>
+                          <SelectItem value="url">URL</SelectItem>
+                          <SelectItem value="image">Image / File Upload</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Placeholder / Suggestion</Label>
+                    <Input
+                      value={field.placeholder}
+                      onChange={(e) => updateCustomField(field.id, { placeholder: e.target.value })}
+                      placeholder="e.g. Upload high-resolution PNG/JPG"
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+                    <div>
+                      <Label className="text-sm">Required Field</Label>
+                      <p className="text-xs text-muted-foreground">Customer must fill this field</p>
+                    </div>
+                    <Switch
+                      checked={field.isRequired}
+                      onCheckedChange={(checked) => updateCustomField(field.id, { isRequired: checked })}
+                    />
+                  </div>
                 </div>
               ))}
-              <button 
-                onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = 'image/*';
-                  input.onchange = (e: any) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        setFormData({ ...formData, images: [...formData.images, event.target?.result as string] });
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  };
-                  input.click();
-                }}
-                className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 hover:bg-muted/30 transition-colors group"
-              >
-                <ImageIcon className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
-                <span className="text-[10px] font-bold text-muted-foreground uppercase">Add Image</span>
-              </button>
+              {formData.customFields.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No custom fields added. Click "Add Field" to create one.
+                </p>
+              )}
             </div>
           </section>
+
+          {/* Step 6: Variants */}
+          <section className="space-y-6 pt-6 border-t border-border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">6</span>
+                Variants (Price Calculation Based)
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addVariant}>
+                <Plus className="w-4 h-4 mr-1" />
+                Add Variant
+              </Button>
+            </div>
+            <div className="space-y-4">
+              {formData.variants.map((variant) => (
+                <div key={variant.id} className="p-4 border border-border rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Variant</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeVariant(variant.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <Label className="text-xs">Variant Name *</Label>
+                      <Input
+                        value={variant.name}
+                        onChange={(e) => updateVariant(variant.id, { name: e.target.value })}
+                        placeholder="e.g. Size"
+                        className="h-9"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Variant Type</Label>
+                      <Input
+                        value={variant.type}
+                        onChange={(e) => updateVariant(variant.id, { type: e.target.value })}
+                        placeholder="e.g. size"
+                        className="h-9"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Unit (optional)</Label>
+                      <Input
+                        value={variant.unit}
+                        onChange={(e) => updateVariant(variant.id, { unit: e.target.value })}
+                        placeholder="e.g. cm, kg"
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Variant Options</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addVariantOption(variant.id)}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add Option
+                      </Button>
+                    </div>
+                    {variant.options.map((option) => (
+                      <div key={option.id} className="flex gap-2 items-end p-3 border border-border rounded-lg">
+                        <div className="flex-1">
+                          <Label className="text-xs">Option Value *</Label>
+                          <Input
+                            value={option.value}
+                            onChange={(e) => updateVariantOption(variant.id, option.id, { value: e.target.value })}
+                            placeholder="e.g. Small, Medium, Large"
+                            className="h-9"
+                          />
+                        </div>
+                        <div className="w-32">
+                          <Label className="text-xs">Price Impact (₹)</Label>
+                          <div className="relative">
+                            <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              value={option.priceModifier}
+                              onChange={(e) => updateVariantOption(variant.id, option.id, { priceModifier: parseFloat(e.target.value) || 0 })}
+                              placeholder="0"
+                              className="h-9 pl-8"
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeVariantOption(variant.id, option.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {variant.options.length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        No options added. Click "Add Option" to create one.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {formData.variants.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No variants added. Click "Add Variant" to create one.
+                </p>
+              )}
+            </div>
+          </section>
+
+          {/* Step 7: Media Gallery (Images & Videos) */}
+          <MediaUploadSection 
+            media={formData.media}
+            onMediaChange={(media) => setFormData({ ...formData, media })}
+          />
 
           {/* Step 8: Status */}
           <section className="space-y-6 pt-6 border-t border-border">
             <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">7</span>
+              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">8</span>
               Product Status
             </div>
             <div className="flex items-center justify-between p-4 border border-border rounded-lg">
               <div>
                 <Label className="text-base font-medium">Product Status</Label>
                 <p className="text-sm text-muted-foreground">
-                  {formData.status === 'active' ? 'Product will be visible to customers' : 'Product will be hidden from customers'}
+                  {formData.status === 'active' ? 'Product will be visible to customers' : 'Product will be hidden from customers (Draft)'}
                 </p>
               </div>
               <Switch
@@ -603,16 +1146,84 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
           </section>
         </div>
 
-        <div className="sticky bottom-0 bg-white px-6 py-4 border-t border-border flex items-center justify-between shadow-up">
+        <div className="sticky bottom-0 bg-white px-6 py-4 border-t border-border flex items-center justify-between shadow-up flex-shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="gap-2 h-11 px-6">
             <X className="w-4 h-4" />
             Cancel
           </Button>
-          <Button className="btn-primary gap-2 h-11 px-8" onClick={handleSubmit}>
-            <Save className="w-4 h-4" />
-            {mode === 'edit' ? 'Update Product' : 'Create Product'}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                // Save as draft (inactive status) - skip validation
+                const draftPayload: any = {
+                  name: formData.name || 'Untitled Product',
+                  type: activeType,
+                  categoryId: formData.categoryId ? Number(formData.categoryId) : null,
+                  description: formData.description,
+                  images: formData.media.map(m => m.url),
+                  media: formData.media.map((m, idx) => ({
+                    url: m.url,
+                    type: m.type,
+                    displayOrder: m.displayOrder !== undefined ? m.displayOrder : idx
+                  })),
+                  detailSections: formData.detailSections,
+                  customFields: formData.customFields.map(field => ({
+                    label: field.label,
+                    fieldType: field.fieldType,
+                    placeholder: field.placeholder,
+                    isRequired: field.isRequired
+                  })),
+                  variants: formData.variants.map(variant => ({
+                    name: variant.name,
+                    type: variant.type,
+                    unit: variant.unit,
+                    options: variant.options.map(opt => ({
+                      value: opt.value,
+                      priceModifier: opt.priceModifier
+                    }))
+                  })),
+                  status: 'inactive', // Draft status
+                };
+                
+                if (activeType === 'PLAIN') {
+                  const sellingPrice = formData.pricePerMeter || 0;
+                  draftPayload.plainProductId = formData.plainProductId || null;
+                  draftPayload.price = sellingPrice;
+                  draftPayload.pricePerMeter = sellingPrice;
+                  draftPayload.originalPrice = sellingPrice;
+                } else if (activeType === 'DESIGNED') {
+                  const sellingPrice = formData.designPrice ?? formData.basePrice ?? 0;
+                  draftPayload.designPrice = formData.designPrice;
+                  draftPayload.price = sellingPrice;
+                  draftPayload.originalPrice = sellingPrice;
+                  draftPayload.recommendedPlainProductIds = formData.recommendedPlainProductIds;
+                } else if (activeType === 'DIGITAL') {
+                  const sellingPrice = formData.basePrice || 0;
+                  draftPayload.price = sellingPrice;
+                  draftPayload.originalPrice = sellingPrice;
+                  draftPayload.fileUrl = formData.digitalFile ? 'uploaded-file-url' : initialData?.fileUrl || '';
+                }
+                
+                if (mode === 'edit' && productId) {
+                  draftPayload.id = productId;
+                }
+                
+                onSave(draftPayload);
+                toast.success('Product saved as draft');
+              }}
+              className="gap-2 h-11 px-6"
+            >
+              Save as Draft
+            </Button>
+            <Button className="btn-primary gap-2 h-11 px-8" onClick={handleSubmit}>
+              <Save className="w-4 h-4" />
+              {mode === 'edit' ? 'Update Product' : 'Create Product'}
+            </Button>
+          </div>
         </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

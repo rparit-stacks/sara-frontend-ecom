@@ -10,25 +10,29 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { categoriesApi, productsApi } from '@/lib/api';
 
-const CategoryProducts = () => {
-  const { id } = useParams<{ id: string }>();
+const CategoryHierarchy = () => {
+  const params = useParams<{ '*': string }>();
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState('featured');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Fetch category details
+  // Parse slug path: "men/shirts/formal-shirts"
+  const slugPath = params['*'] || '';
+  const slugParts = slugPath.split('/').filter(Boolean);
+  
+  // Fetch category by slug path
   const { data: category, isLoading: categoryLoading } = useQuery({
-    queryKey: ['category', id],
-    queryFn: () => categoriesApi.getById(Number(id!)),
-    enabled: !!id,
+    queryKey: ['categoryBySlug', slugPath],
+    queryFn: () => categoriesApi.getBySlugPath(slugPath),
+    enabled: !!slugPath,
   });
   
-  // Fetch products for this category
+  // Fetch products for current category
   const { data: apiProducts = [], isLoading: productsLoading } = useQuery({
-    queryKey: ['categoryProducts', id],
-    queryFn: () => productsApi.getAll({ categoryId: Number(id!), status: 'ACTIVE' }),
-    enabled: !!id,
+    queryKey: ['categoryProducts', category?.id],
+    queryFn: () => productsApi.getAll({ categoryId: category?.id, status: 'ACTIVE' }),
+    enabled: !!category?.id,
   });
   
   // Transform products
@@ -55,16 +59,12 @@ const CategoryProducts = () => {
   const hasSubcategories = category?.subcategories && category.subcategories.length > 0;
   const subcategories = category?.subcategories || [];
   
-  // Build breadcrumb path
-  const buildBreadcrumb = (cat: any): string[] => {
-    const path: string[] = [];
-    if (cat) {
-      path.push(cat.name);
-    }
-    return path;
+  // Build breadcrumb path from slugs
+  const getBreadcrumbPath = (upToIndex: number): string => {
+    if (upToIndex < 0) return '/categories';
+    const pathSlugs = slugParts.slice(0, upToIndex + 1);
+    return '/category/' + pathSlugs.join('/');
   };
-  
-  const breadcrumbs = category ? buildBreadcrumb(category) : [];
 
   if (categoryLoading) {
     return (
@@ -80,9 +80,10 @@ const CategoryProducts = () => {
     return (
       <Layout>
         <div className="text-center py-12">
-          <p className="text-destructive">Category not found</p>
+          <p className="text-destructive text-lg font-semibold mb-2">Category not found</p>
+          <p className="text-muted-foreground mb-4">The category you're looking for doesn't exist.</p>
           <Link to="/categories">
-            <Button className="mt-4">Back to Categories</Button>
+            <Button variant="outline">Back to Categories</Button>
           </Link>
         </div>
       </Layout>
@@ -99,14 +100,24 @@ const CategoryProducts = () => {
               <Link to="/" className="hover:text-primary">Home</Link>
               <span className="mx-1 sm:mx-2">/</span>
               <Link to="/categories" className="hover:text-primary">Categories</Link>
-              {breadcrumbs.map((crumb, idx) => (
-                <span key={idx}>
-                  <span className="mx-1 sm:mx-2">/</span>
-                  <span className={idx === breadcrumbs.length - 1 ? 'text-foreground' : 'hover:text-primary'}>
-                    {crumb}
+              {slugParts.map((slug, idx) => {
+                // Find category name for this slug
+                let categoryName = slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                if (idx === slugParts.length - 1 && category?.name) {
+                  categoryName = category.name;
+                }
+                return (
+                  <span key={idx}>
+                    <span className="mx-1 sm:mx-2">/</span>
+                    <Link 
+                      to={getBreadcrumbPath(idx)}
+                      className={idx === slugParts.length - 1 ? 'text-foreground' : 'hover:text-primary'}
+                    >
+                      {categoryName}
+                    </Link>
                   </span>
-                </span>
-              ))}
+                );
+              })}
             </nav>
             <div className="flex items-center gap-4 mb-4">
               {category.image && (
@@ -127,6 +138,10 @@ const CategoryProducts = () => {
               <p className="text-muted-foreground text-sm xs:text-base sm:text-lg">
                 {subcategories.length} {subcategories.length === 1 ? 'Subcategory' : 'Subcategories'}
               </p>
+            ) : filteredProducts.length === 0 ? (
+              <p className="text-muted-foreground text-sm xs:text-base sm:text-lg">
+                This category is empty.
+              </p>
             ) : (
               <p className="text-muted-foreground text-sm xs:text-base sm:text-lg">
                 {filteredProducts.length} {filteredProducts.length === 1 ? 'Product' : 'Products'}
@@ -142,20 +157,31 @@ const CategoryProducts = () => {
           {hasSubcategories ? (
             // Show subcategories
             <div>
-              <div className="mb-6">
-                <Button 
-                  variant="outline" 
-                  onClick={() => navigate(-1)}
-                  className="gap-2"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back
-                </Button>
-              </div>
+              {slugParts.length > 0 && (
+                <div className="mb-6">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      if (slugParts.length > 1) {
+                        navigate(getBreadcrumbPath(slugParts.length - 2));
+                      } else {
+                        navigate('/categories');
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                  </Button>
+                </div>
+              )}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
                 {subcategories.map((sub: any, index: number) => (
                   <ScrollReveal key={sub.id} delay={index * 0.05}>
-                    <Link to={`/category/${id}/subcategory/${sub.id}`} className="group block">
+                    <Link 
+                      to={`/category/${slugPath ? slugPath + '/' : ''}${sub.slug}`} 
+                      className="group block"
+                    >
                       <div className="card-floral overflow-hidden">
                         <div className="relative aspect-[3/4] overflow-hidden">
                           <img
@@ -181,8 +207,8 @@ const CategoryProducts = () => {
             // Empty category - no products and no subcategories
             <div className="text-center py-12">
               <div className="max-w-md mx-auto">
-                <p className="text-lg font-semibold text-foreground mb-2">No products available in this category.</p>
-                <p className="text-muted-foreground mb-4">This category currently has no products or subcategories.</p>
+                <p className="text-lg font-semibold text-foreground mb-2">This category is empty.</p>
+                <p className="text-muted-foreground mb-4">There are no products or subcategories in this category.</p>
                 <Link to="/categories">
                   <Button variant="outline">Browse Other Categories</Button>
                 </Link>
@@ -273,4 +299,4 @@ const CategoryProducts = () => {
   );
 };
 
-export default CategoryProducts;
+export default CategoryHierarchy;

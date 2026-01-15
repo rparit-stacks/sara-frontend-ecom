@@ -11,10 +11,15 @@ import {
   LogOut,
   Menu,
   X,
-  HelpCircle
+  HelpCircle,
+  Shield,
+  Tag,
+  Truck,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const adminMenuItems = [
@@ -68,12 +73,41 @@ const adminMenuItems = [
     label: 'Users', 
     path: '/admin-sara/users' 
   },
+  { 
+    icon: Shield, 
+    label: 'Admins', 
+    path: '/admin-sara/admins' 
+  },
+  { 
+    icon: Tag, 
+    label: 'Coupons', 
+    path: '/admin-sara/coupons' 
+  },
+  { 
+    icon: Truck, 
+    label: 'Shipping', 
+    path: '/admin-sara/shipping' 
+  },
+  { 
+    icon: MessageSquare, 
+    label: 'Contact Submissions', 
+    path: '/admin-sara/contact-submissions' 
+  },
 ];
 
 export const AdminSidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+
+  const handleLogout = () => {
+    console.log('[Admin Logout] Logging out...');
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
+    localStorage.removeItem('adminLoginTime');
+    navigate('/admin-sara/login');
+  };
 
   useEffect(() => {
     const checkDesktop = () => {
@@ -212,9 +246,9 @@ export const AdminSidebar = () => {
             transition={{ delay: 0.3, duration: 0.3 }}
             className="p-4 border-t border-border"
           >
-            <Link
-              to="/"
-              className="flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
             >
               <motion.div
                 whileHover={{ x: -3 }}
@@ -223,7 +257,7 @@ export const AdminSidebar = () => {
                 <LogOut className="w-5 h-5" />
               </motion.div>
               <span className="font-medium">Logout</span>
-            </Link>
+            </button>
           </motion.div>
         </div>
       </motion.aside>

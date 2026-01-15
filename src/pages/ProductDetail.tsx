@@ -1,29 +1,26 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Heart, ShoppingBag, Share2, Minus, Plus, ChevronRight, Download, Palette, Package, FileJson, IndianRupee } from 'lucide-react';
+import { Heart, ShoppingBag, Share2, Minus, Plus, ChevronRight, Download, Palette, Package, FileJson, IndianRupee, Video, Loader2, Calculator } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import PlainProductSelectionPopup from '@/components/products/PlainProductSelectionPopup';
 import FabricVariantPopup, { FabricVariant } from '@/components/products/FabricVariantPopup';
+import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { productsApi, cartApi, wishlistApi } from '@/lib/api';
+import { guestCart } from '@/lib/guestCart';
 
 // Product Type
 type ProductType = 'PLAIN' | 'DESIGNED' | 'DIGITAL';
-
-// Custom Field Types
-export interface CustomField {
-  id: string;
-  type: 'text' | 'image' | 'input' | 'dropdown';
-  label: string;
-  value?: string;
-  options?: string[];
-}
 
 // Detail Section
 export interface DetailSection {
@@ -32,177 +29,232 @@ export interface DetailSection {
   content: string;
 }
 
-// Mock product data - in real app, fetch from API: GET /api/products/{id}
-const getProductData = (id: string, type?: string): any => {
-  const productType = (type as ProductType) || 'DESIGNED';
-  
-  if (productType === 'DESIGNED') {
-    return {
-      id: '1',
-      type: 'DESIGNED' as ProductType,
-      name: 'Floral Garden Design',
-      designPrice: 1000,
-      images: [
-        'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=800&h=1000&fit=crop',
-        'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&h=1000&fit=crop',
-      ],
-      category: 'Designs',
-      description: 'Beautiful floral garden design that can be applied to any fabric. Perfect for creating custom products.',
-      recommendedPlainProductIds: ['p1', 'p2', 'p3', 'p4'], // Just IDs, not full objects
-      customFields: [
-        { id: 'cf1', type: 'text', label: 'Design Style', value: 'Floral' },
-        { id: 'cf2', type: 'text', label: 'Color Palette', value: 'Pink, Green, White' },
-      ],
-      detailSections: [
-        { id: 'ds1', title: 'Product Details', content: 'This design features intricate floral patterns inspired by traditional Indian art. Perfect for sarees, dupattas, and home decor items.' },
-        { id: 'ds2', title: 'Shipping & Returns', content: 'Free standard shipping on orders over ₹500. Express shipping available. 30-day return policy for unused items in original packaging.' },
-        { id: 'ds3', title: 'Care Instructions', content: 'Design can be applied to any fabric. Follow fabric-specific care instructions. Avoid direct sunlight to preserve colors.' },
-      ],
-      inStock: true,
-      isNew: true,
-    };
-  } else if (productType === 'PLAIN') {
-    return {
-      id: '2',
-      type: 'PLAIN' as ProductType,
-      name: 'Premium Silk Fabric',
-      pricePerMeter: 100,
-      images: [
-        'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=800&h=1000&fit=crop',
-        'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&h=1000&fit=crop',
-      ],
-      category: 'Fabrics',
-      description: 'Premium quality silk fabric. Perfect for creating custom garments and home decor items.',
-      variants: [
-        {
-          id: 'v1',
-          type: 'width',
-          name: 'Width',
-          options: [
-            { id: 'w1', value: '45 inches', priceModifier: 0 },
-            { id: 'w2', value: '54 inches', priceModifier: 20 },
-          ],
-        },
-        {
-          id: 'v2',
-          type: 'gsm',
-          name: 'GSM',
-          options: [
-            { id: 'g1', value: '120 GSM', priceModifier: 0 },
-            { id: 'g2', value: '150 GSM', priceModifier: 15 },
-          ],
-        },
-      ],
-      customFields: [
-        { id: 'cf1', type: 'text', label: 'Material', value: '100% Mulberry Silk' },
-        { id: 'cf2', type: 'text', label: 'Origin', value: 'India' },
-      ],
-      detailSections: [
-        { id: 'ds1', title: 'Product Details', content: 'Premium quality silk fabric sourced from the finest mulberry silk. Soft, luxurious, and perfect for elegant garments.' },
-        { id: 'ds2', title: 'Shipping & Returns', content: 'Free standard shipping on orders over ₹500. Express shipping available. 30-day return policy for unused items in original packaging.' },
-        { id: 'ds3', title: 'Care Instructions', content: 'Dry clean only. Store in a cool, dry place. Avoid direct sunlight to prevent fading.' },
-      ],
-      inStock: true,
-      isNew: false,
-    };
-  } else {
-    return {
-      id: '3',
-      type: 'DIGITAL' as ProductType,
-      name: 'Digital Pattern Pack',
-      price: 500,
-      images: [
-        'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800&h=1000&fit=crop',
-      ],
-      category: 'Digital Products',
-      description: 'Downloadable pattern pack with 10 exclusive designs. High-resolution files ready for printing.',
-      fileUrl: '/downloads/pattern-pack.zip',
-      customFields: [
-        { id: 'cf1', type: 'text', label: 'File Format', value: 'PDF, PNG, SVG' },
-        { id: 'cf2', type: 'text', label: 'Resolution', value: '300 DPI' },
-      ],
-      detailSections: [
-        { id: 'ds1', title: 'Product Details', content: 'This digital pack includes 10 high-resolution patterns in multiple formats. Perfect for printing and digital use.' },
-        { id: 'ds2', title: 'Download Instructions', content: 'After purchase, you will receive a download link via email. Files are available for 30 days. Download can be done multiple times.' },
-        { id: 'ds3', title: 'Usage Rights', content: 'Personal and commercial use allowed. Patterns can be used for printing, digital design, and resale of finished products.' },
-      ],
-      inStock: true,
-      isNew: true,
-    };
-  }
-};
-
-const relatedProducts: Product[] = [
-  { id: '2', name: 'Lavender Fields Cushion', price: 450, image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&h=500&fit=crop', category: 'Home Decor' },
-  { id: '3', name: 'Cherry Blossom Dress', price: 1599, originalPrice: 1999, image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400&h=500&fit=crop', category: 'Clothing', isSale: true },
-  { id: '4', name: 'Wildflower Print Tote', price: 350, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&h=500&fit=crop', category: 'Bags', isNew: true },
-  { id: '5', name: 'Peony Paradise Blouse', price: 799, image: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=400&h=500&fit=crop', category: 'Clothing' },
-];
+// Removed mock data - now using API for all product data
 
 const ProductDetail = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
-  const productType = (searchParams.get('type') as ProductType) || 'DESIGNED';
-  const product = getProductData(id || '1', productType);
+  const queryClient = useQueryClient();
+  
+  // Check if id is a number (ID) or string (slug)
+  const isNumeric = id && /^\d+$/.test(id);
+  
+  // Fetch product from API - support both ID and slug
+  const { data: apiProduct, isLoading: productLoading, error: productError } = useQuery({
+    queryKey: ['product', id],
+    queryFn: () => {
+      if (isNumeric) {
+        return productsApi.getById(Number(id!));
+      } else {
+        return productsApi.getBySlug(id!);
+      }
+    },
+    enabled: !!id,
+    retry: 1,
+  });
+  
+  // Check if product is in wishlist
+  const productType = apiProduct?.type || 'PLAIN';
+  const productId = apiProduct?.id;
+  const { data: wishlistCheck } = useQuery({
+    queryKey: ['wishlist-check', productType, productId],
+    queryFn: () => wishlistApi.checkItem(productType, productId!),
+    enabled: !!productId && !!localStorage.getItem('authToken'),
+  });
+  
+  const isInWishlist = wishlistCheck?.inWishlist || false;
+  
+  // Fetch related products from same category (excluding current product)
+  const { data: relatedProductsData } = useQuery({
+    queryKey: ['related-products', apiProduct?.categoryId, apiProduct?.id],
+    queryFn: () => {
+      if (!apiProduct?.categoryId) return [];
+      return productsApi.getAll({ 
+        status: 'ACTIVE', 
+        categoryId: apiProduct.categoryId 
+      });
+    },
+    enabled: !!apiProduct?.categoryId,
+    select: (data) => {
+      // Filter out current product and limit to 4 products
+      return data
+        .filter((p: any) => p.id !== apiProduct?.id)
+        .slice(0, 4)
+        .map((p: any) => ({
+          id: String(p.id),
+          name: p.name || 'Untitled Product',
+          price: Number(p.price || 0),
+          originalPrice: p.originalPrice ? Number(p.originalPrice) : undefined,
+          image: p.images?.[0] || '',
+          category: p.categoryName || '',
+          isNew: p.isNew,
+          isSale: p.isSale,
+        }));
+    },
+  });
+  
+  const relatedProducts = relatedProductsData || [];
+  
+  // Transform API product to component format
+  const product = useMemo(() => {
+    if (!apiProduct) return null;
+    
+    try {
+      return {
+        id: String(apiProduct.id || ''),
+        type: (apiProduct.type || 'PLAIN') as ProductType,
+        name: apiProduct.name || 'Untitled Product',
+        designPrice: apiProduct.designPrice,
+        price: apiProduct.price,
+        basePrice: apiProduct.price,
+        pricePerMeter: apiProduct.pricePerMeter,
+        images: apiProduct.images || [],
+        media: apiProduct.media || (apiProduct.images ? apiProduct.images.map((url: string, idx: number) => ({ url, type: 'image' as const, displayOrder: idx })) : []),
+        category: apiProduct.categoryName || '',
+        categoryId: apiProduct.categoryId,
+        description: apiProduct.description || '',
+        detailSections: apiProduct.detailSections || [],
+        customFields: apiProduct.customFields || [],
+        variants: apiProduct.variants || [],
+        recommendedPlainProductIds: apiProduct.recommendedFabricIds || [],
+        recommendedFabrics: apiProduct.recommendedFabrics || [],
+        plainProduct: apiProduct.plainProduct,
+        fileUrl: apiProduct.fileUrl,
+        isNew: apiProduct.isNew,
+        isSale: apiProduct.isSale,
+        inStock: apiProduct.status === 'ACTIVE',
+        originalPrice: apiProduct.originalPrice,
+      };
+    } catch (error) {
+      console.error('Error transforming product:', error, apiProduct);
+      return null;
+    }
+  }, [apiProduct]);
 
-  const [selectedImage, setSelectedImage] = useState(0);
+  // Debug logging
+  useEffect(() => {
+    if (apiProduct) {
+      console.log('Product loaded:', { 
+        id: apiProduct.id, 
+        name: apiProduct.name, 
+        slug: apiProduct.slug,
+        type: apiProduct.type,
+        status: apiProduct.status,
+        hasImages: !!apiProduct.images?.length,
+        hasMedia: !!apiProduct.media?.length
+      });
+    }
+    if (product) {
+      console.log('Product transformed successfully:', product.name);
+    }
+  }, [apiProduct, product]);
+
+  const [selectedMedia, setSelectedMedia] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  
+  // Custom Fields and Variants States
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | File | null>>({});
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({}); // variantId -> optionId
   
   // Design Product States
   const [showPlainProductSelection, setShowPlainProductSelection] = useState(false);
   const [showFabricVariant, setShowFabricVariant] = useState(false);
+  const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
   const [selectedFabricId, setSelectedFabricId] = useState<string | null>(null);
+  const [selectedFabric, setSelectedFabric] = useState<any>(null);
   const [selectedFabricVariants, setSelectedFabricVariants] = useState<Record<string, string>>({});
   const [fabricQuantity, setFabricQuantity] = useState(1);
   const [fabricPricePerMeter, setFabricPricePerMeter] = useState<number>(0);
   const [combinedPrice, setCombinedPrice] = useState<number | null>(null);
 
-  // Plain Product States
-  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>(() => {
-    if (product.type === 'PLAIN' && product.variants) {
-      const initial: Record<string, string> = {};
-      product.variants.forEach((variant: FabricVariant) => {
-        if (variant.options.length > 0) {
-          initial[variant.id] = variant.options[0].id;
-        }
-      });
-      return initial;
-    }
-    return {};
+  // Fetch selected fabric product data
+  const { data: fabricProduct } = useQuery({
+    queryKey: ['fabricProduct', selectedFabricId],
+    queryFn: () => productsApi.getById(Number(selectedFabricId!)),
+    enabled: !!selectedFabricId && product?.type === 'DESIGNED',
   });
+
+  // Update combined price for DESIGNED products when variants change
+  useEffect(() => {
+    if (product && product.type === 'DESIGNED' && selectedFabricId) {
+      const baseDesignPrice = product.designPrice || 0;
+      const fabricTotalPrice = fabricPricePerMeter * fabricQuantity;
+      
+      // Add product variant price modifiers
+      let variantModifier = 0;
+      if (product.variants && product.variants.length > 0) {
+        product.variants.forEach((variant: any) => {
+          const selectedOptionId = selectedVariants[String(variant.id)];
+          if (selectedOptionId && variant.options) {
+            const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+            if (selectedOption && selectedOption.priceModifier) {
+              variantModifier += selectedOption.priceModifier * fabricQuantity;
+            }
+          }
+        });
+      }
+      
+      setCombinedPrice(baseDesignPrice + fabricTotalPrice + variantModifier);
+    }
+  }, [product, selectedFabricId, fabricPricePerMeter, fabricQuantity, selectedVariants]);
 
   // Calculate price for plain products (shown directly on page, no popup)
   const plainProductPrice = useMemo(() => {
-    if (product.type !== 'PLAIN') return 0;
-    let basePrice = product.pricePerMeter || 0;
+    if (!product || product.type !== 'PLAIN') return 0;
+    const basePrice = product.pricePerMeter || product.plainProduct?.pricePerMeter || product.price || 0;
+    return basePrice * quantity;
+  }, [product, quantity]);
+
+  // Calculate final price with variants
+  const finalPrice = useMemo(() => {
+    if (!product) return 0;
     
-    if (product.variants) {
-      product.variants.forEach((variant: FabricVariant) => {
-        const selectedOptionId = selectedVariants[variant.id];
-        const selectedOption = variant.options.find(opt => opt.id === selectedOptionId);
-        if (selectedOption?.priceModifier) {
-          basePrice += selectedOption.priceModifier;
+    let basePrice = 0;
+    if (product.type === 'DESIGNED') {
+      basePrice = product.designPrice || 0;
+    } else if (product.type === 'PLAIN') {
+      basePrice = product.pricePerMeter || product.price || 0;
+    } else if (product.type === 'DIGITAL') {
+      basePrice = product.price || 0;
+    }
+    
+    // Add variant price modifiers
+    let variantModifier = 0;
+    if (product.variants && product.variants.length > 0) {
+      product.variants.forEach((variant: any) => {
+        const selectedOptionId = selectedVariants[String(variant.id)];
+        if (selectedOptionId && variant.options) {
+          const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+          if (selectedOption && selectedOption.priceModifier) {
+            variantModifier += selectedOption.priceModifier;
+          }
         }
       });
     }
     
-    return basePrice * quantity;
+    const unitPrice = basePrice + variantModifier;
+    return unitPrice * quantity;
   }, [product, selectedVariants, quantity]);
 
   const handleFabricSelect = (fabricId: string) => {
     setSelectedFabricId(fabricId);
-    // Mock fabric data - in real app, fetch from API
-    const fabricPrices: Record<string, number> = {
-      'p1': 100,
-      'p2': 80,
-      'p3': 120,
-      'p4': 75,
-    };
-    setFabricPricePerMeter(fabricPrices[fabricId] || 100);
     setSelectedFabricVariants({});
     setFabricQuantity(1);
-    setShowFabricVariant(true);
+    // Fabric data will be loaded via useQuery above
+    // Show popup after a brief delay to allow data to load
+    setTimeout(() => {
+      setShowFabricVariant(true);
+    }, 100);
   };
+
+  // Update fabric data when fetched
+  useEffect(() => {
+    if (fabricProduct) {
+      setSelectedFabric(fabricProduct);
+      const price = fabricProduct.pricePerMeter || fabricProduct.price || 0;
+      setFabricPricePerMeter(Number(price));
+    }
+  }, [fabricProduct]);
 
   const handleFabricVariantComplete = (data: {
     fabricId: string;
@@ -213,11 +265,162 @@ const ProductDetail = () => {
     setSelectedFabricId(data.fabricId);
     setSelectedFabricVariants(data.selectedVariants);
     setFabricQuantity(data.quantity);
-    // Calculate combined price: Design Price + Fabric Price
-    const totalPrice = (product.designPrice || 0) + data.totalPrice;
+    // Calculate combined price: Design Price + Fabric Price + Product Variant Modifiers
+    const baseDesignPrice = product.designPrice || 0;
+    
+    // Add product variant price modifiers
+    let variantModifier = 0;
+    if (product.variants && product.variants.length > 0) {
+      product.variants.forEach((variant: any) => {
+        const selectedOptionId = selectedVariants[String(variant.id)];
+        if (selectedOptionId && variant.options) {
+          const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+          if (selectedOption && selectedOption.priceModifier) {
+            variantModifier += selectedOption.priceModifier * data.quantity;
+          }
+        }
+      });
+    }
+    
+    const totalPrice = baseDesignPrice + data.totalPrice + variantModifier;
     setCombinedPrice(totalPrice);
     setFabricPricePerMeter(data.totalPrice / data.quantity);
     setShowFabricVariant(false);
+  };
+
+  // Validate required custom fields
+  const validateCustomFields = (): boolean => {
+    if (!product || !product.customFields) return true;
+    
+    for (const field of product.customFields) {
+      if (field.isRequired) {
+        const value = customFieldValues[String(field.id)];
+        if (!value || (typeof value === 'string' && value.trim() === '')) {
+          toast.error(`Please fill in the required field: ${field.label}`);
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  // Add to cart mutation (for logged-in users)
+  const addToCartMutation = useMutation({
+    mutationFn: (cartData: any) => cartApi.addItem(cartData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+      queryClient.invalidateQueries({ queryKey: ['cart-count'] });
+      toast.success('Product added to cart!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to add product to cart');
+    },
+  });
+
+  // Fetch or create Digital Product from Design Product
+  const { data: digitalProduct, isLoading: isLoadingDigital } = useQuery({
+    queryKey: ['digitalProduct', productId],
+    queryFn: () => productsApi.getDigitalFromDesign(Number(productId!)),
+    enabled: product?.type === 'DESIGNED' && !!productId,
+    retry: false,
+  });
+
+  // Create Digital Product mutation (not used directly, but kept for reference)
+  const createDigitalMutation = useMutation({
+    mutationFn: (price?: number) => productsApi.createDigitalFromDesign(Number(productId!), price),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['digitalProduct', productId] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to create digital product');
+    },
+  });
+
+  // Handle purchase design only
+  const handlePurchaseDesignOnly = async () => {
+    if (!productId || !product) return;
+    
+    try {
+      let digitalProd = digitalProduct;
+      
+      // If digital product doesn't exist, create it
+      if (!digitalProd) {
+        try {
+          digitalProd = await productsApi.createDigitalFromDesign(Number(productId), product.designPrice);
+          queryClient.invalidateQueries({ queryKey: ['digitalProduct', productId] });
+        } catch (error: any) {
+          toast.error(error.message || 'Failed to create digital product');
+          return;
+        }
+      }
+      
+      if (!digitalProd?.id) {
+        toast.error('Digital product not available');
+        return;
+      }
+      
+      // Add digital product to cart
+      const cartData = {
+        productType: 'DIGITAL',
+        productId: digitalProd.id,
+        productName: digitalProd.name || `${product.name} (Digital Design)`,
+        productImage: digitalProd.images?.[0] || product.images?.[0] || '',
+        quantity: 1,
+        unitPrice: digitalProd.price || product.designPrice || 0,
+        totalPrice: digitalProd.price || product.designPrice || 0,
+      };
+      
+      if (!isLoggedIn) {
+        guestCart.addItem(cartData);
+        toast.success('Digital design added to cart!');
+        window.dispatchEvent(new Event('guestCartUpdated'));
+      } else {
+        addToCartMutation.mutate(cartData);
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to add digital design to cart');
+    }
+  };
+  
+  // Check if user is logged in
+  const isLoggedIn = !!localStorage.getItem('authToken');
+
+  // Wishlist mutations
+  const addToWishlistMutation = useMutation({
+    mutationFn: () => wishlistApi.addItem(productType, productId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wishlist'] });
+      queryClient.invalidateQueries({ queryKey: ['wishlist-check', productType, productId] });
+      toast.success('Added to wishlist!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to add to wishlist');
+    },
+  });
+
+  const removeFromWishlistMutation = useMutation({
+    mutationFn: () => wishlistApi.removeByProduct(productType, productId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wishlist'] });
+      queryClient.invalidateQueries({ queryKey: ['wishlist-check', productType, productId] });
+      toast.success('Removed from wishlist!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to remove from wishlist');
+    },
+  });
+
+  const handleWishlistToggle = () => {
+    if (!localStorage.getItem('authToken')) {
+      toast.error('Please login to add items to wishlist');
+      return;
+    }
+    
+    if (isInWishlist) {
+      removeFromWishlistMutation.mutate();
+    } else {
+      addToWishlistMutation.mutate();
+    }
   };
 
   const handleAddToCart = () => {
@@ -226,54 +429,180 @@ const ProductDetail = () => {
       return;
     }
     
-    // Calculate combined price
-    const fabricTotalPrice = fabricPricePerMeter * fabricQuantity;
-    const totalPrice = (product.designPrice || 0) + fabricTotalPrice;
+    // Validate required custom fields
+    if (!validateCustomFields()) {
+      return;
+    }
     
-    // Add to cart
-    const cartItem = {
-      id: `design-${product.id}-fabric-${selectedFabricId}-${Date.now()}`,
-      type: 'DESIGNED',
-      designId: product.id,
-      designPrice: product.designPrice,
-      fabricId: selectedFabricId,
+    // Calculate combined price: Design Price + Fabric Price + Variant Modifiers
+    const baseDesignPrice = product.designPrice || 0;
+    const fabricTotalPrice = fabricPricePerMeter * fabricQuantity;
+    
+    // Add variant price modifiers
+    let variantModifier = 0;
+    if (product.variants && product.variants.length > 0) {
+      product.variants.forEach((variant: any) => {
+        const selectedOptionId = selectedVariants[String(variant.id)];
+        if (selectedOptionId && variant.options) {
+          const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+          if (selectedOption && selectedOption.priceModifier) {
+            variantModifier += selectedOption.priceModifier * fabricQuantity;
+          }
+        }
+      });
+    }
+    
+    const unitPrice = (baseDesignPrice + fabricTotalPrice + variantModifier) / fabricQuantity;
+    const totalPrice = baseDesignPrice + fabricTotalPrice + variantModifier;
+    
+    // Prepare variants map (variantId -> optionValue)
+    const variantsMap: Record<string, string> = {};
+    if (product.variants && product.variants.length > 0) {
+      product.variants.forEach((variant: any) => {
+        const selectedOptionId = selectedVariants[String(variant.id)];
+        if (selectedOptionId && variant.options) {
+          const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+          if (selectedOption) {
+            variantsMap[String(variant.id)] = selectedOption.value || String(selectedOption.id);
+          }
+        }
+      });
+    }
+    
+    // Add fabric variants
+    Object.assign(variantsMap, selectedFabricVariants);
+    
+    // Prepare cart data
+    const cartData = {
+      productType: 'DESIGNED',
+      productId: Number(product.id),
+      productName: product.name,
+      productImage: product.images?.[0] || '',
+      designId: Number(product.id),
+      designPrice: baseDesignPrice,
+      fabricId: Number(selectedFabricId),
       fabricPrice: fabricTotalPrice,
-      fabricPricePerMeter: fabricPricePerMeter,
-      variants: selectedFabricVariants,
       quantity: fabricQuantity,
+      unitPrice: unitPrice,
       totalPrice: totalPrice,
+      variants: variantsMap,
+      customFormData: customFieldValues,
     };
     
-    // Save to localStorage (in real app, call API)
-    const existingCart = JSON.parse(localStorage.getItem('cart') || '[]');
-    existingCart.push(cartItem);
-    localStorage.setItem('cart', JSON.stringify(existingCart));
-    
-    toast.success('Product added to cart!');
+    // Use guest cart if not logged in, otherwise use API
+    if (!isLoggedIn) {
+      guestCart.addItem(cartData);
+      toast.success('Product added to cart!');
+      // Trigger a custom event to update cart count in navbar
+      window.dispatchEvent(new Event('guestCartUpdated'));
+    } else {
+      addToCartMutation.mutate(cartData);
+    }
   };
 
   const handlePlainProductAddToCart = () => {
-    const cartItem = {
-      id: `plain-${product.id}-${Date.now()}`,
-      type: 'PLAIN',
-      plainProductId: product.id,
-      plainProductPrice: plainProductPrice / quantity,
-      variants: selectedVariants,
+    // Validate required custom fields
+    if (!validateCustomFields()) {
+      return;
+    }
+    
+    // Calculate price with variants
+    const basePrice = product.pricePerMeter || product.plainProduct?.pricePerMeter || product.price || 0;
+    let variantModifier = 0;
+    if (product.variants && product.variants.length > 0) {
+      product.variants.forEach((variant: any) => {
+        const selectedOptionId = selectedVariants[String(variant.id)];
+        if (selectedOptionId && variant.options) {
+          const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+          if (selectedOption && selectedOption.priceModifier) {
+            variantModifier += selectedOption.priceModifier;
+          }
+        }
+      });
+    }
+    
+    const unitPrice = basePrice + variantModifier;
+    
+    // Prepare variants map
+    const variantsMap: Record<string, string> = {};
+    if (product.variants && product.variants.length > 0) {
+      product.variants.forEach((variant: any) => {
+        const selectedOptionId = selectedVariants[String(variant.id)];
+        if (selectedOptionId && variant.options) {
+          const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+          if (selectedOption) {
+            variantsMap[String(variant.id)] = selectedOption.value || String(selectedOption.id);
+          }
+        }
+      });
+    }
+    
+    // Prepare cart data
+    const totalPrice = unitPrice * quantity;
+    const cartData = {
+      productType: 'PLAIN',
+      productId: Number(product.id),
+      productName: product.name,
+      productImage: product.images?.[0] || '',
       quantity: quantity,
-      totalPrice: plainProductPrice,
+      unitPrice: unitPrice,
+      totalPrice: totalPrice,
+      variants: variantsMap,
+      customFormData: customFieldValues,
     };
     
-    const existingCart = JSON.parse(localStorage.getItem('cart') || '[]');
-    existingCart.push(cartItem);
-    localStorage.setItem('cart', JSON.stringify(existingCart));
-    
-    toast.success('Product added to cart!');
+    // Use guest cart if not logged in, otherwise use API
+    if (!isLoggedIn) {
+      guestCart.addItem(cartData);
+      toast.success('Product added to cart!');
+      // Trigger a custom event to update cart count in navbar
+      window.dispatchEvent(new Event('guestCartUpdated'));
+    } else {
+      addToCartMutation.mutate(cartData);
+    }
   };
 
+  // Handle digital product add to cart
+  const handleDigitalAddToCart = () => {
+    if (!product || product.type !== 'DIGITAL') return;
+    
+    // Validate required custom fields
+    if (!validateCustomFields()) {
+      return;
+    }
+    
+    const cartData: Omit<import('@/lib/guestCart').GuestCartItem, 'id'> = {
+      productType: 'DIGITAL',
+      productId: Number(product.id),
+      productName: product.name,
+      productImage: product.images?.[0] || '',
+      quantity: quantity,
+      unitPrice: finalPrice / quantity,
+      totalPrice: finalPrice,
+      variants: selectedVariants,
+      customFormData: customFieldValues,
+    };
+    
+    // Use guest cart if not logged in, otherwise use API
+    if (!isLoggedIn) {
+      guestCart.addItem(cartData);
+      toast.success('Digital product added to cart!');
+      window.dispatchEvent(new Event('guestCartUpdated'));
+    } else {
+      addToCartMutation.mutate(cartData);
+    }
+  };
+
+  // Handle digital download (for purchased products)
   const handleDigitalDownload = () => {
-    // In real app, trigger download from API
-    toast.success('Download started!');
-    // window.open(product.fileUrl, '_blank');
+    if (!product || !product.fileUrl) {
+      toast.error('Download file not available');
+      return;
+    }
+    
+    // Open download link in new tab
+    window.open(product.fileUrl, '_blank');
+    toast.success('Opening download...');
   };
 
   const getTypeBadge = () => {
@@ -286,6 +615,46 @@ const ProductDetail = () => {
         return <Badge className="bg-purple-100 text-purple-700 border-purple-200 gap-1"><FileJson className="w-3 h-3" /> Digital Product</Badge>;
     }
   };
+
+  if (productLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (productError) {
+    console.error('Product fetch error:', productError);
+    return (
+      <Layout>
+        <div className="text-center py-12">
+          <p className="text-destructive text-lg font-semibold mb-2">Error loading product</p>
+          <p className="text-muted-foreground mb-4">{productError instanceof Error ? productError.message : 'Unknown error'}</p>
+          <Link to="/products">
+            <Button variant="outline" className="mt-4">Back to Products</Button>
+          </Link>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!product) {
+    console.warn('Product is null, apiProduct:', apiProduct);
+    return (
+      <Layout>
+        <div className="text-center py-12">
+          <p className="text-destructive text-lg font-semibold mb-2">Product not found</p>
+          <p className="text-muted-foreground mb-4">The product you're looking for doesn't exist or has been removed.</p>
+          <Link to="/products">
+            <Button variant="outline" className="mt-4">Back to Products</Button>
+          </Link>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -312,39 +681,108 @@ const ProductDetail = () => {
             <div className="lg:col-span-5">
               <ScrollReveal direction="left">
                 <div className="space-y-3 sm:space-y-5">
-                  <motion.div
-                    key={selectedImage}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="aspect-square rounded-xl sm:rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-sm mx-auto w-full max-w-full sm:max-w-lg"
-                  >
-                    <img
-                      src={product.images[selectedImage]}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </motion.div>
-                  
-                  <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-full sm:max-w-lg mx-auto">
-                    {product.images.map((image: string, index: number) => (
-                      <button
-                        key={index}
-                        onClick={() => setSelectedImage(index)}
-                        className={cn(
-                          "aspect-square rounded-lg sm:rounded-xl overflow-hidden border-2 transition-all",
-                          selectedImage === index 
-                            ? 'border-primary' 
-                            : 'border-transparent hover:border-primary/50'
+                  {product && product.media && product.media.length > 0 ? (
+                    <>
+                      <motion.div
+                        key={selectedMedia}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="aspect-square rounded-xl sm:rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-sm mx-auto w-full max-w-full sm:max-w-lg"
+                      >
+                        {product.media[selectedMedia]?.type === 'video' ? (
+                          <video
+                            src={product.media[selectedMedia].url}
+                            className="w-full h-full object-cover"
+                            controls
+                            autoPlay
+                            muted
+                            playsInline
+                          />
+                        ) : (
+                          <img
+                            src={product.media[selectedMedia].url}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                          />
                         )}
+                      </motion.div>
+                      
+                      <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-full sm:max-w-lg mx-auto">
+                        {product.media.map((item: any, index: number) => (
+                          <button
+                            key={index}
+                            onClick={() => setSelectedMedia(index)}
+                            className={cn(
+                              "aspect-square rounded-lg sm:rounded-xl overflow-hidden border-2 transition-all relative",
+                              selectedMedia === index 
+                                ? 'border-primary' 
+                                : 'border-transparent hover:border-primary/50'
+                            )}
+                          >
+                            {item.type === 'video' ? (
+                              <>
+                                <video
+                                  src={item.url}
+                                  className="w-full h-full object-cover"
+                                  muted
+                                  playsInline
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                  <Video className="w-6 h-6 text-white" />
+                                </div>
+                              </>
+                            ) : (
+                              <img
+                                src={item.url}
+                                alt={`${product.name} ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : product && product.images && product.images.length > 0 ? (
+                    <>
+                      <motion.div
+                        key={selectedMedia}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="aspect-square rounded-xl sm:rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-sm mx-auto w-full max-w-full sm:max-w-lg"
                       >
                         <img
-                          src={image}
-                          alt={`${product.name} ${index + 1}`}
+                          src={product.images[selectedMedia]}
+                          alt={product.name}
                           className="w-full h-full object-cover"
                         />
-                      </button>
-                    ))}
-                  </div>
+                      </motion.div>
+                      
+                      <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-full sm:max-w-lg mx-auto">
+                        {product.images.map((image: string, index: number) => (
+                          <button
+                            key={index}
+                            onClick={() => setSelectedMedia(index)}
+                            className={cn(
+                              "aspect-square rounded-lg sm:rounded-xl overflow-hidden border-2 transition-all",
+                              selectedMedia === index 
+                                ? 'border-primary' 
+                                : 'border-transparent hover:border-primary/50'
+                            )}
+                          >
+                            <img
+                              src={image}
+                              alt={`${product.name} ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="aspect-square rounded-xl sm:rounded-2xl bg-secondary/30 border border-border flex items-center justify-center">
+                      <p className="text-muted-foreground">No media available</p>
+                    </div>
+                  )}
                 </div>
               </ScrollReveal>
             </div>
@@ -362,7 +800,7 @@ const ProductDetail = () => {
                   {/* Title & Price */}
                   <div className="space-y-2 sm:space-y-3">
                     <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">{product.category}</p>
-                    <h1 className="font-cursive text-2xl xs:text-3xl sm:text-4xl lg:text-5xl xl:text-6xl break-words">{product.name}</h1>
+                    <h1 className="font-sans font-semibold text-lg xs:text-xl sm:text-2xl lg:text-3xl xl:text-3xl break-words not-italic" style={{ fontFamily: "'Poppins', sans-serif" }}>{product.name}</h1>
 
                     {/* Price Display */}
                     {product.type === 'DESIGNED' && (
@@ -371,68 +809,112 @@ const ProductDetail = () => {
                           <div className="flex items-center gap-4 flex-wrap">
                             <div>
                               <p className="text-xs sm:text-sm text-muted-foreground">Design Price</p>
-                              <span className="font-cursive text-2xl sm:text-3xl lg:text-4xl text-primary">₹{product.designPrice}</span>
+                              <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">₹{product.designPrice}</span>
                             </div>
                             {selectedFabricId && (
                               <div>
                                 <p className="text-xs sm:text-sm text-muted-foreground">Fabric Price</p>
-                                <span className="font-cursive text-2xl sm:text-3xl text-primary">₹{fabricPricePerMeter * fabricQuantity}</span>
+                                <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">₹{fabricPricePerMeter * fabricQuantity}</span>
+                              </div>
+                            )}
+                            {product.variants && product.variants.length > 0 && Object.keys(selectedVariants).length > 0 && (
+                              <div>
+                                <p className="text-xs sm:text-sm text-muted-foreground">Variant Modifiers</p>
+                                <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">
+                                  {(() => {
+                                    let modifier = 0;
+                                    product.variants.forEach((variant: any) => {
+                                      const selectedOptionId = selectedVariants[String(variant.id)];
+                                      if (selectedOptionId && variant.options) {
+                                        const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+                                        if (selectedOption && selectedOption.priceModifier) {
+                                          modifier += selectedOption.priceModifier * fabricQuantity;
+                                        }
+                                      }
+                                    });
+                                    return modifier > 0 ? `+₹${modifier}` : '₹0';
+                                  })()}
+                                </span>
                               </div>
                             )}
                             {combinedPrice && (
                               <div>
                                 <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
-                                <span className="font-cursive text-3xl sm:text-4xl text-primary">₹{combinedPrice}</span>
+                                <span className="font-bold font-normal text-xl sm:text-xl text-primary not-italic">₹{combinedPrice}</span>
                               </div>
                             )}
                           </div>
                         </div>
                         {selectedFabricId && (
-                          <div className="text-xs sm:text-sm text-muted-foreground space-y-1">
-                            <p>Fabric: {fabricPricePerMeter}/meter × {fabricQuantity} meter{fabricQuantity !== 1 ? 's' : ''}</p>
-                            <p className="text-[10px] sm:text-xs">Design: ₹{product.designPrice} + Fabric: ₹{fabricPricePerMeter * fabricQuantity} = ₹{combinedPrice}</p>
+                          <div className="text-xs sm:text-sm text-muted-foreground pt-2 border-t border-border/50">
+                            <p className="font-medium">Fabric Details:</p>
+                            <p className="mt-1">₹{fabricPricePerMeter}/meter × {fabricQuantity} meter{fabricQuantity !== 1 ? 's' : ''} = ₹{fabricPricePerMeter * fabricQuantity}</p>
                           </div>
                         )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 gap-2"
+                          onClick={() => setShowPriceBreakdown(true)}
+                        >
+                          <Calculator className="w-4 h-4" />
+                          View Price Breakdown
+                        </Button>
                       </div>
                     )}
                     
                     {product.type === 'PLAIN' && (
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Price per meter</p>
-                          <span className="font-cursive text-4xl text-primary">₹{product.pricePerMeter}</span>
+                      <div>
+                        <div className="flex items-baseline gap-3">
+                          <span className="font-bold font-normal text-xl sm:text-2xl text-primary not-italic">
+                            ₹{(() => {
+                              const basePrice = product.pricePerMeter || product.price || 0;
+                              let variantModifier = 0;
+                              if (product.variants && product.variants.length > 0) {
+                                product.variants.forEach((variant: any) => {
+                                  const selectedOptionId = selectedVariants[String(variant.id)];
+                                  if (selectedOptionId && variant.options) {
+                                    const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+                                    if (selectedOption && selectedOption.priceModifier) {
+                                      variantModifier += selectedOption.priceModifier;
+                                    }
+                                  }
+                                });
+                              }
+                              return basePrice + variantModifier;
+                            })()}
+                          </span>
+                          <span className="text-sm text-muted-foreground">per meter</span>
                         </div>
-                        {plainProductPrice > 0 && (
-                          <div>
-                            <p className="text-sm text-muted-foreground">Total</p>
-                            <span className="font-cursive text-3xl text-primary">₹{plainProductPrice}</span>
+                        {finalPrice > 0 && (
+                          <div className="mt-2 pt-2 border-t border-border/50">
+                            <p className="text-xs text-muted-foreground mb-1">Total for {quantity} meter{quantity !== 1 ? 's' : ''}</p>
+                            <span className="font-bold font-normal text-lg text-primary not-italic">₹{finalPrice}</span>
                           </div>
                         )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 gap-2"
+                          onClick={() => setShowPriceBreakdown(true)}
+                        >
+                          <Calculator className="w-4 h-4" />
+                          View Price Breakdown
+                        </Button>
                       </div>
                     )}
                     
-                    {product.type === 'DIGITAL' && (
-                      <div className="flex items-center gap-4">
-                        <span className="font-cursive text-4xl text-primary">₹{product.price}</span>
-                        <Badge variant="secondary" className="text-sm">One-time purchase</Badge>
-                      </div>
-                    )}
                   </div>
 
                   {/* Description */}
-                  <p className="text-muted-foreground text-sm sm:text-base lg:text-lg leading-relaxed mt-2 sm:mt-3">{product.description}</p>
+                  <div className="text-muted-foreground text-sm sm:text-base lg:text-lg leading-relaxed mt-2 sm:mt-3 font-normal not-italic">
+                    {product.description ? (
+                      <p className="whitespace-pre-wrap font-normal not-italic">{product.description.replace(/<[^>]*>/g, '')}</p>
+                    ) : (
+                      <p className="text-muted-foreground/70 font-normal not-italic">No description available.</p>
+                    )}
+                  </div>
 
-                  {/* Custom Fields */}
-                  {product.customFields && product.customFields.length > 0 && (
-                    <div className="space-y-2 sm:space-y-3">
-                      {product.customFields.map((field: CustomField) => (
-                        <div key={field.id} className="flex flex-col xs:flex-row items-start xs:items-center gap-1 xs:gap-3">
-                          <span className="text-xs sm:text-sm font-medium text-muted-foreground xs:min-w-[120px]">{field.label}:</span>
-                          <span className="text-sm sm:text-base break-words">{field.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
 
                   {/* DESIGN PRODUCT: Select Fabric Button & Recommended Fabrics */}
                   {product.type === 'DESIGNED' && (
@@ -450,22 +932,16 @@ const ProductDetail = () => {
                       </div>
 
                       {/* Recommended Fabrics - Grid Layout */}
-                      {product.recommendedPlainProductIds && product.recommendedPlainProductIds.length > 0 && (
+                      {product.recommendedFabrics && product.recommendedFabrics.length > 0 && (
                         <div>
                           <h4 className="font-medium mb-3 sm:mb-4 text-base sm:text-lg flex items-center gap-2">
                             <Palette className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                             Recommended Fabrics
                           </h4>
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
-                            {product.recommendedPlainProductIds.slice(0, 3).map((fabricId: string, index: number) => {
-                              // Mock fabric names - in real app, fetch from API
-                              const fabricNames: Record<string, string> = {
-                                'p1': 'Premium Silk Fabric',
-                                'p2': 'Cotton Blue Fabric',
-                                'p3': 'Linen Cream Fabric',
-                                'p4': 'Cotton White Fabric',
-                              };
-                              const fabricName = fabricNames[fabricId] || `Fabric ${index + 1}`;
+                            {product.recommendedFabrics.slice(0, 3).map((fabric: any, index: number) => {
+                              const fabricId = String(fabric.id);
+                              const fabricName = fabric.name || `Fabric ${index + 1}`;
                               const isSelected = selectedFabricId === fabricId;
                               
                               return (
@@ -501,110 +977,318 @@ const ProductDetail = () => {
                     </div>
                   )}
 
-                  {/* PLAIN PRODUCT: Variant Selection (No popup, direct on page) */}
-                  {product.type === 'PLAIN' && product.variants && (
-                    <div className="space-y-6">
-                      {product.variants.map((variant: FabricVariant) => {
-                        const selectedOptionId = selectedVariants[variant.id];
-                        const selectedOption = variant.options.find(opt => opt.id === selectedOptionId);
-                        
-                        return (
-                          <div key={variant.id}>
-                            <h4 className="font-medium mb-4 text-lg">
-                              {variant.name}: <span className="text-muted-foreground">{selectedOption?.value}</span>
-                            </h4>
-                            <div className="flex flex-wrap gap-3">
-                              {variant.options.map((option) => (
-                                <button
-                                  key={option.id}
-                                  onClick={() => setSelectedVariants({
-                                    ...selectedVariants,
-                                    [variant.id]: option.id
-                                  })}
-                                  className={cn(
-                                    "px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 md:py-3 rounded-full border-2 transition-all text-xs sm:text-sm md:text-base",
-                                    selectedOptionId === option.id
-                                      ? 'border-[#2b9d8f] bg-[#2b9d8f]/10 text-[#2b9d8f]'
-                                      : 'border-border hover:border-[#2b9d8f]/50'
-                                  )}
-                                >
-                                  <span className="truncate">{option.value}</span>
-                                  {option.priceModifier && option.priceModifier > 0 && (
-                                    <span className="text-[10px] sm:text-xs text-[#2b9d8f] ml-1 sm:ml-2 whitespace-nowrap">(+₹{option.priceModifier})</span>
-                                  )}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      
-                      <div>
-                        <h4 className="font-medium mb-4 text-lg">Quantity (Meters)</h4>
-                        <div className="flex items-center gap-5">
-                          <div className="flex items-center border border-border rounded-full">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="rounded-full w-12 h-12"
-                              onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                            >
-                              <Minus className="w-5 h-5" />
-                            </Button>
-                            <span className="w-14 text-center font-medium text-lg">{quantity}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="rounded-full w-12 h-12"
-                              onClick={() => setQuantity(quantity + 1)}
-                            >
-                              <Plus className="w-5 h-5" />
-                            </Button>
-                          </div>
-                          <span className="text-base text-muted-foreground">
-                            {product.inStock ? 'In Stock' : 'Out of Stock'}
-                          </span>
+                  {/* Quantity */}
+                  {product.type !== 'DIGITAL' && (
+                    <div>
+                      <h4 className="font-bold mb-4 text-lg">Quantity {product.type === 'PLAIN' ? '(Meters)' : ''}</h4>
+                      <div className="flex items-center gap-5">
+                        <div className="flex items-center border border-border rounded-full">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-full w-12 h-12"
+                            onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                          >
+                            <Minus className="w-5 h-5" />
+                          </Button>
+                          <span className="w-14 text-center font-medium text-lg">{quantity}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-full w-12 h-12"
+                            onClick={() => setQuantity(quantity + 1)}
+                          >
+                            <Plus className="w-5 h-5" />
+                          </Button>
                         </div>
                       </div>
+                    </div>
+                  )}
+                  
+                  {/* Digital Product Quantity (if multiple licenses needed) */}
+                  {product.type === 'DIGITAL' && (
+                    <div>
+                      <h4 className="font-bold mb-4 text-lg">Quantity (Licenses)</h4>
+                      <div className="flex items-center gap-5">
+                        <div className="flex items-center border border-border rounded-full">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-full w-12 h-12"
+                            onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                          >
+                            <Minus className="w-5 h-5" />
+                          </Button>
+                          <span className="w-14 text-center font-medium text-lg">{quantity}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-full w-12 h-12"
+                            onClick={() => setQuantity(quantity + 1)}
+                          >
+                            <Plus className="w-5 h-5" />
+                          </Button>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {quantity === 1 ? 'Single license' : `${quantity} licenses`}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Variants */}
+                  {product.variants && product.variants.length > 0 && (
+                    <div className="space-y-4">
+                      <h4 className="font-bold mb-4 text-lg">Select Options</h4>
+                      {product.variants.map((variant: any) => (
+                        <div key={variant.id} className="space-y-2">
+                          <Label className="text-sm font-medium">
+                            {variant.name}
+                            {variant.unit && <span className="text-muted-foreground ml-1">({variant.unit})</span>}
+                          </Label>
+                          <div className="flex flex-wrap gap-2">
+                            {variant.options && variant.options.map((option: any) => {
+                              const isSelected = selectedVariants[String(variant.id)] === String(option.id);
+                              return (
+                                <button
+                                  key={option.id}
+                                  onClick={() => {
+                                    setSelectedVariants({
+                                      ...selectedVariants,
+                                      [String(variant.id)]: String(option.id)
+                                    });
+                                  }}
+                                  className={cn(
+                                    "px-4 py-2 rounded-lg border-2 transition-all text-sm",
+                                    isSelected
+                                      ? "border-primary bg-primary/10 text-primary font-medium"
+                                      : "border-border hover:border-primary/50"
+                                  )}
+                                >
+                                  {option.value}
+                                  {option.priceModifier && option.priceModifier !== 0 && (
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      {option.priceModifier > 0 ? '+' : ''}₹{option.priceModifier}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Custom Fields */}
+                  {product.customFields && product.customFields.length > 0 && (
+                    <div className="space-y-4">
+                      <h4 className="font-bold mb-4 text-lg">Additional Information</h4>
+                      {product.customFields.map((field: any) => (
+                        <div key={field.id} className="space-y-2">
+                          <Label className="text-sm font-medium">
+                            {field.label}
+                            {field.isRequired && <span className="text-destructive ml-1">*</span>}
+                          </Label>
+                          {field.fieldType === 'text' && (
+                            <Input
+                              value={customFieldValues[String(field.id)] as string || ''}
+                              onChange={(e) => setCustomFieldValues({
+                                ...customFieldValues,
+                                [String(field.id)]: e.target.value
+                              })}
+                              placeholder={field.placeholder || ''}
+                              className="h-11"
+                              required={field.isRequired}
+                            />
+                          )}
+                          {field.fieldType === 'number' && (
+                            <Input
+                              type="number"
+                              value={customFieldValues[String(field.id)] as string || ''}
+                              onChange={(e) => setCustomFieldValues({
+                                ...customFieldValues,
+                                [String(field.id)]: e.target.value
+                              })}
+                              placeholder={field.placeholder || ''}
+                              className="h-11"
+                              required={field.isRequired}
+                            />
+                          )}
+                          {field.fieldType === 'url' && (
+                            <Input
+                              type="url"
+                              value={customFieldValues[String(field.id)] as string || ''}
+                              onChange={(e) => setCustomFieldValues({
+                                ...customFieldValues,
+                                [String(field.id)]: e.target.value
+                              })}
+                              placeholder={field.placeholder || ''}
+                              className="h-11"
+                              required={field.isRequired}
+                            />
+                          )}
+                          {field.fieldType === 'image' && (
+                            <div className="space-y-2">
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0] || null;
+                                  setCustomFieldValues({
+                                    ...customFieldValues,
+                                    [String(field.id)]: file
+                                  });
+                                }}
+                                className="h-11"
+                                required={field.isRequired}
+                              />
+                              {field.placeholder && (
+                                <p className="text-xs text-muted-foreground">{field.placeholder}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Price Display with Variants */}
+                  {product.variants && product.variants.length > 0 && (
+                    <div className="p-4 bg-muted/30 border border-border rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Base Price</span>
+                        <span className="font-medium">
+                          ₹{product.type === 'DESIGNED' ? (product.designPrice || 0) : (product.price || 0)}
+                        </span>
+                      </div>
+                      {Object.keys(selectedVariants).length > 0 && (
+                        <>
+                          {product.variants.map((variant: any) => {
+                            const selectedOptionId = selectedVariants[String(variant.id)];
+                            if (!selectedOptionId) return null;
+                            const selectedOption = variant.options?.find((opt: any) => String(opt.id) === selectedOptionId);
+                            if (!selectedOption || !selectedOption.priceModifier || selectedOption.priceModifier === 0) return null;
+                            return (
+                              <div key={variant.id} className="flex items-center justify-between mt-2">
+                                <span className="text-sm text-muted-foreground">{variant.name}: {selectedOption.value}</span>
+                                <span className="font-medium">
+                                  {selectedOption.priceModifier > 0 ? '+' : ''}₹{selectedOption.priceModifier}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+                            <span className="font-semibold">Total (×{quantity})</span>
+                            <span className="font-bold text-lg text-primary">₹{finalPrice}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
 
                   {/* DIGITAL PRODUCT: Download Info */}
                   {product.type === 'DIGITAL' && (
-                    <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
-                      <div className="flex items-center gap-3 mb-2">
-                        <FileJson className="w-6 h-6 text-purple-600" />
-                        <h4 className="font-semibold text-purple-900">Digital Download</h4>
+                    <div className="space-y-4">
+                      <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-xl">
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="p-2 bg-purple-100 rounded-lg">
+                            <FileJson className="w-5 h-5 text-purple-600" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-purple-900 mb-1">Digital Download Product</h4>
+                            <p className="text-sm text-purple-700">
+                              Instant access after purchase. High-resolution files ready for printing or personal use.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-purple-200">
+                          <div>
+                            <p className="text-xs text-purple-600 font-medium">File Format</p>
+                            <p className="text-sm text-purple-900 font-semibold">
+                              {product.fileUrl?.split('.').pop()?.toUpperCase() || 'PDF/PNG/JPG'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-purple-600 font-medium">Delivery</p>
+                            <p className="text-sm text-purple-900 font-semibold">Instant</p>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm text-purple-700">
-                        After purchase, you'll receive a download link. Files are high-resolution and ready for printing.
-                      </p>
+                      
+                      {product.description && (
+                        <div className="p-4 bg-muted/30 border border-border rounded-xl">
+                          <h4 className="font-semibold mb-2">What's Included</h4>
+                          <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                            <li>High-resolution digital file</li>
+                            <li>Multiple format options (if available)</li>
+                            <li>Commercial use license (if applicable)</li>
+                            <li>Lifetime access to downloads</li>
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* Actions */}
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-wrap pt-2 sm:pt-3">
+                  <div className="flex flex-col gap-3 sm:gap-4 pt-4 sm:pt-6 border-t border-border/50">
                     {product.type === 'DESIGNED' && (
                       <>
-                        {selectedFabricId ? (
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                          {selectedFabricId ? (
+                            <Button
+                              size="lg"
+                              onClick={handleAddToCart}
+                              disabled={addToCartMutation.isPending}
+                              className="flex-1 w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
+                            >
+                              {addToCartMutation.isPending ? (
+                                <>
+                                  <Loader2 className="w-5 h-5 flex-shrink-0 animate-spin" />
+                                  <span className="text-center">Adding...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <ShoppingBag className="w-5 h-5 flex-shrink-0" />
+                                  <span className="text-center">Add Physical Product</span>
+                                </>
+                              )}
+                            </Button>
+                          ) : (
+                            <Button
+                              size="lg"
+                              onClick={() => setShowPlainProductSelection(true)}
+                              className="flex-1 w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
+                            >
+                              <Palette className="w-5 h-5 flex-shrink-0" />
+                              <span className="text-center">Select Fabric First</span>
+                            </Button>
+                          )}
+                          
+                          {/* Purchase Design Only Option */}
                           <Button
                             size="lg"
-                            onClick={handleAddToCart}
-                            className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-14 sm:h-16 text-base sm:text-lg px-6 sm:px-8 font-semibold"
+                            variant="outline"
+                            onClick={handlePurchaseDesignOnly}
+                            disabled={createDigitalMutation.isPending || isLoadingDigital}
+                            className="flex-1 w-full border-2 border-primary text-primary hover:bg-primary hover:text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
                           >
-                            <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
-                            <span className="truncate">Add to Cart</span>
+                            {createDigitalMutation.isPending || isLoadingDigital ? (
+                              <>
+                                <Loader2 className="w-5 h-5 flex-shrink-0 animate-spin" />
+                                <span className="text-center">Loading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Download className="w-5 h-5 flex-shrink-0" />
+                                <span className="text-center">Purchase Digital Design</span>
+                              </>
+                            )}
                           </Button>
-                        ) : (
-                          <Button
-                            size="lg"
-                            onClick={() => setShowPlainProductSelection(true)}
-                            className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-14 sm:h-16 text-base sm:text-lg px-6 sm:px-8 font-semibold"
-                          >
-                            <Palette className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
-                            <span className="truncate">Select Fabric First</span>
-                          </Button>
-                        )}
+                        </div>
+                        <p className="text-xs sm:text-sm text-muted-foreground text-center px-2">
+                          Choose to purchase the physical product with fabric or just the digital design file
+                        </p>
                       </>
                     )}
                     
@@ -612,42 +1296,116 @@ const ProductDetail = () => {
                       <Button
                         size="lg"
                         onClick={handlePlainProductAddToCart}
-                        className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-14 sm:h-16 text-base sm:text-lg px-6 sm:px-8 font-semibold"
+                        disabled={addToCartMutation.isPending}
+                        className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
                       >
-                        <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
-                        <span className="truncate">Add to Cart</span>
+                        {addToCartMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-5 h-5 flex-shrink-0 animate-spin" />
+                            <span>Adding to Cart...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingBag className="w-5 h-5 flex-shrink-0" />
+                            <span>Add to Cart</span>
+                          </>
+                        )}
                       </Button>
                     )}
                     
                     {product.type === 'DIGITAL' && (
                       <Button
                         size="lg"
-                        onClick={handleDigitalDownload}
-                        className="flex-1 w-full sm:min-w-[220px] bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 h-14 sm:h-16 text-base sm:text-lg px-6 sm:px-8 font-semibold"
+                        onClick={handleDigitalAddToCart}
+                        disabled={addToCartMutation.isPending}
+                        className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
                       >
-                        <Download className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
-                        <span className="truncate">Download Now</span>
+                        {addToCartMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-5 h-5 flex-shrink-0 animate-spin" />
+                            <span>Adding to Cart...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingBag className="w-5 h-5 flex-shrink-0" />
+                            <span>Add to Cart</span>
+                          </>
+                        )}
                       </Button>
                     )}
                     
                     <div className="flex gap-3 sm:gap-4 w-full sm:w-auto">
-                      <Button size="lg" variant="outline" className="rounded-full w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0">
-                        <Heart className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <Button 
+                        size="lg" 
+                        variant="outline" 
+                        className={cn(
+                          "rounded-full w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0 border-border hover:border-primary hover:bg-primary/5",
+                          isInWishlist && "bg-primary/10 border-primary text-primary"
+                        )}
+                        onClick={handleWishlistToggle}
+                        disabled={addToWishlistMutation.isPending || removeFromWishlistMutation.isPending || !productId}
+                      >
+                        <Heart className={cn("w-4 h-4 sm:w-5 sm:h-5", isInWishlist && "fill-current")} />
                       </Button>
-                      <Button size="lg" variant="outline" className="rounded-full w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0">
+                      <Button size="lg" variant="outline" className="rounded-full w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0 border-border hover:border-primary hover:bg-primary/5">
                         <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
                       </Button>
                     </div>
                   </div>
+
+                  {/* Digital Product Features Section */}
+                  {product.type === 'DIGITAL' && (
+                    <div className="border-t border-border pt-6 space-y-4">
+                      <h3 className="font-bold text-lg mb-4">Digital Product Features</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                          <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
+                            <Download className="w-4 h-4 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm">Instant Download</p>
+                            <p className="text-xs text-muted-foreground">Get immediate access after purchase</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                          <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
+                            <FileJson className="w-4 h-4 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm">High Resolution</p>
+                            <p className="text-xs text-muted-foreground">Print-ready quality files</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                          <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
+                            <Package className="w-4 h-4 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm">Multiple Formats</p>
+                            <p className="text-xs text-muted-foreground">Available in various file types</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                          <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
+                            <Share2 className="w-4 h-4 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm">Lifetime Access</p>
+                            <p className="text-xs text-muted-foreground">Download anytime from your account</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Dynamic Detail Sections */}
                   {product.detailSections && product.detailSections.length > 0 && (
                     <Accordion type="single" collapsible className="border-t border-border pt-6">
                       {product.detailSections.map((section: DetailSection) => (
                         <AccordionItem key={section.id} value={section.id}>
-                          <AccordionTrigger className="text-sm sm:text-lg">{section.title}</AccordionTrigger>
+                          <AccordionTrigger className="text-sm sm:text-lg font-sans not-italic" style={{ fontFamily: "'Poppins', sans-serif" }}>{section.title}</AccordionTrigger>
                           <AccordionContent>
-                            <p className="text-muted-foreground text-sm sm:text-base leading-relaxed">
+                            <p className="text-muted-foreground text-sm sm:text-base leading-relaxed font-normal not-italic font-sans" style={{ fontFamily: "'Poppins', sans-serif" }}>
                               {section.content}
                             </p>
                           </AccordionContent>
@@ -663,20 +1421,22 @@ const ProductDetail = () => {
       </section>
 
       {/* Related Products */}
-      <section className="w-full py-14 lg:py-20 bg-secondary/30">
-        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
-          <ScrollReveal>
-            <h2 className="font-cursive text-4xl lg:text-5xl mb-12">You May Also Like</h2>
-          </ScrollReveal>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-            {relatedProducts.map((product, index) => (
-              <ScrollReveal key={product.id} delay={index * 0.1}>
-                <ProductCard product={product} />
-              </ScrollReveal>
-            ))}
+      {relatedProducts.length > 0 && (
+        <section className="w-full py-14 lg:py-20 bg-secondary/30">
+          <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
+            <ScrollReveal>
+              <h2 className="font-cursive font-semibold text-4xl lg:text-5xl mb-12">You May Also Like</h2>
+            </ScrollReveal>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+              {relatedProducts.map((product, index) => (
+                <ScrollReveal key={product.id} delay={index * 0.1}>
+                  <ProductCard product={product} />
+                </ScrollReveal>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Popups */}
       {product.type === 'DESIGNED' && product.recommendedPlainProductIds && (
@@ -688,22 +1448,55 @@ const ProductDetail = () => {
             onPlainProductSelect={handleFabricSelect}
           />
           
-          {selectedFabricId && (
+          {selectedFabricId && selectedFabric && (
             <FabricVariantPopup
               open={showFabricVariant}
               onOpenChange={setShowFabricVariant}
               fabric={{
-                id: selectedFabricId,
-                name: 'Selected Fabric',
-                image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=300&h=300&fit=crop',
-                pricePerMeter: fabricPricePerMeter || 100,
-                status: 'active',
+                id: String(selectedFabric.id),
+                name: selectedFabric.name || 'Selected Fabric',
+                image: selectedFabric.images?.[0] || selectedFabric.media?.[0]?.url || '',
+                pricePerMeter: Number(selectedFabric.pricePerMeter || selectedFabric.price || 0),
+                status: (selectedFabric.status?.toLowerCase() === 'active' ? 'active' : 'inactive') as 'active' | 'inactive',
               }}
-              variants={[]}
+              variants={selectedFabric.variants?.map((v: any) => ({
+                id: String(v.id),
+                type: v.type || '',
+                name: v.name || '',
+                options: v.options?.map((opt: any) => ({
+                  id: String(opt.id),
+                  value: opt.value || '',
+                  priceModifier: Number(opt.priceModifier || 0),
+                })) || [],
+              })) || []}
               onComplete={handleFabricVariantComplete}
             />
           )}
         </>
+      )}
+      
+      {/* Price Breakdown Popup */}
+      {product && (
+        <PriceBreakdownPopup
+          open={showPriceBreakdown}
+          onOpenChange={setShowPriceBreakdown}
+          item={{
+            productType: product.type,
+            productName: product.name,
+            designPrice: product.designPrice,
+            fabricPrice: selectedFabricId ? fabricPricePerMeter * fabricQuantity : undefined,
+            unitPrice: product.type === 'DESIGNED' ? (combinedPrice ? combinedPrice / fabricQuantity : undefined) : (product.pricePerMeter || product.price),
+            totalPrice: product.type === 'DESIGNED' ? combinedPrice : finalPrice,
+            quantity: product.type === 'DESIGNED' ? fabricQuantity : quantity,
+            pricePerMeter: product.pricePerMeter || product.price,
+            basePrice: product.pricePerMeter || product.price || product.designPrice,
+          }}
+          productData={product}
+          selectedVariants={selectedVariants}
+          fabricQuantity={fabricQuantity}
+          fabricPricePerMeter={fabricPricePerMeter}
+          selectedFabricVariants={selectedFabricVariants}
+        />
       )}
     </Layout>
   );
