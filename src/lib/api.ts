@@ -399,6 +399,16 @@ export const orderApi = {
     fetchApi<any>(`/api/admin/orders/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
   updatePaymentStatus: (id: number, paymentStatus: string, paymentId?: string) => 
     fetchApi<any>(`/api/admin/orders/${id}/payment`, { method: 'PUT', body: JSON.stringify({ paymentStatus, paymentId }) }),
+  retrySwipeInvoice: (id: number) => 
+    fetchApi<any>(`/api/admin/orders/${id}/retry-swipe-invoice`, { method: 'POST' }),
+};
+
+// ===============================
+// Business Config API
+// ===============================
+export const businessConfigApi = {
+  getConfig: () => fetchApi<any>('/api/admin/business-config'),
+  updateConfig: (data: any) => fetchApi<any>('/api/admin/business-config', { method: 'PUT', body: JSON.stringify(data) }),
 };
 
 // ===============================

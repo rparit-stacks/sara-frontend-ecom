@@ -226,6 +226,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
     pricePerMeter: '' as string | number,
     designPrice: '' as string | number,
     gstRate: '' as string | number,
+    hsnCode: '',
     images: [] as string[], // Deprecated - use media
     media: [] as Array<{ url: string; type: 'image' | 'video'; displayOrder: number }>,
     digitalFile: null as File | null,
@@ -277,6 +278,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
           pricePerMeter: productData.pricePerMeter ?? productData.price ?? 0,
           designPrice: productData.designPrice || 0,
           gstRate: productData.gstRate ?? 0,
+          hsnCode: productData.hsnCode || '',
           images: productData.images || [],
           media: productData.media || (productData.images ? productData.images.map((url: string, idx: number) => ({ url, type: 'image' as const, displayOrder: idx })) : []),
           digitalFile: null,
@@ -303,6 +305,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       pricePerMeter: '' as string | number,
       designPrice: '' as string | number,
       gstRate: '' as string | number,
+      hsnCode: '',
       images: [],
       media: [],
       digitalFile: null,
@@ -474,6 +477,11 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
     // Add GST rate
     if (formData.gstRate !== '' && formData.gstRate !== null && formData.gstRate !== undefined) {
       payload.gstRate = Number(formData.gstRate);
+    }
+    
+    // Add HSN code
+    if (formData.hsnCode) {
+      payload.hsnCode = formData.hsnCode;
     }
 
     if (mode === 'edit' && productId) {
@@ -724,6 +732,21 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                 />
                 <p className="text-xs text-muted-foreground">
                   GST rate applied to this product at checkout (leave empty or 0 for no GST)
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="p-hsn">HSN Code</Label>
+                <Input
+                  id="p-hsn"
+                  type="text"
+                  placeholder="6109"
+                  maxLength={8}
+                  className="h-11"
+                  value={formData.hsnCode}
+                  onChange={(e) => setFormData({ ...formData, hsnCode: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  HSN code for GST invoice (e.g., 6109 for garments)
                 </p>
               </div>
               <div className="space-y-2">

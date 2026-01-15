@@ -15,7 +15,8 @@ import {
   Shield,
   Tag,
   Truck,
-  MessageSquare
+  MessageSquare,
+  ShoppingBag
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
@@ -69,6 +70,11 @@ const adminMenuItems = [
     path: '/admin-sara/custom-config' 
   },
   { 
+    icon: Settings, 
+    label: 'Business Config', 
+    path: '/admin-sara/business-config' 
+  },
+  { 
     icon: Users, 
     label: 'Users', 
     path: '/admin-sara/users' 
@@ -82,6 +88,11 @@ const adminMenuItems = [
     icon: Tag, 
     label: 'Coupons', 
     path: '/admin-sara/coupons' 
+  },
+  { 
+    icon: ShoppingBag, 
+    label: 'Orders', 
+    path: '/admin-sara/orders' 
   },
   { 
     icon: Truck, 

@@ -47,6 +47,8 @@ import AdminFAQ from "./pages/admin/AdminFAQ";
 import AdminCoupons from "./pages/admin/AdminCoupons";
 import AdminShipping from "./pages/admin/AdminShipping";
 import AdminContactSubmissions from "./pages/admin/AdminContactSubmissions";
+import AdminOrders from "./pages/admin/AdminOrders";
+import AdminBusinessConfig from "./pages/admin/AdminBusinessConfig";
 import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
 
 const queryClient = new QueryClient();
@@ -192,13 +194,29 @@ const App = () => (
               </ProtectedAdminRoute>
             } 
           />
-          <Route 
-            path="/admin-sara/contact-submissions" 
+          <Route
+            path="/admin-sara/contact-submissions"
             element={
               <ProtectedAdminRoute>
                 <AdminContactSubmissions />
               </ProtectedAdminRoute>
-            } 
+            }
+          />
+          <Route
+            path="/admin-sara/orders"
+            element={
+              <ProtectedAdminRoute>
+                <AdminOrders />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/business-config"
+            element={
+              <ProtectedAdminRoute>
+                <AdminBusinessConfig />
+              </ProtectedAdminRoute>
+            }
           />
           
           <Route path="*" element={<NotFound />} />

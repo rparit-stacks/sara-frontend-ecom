@@ -34,11 +34,13 @@ const Checkout = () => {
     city: '',
     postalCode: '',
     state: '',
+    gstin: '',
   });
   
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [notes, setNotes] = useState('');
+  const [hasGstin, setHasGstin] = useState(false);
   
   // Get user email from token
   const getUserEmail = () => {
@@ -127,12 +129,14 @@ const Checkout = () => {
           firstName: address.firstName || '',
           lastName: address.lastName || '',
           email: address.email || '',
-          phone: address.phone || '',
-          address: address.addressLine1 || '',
+          phone: address.phoneNumber || address.phone || '',
+          address: address.address || address.addressLine1 || '',
           city: address.city || '',
-          postalCode: address.postalCode || '',
+          postalCode: address.zipCode || address.postalCode || '',
           state: address.state || '',
+          gstin: address.gstin || '',
         });
+        setHasGstin(!!address.gstin);
         // Trigger shipping recalculation
         queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
       }
@@ -155,6 +159,7 @@ const Checkout = () => {
           city: formData.city,
           postalCode: formData.postalCode,
           state: formData.state,
+          gstin: hasGstin && formData.gstin ? formData.gstin : undefined,
         },
         paymentMethod,
         notes,
@@ -364,6 +369,36 @@ const Checkout = () => {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                    
+                    {/* GSTIN Field (Optional for B2B) */}
+                    <div className="sm:col-span-2">
+                      <div className="flex items-center space-x-2 mb-3">
+                        <input
+                          type="checkbox"
+                          id="hasGstin"
+                          checked={hasGstin}
+                          onChange={(e) => {
+                            setHasGstin(e.target.checked);
+                            if (!e.target.checked) {
+                              setFormData(prev => ({ ...prev, gstin: '' }));
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-border"
+                        />
+                        <label htmlFor="hasGstin" className="text-sm font-medium cursor-pointer">
+                          I have a GSTIN (Business Customer)
+                        </label>
+                      </div>
+                      {hasGstin && (
+                        <Input
+                          placeholder="Enter 15-digit GSTIN (e.g., 27ABCDE1234F1Z5)"
+                          value={formData.gstin}
+                          onChange={(e) => handleInputChange('gstin', e.target.value.toUpperCase())}
+                          maxLength={15}
+                          className="h-11"
+                        />
+                      )}
                     </div>
                   </div>
                 </ScrollReveal>

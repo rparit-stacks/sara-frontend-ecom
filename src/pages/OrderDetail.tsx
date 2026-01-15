@@ -66,6 +66,51 @@ const OrderDetail = () => {
               </CardHeader>
             </Card>
 
+            {/* Swipe Invoice Section */}
+            {order.swipeInvoiceNumber && (
+              <Card className="border-green-200 bg-green-50/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Swipe Invoice</span>
+                    {order.swipeInvoiceUrl && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(order.swipeInvoiceUrl, '_blank')}
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Download Invoice
+                      </Button>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="font-medium">Invoice Number:</span>{' '}
+                      <span>{order.swipeInvoiceNumber}</span>
+                    </div>
+                    {order.swipeIrn && (
+                      <div>
+                        <span className="font-medium">IRN:</span>{' '}
+                        <span className="font-mono text-sm">{order.swipeIrn}</span>
+                      </div>
+                    )}
+                    {order.swipeQrCode && (
+                      <div className="mt-4">
+                        <span className="font-medium block mb-2">QR Code:</span>
+                        <img
+                          src={order.swipeQrCode}
+                          alt="E-Invoice QR Code"
+                          className="w-32 h-32 border border-border rounded"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Order Items */}
             <Card>
               <CardHeader>
