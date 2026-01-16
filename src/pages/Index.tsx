@@ -94,6 +94,16 @@ const Index = () => {
   const { data: cmsData } = useQuery({
     queryKey: ['cmsHomepage'],
     queryFn: () => cmsApi.getHomepage(),
+    refetchOnWindowFocus: false,
+    retry: 2,
+  });
+  
+  // Also fetch Instagram posts directly as fallback
+  const { data: instagramPostsData } = useQuery({
+    queryKey: ['instagramPosts'],
+    queryFn: () => cmsApi.getInstagram(),
+    refetchOnWindowFocus: false,
+    retry: 2,
   });
   
   // Fetch products for best sellers and new arrivals
@@ -660,31 +670,40 @@ const Index = () => {
               <h2 className="font-cursive text-2xl xs:text-3xl sm:text-5xl md:text-6xl lg:text-7xl mt-2 xs:mt-3 sm:mt-4">Follow @studiosara</h2>
             </ScrollReveal>
           </div>
-          <div className="grid grid-cols-3 lg:grid-cols-6 gap-1.5 xs:gap-2 sm:gap-3 lg:gap-5">
-            {instagramPosts.map((post, index) => {
-              const imageUrl = typeof post === 'string' ? post : post.imageUrl;
-              const linkUrl = typeof post === 'string' ? '#' : (post.linkUrl || '#');
-              return (
-                <ScrollReveal key={index} delay={index * 0.05}>
-                  <a 
-                    href={linkUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="group block aspect-square overflow-hidden rounded-lg xs:rounded-xl lg:rounded-2xl"
-                  >
-                    <img
-                      src={imageUrl}
-                      alt={`Instagram post ${index + 1}`}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/placeholder-image.jpg';
-                      }}
-                    />
-                  </a>
-                </ScrollReveal>
-              );
-            })}
-          </div>
+          {instagramPosts.length > 0 ? (
+            <div className="grid grid-cols-3 lg:grid-cols-6 gap-1.5 xs:gap-2 sm:gap-3 lg:gap-5">
+              {instagramPosts.map((post, index) => {
+                const imageUrl = typeof post === 'string' ? post : (post?.imageUrl || '');
+                const linkUrl = typeof post === 'string' ? '#' : (post?.linkUrl || '#');
+                
+                if (!imageUrl) return null;
+                
+                return (
+                  <ScrollReveal key={index} delay={index * 0.05}>
+                    <a 
+                      href={linkUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="group block aspect-square overflow-hidden rounded-lg xs:rounded-xl lg:rounded-2xl bg-muted"
+                    >
+                      <img
+                        src={imageUrl}
+                        alt={`Instagram post ${index + 1}`}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder-image.jpg';
+                        }}
+                      />
+                    </a>
+                  </ScrollReveal>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <p className="text-sm">No Instagram posts available. Add posts from Admin CMS.</p>
+            </div>
+          )}
         </div>
       </section>
 

@@ -221,7 +221,7 @@ export const cmsApi = {
   updateOffer: (id: number, data: any) => fetchApi<any>(`/api/admin/cms/offers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteOffer: (id: number) => fetchApi<void>(`/api/admin/cms/offers/${id}`, { method: 'DELETE' }),
   
-  setInstagramPosts: (posts: Array<{ imageUrl: string; linkUrl?: string }>) => fetchApi<void>('/api/admin/cms/instagram', { method: 'PUT', body: JSON.stringify({ imageUrls }) }),
+  setInstagramPosts: (posts: Array<{ imageUrl: string; linkUrl?: string }>) => fetchApi<void>('/api/admin/cms/instagram', { method: 'PUT', body: JSON.stringify({ posts }) }),
   
   getAllBanners: () => fetchApi<any[]>('/api/admin/cms/banners'),
   createBanner: (data: any) => fetchApi<any>('/api/admin/cms/banners', { method: 'POST', body: JSON.stringify(data) }),

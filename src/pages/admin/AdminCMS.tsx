@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { motion } from 'framer-motion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { cmsApi, productsApi, getInstagramThumbnail, mediaApi } from '@/lib/api';
+import { cmsApi, productsApi, mediaApi } from '@/lib/api';
 
 const AdminCMS = () => {
   const queryClient = useQueryClient();
@@ -419,46 +419,80 @@ const AdminCMS = () => {
     setNewArrivals(newArrivals.filter(id => id !== productId));
   };
 
-  const addInstagramPost = async (url: string) => {
-    if (!url || !url.trim()) {
-      toast.error('Please enter a valid URL');
+  const addInstagramPost = (imageUrl: string, linkUrl?: string) => {
+    if (!imageUrl || !imageUrl.trim()) {
+      toast.error('Please select an image or enter image URL');
       return;
     }
     
-    const trimmedUrl = url.trim();
+    const trimmedImageUrl = imageUrl.trim();
+    const trimmedLinkUrl = linkUrl?.trim() || '';
     
     // Check if already exists
-    if (instagramPosts.includes(trimmedUrl)) {
-      toast.error('This post is already added');
+    const existingPost = instagramPosts.find(p => {
+      const postImageUrl = typeof p === 'string' ? p : p.imageUrl;
+      return postImageUrl === trimmedImageUrl;
+    });
+    
+    if (existingPost) {
+      toast.error('This image is already added');
       return;
     }
     
+    // Add to list - simple and direct
+    setInstagramPosts([...instagramPosts, { 
+      imageUrl: trimmedImageUrl, 
+      linkUrl: trimmedLinkUrl || undefined 
+    }]);
+    
+    toast.success('Instagram post added successfully!');
+  };
+
+  const handleInstagramImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload a valid image file');
+      return;
+    }
+
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      toast.error('File size must be less than 10MB');
+      return;
+    }
+
+    setIsUploadingInstagram(true);
     try {
-      // Show loading state
-      toast.loading('Fetching Instagram thumbnail...', { id: 'instagram-fetch' });
+      // Upload to Cloudinary in instagram folder
+      const imageUrl = await mediaApi.upload(file, 'instagram');
       
-      // Call backend API to get thumbnail
-      const response = await getInstagramThumbnail(trimmedUrl);
-      const thumbnailUrl = response.thumbnailUrl;
+      // Set the uploaded image URL in the input field
+      setNewInstagramImage(imageUrl);
       
-      // Check if thumbnail URL already exists
-      if (instagramPosts.includes(thumbnailUrl)) {
-        toast.error('This image is already added', { id: 'instagram-fetch' });
-        return;
-      }
-      
-      // Add thumbnail URL to list
-      setInstagramPosts([...instagramPosts, thumbnailUrl]);
-      
-      toast.success('Instagram post added successfully!', { id: 'instagram-fetch' });
+      toast.success('Image uploaded successfully! Now add Instagram link and click Add Post.');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to fetch Instagram thumbnail. Please try again.', { id: 'instagram-fetch' });
-      console.error('Error fetching Instagram thumbnail:', error);
+      toast.error(error.message || 'Failed to upload image');
+      console.error('Error uploading image:', error);
+    } finally {
+      setIsUploadingInstagram(false);
     }
   };
 
-  const removeInstagramPost = (url: string) => {
-    setInstagramPosts(instagramPosts.filter(p => p !== url));
+  const updateInstagramPost = (index: number, field: 'imageUrl' | 'linkUrl', value: string) => {
+    const updatedPosts = [...instagramPosts];
+    updatedPosts[index] = {
+      ...updatedPosts[index],
+      [field]: value
+    };
+    setInstagramPosts(updatedPosts);
+  };
+
+  const removeInstagramPost = (index: number) => {
+    setInstagramPosts(instagramPosts.filter((_, i) => i !== index));
   };
 
   const activeTestimonials = testimonials.filter(t => t.isActive).slice(0, 10);
@@ -528,6 +562,8 @@ const AdminCMS = () => {
   // State for adding new Instagram post
   const [newInstagramImage, setNewInstagramImage] = useState('');
   const [newInstagramLink, setNewInstagramLink] = useState('');
+  const [isUploadingInstagram, setIsUploadingInstagram] = useState(false);
+  const instagramFileInputRef = useRef<HTMLInputElement>(null);
 
   const saveLandingContent = () => {
     saveLandingContentMutation.mutate(landingPageContent);
@@ -1101,8 +1137,46 @@ const AdminCMS = () => {
                   <div className="mb-6 p-4 border border-border rounded-lg bg-muted/30">
                     <label className="text-sm font-medium mb-3 block">Add New Instagram Post</label>
                     <div className="space-y-3">
+                      {/* Upload Image */}
                       <div>
-                        <label className="text-xs text-muted-foreground mb-1.5 block">Image URL *</label>
+                        <label className="text-xs text-muted-foreground mb-1.5 block">Select Image *</label>
+                        <div className="flex gap-2">
+                          <input
+                            ref={instagramFileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleInstagramImageUpload}
+                            className="hidden"
+                            disabled={isUploadingInstagram}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => instagramFileInputRef.current?.click()}
+                            disabled={isUploadingInstagram}
+                            className="flex-1 gap-2"
+                          >
+                            {isUploadingInstagram ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <ImageIcon className="w-4 h-4" />
+                                Choose Image
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                        {newInstagramImage && (
+                          <p className="text-xs text-muted-foreground mt-1.5">Selected: {newInstagramImage.length > 50 ? newInstagramImage.substring(0, 50) + '...' : newInstagramImage}</p>
+                        )}
+                      </div>
+                      
+                      {/* Image URL (Alternative) */}
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1.5 block">Or Enter Image URL</label>
                         <Input
                           placeholder="https://example.com/image.jpg"
                           value={newInstagramImage}
@@ -1110,26 +1184,34 @@ const AdminCMS = () => {
                           className="h-10"
                         />
                       </div>
+                      
+                      {/* Instagram Link */}
                       <div>
-                        <label className="text-xs text-muted-foreground mb-1.5 block">Link URL (Optional)</label>
+                        <label className="text-xs text-muted-foreground mb-1.5 block">Instagram Link (Post/Reel/Story)</label>
                         <Input
-                          placeholder="https://www.instagram.com/p/ABC123/"
+                          placeholder="https://www.instagram.com/p/ABC123/ or /reel/ABC123/"
                           value={newInstagramLink}
                           onChange={(e) => setNewInstagramLink(e.target.value)}
                           className="h-10"
                         />
+                        <p className="text-xs text-muted-foreground mt-1">Supports posts, reels, and all Instagram links</p>
                       </div>
+                      
                       <Button
                         onClick={() => {
                           if (newInstagramImage.trim()) {
                             addInstagramPost(newInstagramImage, newInstagramLink);
                             setNewInstagramImage('');
                             setNewInstagramLink('');
+                            if (instagramFileInputRef.current) {
+                              instagramFileInputRef.current.value = '';
+                            }
                           } else {
-                            toast.error('Please enter an image URL');
+                            toast.error('Please select an image or enter image URL');
                           }
                         }}
-                        className="btn-primary gap-2"
+                        className="btn-primary gap-2 w-full"
+                        disabled={isUploadingInstagram || !newInstagramImage.trim()}
                       >
                         <Plus className="w-4 h-4" />
                         Add Post
@@ -1145,12 +1227,17 @@ const AdminCMS = () => {
                         <p>No Instagram posts added yet</p>
                       </div>
                     ) : (
-                      instagramPosts.map((post, index) => (
+                      instagramPosts.map((post, index) => {
+                        // Handle both old format (string) and new format (object)
+                        const imageUrl = typeof post === 'string' ? post : post?.imageUrl || '';
+                        const linkUrl = typeof post === 'string' ? undefined : post?.linkUrl;
+                        
+                        return (
                         <div key={index} className="p-4 border border-border rounded-lg bg-card">
                           <div className="flex gap-4">
                             <div className="flex-shrink-0">
                               <img
-                                src={post.imageUrl}
+                                src={imageUrl}
                                 alt={`Instagram post ${index + 1}`}
                                 className="w-24 h-24 object-cover rounded-lg"
                                 onError={(e) => {
@@ -1162,7 +1249,7 @@ const AdminCMS = () => {
                               <div>
                                 <label className="text-xs text-muted-foreground mb-1.5 block">Image URL</label>
                                 <Input
-                                  value={post.imageUrl}
+                                  value={imageUrl}
                                   onChange={(e) => updateInstagramPost(index, 'imageUrl', e.target.value)}
                                   className="h-9 text-sm"
                                   placeholder="Image URL"
@@ -1171,7 +1258,7 @@ const AdminCMS = () => {
                               <div>
                                 <label className="text-xs text-muted-foreground mb-1.5 block">Link URL</label>
                                 <Input
-                                  value={post.linkUrl || ''}
+                                  value={linkUrl || ''}
                                   onChange={(e) => updateInstagramPost(index, 'linkUrl', e.target.value)}
                                   className="h-9 text-sm"
                                   placeholder="https://www.instagram.com/p/ABC123/"
@@ -1190,7 +1277,8 @@ const AdminCMS = () => {
                             </div>
                           </div>
                         </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
 
