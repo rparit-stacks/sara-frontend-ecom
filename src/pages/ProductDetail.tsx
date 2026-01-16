@@ -11,13 +11,16 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import PlainProductSelectionPopup from '@/components/products/PlainProductSelectionPopup';
 import FabricVariantPopup, { FabricVariant } from '@/components/products/FabricVariantPopup';
 import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { productsApi, cartApi, wishlistApi } from '@/lib/api';
+import { productsApi, cartApi, wishlistApi, customConfigApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
+import DynamicForm from '@/components/products/DynamicForm';
+import { FormField } from '@/components/admin/FormBuilder';
 
 // Product Type
 type ProductType = 'PLAIN' | 'DESIGNED' | 'DIGITAL';
@@ -118,6 +121,7 @@ const ProductDetail = () => {
         variants: apiProduct.variants || [],
         recommendedPlainProductIds: apiProduct.recommendedFabricIds || [],
         recommendedFabrics: apiProduct.recommendedFabrics || [],
+        pricingSlabs: apiProduct.pricingSlabs || [],
         plainProduct: apiProduct.plainProduct,
         fileUrl: apiProduct.fileUrl,
         isNew: apiProduct.isNew,
@@ -166,6 +170,100 @@ const ProductDetail = () => {
   const [fabricQuantity, setFabricQuantity] = useState(1);
   const [fabricPricePerMeter, setFabricPricePerMeter] = useState<number>(0);
   const [combinedPrice, setCombinedPrice] = useState<number | null>(null);
+  
+  // Custom form fields from config (for user-uploaded products)
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customFormFields, setCustomFormFields] = useState<FormField[]>([]);
+  const [customFormData, setCustomFormData] = useState<Record<string, any>>({});
+  
+  // Fetch custom config for designed products
+  const { data: customConfig } = useQuery({
+    queryKey: ['customConfig'],
+    queryFn: () => customConfigApi.getPublicConfig(),
+    enabled: product?.type === 'DESIGNED',
+  });
+  
+  // Determine if this is a custom product (created from user upload)
+  // Custom products inherit everything from config
+  // Custom products typically don't have a designId (they're created from user uploads)
+  const isCustomProduct = useMemo(() => {
+    if (!product || product.type !== 'DESIGNED') return false;
+    
+    // Check if product doesn't have designId - user-uploaded products don't link to a design
+    const hasDesignId = apiProduct?.designId != null;
+    
+    // If product has designId, it's a regular DESIGNED product (not custom)
+    if (hasDesignId) return false;
+    
+    // If no designId, it's likely a custom product (user upload)
+    // Additional checks: slug pattern or name matching config
+    const slug = apiProduct?.slug || '';
+    const hasTimestampSlug = slug.match(/-\d{13}$/); // Pattern from createDesignedProductFromUpload
+    
+    const matchesConfigTitle = customConfig?.pageTitle && 
+      product.name && 
+      product.name.toLowerCase().includes(customConfig.pageTitle.toLowerCase());
+    
+    // No designId means it's a custom product
+    return !hasDesignId || hasTimestampSlug || matchesConfigTitle;
+  }, [product, apiProduct, customConfig]);
+  
+  // Use config data for custom products - Single Source of Truth
+  const effectiveVariants = useMemo(() => {
+    if (isCustomProduct && customConfig?.variants && customConfig.variants.length > 0) {
+      // Use variants from config
+      return customConfig.variants.map((v: any) => ({
+        id: String(v.id || `variant-${v.displayOrder || 0}`),
+        type: v.type || '',
+        name: v.name || '',
+        unit: v.unit || '',
+        frontendId: v.frontendId || '',
+        options: (v.options || []).map((opt: any) => ({
+          id: String(opt.id || `opt-${opt.displayOrder || 0}`),
+          value: opt.value || '',
+          frontendId: opt.frontendId || '',
+          priceModifier: opt.priceModifier || 0,
+        })),
+      }));
+    }
+    // Fallback to product variants
+    return product?.variants || [];
+  }, [isCustomProduct, customConfig?.variants, product?.variants]);
+  
+  const effectivePricingSlabs = useMemo(() => {
+    if (isCustomProduct && customConfig?.pricingSlabs && customConfig.pricingSlabs.length > 0) {
+      // Use pricing slabs from config
+      return customConfig.pricingSlabs;
+    }
+    // Fallback to product pricing slabs
+    return product?.pricingSlabs || [];
+  }, [isCustomProduct, customConfig?.pricingSlabs, product?.pricingSlabs]);
+  
+  const effectiveRecommendedFabrics = useMemo(() => {
+    if (isCustomProduct && customConfig?.recommendedFabricIds && customConfig.recommendedFabricIds.length > 0) {
+      // Use recommended fabrics from config
+      return customConfig.recommendedFabricIds;
+    }
+    // Fallback to product recommended fabrics
+    return product?.recommendedPlainProductIds || [];
+  }, [isCustomProduct, customConfig?.recommendedFabricIds, product?.recommendedPlainProductIds]);
+  
+  // Update custom form fields when config loads
+  useEffect(() => {
+    if (customConfig && customConfig.formFields && product?.type === 'DESIGNED') {
+      const fields: FormField[] = customConfig.formFields.map((field: any) => ({
+        id: String(field.id || `field-${field.displayOrder || 0}`),
+        type: field.type || 'text',
+        label: field.label || '',
+        placeholder: field.placeholder || '',
+        required: field.required || false,
+        min: field.minValue,
+        max: field.maxValue,
+        options: field.options || [],
+      }));
+      setCustomFormFields(fields);
+    }
+  }, [customConfig, product?.type]);
 
   // Fetch selected fabric product data
   const { data: fabricProduct } = useQuery({
@@ -174,13 +272,80 @@ const ProductDetail = () => {
     enabled: !!selectedFabricId && product?.type === 'DESIGNED',
   });
 
+  // Calculate price per meter based on quantity and pricing slabs
+  // Discount-based slab system: Slabs define discount rules, not absolute prices
+  // Works for ANY fabric selected - discount applies to final fabric price (base + variants)
+  // 
+  // Slab Types:
+  // - FIXED_AMOUNT: Fixed discount per meter (e.g., ₹10 less per meter)
+  // - PERCENTAGE: Percentage discount (e.g., 10% off)
+  //
+  // Formula:
+  // Final Price = Final Fabric Price (base + variants) - Slab Discount
+  //
+  // Example:
+  // - Fabric base: ₹100/m, Variant: +₹50/m → Final fabric price: ₹150/m
+  // - Slab: 11-50m → ₹10 discount (FIXED_AMOUNT)
+  // - Quantity: 15m
+  // - Result: ₹150 - ₹10 = ₹140/m
+  const calculatePricePerMeter = (quantity: number, finalFabricPrice: number, slabs?: any[]) => {
+    if (!slabs || slabs.length === 0) {
+      return finalFabricPrice; // No slabs, use final fabric price
+    }
+    
+    // Sort slabs by minQuantity to ensure correct order
+    const sortedSlabs = [...slabs].sort((a, b) => (a.minQuantity || 1) - (b.minQuantity || 1));
+    
+    // Find the matching slab for this quantity
+    for (const slab of sortedSlabs) {
+      const minQty = slab.minQuantity || 1;
+      const maxQty = slab.maxQuantity;
+      
+      if (quantity >= minQty && (maxQty === null || maxQty === undefined || quantity <= maxQty)) {
+        // Apply discount based on slab type
+        const discountType = slab.discountType || 'FIXED_AMOUNT'; // Default to FIXED_AMOUNT for backward compatibility
+        const discountValue = Number(slab.discountValue || slab.pricePerMeter || 0); // Support legacy pricePerMeter
+        
+        if (discountType === 'PERCENTAGE') {
+          // Percentage discount: reduce by X% from final fabric price
+          const discountAmount = (finalFabricPrice * discountValue) / 100;
+          return finalFabricPrice - discountAmount;
+        } else {
+          // FIXED_AMOUNT: reduce by fixed amount per meter
+          // For legacy support: if pricePerMeter is set and discountValue is 0, calculate discount
+          if (discountValue === 0 && slab.pricePerMeter) {
+            // Legacy: pricePerMeter is the final price, calculate discount
+            const legacyFinalPrice = Number(slab.pricePerMeter);
+            return legacyFinalPrice; // Use legacy absolute price
+          } else {
+            // New system: discountValue is the discount amount
+            return finalFabricPrice - discountValue;
+          }
+        }
+      }
+    }
+    
+    // If no slab matches, use final fabric price
+    return finalFabricPrice;
+  };
+
   // Update combined price for DESIGNED products when variants change
+  // IMPORTANT: fabricPricePerMeter already includes fabric variants (set in handleFabricVariantComplete)
+  // Slab discount applies to this final fabric price (base + variants)
   useEffect(() => {
     if (product && product.type === 'DESIGNED' && selectedFabricId) {
       const baseDesignPrice = product.designPrice || 0;
-      const fabricTotalPrice = fabricPricePerMeter * fabricQuantity;
       
-      // Add product variant price modifiers
+      // fabricPricePerMeter is already the final fabric price per meter (base + fabric variants)
+      // Apply slab discount to this final price
+      const finalFabricPricePerMeter = fabricPricePerMeter; // Already includes variants
+      const effectivePricePerMeter = effectivePricingSlabs && effectivePricingSlabs.length > 0
+        ? calculatePricePerMeter(fabricQuantity, finalFabricPricePerMeter, effectivePricingSlabs)
+        : finalFabricPricePerMeter;
+      
+      const fabricTotalPrice = effectivePricePerMeter * fabricQuantity;
+      
+      // Add product variant price modifiers (these are for the design product, not fabric)
       let variantModifier = 0;
       if (product.variants && product.variants.length > 0) {
         product.variants.forEach((variant: any) => {
@@ -265,6 +430,12 @@ const ProductDetail = () => {
     setSelectedFabricId(data.fabricId);
     setSelectedFabricVariants(data.selectedVariants);
     setFabricQuantity(data.quantity);
+    
+    // If custom form fields exist from config, show the form
+    if (customFormFields.length > 0) {
+      setShowCustomForm(true);
+    }
+    
     // Calculate combined price: Design Price + Fabric Price + Product Variant Modifiers
     const baseDesignPrice = product.designPrice || 0;
     
@@ -288,19 +459,36 @@ const ProductDetail = () => {
     setShowFabricVariant(false);
   };
 
-  // Validate required custom fields
+  // Validate required custom fields (both product customFields and config formFields)
   const validateCustomFields = (): boolean => {
-    if (!product || !product.customFields) return true;
-    
-    for (const field of product.customFields) {
-      if (field.isRequired) {
-        const value = customFieldValues[String(field.id)];
-        if (!value || (typeof value === 'string' && value.trim() === '')) {
-          toast.error(`Please fill in the required field: ${field.label}`);
-          return false;
+    if (!product) return true;
+
+    // Validate product customFields
+    if (product.customFields) {
+      for (const field of product.customFields) {
+        if (field.isRequired) {
+          const value = customFieldValues[String(field.id)];
+          if (!value || (typeof value === 'string' && value.trim() === '')) {
+            toast.error(`Please fill in the required field: ${field.label}`);
+            return false;
+          }
         }
       }
     }
+    
+    // Validate custom form fields from config
+    if (customFormFields.length > 0) {
+      for (const field of customFormFields) {
+        if (field.required) {
+          const value = customFormData[field.id];
+          if (!value || (typeof value === 'string' && value.trim() === '')) {
+            toast.error(`Please fill in the required field: ${field.label}`);
+            return false;
+          }
+        }
+      }
+    }
+    
     return true;
   };
 
@@ -315,13 +503,14 @@ const ProductDetail = () => {
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to add product to cart');
     },
-  });
+  } );
 
   // Fetch or create Digital Product from Design Product
+  // Only for regular DESIGNED products, not custom products (user uploads)
   const { data: digitalProduct, isLoading: isLoadingDigital } = useQuery({
     queryKey: ['digitalProduct', productId],
     queryFn: () => productsApi.getDigitalFromDesign(Number(productId!)),
-    enabled: product?.type === 'DESIGNED' && !!productId,
+    enabled: product?.type === 'DESIGNED' && !!productId && !isCustomProduct,
     retry: false,
   });
 
@@ -436,7 +625,12 @@ const ProductDetail = () => {
     
     // Calculate combined price: Design Price + Fabric Price + Variant Modifiers
     const baseDesignPrice = product.designPrice || 0;
-    const fabricTotalPrice = fabricPricePerMeter * fabricQuantity;
+    // Calculate price per meter using slabs if available
+    const effectivePricePerMeter = effectivePricingSlabs && effectivePricingSlabs.length > 0
+      ? calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs)
+      : fabricPricePerMeter;
+    
+    const fabricTotalPrice = effectivePricePerMeter * fabricQuantity;
     
     // Add variant price modifiers
     let variantModifier = 0;
@@ -486,7 +680,7 @@ const ProductDetail = () => {
       unitPrice: unitPrice,
       totalPrice: totalPrice,
       variants: variantsMap,
-      customFormData: customFieldValues,
+      customFormData: { ...customFieldValues, ...customFormData },
     };
     
     // Use guest cart if not logged in, otherwise use API
@@ -548,7 +742,7 @@ const ProductDetail = () => {
       unitPrice: unitPrice,
       totalPrice: totalPrice,
       variants: variantsMap,
-      customFormData: customFieldValues,
+      customFormData: { ...customFieldValues, ...customFormData },
     };
     
     // Use guest cart if not logged in, otherwise use API
@@ -580,7 +774,7 @@ const ProductDetail = () => {
       unitPrice: finalPrice / quantity,
       totalPrice: finalPrice,
       variants: selectedVariants,
-      customFormData: customFieldValues,
+      customFormData: { ...customFieldValues, ...customFormData },
     };
     
     // Use guest cart if not logged in, otherwise use API
@@ -806,49 +1000,89 @@ const ProductDetail = () => {
                     {product.type === 'DESIGNED' && (
                       <div className="space-y-3">
                         <div className="flex flex-col gap-2">
-                          <div className="flex items-center gap-4 flex-wrap">
-                            <div>
-                              <p className="text-xs sm:text-sm text-muted-foreground">Design Price</p>
+                          {/* Horizontal Price Breakdown */}
+                          <div className="flex items-baseline gap-3 sm:gap-4 flex-wrap">
+                            {/* Design Price */}
+                            <div className="flex flex-col">
+                              <p className="text-xs sm:text-sm text-muted-foreground mb-1">Design Price</p>
                               <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">₹{product.designPrice}</span>
                             </div>
+                            
+                            {/* Plus Sign */}
                             {selectedFabricId && (
-                              <div>
-                                <p className="text-xs sm:text-sm text-muted-foreground">Fabric Price</p>
-                                <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">₹{fabricPricePerMeter * fabricQuantity}</span>
-                              </div>
+                              <>
+                                <span className="text-2xl sm:text-3xl text-muted-foreground font-light mt-5">+</span>
+                                
+                                {/* Fabric Price */}
+                                <div className="flex flex-col">
+                                  <p className="text-xs sm:text-sm text-muted-foreground mb-1">Fabric Price</p>
+                                  <div className="flex flex-col">
+                                    <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">
+                                      ₹{(() => {
+                                        const effectivePrice = effectivePricingSlabs && effectivePricingSlabs.length > 0
+                                          ? calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs)
+                                          : fabricPricePerMeter;
+                                        return effectivePrice * fabricQuantity;
+                                      })()}
+                                    </span>
+                                    {effectivePricingSlabs && effectivePricingSlabs.length > 0 && (
+                                      <span className="text-[10px] xs:text-xs text-muted-foreground mt-0.5 leading-tight">
+                                        @ ₹{(() => {
+                                          return calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs);
+                                        })()}/meter (slab pricing)
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </>
                             )}
-                            {product.variants && product.variants.length > 0 && Object.keys(selectedVariants).length > 0 && (
-                              <div>
-                                <p className="text-xs sm:text-sm text-muted-foreground">Variant Modifiers</p>
-                                <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">
-                                  {(() => {
-                                    let modifier = 0;
-                                    product.variants.forEach((variant: any) => {
-                                      const selectedOptionId = selectedVariants[String(variant.id)];
-                                      if (selectedOptionId && variant.options) {
-                                        const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
-                                        if (selectedOption && selectedOption.priceModifier) {
-                                          modifier += selectedOption.priceModifier * fabricQuantity;
-                                        }
-                                      }
-                                    });
-                                    return modifier > 0 ? `+₹${modifier}` : '₹0';
-                                  })()}
-                                </span>
-                              </div>
-                            )}
+                            
+                            {/* Variant Modifiers with Plus */}
+                            {product.variants && product.variants.length > 0 && Object.keys(selectedVariants).length > 0 && (() => {
+                              let modifier = 0;
+                              product.variants.forEach((variant: any) => {
+                                const selectedOptionId = selectedVariants[String(variant.id)];
+                                if (selectedOptionId && variant.options) {
+                                  const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+                                  if (selectedOption && selectedOption.priceModifier) {
+                                    modifier += selectedOption.priceModifier * fabricQuantity;
+                                  }
+                                }
+                              });
+                              return modifier > 0 ? (
+                                <>
+                                  <span className="text-2xl sm:text-3xl text-muted-foreground font-light mt-5">+</span>
+                                  <div className="flex flex-col">
+                                    <p className="text-xs sm:text-sm text-muted-foreground mb-1">Variant Modifiers</p>
+                                    <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">₹{modifier}</span>
+                                  </div>
+                                </>
+                              ) : null;
+                            })()}
+                            
+                            {/* Equals Sign and Total */}
                             {combinedPrice && (
-                              <div>
-                                <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
-                                <span className="font-bold font-normal text-xl sm:text-xl text-primary not-italic">₹{combinedPrice}</span>
-                              </div>
+                              <>
+                                <span className="text-2xl sm:text-3xl text-muted-foreground font-light mt-5">=</span>
+                                <div className="flex flex-col">
+                                  <p className="text-xs sm:text-sm text-muted-foreground mb-1">Total</p>
+                                  <span className="font-bold font-normal text-xl sm:text-2xl text-primary not-italic">₹{combinedPrice}</span>
+                                </div>
+                              </>
                             )}
                           </div>
                         </div>
                         {selectedFabricId && (
                           <div className="text-xs sm:text-sm text-muted-foreground pt-2 border-t border-border/50">
                             <p className="font-medium">Fabric Details:</p>
-                            <p className="mt-1">₹{fabricPricePerMeter}/meter × {fabricQuantity} meter{fabricQuantity !== 1 ? 's' : ''} = ₹{fabricPricePerMeter * fabricQuantity}</p>
+                            <p className="mt-1">
+                              {(() => {
+                                const effectivePrice = effectivePricingSlabs && effectivePricingSlabs.length > 0
+                                  ? calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs)
+                                  : fabricPricePerMeter;
+                                return `₹${effectivePrice}/meter × ${fabricQuantity} meter${fabricQuantity !== 1 ? 's' : ''} = ₹${effectivePrice * fabricQuantity}`;
+                              })()}
+                            </p>
                           </div>
                         )}
                         <Button
@@ -927,19 +1161,25 @@ const ProductDetail = () => {
                           className="w-full h-11 sm:h-12 text-sm sm:text-base gap-2"
                         >
                           <Palette className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                          <span className="truncate">{selectedFabricId ? 'Change Fabric' : 'Select Fabric'}</span>
+                          <span className="truncate">
+                            {selectedFabricId 
+                              ? (customConfig?.selectFabricLabel ? `Change ${customConfig.selectFabricLabel}` : 'Change Fabric')
+                              : (customConfig?.selectFabricLabel || 'Select Fabric')
+                            }
+                          </span>
                         </Button>
                       </div>
 
                       {/* Recommended Fabrics - Grid Layout */}
-                      {product.recommendedFabrics && product.recommendedFabrics.length > 0 && (
+                      {((product.recommendedFabrics && product.recommendedFabrics.length > 0) || 
+                        (isCustomProduct && effectiveRecommendedFabrics.length > 0)) && (
                         <div>
                           <h4 className="font-medium mb-3 sm:mb-4 text-base sm:text-lg flex items-center gap-2">
                             <Palette className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                             Recommended Fabrics
                           </h4>
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
-                            {product.recommendedFabrics.slice(0, 3).map((fabric: any, index: number) => {
+                            {(product.recommendedFabrics || []).slice(0, 3).map((fabric: any, index: number) => {
                               const fabricId = String(fabric.id);
                               const fabricName = fabric.name || `Fabric ${index + 1}`;
                               const isSelected = selectedFabricId === fabricId;
@@ -1154,7 +1394,7 @@ const ProductDetail = () => {
                   )}
 
                   {/* Price Display with Variants */}
-                  {product.variants && product.variants.length > 0 && (
+                  {effectiveVariants && effectiveVariants.length > 0 && (
                     <div className="p-4 bg-muted/30 border border-border rounded-xl">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Base Price</span>
@@ -1164,7 +1404,7 @@ const ProductDetail = () => {
                       </div>
                       {Object.keys(selectedVariants).length > 0 && (
                         <>
-                          {product.variants.map((variant: any) => {
+                          {effectiveVariants.map((variant: any) => {
                             const selectedOptionId = selectedVariants[String(variant.id)];
                             if (!selectedOptionId) return null;
                             const selectedOption = variant.options?.find((opt: any) => String(opt.id) === selectedOptionId);
@@ -1250,7 +1490,9 @@ const ProductDetail = () => {
                               ) : (
                                 <>
                                   <ShoppingBag className="w-5 h-5 flex-shrink-0" />
-                                  <span className="text-center">Add Physical Product</span>
+                                  <span className="text-center">
+                                    {customConfig?.addToCartButtonText || 'Add to Cart'}
+                                  </span>
                                 </>
                               )}
                             </Button>
@@ -1265,30 +1507,34 @@ const ProductDetail = () => {
                             </Button>
                           )}
                           
-                          {/* Purchase Design Only Option */}
-                          <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={handlePurchaseDesignOnly}
-                            disabled={createDigitalMutation.isPending || isLoadingDigital}
-                            className="flex-1 w-full border-2 border-primary text-primary hover:bg-primary hover:text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
-                          >
-                            {createDigitalMutation.isPending || isLoadingDigital ? (
-                              <>
-                                <Loader2 className="w-5 h-5 flex-shrink-0 animate-spin" />
-                                <span className="text-center">Loading...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Download className="w-5 h-5 flex-shrink-0" />
-                                <span className="text-center">Purchase Digital Design</span>
-                              </>
-                            )}
-                          </Button>
+                          {/* Purchase Design Only Option - Only show for regular DESIGNED products, not custom products */}
+                          {!isCustomProduct && (
+                            <Button
+                              size="lg"
+                              variant="outline"
+                              onClick={handlePurchaseDesignOnly}
+                              disabled={createDigitalMutation.isPending || isLoadingDigital}
+                              className="flex-1 w-full border-2 border-primary text-primary hover:bg-primary hover:text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
+                            >
+                              {createDigitalMutation.isPending || isLoadingDigital ? (
+                                <>
+                                  <Loader2 className="w-5 h-5 flex-shrink-0 animate-spin" />
+                                  <span className="text-center">Loading...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Download className="w-5 h-5 flex-shrink-0" />
+                                  <span className="text-center">Purchase Digital Design</span>
+                                </>
+                              )}
+                            </Button>
+                          )}
                         </div>
-                        <p className="text-xs sm:text-sm text-muted-foreground text-center px-2">
-                          Choose to purchase the physical product with fabric or just the digital design file
-                        </p>
+                        {!isCustomProduct && (
+                          <p className="text-xs sm:text-sm text-muted-foreground text-center px-2">
+                            Choose to purchase the physical product with fabric or just the digital design file
+                          </p>
+                        )}
                       </>
                     )}
                     
@@ -1413,6 +1659,27 @@ const ProductDetail = () => {
                       ))}
                     </Accordion>
                   )}
+
+                  {/* Terms & Conditions from Custom Config (for custom products) */}
+                  {isCustomProduct && customConfig?.termsAndConditions && customConfig.termsAndConditions.trim() && (
+                    <div className="border-t border-border pt-6">
+                      <Accordion type="single" collapsible>
+                        <AccordionItem value="terms">
+                          <AccordionTrigger className="text-sm sm:text-lg font-sans not-italic" style={{ fontFamily: "'Poppins', sans-serif" }}>
+                            Terms & Conditions
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div 
+                              className="text-muted-foreground text-sm sm:text-base leading-relaxed font-normal not-italic font-sans whitespace-pre-line"
+                              style={{ fontFamily: "'Poppins', sans-serif" }}
+                            >
+                              {customConfig.termsAndConditions}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </div>
+                  )}
                 </div>
               </ScrollReveal>
             </div>
@@ -1475,6 +1742,29 @@ const ProductDetail = () => {
         </>
       )}
       
+      {/* Custom Form Dialog (from config) */}
+      {product && product.type === 'DESIGNED' && customFormFields.length > 0 && (
+        <Dialog open={showCustomForm} onOpenChange={setShowCustomForm}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">Additional Information</DialogTitle>
+              <DialogDescription>
+                Please provide the following details to complete your custom product order.
+              </DialogDescription>
+            </DialogHeader>
+            <DynamicForm
+              fields={customFormFields}
+              onSubmit={(data) => {
+                setCustomFormData(data);
+                setShowCustomForm(false);
+                toast.success('Custom information saved!');
+              }}
+              initialData={customFormData}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Price Breakdown Popup */}
       {product && (
         <PriceBreakdownPopup
@@ -1484,7 +1774,12 @@ const ProductDetail = () => {
             productType: product.type,
             productName: product.name,
             designPrice: product.designPrice,
-            fabricPrice: selectedFabricId ? fabricPricePerMeter * fabricQuantity : undefined,
+            fabricPrice: selectedFabricId ? (() => {
+              const effectivePrice = effectivePricingSlabs && effectivePricingSlabs.length > 0
+                ? calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs)
+                : fabricPricePerMeter;
+              return effectivePrice * fabricQuantity;
+            })() : undefined,
             unitPrice: product.type === 'DESIGNED' ? (combinedPrice ? combinedPrice / fabricQuantity : undefined) : (product.pricePerMeter || product.price),
             totalPrice: product.type === 'DESIGNED' ? combinedPrice : finalPrice,
             quantity: product.type === 'DESIGNED' ? fabricQuantity : quantity,
@@ -1496,6 +1791,14 @@ const ProductDetail = () => {
           fabricQuantity={fabricQuantity}
           fabricPricePerMeter={fabricPricePerMeter}
           selectedFabricVariants={selectedFabricVariants}
+          discountAmount={selectedFabricId && effectivePricingSlabs && effectivePricingSlabs.length > 0 ? (() => {
+            const effectivePrice = calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs);
+            const discount = fabricPricePerMeter - effectivePrice;
+            return discount > 0 ? discount * fabricQuantity : 0;
+          })() : undefined}
+          finalFabricPricePerMeter={selectedFabricId && effectivePricingSlabs && effectivePricingSlabs.length > 0
+            ? calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs)
+            : fabricPricePerMeter}
         />
       )}
     </Layout>

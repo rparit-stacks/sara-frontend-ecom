@@ -120,7 +120,7 @@ const AdminCMS = () => {
   
   // Instagram mutation
   const saveInstagramMutation = useMutation({
-    mutationFn: (imageUrls: string[]) => cmsApi.setInstagramPosts(imageUrls),
+    mutationFn: (posts: Array<{ imageUrl: string; linkUrl?: string }>) => cmsApi.setInstagramPosts(posts),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cmsHomepage'] });
       queryClient.invalidateQueries({ queryKey: ['cms'] });
@@ -284,7 +284,7 @@ const AdminCMS = () => {
   });
 
   // Instagram Posts State
-  const [instagramPosts, setInstagramPosts] = useState<string[]>([]);
+  const [instagramPosts, setInstagramPosts] = useState<Array<{ imageUrl: string; linkUrl?: string }>>([]);
   
   // Update local state when CMS data loads
   useEffect(() => {
@@ -299,7 +299,18 @@ const AdminCMS = () => {
       if (newArrivalIds.length > 0) {
         setNewArrivals(newArrivalIds.map(String));
       }
-      if (cmsData.instagramPosts) setInstagramPosts(cmsData.instagramPosts);
+      if (cmsData.instagramPosts) {
+        // Handle both old format (string[]) and new format (Array<{imageUrl, linkUrl}>)
+        if (Array.isArray(cmsData.instagramPosts) && cmsData.instagramPosts.length > 0) {
+          if (typeof cmsData.instagramPosts[0] === 'string') {
+            // Old format - convert to new format
+            setInstagramPosts(cmsData.instagramPosts.map((url: string) => ({ imageUrl: url })));
+          } else {
+            // New format
+            setInstagramPosts(cmsData.instagramPosts);
+          }
+        }
+      }
       if (cmsData.content) {
         const content = cmsData.content;
         if (content.hero) {
@@ -513,6 +524,10 @@ const AdminCMS = () => {
   const saveInstagram = () => {
     saveInstagramMutation.mutate(instagramPosts);
   };
+  
+  // State for adding new Instagram post
+  const [newInstagramImage, setNewInstagramImage] = useState('');
+  const [newInstagramLink, setNewInstagramLink] = useState('');
 
   const saveLandingContent = () => {
     saveLandingContentMutation.mutate(landingPageContent);
@@ -686,8 +701,17 @@ const AdminCMS = () => {
                   </div>
 
                   <Button className="btn-primary gap-2" onClick={saveBestSellers} disabled={saveBestSellersMutation.isPending}>
-                    <Save className="w-4 h-4" />
-                    {saveBestSellersMutation.isPending ? 'Saving...' : 'Save Best Sellers'}
+                    {saveBestSellersMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Best Sellers
+                      </>
+                    )}
                   </Button>
                 </div>
               </motion.div>
@@ -787,8 +811,17 @@ const AdminCMS = () => {
                   </div>
 
                   <Button className="btn-primary gap-2" onClick={saveNewArrivals} disabled={saveNewArrivalsMutation.isPending}>
-                    <Save className="w-4 h-4" />
-                    {saveNewArrivalsMutation.isPending ? 'Saving...' : 'Save New Arrivals'}
+                    {saveNewArrivalsMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save New Arrivals
+                      </>
+                    )}
                   </Button>
                 </div>
               </motion.div>
@@ -845,8 +878,17 @@ const AdminCMS = () => {
                       className="btn-primary gap-2" 
                       disabled={generateLinkMutation.isPending}
                     >
-                      <LinkIcon className="w-4 h-4" />
-                      {generateLinkMutation.isPending ? 'Generating...' : 'Generate New Link'}
+                      {generateLinkMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <LinkIcon className="w-4 h-4" />
+                          Generate New Link
+                        </>
+                      )}
                     </Button>
                   </div>
 
@@ -964,8 +1006,17 @@ const AdminCMS = () => {
                                 disabled={updateOfferMutation.isPending || !offer.title}
                                 className="gap-2"
                               >
-                                <Save className="w-4 h-4" />
-                                {updateOfferMutation.isPending ? 'Saving...' : 'Save'}
+                                {updateOfferMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Saving...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Save className="w-4 h-4" />
+                                    Save
+                                  </>
+                                )}
                               </Button>
                             )}
                             {offer.id && typeof offer.id === 'number' && (
@@ -988,8 +1039,17 @@ const AdminCMS = () => {
                                   disabled={createOfferMutation.isPending || !offer.title}
                                   className="gap-2"
                                 >
-                                  <Save className="w-4 h-4" />
-                                  {createOfferMutation.isPending ? 'Saving...' : 'Save'}
+                                  {createOfferMutation.isPending ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      Saving...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Save className="w-4 h-4" />
+                                      Save
+                                    </>
+                                  )}
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -1035,64 +1095,117 @@ const AdminCMS = () => {
               >
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Manage Instagram Posts</h3>
-                  <p className="text-sm text-muted-foreground mb-6">Add or remove Instagram posts displayed on the homepage.</p>
+                  <p className="text-sm text-muted-foreground mb-6">Add image and link for Instagram posts displayed on the homepage.</p>
                   
-                  <div className="mb-6">
-                    <label className="text-sm font-medium mb-2 block">Add Instagram Post URL</label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Enter an Instagram post URL (e.g., https://www.instagram.com/p/ABC123/) and we'll automatically fetch the image.
-                    </p>
-                    <div className="flex gap-2">
-                      <Input
-                        id="instagram-url-input"
-                        placeholder="https://www.instagram.com/p/ABC123/"
-                        className="flex-1"
-                        onKeyDown={async (e) => {
-                          if (e.key === 'Enter') {
-                            const input = e.target as HTMLInputElement;
-                            await addInstagramPost(input.value);
-                            input.value = '';
-                          }
-                        }}
-                      />
+                  {/* Add New Instagram Post */}
+                  <div className="mb-6 p-4 border border-border rounded-lg bg-muted/30">
+                    <label className="text-sm font-medium mb-3 block">Add New Instagram Post</label>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1.5 block">Image URL *</label>
+                        <Input
+                          placeholder="https://example.com/image.jpg"
+                          value={newInstagramImage}
+                          onChange={(e) => setNewInstagramImage(e.target.value)}
+                          className="h-10"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1.5 block">Link URL (Optional)</label>
+                        <Input
+                          placeholder="https://www.instagram.com/p/ABC123/"
+                          value={newInstagramLink}
+                          onChange={(e) => setNewInstagramLink(e.target.value)}
+                          className="h-10"
+                        />
+                      </div>
                       <Button
-                        onClick={async (e) => {
-                          const input = document.getElementById('instagram-url-input') as HTMLInputElement;
-                          if (input) {
-                            await addInstagramPost(input.value);
-                            input.value = '';
+                        onClick={() => {
+                          if (newInstagramImage.trim()) {
+                            addInstagramPost(newInstagramImage, newInstagramLink);
+                            setNewInstagramImage('');
+                            setNewInstagramLink('');
+                          } else {
+                            toast.error('Please enter an image URL');
                           }
                         }}
-                        className="btn-primary"
+                        className="btn-primary gap-2"
                       >
                         <Plus className="w-4 h-4" />
+                        Add Post
                       </Button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {instagramPosts.map((post, index) => (
-                      <div key={index} className="relative group">
-                        <img
-                          src={post}
-                          alt={`Instagram post ${index + 1}`}
-                          className="w-full aspect-square object-cover rounded-lg"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeInstagramPost(post)}
-                          className="absolute top-2 right-2 bg-white/90 hover:bg-white text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                  {/* Existing Instagram Posts */}
+                  <div className="space-y-4 mb-6">
+                    {instagramPosts.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                        <Instagram className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p>No Instagram posts added yet</p>
                       </div>
-                    ))}
+                    ) : (
+                      instagramPosts.map((post, index) => (
+                        <div key={index} className="p-4 border border-border rounded-lg bg-card">
+                          <div className="flex gap-4">
+                            <div className="flex-shrink-0">
+                              <img
+                                src={post.imageUrl}
+                                alt={`Instagram post ${index + 1}`}
+                                className="w-24 h-24 object-cover rounded-lg"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/placeholder-image.jpg';
+                                }}
+                              />
+                            </div>
+                            <div className="flex-1 space-y-3">
+                              <div>
+                                <label className="text-xs text-muted-foreground mb-1.5 block">Image URL</label>
+                                <Input
+                                  value={post.imageUrl}
+                                  onChange={(e) => updateInstagramPost(index, 'imageUrl', e.target.value)}
+                                  className="h-9 text-sm"
+                                  placeholder="Image URL"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs text-muted-foreground mb-1.5 block">Link URL</label>
+                                <Input
+                                  value={post.linkUrl || ''}
+                                  onChange={(e) => updateInstagramPost(index, 'linkUrl', e.target.value)}
+                                  className="h-9 text-sm"
+                                  placeholder="https://www.instagram.com/p/ABC123/"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex-shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeInstagramPost(index)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
 
                   <Button className="btn-primary gap-2" onClick={saveInstagram} disabled={saveInstagramMutation.isPending}>
-                    <Save className="w-4 h-4" />
-                    {saveInstagramMutation.isPending ? 'Saving...' : 'Save Instagram Posts'}
+                    {saveInstagramMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Instagram Posts
+                      </>
+                    )}
                   </Button>
                 </div>
               </motion.div>
@@ -1135,8 +1248,17 @@ const AdminCMS = () => {
                   <Input type="file" accept="image/*" className="h-11" />
                 </div>
                 <Button className="btn-primary gap-2" onClick={saveLandingContent} disabled={saveLandingContentMutation.isPending}>
-                  <Save className="w-4 h-4" />
-                  {saveLandingContentMutation.isPending ? 'Saving...' : 'Save Changes'}
+                  {saveLandingContentMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Save Changes
+                    </>
+                  )}
                 </Button>
               </motion.div>
             </TabsContent>
@@ -1175,8 +1297,17 @@ const AdminCMS = () => {
                   />
                 </div>
                 <Button className="btn-primary gap-2" onClick={saveContactContent} disabled={saveContactContentMutation.isPending}>
-                  <Save className="w-4 h-4" />
-                  {saveContactContentMutation.isPending ? 'Saving...' : 'Save Changes'}
+                  {saveContactContentMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Save Changes
+                    </>
+                  )}
                 </Button>
               </motion.div>
             </TabsContent>
@@ -1359,8 +1490,17 @@ const AdminCMS = () => {
                             disabled={updateBannerMutation.isPending || createBannerMutation.isPending || !banner.image}
                             className="gap-2"
                           >
-                            <Save className="w-4 h-4" />
-                            {banner.id ? 'Update' : 'Create'} Banner
+                            {(updateBannerMutation.isPending || createBannerMutation.isPending) ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-4 h-4" />
+                                {banner.id ? 'Update' : 'Create'} Banner
+                              </>
+                            )}
                           </Button>
                           {banner.id && (
                             <Button
@@ -1370,8 +1510,17 @@ const AdminCMS = () => {
                               disabled={deleteBannerMutation.isPending}
                               className="text-destructive hover:text-destructive gap-2"
                             >
-                              <Trash2 className="w-4 h-4" />
-                              Delete
+                              {deleteBannerMutation.isPending ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Deleting...
+                                </>
+                              ) : (
+                                <>
+                                  <Trash2 className="w-4 h-4" />
+                                  Delete
+                                </>
+                              )}
                             </Button>
                           )}
                         </div>

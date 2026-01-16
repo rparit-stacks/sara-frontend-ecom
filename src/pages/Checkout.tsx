@@ -63,6 +63,9 @@ const Checkout = () => {
   
   const isLoggedIn = !!localStorage.getItem('authToken');
   
+  // Find default address
+  const defaultAddress = addresses.find((addr: any) => addr.isDefault === true);
+  
   // Track applied coupon code separately (before useQuery to avoid circular dependency)
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   
@@ -90,6 +93,14 @@ const Checkout = () => {
       }
     },
   });
+  
+  // Auto-fill default address if logged in and default address exists
+  useEffect(() => {
+    if (isLoggedIn && defaultAddress && !selectedAddressId) {
+      setSelectedAddressId(defaultAddress.id);
+      // Address will be loaded via the selectedAddressId effect below
+    }
+  }, [isLoggedIn, defaultAddress, selectedAddressId]);
   
   // Fetch cart with current state
   const { data: cartData, isLoading: cartLoading, refetch: refetchCart } = useQuery({
@@ -200,6 +211,10 @@ const Checkout = () => {
         guestCart.clear();
         window.dispatchEvent(new Event('guestCartUpdated'));
       }
+      // Refresh addresses in case a new one was saved
+      if (isLoggedIn) {
+        queryClient.invalidateQueries({ queryKey: ['user-addresses'] });
+      }
       queryClient.invalidateQueries({ queryKey: ['cart'] });
       navigate(`/order-confirmation/${data.id}`, { state: { orderId: data.id } });
     },
@@ -277,8 +292,34 @@ const Checkout = () => {
           ) : (
             <div className="grid lg:grid-cols-3 gap-10 lg:gap-14">
               <div className="lg:col-span-2 space-y-8">
+                {/* Login Prompt for Guests */}
+                {!isLoggedIn && (
+                  <ScrollReveal>
+                    <div className="bg-card p-6 rounded-2xl border border-border">
+                      <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                          <h3 className="font-cursive text-xl mb-2">Have an account?</h3>
+                          <p className="text-sm text-muted-foreground">Login to use your saved addresses</p>
+                        </div>
+                        <Button 
+                          onClick={() => navigate('/login', { state: { returnTo: '/checkout' } })}
+                          variant="outline"
+                          className="h-11"
+                        >
+                          Login Now
+                        </Button>
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-border">
+                        <p className="text-xs text-muted-foreground">
+                          Or continue as guest - we'll create an account for you and save this address automatically
+                        </p>
+                      </div>
+                    </div>
+                  </ScrollReveal>
+                )}
+
                 {/* Address Selection */}
-                {addresses.length > 0 && (
+                {isLoggedIn && addresses.length > 0 && (
                   <ScrollReveal>
                     <div className="bg-card p-6 rounded-2xl border border-border">
                       <h3 className="font-cursive text-xl mb-4">Select Address</h3>
@@ -290,6 +331,7 @@ const Checkout = () => {
                           {addresses.map((addr: any) => (
                             <SelectItem key={addr.id} value={addr.id.toString()}>
                               {addr.firstName} {addr.lastName}, {addr.city}, {addr.state}
+                              {addr.isDefault && ' (Default)'}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -300,7 +342,9 @@ const Checkout = () => {
 
                 <ScrollReveal>
                   <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border">
-                    <h3 className="font-cursive text-xl sm:text-2xl mb-6">Shipping Information</h3>
+                    <h3 className="font-cursive text-xl sm:text-2xl mb-6">
+                      {isLoggedIn ? 'Shipping Information' : 'Shipping Information (Guest Checkout)'}
+                    </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                       <Input 
                         placeholder="First name *" 

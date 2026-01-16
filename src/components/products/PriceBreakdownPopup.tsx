@@ -32,6 +32,8 @@ interface PriceBreakdownPopupProps {
   fabricQuantity?: number;
   fabricPricePerMeter?: number;
   selectedFabricVariants?: Record<string, string>;
+  discountAmount?: number; // Discount from pricing slabs
+  finalFabricPricePerMeter?: number; // Final fabric price after discount
 }
 
 export const PriceBreakdownPopup = ({
@@ -43,6 +45,8 @@ export const PriceBreakdownPopup = ({
   fabricQuantity,
   fabricPricePerMeter,
   selectedFabricVariants,
+  discountAmount,
+  finalFabricPricePerMeter,
 }: PriceBreakdownPopupProps) => {
   // Fetch product data for cart items to get variant details
   const { data: fetchedProductData } = useQuery({
@@ -203,115 +207,144 @@ export const PriceBreakdownPopup = ({
         </DialogHeader>
         
         <div className="space-y-4 py-4">
-          <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
-            <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-              {item.productName}
-            </h4>
+          <div className="bg-secondary/30 rounded-lg p-4 space-y-4">
+            <div className="border-b border-border pb-3">
+              <h4 className="font-semibold text-base">
+                {item.productName}
+                {breakdown.quantity && breakdown.quantity > 1 && (
+                  <span className="text-muted-foreground font-normal ml-2">
+                    × {breakdown.quantity} {item.productType === 'DESIGNED' ? 'meter' : item.productType === 'PLAIN' ? 'meter' : 'item'}{breakdown.quantity !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </h4>
+            </div>
             
             {item.productType === 'DESIGNED' && breakdown.basePrice !== undefined && (
               <>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Design Price</span>
-                    <span className="font-medium">₹{breakdown.basePrice.toLocaleString('en-IN')}</span>
-                  </div>
-                  
-                  {breakdown.fabricPrice !== undefined && (
-                    <>
-                      {breakdown.fabricBasePricePerMeter !== undefined && (
-                        <div className="flex justify-between text-xs text-muted-foreground pl-4">
-                          <span>Fabric (₹{breakdown.fabricBasePricePerMeter.toLocaleString('en-IN')}/meter)</span>
-                          <span>× {breakdown.quantity} meter{breakdown.quantity !== 1 ? 's' : ''}</span>
+                <div className="space-y-4">
+                  {/* Horizontal Price Breakdown */}
+                  <div className="flex items-baseline gap-3 sm:gap-4 flex-wrap">
+                    {/* Design Price */}
+                    <div className="flex flex-col">
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-1">Design Price</p>
+                      <span className="font-semibold text-base sm:text-lg text-primary">₹{breakdown.basePrice.toLocaleString('en-IN')}</span>
+                    </div>
+                    
+                    {/* Plus Sign */}
+                    {breakdown.fabricPrice !== undefined && (
+                      <>
+                        <span className="text-2xl sm:text-3xl text-muted-foreground font-light mt-4">+</span>
+                        
+                        {/* Fabric Price */}
+                        <div className="flex flex-col">
+                          <p className="text-xs sm:text-sm text-muted-foreground mb-1">Fabric Price</p>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-base sm:text-lg text-primary">
+                              ₹{breakdown.fabricPrice.toLocaleString('en-IN')}
+                            </span>
+                            {breakdown.fabricBasePricePerMeter !== undefined && finalFabricPricePerMeter !== undefined && finalFabricPricePerMeter !== breakdown.fabricBasePricePerMeter && (
+                              <span className="text-[10px] xs:text-xs text-muted-foreground mt-0.5 leading-tight">
+                                @ ₹{finalFabricPricePerMeter.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/meter (slab pricing)
+                              </span>
+                            )}
+                            {breakdown.fabricBasePricePerMeter !== undefined && (!finalFabricPricePerMeter || finalFabricPricePerMeter === breakdown.fabricBasePricePerMeter) && (
+                              <span className="text-[10px] xs:text-xs text-muted-foreground mt-0.5 leading-tight">
+                                @ ₹{breakdown.fabricBasePricePerMeter.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/meter × {breakdown.quantity} meter{breakdown.quantity !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Fabric Price</span>
-                        <span className="font-medium">₹{breakdown.fabricPrice.toLocaleString('en-IN')}</span>
-                      </div>
-                    </>
-                  )}
-                  
-                  {breakdown.variantModifier !== undefined && breakdown.variantModifier > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Variant Modifiers</span>
-                      <span className="font-medium text-primary">+₹{breakdown.variantModifier.toLocaleString('en-IN')}</span>
-                    </div>
-                  )}
-                  
-                  <div className="border-t pt-2 mt-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Unit Price</span>
-                      <span className="font-medium">₹{breakdown.unitPrice?.toLocaleString('en-IN', { maximumFractionDigits: 2 }) || '0'}</span>
-                    </div>
-                    <div className="flex justify-between mt-1">
-                      <span className="text-muted-foreground">Quantity</span>
-                      <span className="font-medium">{breakdown.quantity}</span>
+                      </>
+                    )}
+                    
+                    {/* Variant Modifiers with Plus */}
+                    {breakdown.variantModifier !== undefined && breakdown.variantModifier > 0 && (
+                      <>
+                        <span className="text-2xl sm:text-3xl text-muted-foreground font-light mt-4">+</span>
+                        <div className="flex flex-col">
+                          <p className="text-xs sm:text-sm text-muted-foreground mb-1">Variant Modifiers</p>
+                          <span className="font-semibold text-base sm:text-lg text-primary">₹{breakdown.variantModifier.toLocaleString('en-IN')}</span>
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Equals Sign and Total */}
+                    <span className="text-2xl sm:text-3xl text-muted-foreground font-light mt-4">=</span>
+                    <div className="flex flex-col">
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-1">Total</p>
+                      <span className="font-bold text-lg sm:text-xl text-primary">₹{breakdown.totalPrice.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                   
-                  <div className="border-t pt-2 mt-2 flex justify-between items-center">
-                    <span className="font-semibold text-base">Total</span>
-                    <span className="font-bold text-lg text-primary">₹{breakdown.totalPrice.toLocaleString('en-IN')}</span>
-                  </div>
+                  {/* Discount from Slabs */}
+                  {discountAmount !== undefined && discountAmount > 0 && (
+                    <div className="flex justify-between items-center py-2 bg-green-50 dark:bg-green-950/20 rounded-md px-3 border border-green-200 dark:border-green-900/30 mt-3">
+                      <span className="text-green-700 dark:text-green-400 font-medium text-sm">Discount Applied</span>
+                      <span className="font-semibold text-sm text-green-700 dark:text-green-400">
+                        -₹{discountAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Unit Price Info */}
+                  {breakdown.quantity > 1 && (
+                    <div className="text-center text-xs text-muted-foreground pt-2 border-t border-border/50 mt-3">
+                      Unit Price: ₹{breakdown.unitPrice?.toLocaleString('en-IN', { maximumFractionDigits: 2 }) || '0'}/meter
+                    </div>
+                  )}
                 </div>
               </>
             )}
             
             {item.productType === 'PLAIN' && (
               <>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Base Price per Meter</span>
-                    <span className="font-medium">₹{breakdown.basePrice.toLocaleString('en-IN')}</span>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center py-2 border-b border-border/50">
+                    <span className="text-muted-foreground font-medium">Base Price per Meter</span>
+                    <span className="font-semibold text-base">₹{breakdown.basePrice.toLocaleString('en-IN')}</span>
                   </div>
                   
                   {breakdown.variantModifier !== undefined && breakdown.variantModifier !== 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Variant Modifiers</span>
-                      <span className="font-medium text-primary">
+                    <div className="flex justify-between items-center py-2 border-b border-border/50">
+                      <span className="text-muted-foreground font-medium">Variant Modifiers</span>
+                      <span className="font-semibold text-base text-primary">
                         {breakdown.variantModifier > 0 ? '+' : ''}₹{breakdown.variantModifier.toLocaleString('en-IN')}
                       </span>
                     </div>
                   )}
                   
-                  <div className="border-t pt-2 mt-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Price per Meter</span>
-                      <span className="font-medium">₹{breakdown.pricePerMeter?.toLocaleString('en-IN', { maximumFractionDigits: 2 }) || '0'}</span>
-                    </div>
-                    <div className="flex justify-between mt-1">
-                      <span className="text-muted-foreground">Quantity</span>
-                      <span className="font-medium">{breakdown.quantity} meter{breakdown.quantity !== 1 ? 's' : ''}</span>
-                    </div>
+                  <div className="border-t-2 border-primary/20 pt-3 mt-3 flex justify-between items-center bg-primary/5 dark:bg-primary/10 rounded-lg px-4 py-3">
+                    <span className="font-bold text-lg">Total Amount</span>
+                    <span className="font-bold text-xl text-primary">₹{breakdown.totalPrice.toLocaleString('en-IN')}</span>
                   </div>
                   
-                  <div className="border-t pt-2 mt-2 flex justify-between items-center">
-                    <span className="font-semibold text-base">Total</span>
-                    <span className="font-bold text-lg text-primary">₹{breakdown.totalPrice.toLocaleString('en-IN')}</span>
-                  </div>
+                  {breakdown.quantity > 1 && (
+                    <div className="text-center text-xs text-muted-foreground pt-2">
+                      Price: ₹{breakdown.pricePerMeter?.toLocaleString('en-IN', { maximumFractionDigits: 2 }) || '0'}/meter × {breakdown.quantity} meter{breakdown.quantity !== 1 ? 's' : ''}
+                    </div>
+                  )}
                 </div>
               </>
             )}
             
             {item.productType === 'DIGITAL' && (
               <>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Base Price</span>
-                    <span className="font-medium">₹{breakdown.basePrice.toLocaleString('en-IN')}</span>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center py-2 border-b border-border/50">
+                    <span className="text-muted-foreground font-medium">Base Price</span>
+                    <span className="font-semibold text-base">₹{breakdown.basePrice.toLocaleString('en-IN')}</span>
                   </div>
                   
-                  <div className="border-t pt-2 mt-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Quantity</span>
-                      <span className="font-medium">{breakdown.quantity}</span>
+                  <div className="border-t-2 border-primary/20 pt-3 mt-3 flex justify-between items-center bg-primary/5 dark:bg-primary/10 rounded-lg px-4 py-3">
+                    <span className="font-bold text-lg">Total Amount</span>
+                    <span className="font-bold text-xl text-primary">₹{breakdown.totalPrice.toLocaleString('en-IN')}</span>
+                  </div>
+                  
+                  {breakdown.quantity > 1 && (
+                    <div className="text-center text-xs text-muted-foreground pt-2">
+                      Quantity: {breakdown.quantity} item{breakdown.quantity !== 1 ? 's' : ''}
                     </div>
-                  </div>
-                  
-                  <div className="border-t pt-2 mt-2 flex justify-between items-center">
-                    <span className="font-semibold text-base">Total</span>
-                    <span className="font-bold text-lg text-primary">₹{breakdown.totalPrice.toLocaleString('en-IN')}</span>
-                  </div>
+                  )}
                 </div>
               </>
             )}

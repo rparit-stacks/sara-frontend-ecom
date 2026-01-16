@@ -350,7 +350,7 @@ const AdminCategories = () => {
         </div>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogContent className="sm:max-w-[600px] lg:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader className="flex-shrink-0">
               <DialogTitle className="font-cursive text-2xl">
                 {editingCategory ? 'Edit Category' : 'Add New Category'}
@@ -550,10 +550,17 @@ const AdminCategories = () => {
                   className="btn-primary gap-2"
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
-                  <Save className="w-4 h-4" />
-                  {createMutation.isPending || updateMutation.isPending 
-                    ? 'Saving...' 
-                    : `${editingCategory ? 'Update' : 'Create'} Category`}
+                  {(createMutation.isPending || updateMutation.isPending) ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      {editingCategory ? 'Update' : 'Create'} Category
+                    </>
+                  )}
                 </Button>
               </DialogFooter>
             </form>

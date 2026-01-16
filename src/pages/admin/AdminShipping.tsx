@@ -268,7 +268,11 @@ const AdminShipping = () => {
                             onClick={() => deleteMutation.mutate(rule.id)}
                             disabled={deleteMutation.isPending}
                           >
-                            <Trash2 className="w-4 h-4 text-destructive" />
+                            {deleteMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-destructive" />
+                            ) : (
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            )}
                           </Button>
                         </div>
                       </td>
@@ -439,8 +443,16 @@ const AdminShipping = () => {
                     (formData.calculationType === 'FLAT' && !formData.flatPrice) ||
                     (formData.scope === 'STATE_WISE' && !formData.state) ||
                     (formData.calculationType === 'RANGE_BASED' && formData.ranges.length === 0)}
+                  className="gap-2"
                 >
-                  {createMutation.isPending ? 'Creating...' : 'Create'}
+                  {createMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create'
+                  )}
                 </Button>
               </div>
             </div>
@@ -598,8 +610,16 @@ const AdminShipping = () => {
                   disabled={updateMutation.isPending || !formData.ruleName || 
                     (formData.calculationType === 'FLAT' && !formData.flatPrice) ||
                     (formData.scope === 'STATE_WISE' && !formData.state)}
+                  className="gap-2"
                 >
-                  {updateMutation.isPending ? 'Updating...' : 'Update'}
+                  {updateMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update'
+                  )}
                 </Button>
               </div>
             </div>

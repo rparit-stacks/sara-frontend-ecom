@@ -226,7 +226,11 @@ const AdminCoupons = () => {
                             onClick={() => deleteMutation.mutate(coupon.id)}
                             disabled={deleteMutation.isPending}
                           >
-                            <Trash2 className="w-4 h-4 text-destructive" />
+                            {deleteMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-destructive" />
+                            ) : (
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            )}
                           </Button>
                         </div>
                       </td>
@@ -356,8 +360,15 @@ const AdminCoupons = () => {
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreate} disabled={createMutation.isPending || !formData.code || !formData.value}>
-                  {createMutation.isPending ? 'Creating...' : 'Create'}
+                <Button onClick={handleCreate} disabled={createMutation.isPending || !formData.code || !formData.value} className="gap-2">
+                  {createMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create'
+                  )}
                 </Button>
               </div>
             </div>
@@ -476,8 +487,15 @@ const AdminCoupons = () => {
                 <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleUpdate} disabled={updateMutation.isPending || !formData.code || !formData.value}>
-                  {updateMutation.isPending ? 'Updating...' : 'Update'}
+                <Button onClick={handleUpdate} disabled={updateMutation.isPending || !formData.code || !formData.value} className="gap-2">
+                  {updateMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update'
+                  )}
                 </Button>
               </div>
             </div>

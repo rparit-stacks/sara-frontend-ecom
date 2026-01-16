@@ -226,8 +226,17 @@ const AdminContactSubmissions = () => {
                       disabled={deleteMutation.isPending}
                       className="text-destructive hover:text-destructive gap-2"
                     >
-                      <Trash2 className="w-4 h-4" />
-                      Delete
+                      {deleteMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -310,22 +319,46 @@ const AdminContactSubmissions = () => {
                     variant="outline"
                     onClick={() => handleUpdateStatus('READ')}
                     disabled={updateStatusMutation.isPending || selectedSubmission.status === 'READ'}
+                    className="gap-2"
                   >
-                    Mark as Read
+                    {updateStatusMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Mark as Read'
+                    )}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => handleUpdateStatus('REPLIED')}
                     disabled={updateStatusMutation.isPending || selectedSubmission.status === 'REPLIED'}
+                    className="gap-2"
                   >
-                    Mark as Replied
+                    {updateStatusMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Mark as Replied'
+                    )}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => handleUpdateStatus('ARCHIVED')}
                     disabled={updateStatusMutation.isPending || selectedSubmission.status === 'ARCHIVED'}
+                    className="gap-2"
                   >
-                    Archive
+                    {updateStatusMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Archive'
+                    )}
                   </Button>
                   <Button
                     variant="outline"

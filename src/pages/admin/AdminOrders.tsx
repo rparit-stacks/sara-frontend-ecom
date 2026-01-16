@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Search, Eye, Loader2, CheckCircle2, XCircle, Package, Truck, Download, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -20,7 +20,7 @@ const AdminOrders = () => {
   const queryClient = useQueryClient();
   
   // Fetch orders
-  const { data: orders = [], isLoading, refetch } = useQuery({
+  const { data: orders = [], isLoading, refetch: refetchOrders } = useQuery({
     queryKey: ['adminOrders', statusFilter],
     queryFn: () => orderApi.getAllOrders(statusFilter === 'all' ? undefined : statusFilter),
   });
@@ -45,9 +45,11 @@ const AdminOrders = () => {
     mutationFn: (id: number) => orderApi.retrySwipeInvoice(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminOrders'] });
+      queryClient.invalidateQueries({ queryKey: ['adminOrderDetails'] });
       toast.success('Swipe invoice created successfully!');
+      // Refetch order details to get updated invoice info
       if (selectedOrder) {
-        refetch();
+        queryClient.refetchQueries({ queryKey: ['adminOrderDetails', selectedOrder.id] });
       }
     },
     onError: (error: Error) => {
@@ -265,6 +267,9 @@ const AdminOrders = () => {
               <DialogTitle className="text-2xl font-bold">
                 Order #{displayOrder?.orderNumber}
               </DialogTitle>
+              <DialogDescription>
+                View and manage order details, update status, and handle Swipe invoice
+              </DialogDescription>
             </DialogHeader>
             
             {isLoadingDetails ? (
@@ -289,9 +294,19 @@ const AdminOrders = () => {
                       <Button
                         onClick={() => handleUpdateStatus('CONFIRMED')}
                         disabled={updateStatusMutation.isPending}
+                        className="gap-2"
                       >
-                        <CheckCircle2 className="w-4 h-4 mr-2" />
-                        Confirm Order
+                        {updateStatusMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4" />
+                            Confirm Order
+                          </>
+                        )}
                       </Button>
                     )}
                     {displayOrder.status === 'CONFIRMED' && (
@@ -299,9 +314,19 @@ const AdminOrders = () => {
                         variant="outline"
                         onClick={() => handleUpdateStatus('PROCESSING')}
                         disabled={updateStatusMutation.isPending}
+                        className="gap-2"
                       >
-                        <Package className="w-4 h-4 mr-2" />
-                        Mark Processing
+                        {updateStatusMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <Package className="w-4 h-4" />
+                            Mark Processing
+                          </>
+                        )}
                       </Button>
                     )}
                     {displayOrder.status === 'PROCESSING' && (
@@ -309,9 +334,19 @@ const AdminOrders = () => {
                         variant="outline"
                         onClick={() => handleUpdateStatus('SHIPPED')}
                         disabled={updateStatusMutation.isPending}
+                        className="gap-2"
                       >
-                        <Truck className="w-4 h-4 mr-2" />
-                        Mark Shipped
+                        {updateStatusMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <Truck className="w-4 h-4" />
+                            Mark Shipped
+                          </>
+                        )}
                       </Button>
                     )}
                     {displayOrder.status === 'SHIPPED' && (
@@ -319,9 +354,19 @@ const AdminOrders = () => {
                         variant="outline"
                         onClick={() => handleUpdateStatus('DELIVERED')}
                         disabled={updateStatusMutation.isPending}
+                        className="gap-2"
                       >
-                        <CheckCircle2 className="w-4 h-4 mr-2" />
-                        Mark Delivered
+                        {updateStatusMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4" />
+                            Mark Delivered
+                          </>
+                        )}
                       </Button>
                     )}
                     {(displayOrder.status === 'PENDING' || displayOrder.status === 'CONFIRMED') && (
@@ -329,9 +374,19 @@ const AdminOrders = () => {
                         variant="destructive"
                         onClick={() => handleUpdateStatus('CANCELLED')}
                         disabled={updateStatusMutation.isPending}
+                        className="gap-2"
                       >
-                        <XCircle className="w-4 h-4 mr-2" />
-                        Cancel
+                        {updateStatusMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-4 h-4" />
+                            Cancel
+                          </>
+                        )}
                       </Button>
                     )}
                   </div>

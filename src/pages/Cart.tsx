@@ -12,6 +12,105 @@ import { guestCart } from '@/lib/guestCart';
 import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import CartItemDetails from '@/components/cart/CartItemDetails';
 
+// Separate component for cart item to allow hooks usage
+const CartItem = ({ 
+  item, 
+  isLoggedIn, 
+  updateMutation, 
+  removeMutation, 
+  handleQuantityChange, 
+  handleRemoveItem,
+  setSelectedItemForBreakdown,
+  setShowPriceBreakdown
+}: any) => {
+  // Get product slug - use from item if available, otherwise fetch it
+  const { data: productData } = useQuery({
+    queryKey: ['product-slug', item.productId],
+    queryFn: () => productsApi.getById(item.productId),
+    enabled: !!item.productId && !item.productSlug,
+    retry: false,
+  });
+  
+  // Use slug from backend cart, fetched product, or fallback to ID
+  const productSlug = item.productSlug || productData?.slug || item.productId;
+  
+  return (
+    <ScrollReveal key={item.id}>
+      <div className="flex gap-3 xs:gap-4 sm:gap-6 p-3 xs:p-4 sm:p-6 bg-card rounded-xl sm:rounded-2xl border border-border">
+        <img src={item.productImage || ''} alt={item.productName} className="w-20 h-24 xs:w-24 xs:h-32 sm:w-28 sm:h-36 lg:w-32 lg:h-40 object-cover rounded-lg sm:rounded-xl flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <Link 
+            to={`/products/${productSlug}`} 
+            className="font-cursive text-lg xs:text-xl sm:text-2xl hover:text-[#2b9d8f] line-clamp-2"
+          >
+            {item.productName}
+          </Link>
+          <p className="text-xs xs:text-sm sm:text-base text-muted-foreground mt-1">{item.productType}</p>
+          
+          {/* Show fabric name, variants, and quantity details */}
+          <CartItemDetails 
+            item={{
+              productType: item.productType,
+              productId: item.productId,
+              fabricId: item.fabricId,
+              quantity: item.quantity || 1,
+              variants: item.variants,
+            }}
+          />
+          
+          <div className="flex items-center justify-between mt-2 xs:mt-3">
+            <p className="font-semibold text-[#2b9d8f] text-base xs:text-lg sm:text-xl">₹{item.totalPrice?.toLocaleString('en-IN') || item.unitPrice?.toLocaleString('en-IN') || 0}</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => {
+                setSelectedItemForBreakdown(item);
+                setShowPriceBreakdown(true);
+              }}
+            >
+              <Calculator className="w-3.5 h-3.5" />
+              Breakdown
+            </Button>
+          </div>
+          <div className="flex items-center gap-3 xs:gap-4 sm:gap-5 mt-3 xs:mt-4">
+            <div className="flex items-center border border-border rounded-full">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 rounded-full"
+                onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                disabled={isLoggedIn && updateMutation.isPending}
+              >
+                <Minus className="w-3 h-3 xs:w-4 xs:h-4" />
+              </Button>
+              <span className="w-8 xs:w-9 sm:w-10 text-center text-xs xs:text-sm sm:text-base">{item.quantity || 1}</span>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 rounded-full"
+                onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                disabled={isLoggedIn && updateMutation.isPending}
+              >
+                <Plus className="w-3 h-3 xs:w-4 xs:h-4" />
+              </Button>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-destructive w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10"
+              onClick={() => handleRemoveItem(item.id)}
+              disabled={isLoggedIn && removeMutation.isPending}
+            >
+              <Trash2 className="w-4 h-4 xs:w-5 xs:h-5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </ScrollReveal>
+  );
+};
+
 const Cart = () => {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
@@ -190,74 +289,17 @@ const Cart = () => {
             <div className="grid lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 xl:gap-14">
               <div className="lg:col-span-2 space-y-4 sm:space-y-6">
                 {items.map((item: any) => (
-                  <ScrollReveal key={item.id}>
-                    <div className="flex gap-3 xs:gap-4 sm:gap-6 p-3 xs:p-4 sm:p-6 bg-card rounded-xl sm:rounded-2xl border border-border">
-                      <img src={item.productImage || ''} alt={item.productName} className="w-20 h-24 xs:w-24 xs:h-32 sm:w-28 sm:h-36 lg:w-32 lg:h-40 object-cover rounded-lg sm:rounded-xl flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <Link to={`/product/${item.productId}`} className="font-cursive text-lg xs:text-xl sm:text-2xl hover:text-[#2b9d8f] line-clamp-2">{item.productName}</Link>
-                        <p className="text-xs xs:text-sm sm:text-base text-muted-foreground mt-1">{item.productType}</p>
-                        
-                        {/* Show fabric name, variants, and quantity details */}
-                        <CartItemDetails 
-                          item={{
-                            productType: item.productType,
-                            productId: item.productId,
-                            fabricId: item.fabricId,
-                            quantity: item.quantity || 1,
-                            variants: item.variants,
-                          }}
-                        />
-                        
-                        <div className="flex items-center justify-between mt-2 xs:mt-3">
-                          <p className="font-semibold text-[#2b9d8f] text-base xs:text-lg sm:text-xl">₹{item.totalPrice?.toLocaleString('en-IN') || item.unitPrice?.toLocaleString('en-IN') || 0}</p>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-1.5 text-xs"
-                            onClick={() => {
-                              setSelectedItemForBreakdown(item);
-                              setShowPriceBreakdown(true);
-                            }}
-                          >
-                            <Calculator className="w-3.5 h-3.5" />
-                            Breakdown
-                          </Button>
-                        </div>
-                        <div className="flex items-center gap-3 xs:gap-4 sm:gap-5 mt-3 xs:mt-4">
-                          <div className="flex items-center border border-border rounded-full">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 rounded-full"
-                              onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                              disabled={isLoggedIn && updateMutation.isPending}
-                            >
-                              <Minus className="w-3 h-3 xs:w-4 xs:h-4" />
-                            </Button>
-                            <span className="w-8 xs:w-9 sm:w-10 text-center text-xs xs:text-sm sm:text-base">{item.quantity || 1}</span>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 rounded-full"
-                              onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                              disabled={isLoggedIn && updateMutation.isPending}
-                            >
-                              <Plus className="w-3 h-3 xs:w-4 xs:h-4" />
-                            </Button>
-                          </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-destructive w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10"
-                            onClick={() => handleRemoveItem(item.id)}
-                            disabled={isLoggedIn && removeMutation.isPending}
-                          >
-                            <Trash2 className="w-4 h-4 xs:w-5 xs:h-5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </ScrollReveal>
+                  <CartItem
+                    key={item.id}
+                    item={item}
+                    isLoggedIn={isLoggedIn}
+                    updateMutation={updateMutation}
+                    removeMutation={removeMutation}
+                    handleQuantityChange={handleQuantityChange}
+                    handleRemoveItem={handleRemoveItem}
+                    setSelectedItemForBreakdown={setSelectedItemForBreakdown}
+                    setShowPriceBreakdown={setShowPriceBreakdown}
+                  />
                 ))}
               </div>
               

@@ -93,6 +93,7 @@ export const productsApi = {
     }),
   getDigitalFromDesign: (designProductId: number) => 
     fetchApi<any>(`/api/products/${designProductId}/digital`),
+  createFromUpload: (data: any) => fetchApi<any>('/api/products/create-from-upload', { method: 'POST', body: JSON.stringify(data) }),
   uploadMedia: async (files: File[], folder: string = 'products'): Promise<any[]> => {
     const formData = new FormData();
     files.forEach(file => {
@@ -198,7 +199,7 @@ export const cmsApi = {
   getNewArrivals: () => fetchApi<number[]>('/api/cms/new-arrivals'),
   getTestimonials: () => fetchApi<any[]>('/api/cms/testimonials'),
   getOffers: () => fetchApi<any[]>('/api/cms/offers'),
-  getInstagram: () => fetchApi<string[]>('/api/cms/instagram'),
+  getInstagram: () => fetchApi<Array<{ imageUrl: string; linkUrl?: string }>>('/api/cms/instagram'),
   getBanners: () => fetchApi<any[]>('/api/cms/banners'),
   getLandingContent: () => fetchApi<Record<string, string>>('/api/cms/landing'),
   getContactInfo: () => fetchApi<Record<string, string>>('/api/cms/contact'),
@@ -220,7 +221,7 @@ export const cmsApi = {
   updateOffer: (id: number, data: any) => fetchApi<any>(`/api/admin/cms/offers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteOffer: (id: number) => fetchApi<void>(`/api/admin/cms/offers/${id}`, { method: 'DELETE' }),
   
-  setInstagramPosts: (imageUrls: string[]) => fetchApi<void>('/api/admin/cms/instagram', { method: 'PUT', body: JSON.stringify({ imageUrls }) }),
+  setInstagramPosts: (posts: Array<{ imageUrl: string; linkUrl?: string }>) => fetchApi<void>('/api/admin/cms/instagram', { method: 'PUT', body: JSON.stringify({ imageUrls }) }),
   
   getAllBanners: () => fetchApi<any[]>('/api/admin/cms/banners'),
   createBanner: (data: any) => fetchApi<any>('/api/admin/cms/banners', { method: 'POST', body: JSON.stringify(data) }),
@@ -327,6 +328,7 @@ export const faqApi = {
 // ===============================
 export const customConfigApi = {
   getConfig: () => fetchApi<any>('/api/custom-config'),
+  getPublicConfig: () => fetchApi<any>('/api/custom-config'),
   submitDesignRequest: (data: any) => fetchApi<any>('/api/custom-design-requests', { method: 'POST', body: JSON.stringify(data) }),
   
   // Admin
@@ -506,6 +508,45 @@ export const authApi = {
   verifyOtp: (email: string, otp: string) => 
     fetchApi<any>('/api/auth/otp/verify', { method: 'POST', body: JSON.stringify({ email, otp }) }),
   getGoogleLoginUrl: () => `${API_BASE_URL}/oauth2/authorization/google`,
+};
+
+// ===============================
+// Mockup API
+// ===============================
+export const mockupApi = {
+  /**
+   * Generate mockups for all templates using uploaded design
+   * @param file - Design image file
+   * @returns Array of generated mockup URLs
+   */
+  generateAllMockups: async (file: File): Promise<Array<{ url: string; template: string; width: number; height: number }>> => {
+    const formData = new FormData();
+    formData.append('design', file);
+    
+    const MOCKUP_API_URL = import.meta.env.VITE_MOCKUP_API_URL ?? 'https://mockup-sara.vercel.app';
+    
+    console.log('[Mockup API] Generating mockups for design:', file.name);
+    
+    const response = await fetch(`${MOCKUP_API_URL}/api/mockup/generate-all`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[Mockup API] Error:', error);
+      throw new Error(error || 'Failed to generate mockups');
+    }
+    
+    const data = await response.json();
+    console.log('[Mockup API] Success:', data);
+    
+    if (!data.success || !data.results || data.results.length === 0) {
+      throw new Error('No mockups generated. Please ensure mockup templates are available.');
+    }
+    
+    return data.results;
+  },
 };
 
 // Submit testimonial via link

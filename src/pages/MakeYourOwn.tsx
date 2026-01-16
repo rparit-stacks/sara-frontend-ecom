@@ -1,20 +1,25 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Button } from '@/components/ui/button';
 import { Upload, ArrowRight, Palette, Sparkles, ShieldCheck, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { productsApi, customConfigApi, mediaApi, mockupApi } from '@/lib/api';
 
 const MakeYourOwn = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isGeneratingMockups, setIsGeneratingMockups] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [generatedMockups, setGeneratedMockups] = useState<any[]>([]);
+  const [generatedMockups, setGeneratedMockups] = useState<Array<{ url: string; template: string; width: number; height: number }>>([]);
+  const [originalDesignUrl, setOriginalDesignUrl] = useState<string | null>(null);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -35,24 +40,131 @@ const MakeYourOwn = () => {
     setSelectedFile(file);
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
-    toast.success('Design selected successfully!');
+    
+    // Upload original design file first, then generate mockups
+    setIsGeneratingMockups(true);
+    try {
+      // Step 1: Upload original design file to save it for admin
+      const uploadedFiles = await productsApi.uploadMedia([file], 'products/original-designs');
+      const originalUrl = uploadedFiles[0]?.url;
+      
+      if (!originalUrl) {
+        throw new Error('Failed to upload original design file');
+      }
+      
+      setOriginalDesignUrl(originalUrl);
+      console.log('[MakeYourOwn] Original design uploaded:', originalUrl);
+      
+      // Step 2: Generate mockups from the design
+      const mockups = await mockupApi.generateAllMockups(file);
+      setGeneratedMockups(mockups);
+      toast.success(`Design uploaded! Generated ${mockups.length} mockup${mockups.length > 1 ? 's' : ''}.`);
+    } catch (error) {
+      console.error('Failed to process design:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to process design. Please try again.');
+      // Clear the file selection if processing fails
+      setSelectedFile(null);
+      setPreviewUrl(null);
+      setOriginalDesignUrl(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } finally {
+      setIsGeneratingMockups(false);
+    }
   };
 
-  const handleProceed = () => {
+  // Fetch custom config
+  const { data: customConfig } = useQuery({
+    queryKey: ['customConfig'],
+    queryFn: () => customConfigApi.getPublicConfig(),
+  });
+
+  // Create product mutation
+  const createProductMutation = useMutation({
+    mutationFn: async (data: any) => {
+      setIsUploading(true);
+      try {
+        // Use generated mockup images (minimum 1, use all available)
+        if (!generatedMockups || generatedMockups.length === 0) {
+          throw new Error('No mockup images available. Please upload your design first.');
+        }
+        
+        if (!originalDesignUrl) {
+          throw new Error('Original design file not available. Please upload your design again.');
+        }
+        
+        // Create product with generated mockup images + original design
+        // Mockup images first (for display), then original design at the end (for admin access)
+        const mediaItems = [
+          // Mockup images for product display (displayOrder: 0, 1, 2, ...)
+          ...generatedMockups.map((mockup, index) => ({
+            url: mockup.url,
+            type: 'image',
+            displayOrder: index
+          })),
+          // Original design file at the end (displayOrder: 9999)
+          // Admin Note: The media item with displayOrder: 9999 is the original user-uploaded design file
+          // This allows admin to access and download the original design for future use
+          {
+            url: originalDesignUrl,
+            type: 'image',
+            displayOrder: 9999 // High number so it appears last in media list, admin can easily identify it
+          }
+        ];
+        
+        return productsApi.createFromUpload({
+          ...data,
+          media: mediaItems
+        });
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    onSuccess: (createdProduct) => {
+      toast.success('Product created successfully!');
+      // Navigate to product detail page using slug
+      if (createdProduct.slug) {
+        navigate(`/products/${createdProduct.slug}`);
+      } else if (createdProduct.id) {
+        // Fallback to ID if slug is not available
+        navigate(`/products/${createdProduct.id}`);
+      } else {
+        toast.error('Product created but unable to navigate. Please refresh the page.');
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to create product');
+    },
+  });
+
+  const handleProceed = async () => {
     if (!selectedFile || !previewUrl) {
       toast.error('Please upload your design first.');
       return;
     }
     
-    // Navigate directly to product page (same flow as Design Product)
-    // The product page will handle fabric selection, variants, and custom form
-    navigate('/custom-product', { 
-      state: { 
-        designUrl: previewUrl,
-        designFile: selectedFile,
-        isTemporary: true,
-        isCustomDesign: true, // Flag to indicate this is a user-uploaded design
-      } 
+    if (!customConfig) {
+      toast.error('Loading configuration... Please try again.');
+      return;
+    }
+    
+    if (generatedMockups.length === 0) {
+      toast.error('Please wait for mockups to be generated.');
+      return;
+    }
+    
+    if (isGeneratingMockups) {
+      toast.error('Please wait for mockups to finish generating.');
+      return;
+    }
+    
+    // Create product with custom config using generated mockup images
+    createProductMutation.mutate({
+      name: customConfig.pageTitle || 'Custom Design',
+      description: customConfig.pageDescription || 'Your custom design',
+      designPrice: customConfig.designPrice || 0,
+      status: 'ACTIVE',
     });
   };
 
@@ -98,22 +210,24 @@ const MakeYourOwn = () => {
                     
                     <div className="flex flex-col gap-3 xs:gap-4">
                       <input
+                        ref={fileInputRef}
                         id="design-upload"
                         type="file"
                         accept="image/*"
                         className="hidden"
                         onChange={handleFileChange}
                       />
-                      <label htmlFor="design-upload" className="w-full">
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          disabled={isUploading}
-                          className="h-11 xs:h-12 sm:h-14 px-4 xs:px-6 sm:px-8 lg:px-10 text-sm xs:text-base sm:text-lg rounded-xl sm:rounded-2xl cursor-pointer w-full"
-                        >
-                          <span className="truncate">{isUploading ? 'Processing...' : 'Choose Design File'}</span>
-                        </Button>
-                      </label>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        disabled={isUploading || isGeneratingMockups}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="h-11 xs:h-12 sm:h-14 px-4 xs:px-6 sm:px-8 lg:px-10 text-sm xs:text-base sm:text-lg rounded-xl sm:rounded-2xl cursor-pointer w-full"
+                      >
+                        <span className="truncate">
+                          {isGeneratingMockups ? 'Generating Mockups...' : isUploading ? 'Processing...' : 'Choose Design File'}
+                        </span>
+                      </Button>
                       <p className="text-[10px] xs:text-xs text-muted-foreground">
                         Maximum file size: 10MB
                       </p>
@@ -157,7 +271,13 @@ const MakeYourOwn = () => {
                           </div>
                           <p className="text-xs xs:text-sm font-medium text-primary flex items-center gap-1.5 xs:gap-2 px-2 text-center">
                             <Sparkles className="w-3 h-3 xs:w-4 xs:h-4 flex-shrink-0" />
-                            <span className="truncate">Ready to create product page</span>
+                            <span className="truncate">
+                              {isGeneratingMockups 
+                                ? 'Generating mockups...' 
+                                : generatedMockups.length > 0 
+                                  ? `${generatedMockups.length} mockup${generatedMockups.length > 1 ? 's' : ''} ready` 
+                                  : 'Ready to create product page'}
+                            </span>
                           </p>
                         </motion.div>
                       ) : (
@@ -181,13 +301,18 @@ const MakeYourOwn = () => {
                   <Button 
                     size="lg" 
                     onClick={handleProceed}
-                    disabled={!previewUrl || isUploading}
+                    disabled={!previewUrl || isUploading || isGeneratingMockups || createProductMutation.isPending || !customConfig || generatedMockups.length === 0}
                     className="w-full h-12 xs:h-14 sm:h-16 text-sm xs:text-base sm:text-lg lg:text-xl rounded-xl sm:rounded-2xl bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 shadow-lg sm:shadow-xl shadow-[#2b9d8f]/20"
                   >
-                    {isUploading ? (
+                    {(isUploading || createProductMutation.isPending) ? (
                       <>
                         <Loader2 className="w-5 h-5 xs:w-6 xs:h-6 animate-spin flex-shrink-0" />
-                        <span className="truncate">Generating Product Page...</span>
+                        <span className="truncate">Creating Product...</span>
+                      </>
+                    ) : isGeneratingMockups ? (
+                      <>
+                        <Loader2 className="w-5 h-5 xs:w-6 xs:h-6 animate-spin flex-shrink-0" />
+                        <span className="truncate">Generating Mockups...</span>
                       </>
                     ) : (
                       <>

@@ -223,12 +223,29 @@ const CustomDesign = () => {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-white/90 backdrop-blur-sm relative z-0">
-        <div className="container-custom">
+      <section className="py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-white/90 backdrop-blur-sm relative z-0 overflow-hidden">
+        {/* Background Images */}
+        <div 
+          className="absolute inset-0 opacity-10 pointer-events-none"
+          style={{
+            backgroundImage: 'url(/bg_images/6e22cdcedfa63286bcf4f43754509fe0%20copy.png)',
+            backgroundPosition: 'center',
+            backgroundSize: 'cover',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
+        <div className="absolute top-10 right-10 w-32 h-32 xs:w-40 xs:h-40 sm:w-48 sm:h-48 opacity-5 pointer-events-none hidden md:block">
+          <img src="/bg_images/68fccd394db41a54b986a269033bf872 copy.png" alt="" className="w-full h-full object-contain" />
+        </div>
+        <div className="absolute bottom-10 left-10 w-28 h-28 xs:w-36 xs:h-36 sm:w-40 sm:h-40 opacity-5 pointer-events-none hidden md:block">
+          <img src="/bg_images/6eee32992a66df14391a55bb7cd7c3e3 copy.png" alt="" className="w-full h-full object-contain" />
+        </div>
+        
+        <div className="container-custom relative z-10">
           <ScrollReveal>
             <div className="text-center mb-8 xs:mb-10 sm:mb-12">
               <motion.h2 
-                className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl text-primary mb-3 xs:mb-4 px-2"
+                className="font-cursive text-4xl xs:text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-primary mb-3 xs:mb-4 px-2"
                 whileInView={{ opacity: 1, y: 0 }}
                 initial={{ opacity: 0, y: 20 }}
                 transition={{ duration: 0.6 }}
@@ -269,15 +286,54 @@ const CustomDesign = () => {
 
       {/* Design Request Form Section */}
       <section id="design-form" className="py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-gradient-to-b from-warm to-white/90 backdrop-blur-sm relative overflow-hidden z-10">
-        {/* Decorative Elements */}
+        {/* Background Images */}
+        <div 
+          className="absolute inset-0 opacity-8 pointer-events-none"
+          style={{
+            backgroundImage: 'url(/bg_images/a603b38fb1ef532479389da84c00a970 copy.png)',
+            backgroundPosition: 'center',
+            backgroundSize: 'cover',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
+        <div 
+          className="absolute inset-0 opacity-5 pointer-events-none"
+          style={{
+            backgroundImage: 'url(/bg_images/6e22cdcedfa63286bcf4f43754509fe0%20copy.png)',
+            backgroundPosition: 'top left',
+            backgroundSize: '30%',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
+        <div 
+          className="absolute inset-0 opacity-5 pointer-events-none"
+          style={{
+            backgroundImage: 'url(/bg_images/e9a22ea4ff03375f5fcfc718eb3f5894 copy.png)',
+            backgroundPosition: 'bottom right',
+            backgroundSize: '25%',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
         <div className="absolute top-0 left-0 w-24 h-24 xs:w-32 xs:h-32 bg-primary/5 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
         <div className="absolute bottom-0 right-0 w-32 h-32 xs:w-48 xs:h-48 bg-accent/5 rounded-full translate-x-1/2 translate-y-1/2 pointer-events-none"></div>
+        <div className="absolute top-20 right-20 w-24 h-24 xs:w-32 xs:h-32 opacity-6 pointer-events-none hidden lg:block">
+          <img src="/bg_images/909a6230d8137dc501ca08257ed328b9 copy.png" alt="" className="w-full h-full object-contain" />
+        </div>
+        <div className="absolute bottom-20 left-20 w-28 h-28 xs:w-36 xs:h-36 opacity-6 pointer-events-none hidden lg:block">
+          <img src="/bg_images/f4fd6c7d6a5ba90fa1bc31d53ee4bacc copy.png" alt="" className="w-full h-full object-contain" />
+        </div>
+        <div className="absolute top-1/2 left-10 w-20 h-20 xs:w-28 xs:h-28 opacity-4 pointer-events-none hidden md:block">
+          <img src="/bg_images/68fccd394db41a54b986a269033bf872 copy.png" alt="" className="w-full h-full object-contain" />
+        </div>
+        <div className="absolute top-1/3 right-10 w-24 h-24 xs:w-32 xs:h-32 opacity-4 pointer-events-none hidden md:block">
+          <img src="/bg_images/c71febdd919ac8f0010cd96003e2ff7d copy.png" alt="" className="w-full h-full object-contain" />
+        </div>
 
         <div className="container-custom relative z-10">
           <ScrollReveal>
             <div className="text-center mb-8 xs:mb-10 sm:mb-12">
               <motion.h2 
-                className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl text-primary mb-3 xs:mb-4 px-2"
+                className="font-cursive text-4xl xs:text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-primary mb-3 xs:mb-4 px-2"
                 whileInView={{ opacity: 1, y: 0 }}
                 initial={{ opacity: 0, y: 20 }}
                 transition={{ duration: 0.6 }}
@@ -450,12 +506,29 @@ const CustomDesign = () => {
       </section>
 
       {/* Design Specialties Section */}
-      <section className="py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-white/90 backdrop-blur-sm relative z-10">
-        <div className="container-custom">
+      <section className="py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-white/90 backdrop-blur-sm relative z-10 overflow-hidden">
+        {/* Background Images */}
+        <div 
+          className="absolute inset-0 opacity-10 pointer-events-none"
+          style={{
+            backgroundImage: 'url(/bg_images/e9a22ea4ff03375f5fcfc718eb3f5894 copy.png)',
+            backgroundPosition: 'center',
+            backgroundSize: 'cover',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
+        <div className="absolute top-10 left-10 w-32 h-32 xs:w-40 xs:h-40 sm:w-48 sm:h-48 opacity-5 pointer-events-none hidden md:block">
+          <img src="/bg_images/6be0f0ce2c11383d352bd0828a354dba copy.png" alt="" className="w-full h-full object-contain" />
+        </div>
+        <div className="absolute bottom-10 right-10 w-28 h-28 xs:w-36 xs:h-36 sm:w-40 sm:h-40 opacity-5 pointer-events-none hidden md:block">
+          <img src="/bg_images/c71febdd919ac8f0010cd96003e2ff7d copy.png" alt="" className="w-full h-full object-contain" />
+        </div>
+        
+        <div className="container-custom relative z-10">
           <ScrollReveal>
             <div className="text-center mb-8 xs:mb-10 sm:mb-12">
               <motion.h2 
-                className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl text-primary mb-3 xs:mb-4 px-2"
+                className="font-cursive text-4xl xs:text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-primary mb-3 xs:mb-4 px-2"
                 whileInView={{ opacity: 1, y: 0 }}
                 initial={{ opacity: 0, y: 20 }}
                 transition={{ duration: 0.6 }}
@@ -490,12 +563,29 @@ const CustomDesign = () => {
       </section>
 
       {/* Why Choose Us Section */}
-      <section className="py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-gradient-to-b from-warm to-white/90 backdrop-blur-sm relative z-10">
-        <div className="container-custom">
+      <section className="py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-gradient-to-b from-warm to-white/90 backdrop-blur-sm relative z-10 overflow-hidden">
+        {/* Background Images */}
+        <div 
+          className="absolute inset-0 opacity-3 pointer-events-none"
+          style={{
+            backgroundImage: 'url(/bg_images/661653d7e241afba33eeb02dc6a09f9e%20copy.png)',
+            backgroundPosition: 'center',
+            backgroundSize: 'cover',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
+        <div className="absolute top-20 right-20 w-32 h-32 xs:w-40 xs:h-40 sm:w-48 sm:h-48 opacity-3 pointer-events-none hidden lg:block">
+          <img src="/bg_images/6be0f0ce2c11383d352bd0828a354dba copy.png" alt="" className="w-full h-full object-contain" />
+        </div>
+        <div className="absolute bottom-20 left-20 w-28 h-28 xs:w-36 xs:h-36 sm:w-40 sm:h-40 opacity-3 pointer-events-none hidden lg:block">
+          <img src="/bg_images/68fccd394db41a54b986a269033bf872 copy.png" alt="" className="w-full h-full object-contain" />
+        </div>
+        
+        <div className="container-custom relative z-10">
           <ScrollReveal>
             <div className="text-center mb-8 xs:mb-10 sm:mb-12">
               <motion.h2 
-                className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl text-primary mb-3 xs:mb-4 px-2"
+                className="font-cursive text-4xl xs:text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-primary mb-3 xs:mb-4 px-2"
                 whileInView={{ opacity: 1, y: 0 }}
                 initial={{ opacity: 0, y: 20 }}
                 transition={{ duration: 0.6 }}
@@ -553,7 +643,7 @@ const CustomDesign = () => {
         <div className="container-custom relative z-10 text-center">
           <ScrollReveal>
             <motion.h2 
-              className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl text-white mb-3 xs:mb-4 px-2"
+              className="font-cursive text-4xl xs:text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-white mb-3 xs:mb-4 px-2"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}

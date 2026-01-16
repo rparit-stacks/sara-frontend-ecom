@@ -374,7 +374,7 @@ const AdminProducts = () => {
                           )}
                           <div className="flex items-center gap-2">
                             <Link 
-                              to={`/product/${product.slug || product.id}`}
+                              to={`/products/${product.slug || product.id}`}
                               target="_blank"
                               className="font-semibold hover:text-primary transition-colors"
                             >
@@ -413,14 +413,18 @@ const AdminProducts = () => {
                             </Button>
                           </motion.div>
                           <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="icon" 
                               className="h-9 w-9 text-destructive hover:text-destructive"
                               onClick={() => handleDelete(product.id)}
                               disabled={deleteMutation.isPending}
                             >
-                              <Trash2 className="w-4 h-4" />
+                              {deleteMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
                             </Button>
                           </motion.div>
                         </div>

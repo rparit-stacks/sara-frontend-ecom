@@ -94,7 +94,12 @@ const Wishlist = () => {
                     </div>
                     <div className="p-3 xs:p-4 sm:p-5">
                       <p className="text-xs xs:text-sm text-muted-foreground truncate">{item.productType}</p>
-                      <Link to={`/product/${item.productId}`} className="font-cursive text-base xs:text-lg sm:text-xl hover:text-[#2b9d8f] block mt-1 xs:mt-2 line-clamp-2">{item.productName || 'Product'}</Link>
+                      <Link 
+                        to={`/products/${item.productSlug || item.productId}`} 
+                        className="font-cursive text-base xs:text-lg sm:text-xl hover:text-[#2b9d8f] block mt-1 xs:mt-2 line-clamp-2"
+                      >
+                        {item.productName || 'Product'}
+                      </Link>
                       <p className="font-semibold text-[#2b9d8f] text-base xs:text-lg sm:text-xl mt-2 xs:mt-3">{item.productPrice || '₹0'}</p>
                       <Button 
                         className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white mt-3 xs:mt-4 gap-2 h-10 xs:h-11 sm:h-12 text-xs xs:text-sm sm:text-base"

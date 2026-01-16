@@ -63,11 +63,11 @@ const features = [
 ];
 
 // Default Instagram Posts
-const defaultInstagramPosts = [
-  'https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1487530811176-3780de880c2d?w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=400&h=400&fit=crop',
+const defaultInstagramPosts: Array<{ imageUrl: string; linkUrl?: string }> = [
+  { imageUrl: 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=400&h=400&fit=crop' },
+  { imageUrl: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=400&h=400&fit=crop' },
+  { imageUrl: 'https://images.unsplash.com/photo-1487530811176-3780de880c2d?w=400&h=400&fit=crop' },
+  { imageUrl: 'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=400&h=400&fit=crop' },
 ];
 
 // Default testimonials
@@ -199,7 +199,18 @@ const Index = () => {
     .slice(0, 10);
   
   // Get Instagram posts from CMS or use defaults
-  const instagramPosts = cmsData?.instagramPosts?.length ? cmsData.instagramPosts : defaultInstagramPosts;
+  // Handle both old format (string[]) and new format (Array<{imageUrl, linkUrl}>)
+  const instagramPosts = (() => {
+    if (cmsData?.instagramPosts?.length) {
+      const posts = cmsData.instagramPosts;
+      if (typeof posts[0] === 'string') {
+        // Old format - convert to new format
+        return posts.map((url: string) => ({ imageUrl: url }));
+      }
+      return posts;
+    }
+    return defaultInstagramPosts;
+  })();
   
   // Get categories from API - only parent categories (no parentId)
   const categories = apiCategories.length 
@@ -650,17 +661,29 @@ const Index = () => {
             </ScrollReveal>
           </div>
           <div className="grid grid-cols-3 lg:grid-cols-6 gap-1.5 xs:gap-2 sm:gap-3 lg:gap-5">
-            {instagramPosts.map((post, index) => (
-              <ScrollReveal key={index} delay={index * 0.05}>
-                <a href="#" className="group block aspect-square overflow-hidden rounded-lg xs:rounded-xl lg:rounded-2xl">
-                  <img
-                    src={post}
-                    alt={`Instagram post ${index + 1}`}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                  />
-                </a>
-              </ScrollReveal>
-            ))}
+            {instagramPosts.map((post, index) => {
+              const imageUrl = typeof post === 'string' ? post : post.imageUrl;
+              const linkUrl = typeof post === 'string' ? '#' : (post.linkUrl || '#');
+              return (
+                <ScrollReveal key={index} delay={index * 0.05}>
+                  <a 
+                    href={linkUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="group block aspect-square overflow-hidden rounded-lg xs:rounded-xl lg:rounded-2xl"
+                  >
+                    <img
+                      src={imageUrl}
+                      alt={`Instagram post ${index + 1}`}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/placeholder-image.jpg';
+                      }}
+                    />
+                  </a>
+                </ScrollReveal>
+              );
+            })}
           </div>
         </div>
       </section>

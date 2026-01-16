@@ -315,8 +315,13 @@ const AdminFAQ = () => {
                         size="icon"
                         onClick={() => handleDelete(faq.id)}
                         className="h-9 w-9 text-destructive hover:text-destructive"
+                        disabled={deleteMutation.isPending}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {deleteMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
                       </Button>
                     </motion.div>
                   </div>
@@ -422,9 +427,22 @@ const AdminFAQ = () => {
               }}>
                 Cancel
               </Button>
-              <Button className="btn-primary gap-2" onClick={handleSave}>
-                <Save className="w-4 h-4" />
-                {editingFAQ ? 'Update FAQ' : 'Create FAQ'}
+              <Button 
+                className="btn-primary gap-2" 
+                onClick={handleSave}
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                {(createMutation.isPending || updateMutation.isPending) ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    {editingFAQ ? 'Update FAQ' : 'Create FAQ'}
+                  </>
+                )}
               </Button>
             </div>
           </DialogContent>
@@ -441,8 +459,19 @@ const AdminFAQ = () => {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
-                Delete
+              <AlertDialogAction 
+                onClick={confirmDelete} 
+                className="bg-destructive text-destructive-foreground gap-2"
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

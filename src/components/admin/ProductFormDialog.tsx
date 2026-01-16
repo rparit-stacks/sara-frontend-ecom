@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -232,6 +232,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
     digitalFile: null as File | null,
     plainProductId: null as string | null,
     recommendedPlainProductIds: [] as string[],
+    pricingSlabs: [] as Array<{ id?: string; minQuantity: number; maxQuantity: number | null; discountType: 'FIXED_AMOUNT' | 'PERCENTAGE'; discountValue: number; pricePerMeter?: number; displayOrder: number }>,
     detailSections: [] as DetailSection[],
     customFields: [] as Array<{
       id: string;
@@ -284,6 +285,15 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
           digitalFile: null,
           plainProductId: productData.plainProductId ? String(productData.plainProductId) : null,
           recommendedPlainProductIds: productData.recommendedPlainProductIds ? productData.recommendedPlainProductIds.map((id: any) => String(id)) : [],
+          pricingSlabs: productData.pricingSlabs ? productData.pricingSlabs.map((slab: any, idx: number) => ({
+            id: `slab-${slab.id || idx}`,
+            minQuantity: slab.minQuantity || 1,
+            maxQuantity: slab.maxQuantity || null,
+            discountType: (slab.discountType || 'FIXED_AMOUNT') as 'FIXED_AMOUNT' | 'PERCENTAGE',
+            discountValue: slab.discountValue || slab.pricePerMeter || 0, // Support legacy pricePerMeter
+            pricePerMeter: slab.pricePerMeter, // Keep for legacy support
+            displayOrder: slab.displayOrder !== undefined ? slab.displayOrder : idx,
+          })) : [],
           detailSections: productData.detailSections || [],
           customFields: productData.customFields || [],
           variants: productData.variants || [],
@@ -311,6 +321,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       digitalFile: null,
       plainProductId: null,
       recommendedPlainProductIds: [],
+      pricingSlabs: [] as Array<{ id?: string; minQuantity: number; maxQuantity: number | null; discountType: 'FIXED_AMOUNT' | 'PERCENTAGE'; discountValue: number; pricePerMeter?: number; displayOrder: number }>,
       detailSections: [],
       customFields: [],
       variants: [],
@@ -362,6 +373,35 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
         }
         return '';
       default:
+        // Handle pricing slab validation
+        if (fieldName.startsWith('pricingSlab_')) {
+          const parts = fieldName.split('_');
+          if (parts.length >= 3) {
+            const index = parseInt(parts[1]);
+            const field = parts[2];
+            if (field === 'discountValue') {
+              if (value === undefined || value === null || value < 0) {
+                return 'Discount value must be 0 or greater';
+              }
+            } else if (field === 'discountType') {
+              if (!value || (value !== 'FIXED_AMOUNT' && value !== 'PERCENTAGE')) {
+                return 'Discount type is required';
+              }
+            } else if (field === 'minQuantity') {
+              if (value === undefined || value === null || value < 1) {
+                return 'Min quantity must be at least 1';
+              }
+            } else if (field === 'maxQuantity') {
+              // maxQuantity can be null, but if set, must be >= minQuantity
+              if (value !== null && value !== undefined) {
+                const slab = formData.pricingSlabs?.[index];
+                if (slab && slab.minQuantity && value < slab.minQuantity) {
+                  return 'Max quantity must be greater than min quantity';
+                }
+              }
+            }
+          }
+        }
         return '';
     }
   };
@@ -384,6 +424,24 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
     newErrors.designPrice = validateField('designPrice', formData.designPrice);
     newErrors.basePrice = validateField('basePrice', formData.basePrice);
     newErrors.digitalFile = validateField('digitalFile', formData.digitalFile);
+
+    // Validate pricing slabs for DESIGNED products
+    if (activeType === 'DESIGNED' && formData.pricingSlabs && formData.pricingSlabs.length > 0) {
+      formData.pricingSlabs.forEach((slab, index) => {
+        if (!slab.discountType || (slab.discountType !== 'FIXED_AMOUNT' && slab.discountType !== 'PERCENTAGE')) {
+          newErrors[`pricingSlab_${index}_discountType`] = 'Discount type is required';
+        }
+        if (slab.discountValue === undefined || slab.discountValue === null || slab.discountValue < 0) {
+          newErrors[`pricingSlab_${index}_discountValue`] = 'Discount value must be 0 or greater';
+        }
+        if (slab.minQuantity === undefined || slab.minQuantity < 1) {
+          newErrors[`pricingSlab_${index}_minQuantity`] = 'Min quantity must be at least 1';
+        }
+        if (slab.maxQuantity !== null && slab.maxQuantity !== undefined && slab.maxQuantity < slab.minQuantity) {
+          newErrors[`pricingSlab_${index}_maxQuantity`] = 'Max quantity must be greater than min quantity';
+        }
+      });
+    }
 
     setErrors(newErrors);
     setTouched({
@@ -467,6 +525,22 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       payload.price = sellingPrice;
       payload.originalPrice = sellingPrice;
       payload.recommendedPlainProductIds = formData.recommendedPlainProductIds;
+      // Add pricing slabs
+      if (formData.pricingSlabs && formData.pricingSlabs.length > 0) {
+        payload.pricingSlabs = formData.pricingSlabs.map(slab => {
+          // Ensure required fields are present
+          const discountType = slab.discountType || 'FIXED_AMOUNT';
+          const discountValue = slab.discountValue !== undefined && slab.discountValue !== null ? slab.discountValue : 0;
+          
+          return {
+            minQuantity: slab.minQuantity,
+            maxQuantity: slab.maxQuantity,
+            discountType: discountType,
+            discountValue: discountValue,
+            displayOrder: slab.displayOrder || 0
+          };
+        });
+      }
     } else if (activeType === 'DIGITAL') {
       const sellingPrice = formData.basePrice;
       payload.price = sellingPrice;
@@ -497,6 +571,36 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       // Error handling is done in parent component's mutation
       console.error('Error submitting product:', error);
     }
+  };
+
+  const addPricingSlab = () => {
+    const newSlab = {
+      id: `slab-${Date.now()}`,
+      minQuantity: (formData.pricingSlabs && formData.pricingSlabs.length > 0)
+        ? ((formData.pricingSlabs[formData.pricingSlabs.length - 1].maxQuantity || formData.pricingSlabs[formData.pricingSlabs.length - 1].minQuantity) + 1)
+        : 1,
+      maxQuantity: null as number | null,
+      discountType: 'FIXED_AMOUNT' as 'FIXED_AMOUNT' | 'PERCENTAGE',
+      discountValue: 0,
+      displayOrder: (formData.pricingSlabs || []).length,
+    };
+    setFormData({ ...formData, pricingSlabs: [...(formData.pricingSlabs || []), newSlab] });
+  };
+
+  const removePricingSlab = (id: string) => {
+    setFormData({
+      ...formData,
+      pricingSlabs: (formData.pricingSlabs || []).filter(slab => slab.id !== id).map((slab, idx) => ({ ...slab, displayOrder: idx }))
+    });
+  };
+
+  const updatePricingSlab = (id: string, field: string, value: any) => {
+    setFormData({
+      ...formData,
+      pricingSlabs: (formData.pricingSlabs || []).map(slab =>
+        slab.id === id ? { ...slab, [field]: value } : slab
+      )
+    });
   };
 
   const addDetailSection = () => {
@@ -623,6 +727,9 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                 <DialogTitle className="font-cursive text-3xl">
                   {mode === 'edit' ? 'Edit Product' : 'Create Product'}
                 </DialogTitle>
+                <DialogDescription>
+                  {mode === 'edit' ? 'Update product details and settings' : 'Fill in the details to create a new product'}
+                </DialogDescription>
               </DialogHeader>
               <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
                 <X className="w-5 h-5" />
@@ -829,6 +936,154 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                     onChange={(ids) => setFormData({ ...formData, recommendedPlainProductIds: ids })}
                     maxSelection={10}
                   />
+                </div>
+                
+                {/* Quantity-Based Pricing Slabs */}
+                <div className="space-y-4 pt-6 border-t border-border">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-base font-semibold">Quantity-Based Pricing Slabs</Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Set quantity-based pricing that works for ANY fabric. First slab (1-10m) uses fabric's base price. 
+                        Subsequent slabs use the price you set (e.g., 11-50m = ₹90/m means ₹10 less per meter from base).
+                      </p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={addPricingSlab}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Slab
+                    </Button>
+                  </div>
+                  
+                  {(!formData.pricingSlabs || formData.pricingSlabs.length === 0) ? (
+                    <div className="p-4 border border-dashed border-border rounded-lg text-center text-sm text-muted-foreground">
+                      No pricing slabs added. Add slabs to enable quantity-based pricing.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {(formData.pricingSlabs || []).map((slab, index) => (
+                        <div key={slab.id} className="p-4 border border-border rounded-lg space-y-3 bg-muted/30">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm font-medium">Slab {index + 1}</Label>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removePricingSlab(slab.id!)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label className="text-xs">Min Quantity (meters) *</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={slab.minQuantity}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 1;
+                                  updatePricingSlab(slab.id!, 'minQuantity', value);
+                                  // Clear error on change
+                                  if (errors[`pricingSlab_${index}_minQuantity`]) {
+                                    setErrors({ ...errors, [`pricingSlab_${index}_minQuantity`]: '' });
+                                  }
+                                }}
+                                onBlur={() => {
+                                  const error = validateField(`pricingSlab_${index}_minQuantity`, slab.minQuantity);
+                                  setErrors({ ...errors, [`pricingSlab_${index}_minQuantity`]: error });
+                                }}
+                                className={`h-9 ${errors[`pricingSlab_${index}_minQuantity`] ? 'border-red-500' : ''}`}
+                                placeholder="1"
+                              />
+                              {errors[`pricingSlab_${index}_minQuantity`] && (
+                                <p className="text-xs text-red-500">{errors[`pricingSlab_${index}_minQuantity`]}</p>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs">Max Quantity (meters)</Label>
+                              <Input
+                                type="number"
+                                min={slab.minQuantity || 1}
+                                value={slab.maxQuantity || ''}
+                                onChange={(e) => {
+                                  const value = e.target.value === '' ? null : parseInt(e.target.value);
+                                  updatePricingSlab(slab.id!, 'maxQuantity', value);
+                                  // Clear error on change
+                                  if (errors[`pricingSlab_${index}_maxQuantity`]) {
+                                    setErrors({ ...errors, [`pricingSlab_${index}_maxQuantity`]: '' });
+                                  }
+                                }}
+                                onBlur={() => {
+                                  const error = validateField(`pricingSlab_${index}_maxQuantity`, slab.maxQuantity);
+                                  setErrors({ ...errors, [`pricingSlab_${index}_maxQuantity`]: error });
+                                }}
+                                className={`h-9 ${errors[`pricingSlab_${index}_maxQuantity`] ? 'border-red-500' : ''}`}
+                                placeholder="Leave empty for no limit"
+                              />
+                              <p className="text-xs text-muted-foreground">Leave empty for unlimited</p>
+                              {errors[`pricingSlab_${index}_maxQuantity`] && (
+                                <p className="text-xs text-red-500">{errors[`pricingSlab_${index}_maxQuantity`]}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                            <div className="space-y-2">
+                              <Label className="text-xs">Discount Type *</Label>
+                              <Select
+                                value={slab.discountType || 'FIXED_AMOUNT'}
+                                onValueChange={(value: 'FIXED_AMOUNT' | 'PERCENTAGE') => updatePricingSlab(slab.id!, 'discountType', value)}
+                              >
+                                <SelectTrigger className={`h-9 ${errors[`pricingSlab_${index}_discountType`] ? 'border-red-500' : ''}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="FIXED_AMOUNT">Fixed Amount (₹)</SelectItem>
+                                  <SelectItem value="PERCENTAGE">Percentage (%)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              {errors[`pricingSlab_${index}_discountType`] && (
+                                <p className="text-xs text-red-500">{errors[`pricingSlab_${index}_discountType`]}</p>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs">
+                                {slab.discountType === 'PERCENTAGE' ? 'Discount (%) *' : 'Discount Amount (₹) *'}
+                              </Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step={slab.discountType === 'PERCENTAGE' ? '0.1' : '0.01'}
+                                value={slab.discountValue !== undefined && slab.discountValue !== null ? slab.discountValue : ''}
+                                onChange={(e) => {
+                                  const value = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0;
+                                  updatePricingSlab(slab.id!, 'discountValue', value);
+                                  // Clear error on change
+                                  if (errors[`pricingSlab_${index}_discountValue`]) {
+                                    setErrors({ ...errors, [`pricingSlab_${index}_discountValue`]: '' });
+                                  }
+                                }}
+                                onBlur={() => {
+                                  const error = validateField(`pricingSlab_${index}_discountValue`, slab.discountValue);
+                                  setErrors({ ...errors, [`pricingSlab_${index}_discountValue`]: error });
+                                }}
+                                className={`h-9 ${errors[`pricingSlab_${index}_discountValue`] ? 'border-red-500' : ''}`}
+                                placeholder={slab.discountType === 'PERCENTAGE' ? '10' : '10.00'}
+                              />
+                              {errors[`pricingSlab_${index}_discountValue`] && (
+                                <p className="text-xs text-red-500">{errors[`pricingSlab_${index}_discountValue`]}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-2 p-2 bg-muted/50 rounded">
+                            {slab.discountType === 'PERCENTAGE' 
+                              ? `${slab.discountValue || 0}% discount per meter for ${slab.maxQuantity ? `${slab.minQuantity}-${slab.maxQuantity}` : `${slab.minQuantity}+`} meters`
+                              : `₹${slab.discountValue || 0} discount per meter for ${slab.maxQuantity ? `${slab.minQuantity}-${slab.maxQuantity}` : `${slab.minQuantity}+`} meters`}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </motion.section>
             )}

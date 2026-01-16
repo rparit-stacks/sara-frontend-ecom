@@ -326,7 +326,11 @@ const AdminBlog = () => {
                         className="text-destructive hover:text-destructive"
                         disabled={deleteMutation.isPending}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {deleteMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
                       </Button>
                     </motion.div>
                   </div>
@@ -510,10 +514,17 @@ const AdminBlog = () => {
                 onClick={handleSave}
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
-                <Save className="w-4 h-4" />
-                {createMutation.isPending || updateMutation.isPending 
-                  ? 'Saving...' 
-                  : editingBlog ? 'Update Blog' : 'Create Blog'}
+                {(createMutation.isPending || updateMutation.isPending) ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    {editingBlog ? 'Update Blog' : 'Create Blog'}
+                  </>
+                )}
               </Button>
             </div>
           </DialogContent>
@@ -530,12 +541,19 @@ const AdminBlog = () => {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={confirmDelete} 
-                className="bg-destructive text-destructive-foreground"
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-destructive text-destructive-foreground gap-2"
                 disabled={deleteMutation.isPending}
               >
-                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                {deleteMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
