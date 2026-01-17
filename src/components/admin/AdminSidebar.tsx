@@ -104,6 +104,11 @@ const adminMenuItems = [
     label: 'Contact Submissions', 
     path: '/admin-sara/contact-submissions' 
   },
+  { 
+    icon: MessageSquare, 
+    label: 'WhatsApp', 
+    path: '/admin-sara/whatsapp' 
+  },
 ];
 
 export const AdminSidebar = () => {

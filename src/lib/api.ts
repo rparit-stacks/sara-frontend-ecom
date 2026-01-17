@@ -86,6 +86,30 @@ export const productsApi = {
   createDigital: (data: any) => fetchApi<any>('/api/admin/products/digital', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: any) => fetchApi<any>(`/api/admin/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) => fetchApi<void>(`/api/admin/products/${id}`, { method: 'DELETE' }),
+  bulkDelete: (ids: number[]) => fetchApi<any>('/api/admin/products/bulk', { method: 'DELETE', body: JSON.stringify({ ids }) }),
+  toggleStatus: (id: number) => fetchApi<any>(`/api/admin/products/${id}/toggle-status`, { method: 'POST' }),
+  bulkToggleStatus: (ids: number[], action: 'pause' | 'unpause') => 
+    fetchApi<any>('/api/admin/products/bulk/toggle-status', { method: 'POST', body: JSON.stringify({ ids, action }) }),
+  exportToExcel: async () => {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/products/export`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('adminToken') || ''}`,
+      },
+    });
+    if (!response.ok) throw new Error('Failed to export products');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const contentDisposition = response.headers.get('content-disposition');
+    const filename = contentDisposition?.split('filename=')[1]?.replace(/"/g, '') || 'products_export.xlsx';
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
   createDigitalFromDesign: (designProductId: number, price?: number) => 
     fetchApi<any>(`/api/products/${designProductId}/create-digital`, { 
       method: 'POST', 
@@ -94,6 +118,29 @@ export const productsApi = {
   getDigitalFromDesign: (designProductId: number) => 
     fetchApi<any>(`/api/products/${designProductId}/digital`),
   createFromUpload: (data: any) => fetchApi<any>('/api/products/create-from-upload', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+// ===============================
+// Custom Products API (Make Your Own)
+// ===============================
+export const customProductsApi = {
+  create: (data: any) => fetchApi<any>('/api/custom-products', { method: 'POST', body: JSON.stringify(data) }),
+  getById: (id: number, userEmail?: string) => {
+    const url = userEmail 
+      ? `/api/custom-products/${id}?userEmail=${encodeURIComponent(userEmail)}`
+      : `/api/custom-products/${id}`;
+    return fetchApi<any>(url);
+  },
+  getSaved: () => fetchApi<any[]>('/api/custom-products/saved'),
+  getAll: () => fetchApi<any[]>('/api/custom-products'),
+  save: (id: number) => fetchApi<any>(`/api/custom-products/${id}/save`, { method: 'POST' }),
+  delete: (id: number) => fetchApi<void>(`/api/custom-products/${id}`, { method: 'DELETE' }),
+  deleteUnsaved: (id: number, userEmail?: string) => {
+    const url = userEmail 
+      ? `/api/custom-products/unsaved/${id}?userEmail=${encodeURIComponent(userEmail)}`
+      : `/api/custom-products/unsaved/${id}`;
+    return fetchApi<void>(url, { method: 'DELETE' });
+  },
   uploadMedia: async (files: File[], folder: string = 'products'): Promise<any[]> => {
     const formData = new FormData();
     files.forEach(file => {
@@ -101,9 +148,10 @@ export const productsApi = {
     });
     formData.append('folder', folder);
     
-    const token = localStorage.getItem('adminToken');
+    // Use authToken for regular users (Make Your Own), adminToken for admin
+    const token = localStorage.getItem('authToken') || localStorage.getItem('adminToken');
     const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
-    console.log('[Product Media Upload] Uploading', files.length, 'files to:', `${API_BASE_URL}/api/admin/products/upload-media`);
+    console.log('[Custom Product Media Upload] Uploading', files.length, 'files to:', `${API_BASE_URL}/api/admin/products/upload-media`);
     
     const response = await fetch(`${API_BASE_URL}/api/admin/products/upload-media`, {
       method: 'POST',
@@ -113,12 +161,12 @@ export const productsApi = {
     
     if (!response.ok) {
       const error = await response.text();
-      console.error('[Product Media Upload] Error:', error);
+      console.error('[Custom Product Media Upload] Error:', error);
       throw new Error(error || 'Failed to upload media');
     }
     
     const data = await response.json();
-    console.log('[Product Media Upload] Success:', data);
+    console.log('[Custom Product Media Upload] Success:', data);
     return data.files || [];
   },
 };
@@ -165,6 +213,8 @@ export const categoriesApi = {
   getById: (id: number) => fetchApi<any>(`/api/categories/id/${id}`),
   getBySlugPath: (slugPath: string) => fetchApi<any>(`/api/categories/${slugPath}`),
   getLeafCategories: () => fetchApi<any[]>('/api/categories/leaf'),
+  getMyCategories: () => fetchApi<any[]>('/api/categories/my-categories'),
+  getDashboardNotification: () => fetchApi<any>('/api/categories/dashboard-notification'),
   create: (data: any) => fetchApi<any>('/api/admin/categories', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: any) => fetchApi<any>(`/api/admin/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) => fetchApi<void>(`/api/admin/categories/${id}`, { method: 'DELETE' }),
@@ -354,7 +404,10 @@ export const cartApi = {
     const query = params.toString();
     return fetchApi<any>(`/api/cart${query ? `?${query}` : ''}`);
   },
-  addItem: (data: any) => fetchApi<any>('/api/cart', { method: 'POST', body: JSON.stringify(data) }),
+  addItem: (data: any) => {
+    // Ensure customProductId is included if it's a custom product
+    return fetchApi<any>('/api/cart', { method: 'POST', body: JSON.stringify(data) });
+  },
   updateItem: (itemId: number, quantity: number) => fetchApi<any>(`/api/cart/${itemId}`, { method: 'PUT', body: JSON.stringify({ quantity }) }),
   removeItem: (itemId: number) => fetchApi<void>(`/api/cart/${itemId}`, { method: 'DELETE' }),
   clearCart: () => fetchApi<void>('/api/cart', { method: 'DELETE' }),
@@ -411,6 +464,68 @@ export const orderApi = {
 export const businessConfigApi = {
   getConfig: () => fetchApi<any>('/api/admin/business-config'),
   updateConfig: (data: any) => fetchApi<any>('/api/admin/business-config', { method: 'PUT', body: JSON.stringify(data) }),
+};
+
+// ===============================
+// WhatsApp API
+// ===============================
+export const whatsappApi = {
+  // WASender Account Management
+  accounts: {
+    getAll: () => fetchApi<any[]>('/api/admin/whatsapp/accounts'),
+    getById: (id: number) => fetchApi<any>(`/api/admin/whatsapp/accounts/${id}`),
+    create: (data: any) => fetchApi<any>('/api/admin/whatsapp/accounts', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) => fetchApi<any>(`/api/admin/whatsapp/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) => fetchApi<void>(`/api/admin/whatsapp/accounts/${id}`, { method: 'DELETE' }),
+    activate: (id: number) => fetchApi<any>(`/api/admin/whatsapp/accounts/${id}/activate`, { method: 'PUT' }),
+    testConnection: (id: number) => fetchApi<any>(`/api/admin/whatsapp/accounts/${id}/test`, { method: 'POST' }),
+  },
+  
+  // Chatbot Management
+  chatbot: {
+    getConfig: () => fetchApi<any>('/api/admin/whatsapp/chatbot/config'),
+    updateConfig: (data: any) => fetchApi<any>('/api/admin/whatsapp/chatbot/config', { method: 'PUT', body: JSON.stringify(data) }),
+    rules: {
+      getAll: () => fetchApi<any[]>('/api/admin/whatsapp/chatbot/rules'),
+      getById: (id: number) => fetchApi<any>(`/api/admin/whatsapp/chatbot/rules/${id}`),
+      create: (data: any) => fetchApi<any>('/api/admin/whatsapp/chatbot/rules', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: number, data: any) => fetchApi<any>(`/api/admin/whatsapp/chatbot/rules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      delete: (id: number) => fetchApi<void>(`/api/admin/whatsapp/chatbot/rules/${id}`, { method: 'DELETE' }),
+      toggle: (id: number) => fetchApi<any>(`/api/admin/whatsapp/chatbot/rules/${id}/toggle`, { method: 'PUT' }),
+    },
+  },
+  
+  // Order Status Templates
+  orderTemplates: {
+    getAll: () => fetchApi<any[]>('/api/admin/whatsapp/order-templates'),
+    getByStatus: (statusType: string) => fetchApi<any>(`/api/admin/whatsapp/order-templates/${statusType}`),
+    update: (statusType: string, data: any) => fetchApi<any>(`/api/admin/whatsapp/order-templates/${statusType}`, { method: 'PUT', body: JSON.stringify(data) }),
+    toggle: (statusType: string) => fetchApi<any>(`/api/admin/whatsapp/order-templates/${statusType}/toggle`, { method: 'PUT' }),
+    preview: (statusType: string) => fetchApi<any>(`/api/admin/whatsapp/order-templates/${statusType}/preview`, { method: 'POST' }),
+  },
+  
+  // Message Templates
+  templates: {
+    getAll: () => fetchApi<any[]>('/api/admin/whatsapp/templates'),
+    getById: (id: number) => fetchApi<any>(`/api/admin/whatsapp/templates/${id}`),
+    create: (data: any) => fetchApi<any>('/api/admin/whatsapp/templates', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) => fetchApi<any>(`/api/admin/whatsapp/templates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) => fetchApi<void>(`/api/admin/whatsapp/templates/${id}`, { method: 'DELETE' }),
+  },
+  
+  // Messages
+  messages: {
+    send: (data: any) => fetchApi<any>('/api/admin/whatsapp/messages/send', { method: 'POST', body: JSON.stringify(data) }),
+    broadcast: (data: any) => fetchApi<any>('/api/admin/whatsapp/messages/broadcast', { method: 'POST', body: JSON.stringify(data) }),
+    getHistory: (params?: { messageType?: string; status?: string }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.messageType) searchParams.set('messageType', params.messageType);
+      if (params?.status) searchParams.set('status', params.status);
+      const query = searchParams.toString();
+      return fetchApi<any[]>(`/api/admin/whatsapp/messages${query ? `?${query}` : ''}`);
+    },
+    getById: (id: number) => fetchApi<any>(`/api/admin/whatsapp/messages/${id}`),
+  },
 };
 
 // ===============================

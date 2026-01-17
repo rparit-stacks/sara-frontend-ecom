@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { userApi, orderApi } from '@/lib/api';
-import { Package, MapPin, User, Edit, Trash2, Plus, Loader2, Check } from 'lucide-react';
+import { userApi, orderApi, categoriesApi } from '@/lib/api';
+import { Package, MapPin, User, Edit, Trash2, Plus, Loader2, Check, Gift, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -90,6 +90,13 @@ const Dashboard = () => {
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['user-orders'],
     queryFn: () => orderApi.getUserOrders(),
+    enabled: !!token,
+  });
+
+  // Fetch dashboard notification for restricted categories
+  const { data: dashboardNotification } = useQuery({
+    queryKey: ['dashboardNotification'],
+    queryFn: () => categoriesApi.getDashboardNotification(),
     enabled: !!token,
   });
 
@@ -220,6 +227,41 @@ const Dashboard = () => {
               Logout
             </Button>
           </div>
+
+          {/* Dashboard Notification for Restricted Categories */}
+          {dashboardNotification?.hasRestrictedCategories && (
+            <Card className="mb-6 bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                  <div className="rounded-full bg-primary/20 p-3">
+                    <Gift className="w-6 h-6 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg mb-2">Special Products Available!</h3>
+                    <p className="text-muted-foreground mb-4">
+                      {dashboardNotification.message || 'The store has loaded special products for you.'}
+                    </p>
+                    {dashboardNotification.categories && dashboardNotification.categories.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {dashboardNotification.categories.map((cat: any) => (
+                          <Button
+                            key={cat.id}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(`/categories/${cat.id}`)}
+                            className="gap-2"
+                          >
+                            {cat.name}
+                            <ArrowRight className="w-4 h-4" />
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Sidebar */}

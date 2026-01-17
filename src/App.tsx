@@ -49,6 +49,7 @@ import AdminShipping from "./pages/admin/AdminShipping";
 import AdminContactSubmissions from "./pages/admin/AdminContactSubmissions";
 import AdminOrders from "./pages/admin/AdminOrders";
 import AdminBusinessConfig from "./pages/admin/AdminBusinessConfig";
+import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
 import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
 
 const queryClient = new QueryClient();
@@ -84,6 +85,7 @@ const App = () => (
           <Route path="/customize" element={<Customize />} />
           <Route path="/custom-design" element={<CustomDesign />} />
           <Route path="/make-your-own" element={<MakeYourOwn />} />
+          <Route path="/custom-product/:id" element={<CustomProductDetail />} />
           <Route path="/custom-product" element={<CustomProductDetail />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/:id" element={<BlogDetail />} />
@@ -215,6 +217,14 @@ const App = () => (
             element={
               <ProtectedAdminRoute>
                 <AdminBusinessConfig />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/whatsapp"
+            element={
+              <ProtectedAdminRoute>
+                <AdminWhatsApp />
               </ProtectedAdminRoute>
             }
           />

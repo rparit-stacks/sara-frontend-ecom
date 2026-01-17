@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, ArrowRight, Palette, Sparkles, ShieldCheck, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { productsApi, customConfigApi, mediaApi, mockupApi } from '@/lib/api';
+import { customProductsApi, customConfigApi, mediaApi, mockupApi, productsApi } from '@/lib/api';
 
 const MakeYourOwn = () => {
   const navigate = useNavigate();
@@ -18,6 +18,19 @@ const MakeYourOwn = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [generatedMockups, setGeneratedMockups] = useState<Array<{ url: string; template: string; width: number; height: number }>>([]);
   const [originalDesignUrl, setOriginalDesignUrl] = useState<string | null>(null);
+  
+  // Get or create guest identifier for non-logged-in users
+  const getGuestIdentifier = () => {
+    const isLoggedIn = !!localStorage.getItem('authToken');
+    if (isLoggedIn) return null; // Logged in users don't need guest ID
+    
+    let guestId = localStorage.getItem('guestId');
+    if (!guestId) {
+      guestId = `guest_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      localStorage.setItem('guestId', guestId);
+    }
+    return guestId;
+  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -45,7 +58,7 @@ const MakeYourOwn = () => {
     setIsGeneratingMockups(true);
     try {
       // Step 1: Upload original design file to save it for admin
-      const uploadedFiles = await productsApi.uploadMedia([file], 'products/original-designs');
+      const uploadedFiles = await customProductsApi.uploadMedia([file], 'products/original-designs');
       const originalUrl = uploadedFiles[0]?.url;
       
       if (!originalUrl) {
@@ -80,61 +93,42 @@ const MakeYourOwn = () => {
     queryFn: () => customConfigApi.getPublicConfig(),
   });
 
-  // Create product mutation
+  // Create custom product mutation (Make Your Own)
   const createProductMutation = useMutation({
     mutationFn: async (data: any) => {
       setIsUploading(true);
       try {
-        // Use generated mockup images (minimum 1, use all available)
-        if (!generatedMockups || generatedMockups.length === 0) {
-          throw new Error('No mockup images available. Please upload your design first.');
-        }
-        
         if (!originalDesignUrl) {
           throw new Error('Original design file not available. Please upload your design again.');
         }
         
-        // Create product with generated mockup images + original design
-        // Mockup images first (for display), then original design at the end (for admin access)
-        const mediaItems = [
-          // Mockup images for product display (displayOrder: 0, 1, 2, ...)
-          ...generatedMockups.map((mockup, index) => ({
-            url: mockup.url,
-            type: 'image',
-            displayOrder: index
-          })),
-          // Original design file at the end (displayOrder: 9999)
-          // Admin Note: The media item with displayOrder: 9999 is the original user-uploaded design file
-          // This allows admin to access and download the original design for future use
-          {
-            url: originalDesignUrl,
-            type: 'image',
-            displayOrder: 9999 // High number so it appears last in media list, admin can easily identify it
-          }
-        ];
+        // Create custom product (user-specific, never appears in public listings)
+        const guestId = getGuestIdentifier();
+        const customProductData = {
+          name: data.name || 'Custom Design',
+          description: data.description || 'Your custom design',
+          designPrice: data.designPrice || 0,
+          images: [originalDesignUrl], // Use original design URL
+          mockupUrls: generatedMockups.map(m => m.url), // Include all generated mockup URLs
+          userEmail: guestId, // Include guest identifier if not logged in
+        };
         
-        return productsApi.createFromUpload({
-          ...data,
-          media: mediaItems
-        });
+        return customProductsApi.create(customProductData);
       } finally {
         setIsUploading(false);
       }
     },
     onSuccess: (createdProduct) => {
-      toast.success('Product created successfully!');
-      // Navigate to product detail page using slug
-      if (createdProduct.slug) {
-        navigate(`/products/${createdProduct.slug}`);
-      } else if (createdProduct.id) {
-        // Fallback to ID if slug is not available
-        navigate(`/products/${createdProduct.id}`);
+      toast.success('Custom product created! Now select your fabric.');
+      // Navigate to custom product detail page
+      if (createdProduct.id) {
+        navigate(`/custom-product/${createdProduct.id}`);
       } else {
         toast.error('Product created but unable to navigate. Please refresh the page.');
       }
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to create product');
+      toast.error(error.message || 'Failed to create custom product');
     },
   });
 

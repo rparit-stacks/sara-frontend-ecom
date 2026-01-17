@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, Package, ExternalLink, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Package, ExternalLink, Loader2, Pause, Play, Download, CheckSquare, Square } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -33,6 +33,8 @@ const AdminProducts = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [deleteProductId, setDeleteProductId] = useState<number | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [filterType, setFilterType] = useState<'ALL' | ProductType>(() => {
     const typeParam = searchParams.get('type') as ProductType | null;
     return typeParam || 'ALL';
@@ -136,9 +138,61 @@ const AdminProducts = () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast.success('Product deleted successfully!');
       setDeleteProductId(null);
+      setSelectedProducts(new Set());
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to delete product');
+    },
+  });
+
+  // Bulk delete mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: productsApi.bulkDelete,
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success(`${data.count || selectedProducts.size} product(s) deleted successfully!`);
+      setBulkDeleteIds(null);
+      setSelectedProducts(new Set());
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to delete products');
+    },
+  });
+
+  // Toggle status mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: productsApi.toggleStatus,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Product status updated successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update product status');
+    },
+  });
+
+  // Bulk toggle status mutation
+  const bulkToggleStatusMutation = useMutation({
+    mutationFn: ({ ids, action }: { ids: number[]; action: 'pause' | 'unpause' }) => 
+      productsApi.bulkToggleStatus(ids, action),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success(`${data.count || selectedProducts.size} product(s) ${data.message?.includes('pause') ? 'paused' : 'unpaused'} successfully!`);
+      setSelectedProducts(new Set());
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update product status');
+    },
+  });
+
+  // Export mutation
+  const exportMutation = useMutation({
+    mutationFn: productsApi.exportToExcel,
+    onSuccess: () => {
+      toast.success('Products exported to Excel successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to export products');
     },
   });
 
@@ -202,6 +256,65 @@ const AdminProducts = () => {
     }
   };
 
+  const confirmBulkDelete = () => {
+    if (bulkDeleteIds && bulkDeleteIds.length > 0) {
+      bulkDeleteMutation.mutate(bulkDeleteIds);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedProducts.size === filteredProducts.length) {
+      setSelectedProducts(new Set());
+    } else {
+      setSelectedProducts(new Set(filteredProducts.map((p: any) => p.id)));
+    }
+  };
+
+  const handleSelectProduct = (productId: number) => {
+    const newSelected = new Set(selectedProducts);
+    if (newSelected.has(productId)) {
+      newSelected.delete(productId);
+    } else {
+      newSelected.add(productId);
+    }
+    setSelectedProducts(newSelected);
+  };
+
+  const handleBulkPause = () => {
+    const ids = Array.from(selectedProducts);
+    if (ids.length === 0) {
+      toast.error('Please select at least one product');
+      return;
+    }
+    bulkToggleStatusMutation.mutate({ ids, action: 'pause' });
+  };
+
+  const handleBulkUnpause = () => {
+    const ids = Array.from(selectedProducts);
+    if (ids.length === 0) {
+      toast.error('Please select at least one product');
+      return;
+    }
+    bulkToggleStatusMutation.mutate({ ids, action: 'unpause' });
+  };
+
+  const handleBulkDelete = () => {
+    const ids = Array.from(selectedProducts);
+    if (ids.length === 0) {
+      toast.error('Please select at least one product');
+      return;
+    }
+    setBulkDeleteIds(ids);
+  };
+
+  const handleToggleStatus = (productId: number) => {
+    toggleStatusMutation.mutate(productId);
+  };
+
+  const handleExport = () => {
+    exportMutation.mutate();
+  };
+
   // Transform plain products for the form dialog
   const plainProductsForForm: PlainProduct[] = plainProducts
     .filter((p: any) => p && p.id) // Filter out any null/undefined products
@@ -263,12 +376,60 @@ const AdminProducts = () => {
             </h1>
             <p className="text-muted-foreground text-lg">Create and manage all product types</p>
           </div>
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button className="btn-primary gap-2" onClick={() => setIsAddDialogOpen(true)}>
-              <Plus className="w-4 h-4" />
-              Add New Product
-            </Button>
-          </motion.div>
+          <div className="flex gap-2">
+            {selectedProducts.size > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="flex gap-2"
+              >
+                <Button 
+                  variant="outline" 
+                  className="gap-2"
+                  onClick={handleBulkPause}
+                  disabled={bulkToggleStatusMutation.isPending}
+                >
+                  <Pause className="w-4 h-4" />
+                  Pause ({selectedProducts.size})
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="gap-2"
+                  onClick={handleBulkUnpause}
+                  disabled={bulkToggleStatusMutation.isPending}
+                >
+                  <Play className="w-4 h-4" />
+                  Unpause ({selectedProducts.size})
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  className="gap-2"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleteMutation.isPending}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete ({selectedProducts.size})
+                </Button>
+              </motion.div>
+            )}
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button 
+                variant="outline" 
+                className="gap-2"
+                onClick={handleExport}
+                disabled={exportMutation.isPending}
+              >
+                <Download className="w-4 h-4" />
+                {exportMutation.isPending ? 'Exporting...' : 'Export Excel'}
+              </Button>
+            </motion.div>
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button className="btn-primary gap-2" onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="w-4 h-4" />
+                Add New Product
+              </Button>
+            </motion.div>
+          </div>
           
           <ProductFormDialog
             open={isAddDialogOpen}
@@ -335,6 +496,18 @@ const AdminProducts = () => {
             <table className="w-full">
               <thead className="bg-muted">
                 <tr>
+                  <th className="text-left p-4 font-semibold text-sm w-12">
+                    <button
+                      onClick={handleSelectAll}
+                      className="flex items-center justify-center"
+                    >
+                      {selectedProducts.size === filteredProducts.length && filteredProducts.length > 0 ? (
+                        <CheckSquare className="w-5 h-5 text-primary" />
+                      ) : (
+                        <Square className="w-5 h-5 text-muted-foreground" />
+                      )}
+                    </button>
+                  </th>
                   <th className="text-left p-4 font-semibold text-sm">Product</th>
                   <th className="text-left p-4 font-semibold text-sm">Type</th>
                   <th className="text-left p-4 font-semibold text-sm">Category</th>
@@ -346,7 +519,7 @@ const AdminProducts = () => {
               <tbody>
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={7} className="p-8 text-center text-muted-foreground">
                       No products found. Create your first product!
                     </td>
                   </tr>
@@ -357,8 +530,20 @@ const AdminProducts = () => {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: Math.min(index * 0.05, 0.5), duration: 0.3 }}
-                      className="border-t border-border hover:bg-muted/50 transition-colors"
+                      className={`border-t border-border hover:bg-muted/50 transition-colors ${selectedProducts.has(product.id) ? 'bg-primary/5' : ''}`}
                     >
+                      <td className="p-4">
+                        <button
+                          onClick={() => handleSelectProduct(product.id)}
+                          className="flex items-center justify-center"
+                        >
+                          {selectedProducts.has(product.id) ? (
+                            <CheckSquare className="w-5 h-5 text-primary" />
+                          ) : (
+                            <Square className="w-5 h-5 text-muted-foreground" />
+                          )}
+                        </button>
+                      </td>
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           {product.images?.[0] ? (
@@ -402,6 +587,24 @@ const AdminProducts = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
+                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-9 w-9"
+                              onClick={() => handleToggleStatus(product.id)}
+                              disabled={toggleStatusMutation.isPending}
+                              title={product.status === 'ACTIVE' ? 'Pause' : 'Unpause'}
+                            >
+                              {toggleStatusMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : product.status === 'ACTIVE' ? (
+                                <Pause className="w-4 h-4" />
+                              ) : (
+                                <Play className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </motion.div>
                           <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                             <Button 
                               variant="ghost" 
@@ -454,6 +657,28 @@ const AdminProducts = () => {
                 disabled={deleteMutation.isPending}
               >
                 {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Bulk Delete Confirmation Dialog */}
+        <AlertDialog open={bulkDeleteIds !== null} onOpenChange={(open) => !open && setBulkDeleteIds(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete {bulkDeleteIds?.length || 0} Product(s)</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {bulkDeleteIds?.length || 0} selected product(s)? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={bulkDeleteMutation.isPending}>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmBulkDelete} 
+                className="bg-destructive text-destructive-foreground"
+                disabled={bulkDeleteMutation.isPending}
+              >
+                {bulkDeleteMutation.isPending ? 'Deleting...' : 'Delete All'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

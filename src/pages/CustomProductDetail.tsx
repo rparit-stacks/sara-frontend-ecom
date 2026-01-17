@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Heart, ShoppingBag, Share2, Truck, RotateCcw, Shield, Minus, Plus, ChevronRight, Palette, CheckCircle2, Info } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
@@ -14,44 +15,107 @@ import { FormField } from '@/components/admin/FormBuilder';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { IndianRupee } from 'lucide-react';
-
-// Mock custom form fields from admin config - In real app, fetch from API: GET /api/admin/custom-config
-const getCustomFormFields = (): FormField[] => [
-  {
-    id: 'field-1',
-    type: 'text',
-    label: 'Product Name',
-    placeholder: 'Enter a name for your custom product',
-    required: true,
-    min: 3,
-    max: 50,
-  },
-  {
-    id: 'field-2',
-    type: 'dropdown',
-    label: 'Product Category',
-    required: true,
-    options: ['Home Decor', 'Fashion', 'Accessories'],
-  },
-];
-
-// Mock design price - In real app, this would come from config
-const DESIGN_PRICE = 1000;
+import { customProductsApi, cartApi, wishlistApi, customConfigApi } from '@/lib/api';
 
 const CustomProductDetail = () => {
+  const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   
-  const designUrl = (location.state as any)?.designUrl;
-  const isTemporary = (location.state as any)?.isTemporary ?? true;
-  const isCustomDesign = (location.state as any)?.isCustomDesign ?? true;
+  // This is always a custom design page
+  const isCustomDesign = true;
+  
+  // Get custom config from backend
+  const { data: customConfig } = useQuery({
+    queryKey: ['customConfig'],
+    queryFn: () => customConfigApi.getPublicConfig(),
+  });
+
+  // Get or create guest identifier for non-logged-in users
+  const getGuestIdentifier = () => {
+    const isLoggedIn = !!localStorage.getItem('authToken');
+    if (isLoggedIn) return null;
+    
+    let guestId = localStorage.getItem('guestId');
+    if (!guestId) {
+      guestId = `guest_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      localStorage.setItem('guestId', guestId);
+    }
+    return guestId;
+  };
+
+  // Get custom product from API if ID is in URL
+  const guestId = getGuestIdentifier();
+  const { data: customProduct, isLoading: loadingProduct } = useQuery({
+    queryKey: ['customProduct', id, guestId],
+    queryFn: () => customProductsApi.getById(Number(id!), guestId || undefined),
+    enabled: !!id,
+  });
+  
+  // Fallback to location.state for backward compatibility
+  const designUrl = customProduct?.designUrl || (location.state as any)?.designUrl;
+  const customProductId = customProduct?.id || (id ? Number(id) : null);
+  const isTemporary = !customProduct?.isSaved ?? true;
+  
+  // Parse mockup URLs from customProduct (stored as JSON string)
+  const mockupUrls = useMemo(() => {
+    if (!customProduct?.mockupUrls) return [];
+    try {
+      const parsed = JSON.parse(customProduct.mockupUrls);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }, [customProduct?.mockupUrls]);
+  
+  // Combine original design with all mockup images (must be before early return)
+  const displayImages = useMemo(() => {
+    if (!designUrl) return [];
+    const images = [designUrl]; // Original design first
+    if (mockupUrls && mockupUrls.length > 0) {
+      images.push(...mockupUrls); // Add all mockup URLs
+    }
+    return images;
+  }, [designUrl, mockupUrls]);
+  
+  // Get design price from custom config (backend provides this)
+  const DESIGN_PRICE = useMemo(() => {
+    return customConfig?.designPrice || customProduct?.designPrice || 1000;
+  }, [customConfig?.designPrice, customProduct?.designPrice]);
+  
+  // Get custom form fields from config (backend provides this)
+  const customFormFields = useMemo(() => {
+    return customConfig?.formFields || [];
+  }, [customConfig?.formFields]);
+  
+  // Auto-delete unsaved product when user leaves
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (customProductId && isTemporary) {
+        // Delete unsaved product when user leaves
+        customProductsApi.deleteUnsaved(customProductId).catch(() => {
+          // Ignore errors on page unload
+        });
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Also delete when component unmounts (user navigates away)
+      if (customProductId && isTemporary) {
+        const guestId = getGuestIdentifier();
+        customProductsApi.deleteUnsaved(customProductId, guestId || undefined).catch(() => {});
+      }
+    };
+  }, [customProductId, isTemporary]);
   
   useEffect(() => {
-    if (!designUrl) {
+    if (!designUrl && !loadingProduct) {
       toast.error('Please upload a design first.');
       navigate('/make-your-own');
     }
-  }, [designUrl, navigate]);
+  }, [designUrl, loadingProduct, navigate]);
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
@@ -65,13 +129,12 @@ const CustomProductDetail = () => {
   // Custom Form State
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customFormData, setCustomFormData] = useState<Record<string, any>>({});
-  const customFormFields = getCustomFormFields();
 
   // Calculate combined price (Design Price + Fabric Price)
   const combinedPrice = useMemo(() => {
     if (!fabricSelectionData) return DESIGN_PRICE;
     return DESIGN_PRICE + fabricSelectionData.totalPrice;
-  }, [fabricSelectionData]);
+  }, [fabricSelectionData, DESIGN_PRICE]);
 
   const handlePlainProductSelect = (productId: string) => {
     setSelectedPlainProductId(productId);
@@ -92,6 +155,29 @@ const CustomProductDetail = () => {
     toast.success('Custom information saved!');
   };
 
+  // Save custom product mutation
+  const saveCustomProductMutation = useMutation({
+    mutationFn: () => customProductId ? customProductsApi.save(customProductId) : Promise.resolve(null),
+    onSuccess: () => {
+      setIsSaved(true);
+    },
+  });
+
+  // Add to cart mutation
+  const addToCartMutation = useMutation({
+    mutationFn: (cartData: any) => cartApi.addItem(cartData),
+    onSuccess: () => {
+      if (customProductId) {
+        // Save custom product when added to cart
+        saveCustomProductMutation.mutate();
+      }
+      toast.success('Custom product added to cart and saved!');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to add to cart');
+    },
+  });
+
   const handleAddToCart = () => {
     if (!fabricSelectionData) {
       toast.error('Please select a fabric first');
@@ -103,29 +189,39 @@ const CustomProductDetail = () => {
       return;
     }
 
-    const productData = {
-      id: `custom-${Date.now()}`,
-      type: 'CUSTOM',
-      name: customFormData['field-1'] || 'Custom Studio Sara Piece',
-      designUrl,
+    const cartData = {
+      productType: 'CUSTOM',
+      productId: customProductId || 0, // Custom products don't have regular product ID
+      productName: customFormData['field-1'] || 'Custom Studio Sara Piece',
+      productImage: designUrl,
       designPrice: DESIGN_PRICE,
-      fabricId: fabricSelectionData.fabricId,
+      fabricId: Number(fabricSelectionData.fabricId),
       fabricPrice: fabricSelectionData.totalPrice,
-      variants: fabricSelectionData.selectedVariants,
       quantity: fabricSelectionData.quantity,
-      customFormData,
-      totalPrice: combinedPrice,
-      isCustom: true,
-      savedAt: new Date().toISOString()
+      unitPrice: combinedPrice,
+      variants: fabricSelectionData.selectedVariants,
+      customFormData: customFormData,
+      uploadedDesignUrl: designUrl,
+      customProductId: customProductId, // Include custom product ID
     };
     
-    const existingCart = JSON.parse(localStorage.getItem('cart') || '[]');
-    existingCart.push(productData);
-    localStorage.setItem('cart', JSON.stringify(existingCart));
-    
-    setIsSaved(true);
-    toast.success('Custom product added to cart and saved!');
+    addToCartMutation.mutate(cartData);
   };
+
+  // Add to wishlist mutation
+  const addToWishlistMutation = useMutation({
+    mutationFn: (wishlistData: any) => wishlistApi.addItem(wishlistData),
+    onSuccess: () => {
+      if (customProductId) {
+        // Save custom product when added to wishlist
+        saveCustomProductMutation.mutate();
+      }
+      toast.success('Custom product added to wishlist and saved!');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to add to wishlist');
+    },
+  });
 
   const handleAddToWishlist = () => {
     if (!fabricSelectionData) {
@@ -133,32 +229,24 @@ const CustomProductDetail = () => {
       return;
     }
 
-    const productData = {
-      id: `custom-${Date.now()}`,
-      type: 'CUSTOM',
-      name: customFormData['field-1'] || 'Custom Studio Sara Piece',
-      designUrl,
+    const wishlistData = {
+      productType: 'CUSTOM',
+      productId: customProductId || 0,
+      productName: customFormData['field-1'] || 'Custom Studio Sara Piece',
+      productImage: designUrl,
       designPrice: DESIGN_PRICE,
-      fabricId: fabricSelectionData.fabricId,
+      fabricId: Number(fabricSelectionData.fabricId),
       fabricPrice: fabricSelectionData.totalPrice,
       variants: fabricSelectionData.selectedVariants,
-      customFormData,
-      totalPrice: combinedPrice,
-      isCustom: true,
-      savedAt: new Date().toISOString()
+      customFormData: customFormData,
+      uploadedDesignUrl: designUrl,
+      customProductId: customProductId,
     };
     
-    const existingWishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
-    existingWishlist.push(productData);
-    localStorage.setItem('wishlist', JSON.stringify(existingWishlist));
-    
-    setIsSaved(true);
-    toast.success('Custom product added to wishlist and saved!');
+    addToWishlistMutation.mutate(wishlistData);
   };
 
-  if (!designUrl) return null;
-
-  const displayImages = [designUrl]; // Just the uploaded design
+  if (!designUrl || displayImages.length === 0) return null;
 
   return (
     <Layout>
@@ -213,10 +301,34 @@ const CustomProductDetail = () => {
                   >
                     <img
                       src={displayImages[selectedImage]}
-                      alt="Your custom design"
+                      alt={selectedImage === 0 ? "Your custom design" : `Mockup ${selectedImage}`}
                       className="w-full h-full object-cover"
                     />
                   </motion.div>
+                  
+                  {/* Thumbnail navigation if multiple images */}
+                  {displayImages.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                      {displayImages.map((img, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedImage(idx)}
+                          className={cn(
+                            "flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-all",
+                            selectedImage === idx
+                              ? "border-primary shadow-md"
+                              : "border-border hover:border-primary/50"
+                          )}
+                        >
+                          <img
+                            src={img}
+                            alt={idx === 0 ? "Original design" : `Mockup ${idx}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   
                   <div className="flex justify-center">
                     <button 
@@ -241,7 +353,9 @@ const CustomProductDetail = () => {
                   </div>
 
                   <div>
-                    <h1 className="font-cursive text-5xl lg:text-6xl mb-5">Your Custom Design</h1>
+                    <h1 className="font-cursive text-5xl lg:text-6xl mb-5">
+                      {customConfig?.pageTitle || 'Your Custom Design'}
+                    </h1>
                     
                     {/* Price Display */}
                     <div className="space-y-2 mb-6">
@@ -257,9 +371,19 @@ const CustomProductDetail = () => {
                     </div>
                   </div>
 
-                  <p className="text-muted-foreground text-lg leading-relaxed">
-                    Create a one-of-a-kind Studio Sara product with your unique design. Select your preferred fabric and customize your product.
-                  </p>
+                  {customConfig?.pageDescription && (
+                    <p className="text-muted-foreground text-lg leading-relaxed">
+                      {customConfig.pageDescription}
+                    </p>
+                  )}
+                  
+                  {customConfig?.instructions && (
+                    <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
+                      <p className="text-sm text-muted-foreground whitespace-pre-line">
+                        {customConfig.instructions}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Fabric Selection - Same as Design Product */}
                   {!fabricSelectionData ? (
@@ -267,7 +391,7 @@ const CustomProductDetail = () => {
                       <div>
                         <h4 className="font-medium mb-4 text-lg flex items-center gap-2">
                           <Palette className="w-5 h-5 text-primary" />
-                          Select Plain Product (Fabric)
+                          {customConfig?.selectFabricLabel || 'Select Fabric'}
                         </h4>
                         <p className="text-sm text-muted-foreground mb-4">
                           Choose a fabric for your custom design. You can browse all available options.
@@ -278,7 +402,7 @@ const CustomProductDetail = () => {
                           className="w-full h-12 text-base gap-2"
                         >
                           <Palette className="w-5 h-5" />
-                          Browse All Plain Products
+                          {customConfig?.selectFabricLabel || 'Browse All Plain Products'}
                         </Button>
                       </div>
                     </div>
@@ -288,7 +412,7 @@ const CustomProductDetail = () => {
                         <div>
                           <h4 className="font-medium text-lg">Selected Fabric</h4>
                           <p className="text-sm text-muted-foreground">
-                            Quantity: {fabricSelectionData.quantity} meters
+                            {customConfig?.quantityLabel || 'Quantity'}: {fabricSelectionData.quantity} meters
                           </p>
                         </div>
                         <Button
@@ -349,7 +473,7 @@ const CustomProductDetail = () => {
                       className="flex-1 min-w-[220px] btn-primary gap-3 h-14 text-base"
                     >
                       <ShoppingBag className="w-5 h-5" />
-                      Add to Cart
+                      {customConfig?.addToCartButtonText || 'Add to Cart'}
                     </Button>
                     <Button 
                       size="lg" 
@@ -364,6 +488,24 @@ const CustomProductDetail = () => {
                       <Share2 className="w-5 h-5" />
                     </Button>
                   </div>
+
+                  {/* Terms and Conditions */}
+                  {customConfig?.termsAndConditions && customConfig.termsAndConditions.trim() && (
+                    <div className="pt-8 border-t border-border">
+                      <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="terms">
+                          <AccordionTrigger className="text-left">
+                            Terms and Conditions
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="text-sm text-muted-foreground whitespace-pre-line">
+                              {customConfig.termsAndConditions}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </div>
+                  )}
 
                   {/* Trust Features */}
                   <div className="grid grid-cols-3 gap-6 pt-8 border-t border-border">
@@ -393,7 +535,7 @@ const CustomProductDetail = () => {
           <PlainProductSelectionPopup
             open={showPlainProductSelection}
             onOpenChange={setShowPlainProductSelection}
-            recommendedPlainProductIds={[]} // No recommendations for custom designs
+            recommendedPlainProductIds={customConfig?.recommendedFabricIds || []} // Use recommendations from config
             onPlainProductSelect={handlePlainProductSelect}
           />
           
