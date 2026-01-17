@@ -35,24 +35,27 @@ export interface DetailSection {
 // Removed mock data - now using API for all product data
 
 const ProductDetail = () => {
-  const { id } = useParams();
+  const { id, slug } = useParams();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   
-  // Check if id is a number (ID) or string (slug)
-  const isNumeric = id && /^\d+$/.test(id);
+  // Get identifier from either id or slug param
+  const identifier = id || slug;
+  
+  // Check if identifier is a number (ID) or string (slug)
+  const isNumeric = identifier && /^\d+$/.test(identifier);
   
   // Fetch product from API - support both ID and slug
   const { data: apiProduct, isLoading: productLoading, error: productError } = useQuery({
-    queryKey: ['product', id],
+    queryKey: ['product', identifier],
     queryFn: () => {
       if (isNumeric) {
-        return productsApi.getById(Number(id!));
+        return productsApi.getById(Number(identifier!));
       } else {
-        return productsApi.getBySlug(id!);
+        return productsApi.getBySlug(identifier!);
       }
     },
-    enabled: !!id,
+    enabled: !!identifier,
     retry: 1,
   });
   
