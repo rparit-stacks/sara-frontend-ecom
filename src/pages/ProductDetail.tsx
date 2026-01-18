@@ -7,6 +7,7 @@ import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
 import { Button } from '@/components/ui/button';
+import { ButtonWithLoading } from '@/components/ui/ButtonWithLoading';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +22,7 @@ import { productsApi, cartApi, wishlistApi, customConfigApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import DynamicForm from '@/components/products/DynamicForm';
 import { FormField } from '@/components/admin/FormBuilder';
+import { usePrice } from '@/lib/currency';
 
 // Product Type
 type ProductType = 'PLAIN' | 'DESIGNED' | 'DIGITAL';
@@ -35,27 +37,16 @@ export interface DetailSection {
 // Removed mock data - now using API for all product data
 
 const ProductDetail = () => {
-  const { id, slug } = useParams();
+  const { slug } = useParams();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const { format } = usePrice();
   
-  // Get identifier from either id or slug param
-  const identifier = id || slug;
-  
-  // Check if identifier is a number (ID) or string (slug)
-  const isNumeric = identifier && /^\d+$/.test(identifier);
-  
-  // Fetch product from API - support both ID and slug
+  // Fetch product from API using slug only
   const { data: apiProduct, isLoading: productLoading, error: productError } = useQuery({
-    queryKey: ['product', identifier],
-    queryFn: () => {
-      if (isNumeric) {
-        return productsApi.getById(Number(identifier!));
-      } else {
-        return productsApi.getBySlug(identifier!);
-      }
-    },
-    enabled: !!identifier,
+    queryKey: ['product', slug],
+    queryFn: () => productsApi.getBySlug(slug!),
+    enabled: !!slug,
     retry: 1,
   });
   
@@ -528,9 +519,15 @@ const ProductDetail = () => {
     },
   });
 
+  // State for Buy Design Only loading
+  const [isBuyingDesignOnly, setIsBuyingDesignOnly] = useState(false);
+
   // Handle purchase design only
   const handlePurchaseDesignOnly = async () => {
     if (!productId || !product) return;
+    
+    setIsBuyingDesignOnly(true);
+    const startTime = Date.now();
     
     try {
       let digitalProd = digitalProduct;
@@ -542,12 +539,20 @@ const ProductDetail = () => {
           queryClient.invalidateQueries({ queryKey: ['digitalProduct', productId] });
         } catch (error: any) {
           toast.error(error.message || 'Failed to create digital product');
+          const elapsed = Date.now() - startTime;
+          const remaining = Math.max(0, 300 - elapsed);
+          await new Promise(resolve => setTimeout(resolve, remaining));
+          setIsBuyingDesignOnly(false);
           return;
         }
       }
       
       if (!digitalProd?.id) {
         toast.error('Digital product not available');
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, 300 - elapsed);
+        await new Promise(resolve => setTimeout(resolve, remaining));
+        setIsBuyingDesignOnly(false);
         return;
       }
       
@@ -569,8 +574,18 @@ const ProductDetail = () => {
       } else {
         addToCartMutation.mutate(cartData);
       }
+      
+      // Ensure minimum visibility duration
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, 300 - elapsed);
+      await new Promise(resolve => setTimeout(resolve, remaining));
     } catch (error: any) {
       toast.error(error.message || 'Failed to add digital design to cart');
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, 300 - elapsed);
+      await new Promise(resolve => setTimeout(resolve, remaining));
+    } finally {
+      setIsBuyingDesignOnly(false);
     }
   };
   
@@ -797,9 +812,39 @@ const ProductDetail = () => {
       return;
     }
     
-    // Open download link in new tab
+    // Check if fileUrl is a JSON array (multiple files)
+    try {
+      const fileUrls = JSON.parse(product.fileUrl);
+      if (Array.isArray(fileUrls) && fileUrls.length > 0) {
+        // Multiple files - open all in new tabs
+        fileUrls.forEach((url: string, index: number) => {
+          setTimeout(() => {
+            window.open(url, '_blank');
+          }, index * 200); // Stagger opens to avoid popup blocker
+        });
+        toast.success(`Opening ${fileUrls.length} design file(s)...`);
+      } else {
+        // Single file
     window.open(product.fileUrl, '_blank');
     toast.success('Opening download...');
+      }
+    } catch {
+      // Not JSON, treat as single URL or comma-separated
+      if (product.fileUrl.includes(',') && !product.fileUrl.startsWith('http')) {
+        // Comma-separated URLs
+        const urls = product.fileUrl.split(',').map((u: string) => u.trim()).filter((u: string) => u);
+        urls.forEach((url: string, index: number) => {
+          setTimeout(() => {
+            window.open(url, '_blank');
+          }, index * 200);
+        });
+        toast.success(`Opening ${urls.length} design file(s)...`);
+      } else {
+        // Single URL
+        window.open(product.fileUrl, '_blank');
+        toast.success('Opening download...');
+      }
+    }
   };
 
   const getTypeBadge = () => {
@@ -1008,7 +1053,7 @@ const ProductDetail = () => {
                             {/* Design Price */}
                             <div className="flex flex-col">
                               <p className="text-xs sm:text-sm text-muted-foreground mb-1">Design Price</p>
-                              <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">₹{product.designPrice}</span>
+                              <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">{format(product.designPrice || 0)}</span>
                             </div>
                             
                             {/* Plus Sign */}
@@ -1021,18 +1066,16 @@ const ProductDetail = () => {
                                   <p className="text-xs sm:text-sm text-muted-foreground mb-1">Fabric Price</p>
                                   <div className="flex flex-col">
                                     <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">
-                                      ₹{(() => {
+                                      {format((() => {
                                         const effectivePrice = effectivePricingSlabs && effectivePricingSlabs.length > 0
                                           ? calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs)
                                           : fabricPricePerMeter;
                                         return effectivePrice * fabricQuantity;
-                                      })()}
+                                      })())}
                                     </span>
                                     {effectivePricingSlabs && effectivePricingSlabs.length > 0 && (
                                       <span className="text-[10px] xs:text-xs text-muted-foreground mt-0.5 leading-tight">
-                                        @ ₹{(() => {
-                                          return calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs);
-                                        })()}/meter (slab pricing)
+                                        @ {format(calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs))}/meter (slab pricing)
                                       </span>
                                     )}
                                   </div>
@@ -1057,7 +1100,7 @@ const ProductDetail = () => {
                                   <span className="text-2xl sm:text-3xl text-muted-foreground font-light mt-5">+</span>
                                   <div className="flex flex-col">
                                     <p className="text-xs sm:text-sm text-muted-foreground mb-1">Variant Modifiers</p>
-                                    <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">₹{modifier}</span>
+                                    <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">{format(modifier)}</span>
                                   </div>
                                 </>
                               ) : null;
@@ -1069,7 +1112,7 @@ const ProductDetail = () => {
                                 <span className="text-2xl sm:text-3xl text-muted-foreground font-light mt-5">=</span>
                                 <div className="flex flex-col">
                                   <p className="text-xs sm:text-sm text-muted-foreground mb-1">Total</p>
-                                  <span className="font-bold font-normal text-xl sm:text-2xl text-primary not-italic">₹{combinedPrice}</span>
+                                  <span className="font-bold font-normal text-xl sm:text-2xl text-primary not-italic">{format(combinedPrice)}</span>
                                 </div>
                               </>
                             )}
@@ -1083,7 +1126,7 @@ const ProductDetail = () => {
                                 const effectivePrice = effectivePricingSlabs && effectivePricingSlabs.length > 0
                                   ? calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs)
                                   : fabricPricePerMeter;
-                                return `₹${effectivePrice}/meter × ${fabricQuantity} meter${fabricQuantity !== 1 ? 's' : ''} = ₹${effectivePrice * fabricQuantity}`;
+                                return `${format(effectivePrice)}/meter × ${fabricQuantity} meter${fabricQuantity !== 1 ? 's' : ''} = ${format(effectivePrice * fabricQuantity)}`;
                               })()}
                             </p>
                           </div>
@@ -1104,7 +1147,7 @@ const ProductDetail = () => {
                       <div>
                         <div className="flex items-baseline gap-3">
                           <span className="font-bold font-normal text-xl sm:text-2xl text-primary not-italic">
-                            ₹{(() => {
+                            {format((() => {
                               const basePrice = product.pricePerMeter || product.price || 0;
                               let variantModifier = 0;
                               if (product.variants && product.variants.length > 0) {
@@ -1119,14 +1162,14 @@ const ProductDetail = () => {
                                 });
                               }
                               return basePrice + variantModifier;
-                            })()}
+                            })())}
                           </span>
                           <span className="text-sm text-muted-foreground">per meter</span>
                         </div>
                         {finalPrice > 0 && (
                           <div className="mt-2 pt-2 border-t border-border/50">
                             <p className="text-xs text-muted-foreground mb-1">Total for {quantity} meter{quantity !== 1 ? 's' : ''}</p>
-                            <span className="font-bold font-normal text-lg text-primary not-italic">₹{finalPrice}</span>
+                            <span className="font-bold font-normal text-lg text-primary not-italic">{format(finalPrice)}</span>
                           </div>
                         )}
                         <Button
@@ -1311,7 +1354,7 @@ const ProductDetail = () => {
                                   {option.value}
                                   {option.priceModifier && option.priceModifier !== 0 && (
                                     <span className="ml-2 text-xs text-muted-foreground">
-                                      {option.priceModifier > 0 ? '+' : ''}₹{option.priceModifier}
+                                      {option.priceModifier > 0 ? '+' : ''}{format(option.priceModifier)}
                                     </span>
                                   )}
                                 </button>
@@ -1402,7 +1445,7 @@ const ProductDetail = () => {
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Base Price</span>
                         <span className="font-medium">
-                          ₹{product.type === 'DESIGNED' ? (product.designPrice || 0) : (product.price || 0)}
+                          {format(product.type === 'DESIGNED' ? (product.designPrice || 0) : (product.price || 0))}
                         </span>
                       </div>
                       {Object.keys(selectedVariants).length > 0 && (
@@ -1416,14 +1459,14 @@ const ProductDetail = () => {
                               <div key={variant.id} className="flex items-center justify-between mt-2">
                                 <span className="text-sm text-muted-foreground">{variant.name}: {selectedOption.value}</span>
                                 <span className="font-medium">
-                                  {selectedOption.priceModifier > 0 ? '+' : ''}₹{selectedOption.priceModifier}
+                                  {selectedOption.priceModifier > 0 ? '+' : ''}{format(selectedOption.priceModifier)}
                                 </span>
                               </div>
                             );
                           })}
                           <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
                             <span className="font-semibold">Total (×{quantity})</span>
-                            <span className="font-bold text-lg text-primary">₹{finalPrice}</span>
+                            <span className="font-bold text-lg text-primary">{format(finalPrice)}</span>
                           </div>
                         </>
                       )}
@@ -1510,30 +1553,23 @@ const ProductDetail = () => {
                             </Button>
                           )}
                           
-                          {/* Purchase Design Only Option - Only show for regular DESIGNED products, not custom products */}
-                          {!isCustomProduct && (
-                            <Button
+                          {/* Buy Design Only - Always visible for all DESIGNED products (admin-created) */}
+                          {product.type === 'DESIGNED' && (
+                            <ButtonWithLoading
                               size="lg"
                               variant="outline"
                               onClick={handlePurchaseDesignOnly}
-                              disabled={createDigitalMutation.isPending || isLoadingDigital}
+                              isLoading={isBuyingDesignOnly || createDigitalMutation.isPending || isLoadingDigital}
+                              loadingText="Adding to cart..."
+                              minimumDuration={300}
                               className="flex-1 w-full border-2 border-primary text-primary hover:bg-primary hover:text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
                             >
-                              {createDigitalMutation.isPending || isLoadingDigital ? (
-                                <>
-                                  <Loader2 className="w-5 h-5 flex-shrink-0 animate-spin" />
-                                  <span className="text-center">Loading...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Download className="w-5 h-5 flex-shrink-0" />
-                                  <span className="text-center">Purchase Digital Design</span>
-                                </>
-                              )}
-                            </Button>
+                              <Download className="w-5 h-5 flex-shrink-0" />
+                              <span className="text-center">Buy Design Only</span>
+                            </ButtonWithLoading>
                           )}
                         </div>
-                        {!isCustomProduct && (
+                        {product.type === 'DESIGNED' && (
                           <p className="text-xs sm:text-sm text-muted-foreground text-center px-2">
                             Choose to purchase the physical product with fabric or just the digital design file
                           </p>

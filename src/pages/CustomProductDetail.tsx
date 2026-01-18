@@ -16,11 +16,13 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { IndianRupee } from 'lucide-react';
 import { customProductsApi, cartApi, wishlistApi, customConfigApi } from '@/lib/api';
+import { usePrice } from '@/lib/currency';
 
 const CustomProductDetail = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const { format } = usePrice();
   
   // This is always a custom design page
   const isCustomDesign = true;
@@ -360,12 +362,12 @@ const CustomProductDetail = () => {
                     {/* Price Display */}
                     <div className="space-y-2 mb-6">
                       <div className="flex items-center gap-4">
-                        <span className="font-cursive text-4xl text-primary">₹{combinedPrice}</span>
+                        <span className="font-cursive text-4xl text-primary">{format(combinedPrice)}</span>
                       </div>
                       {fabricSelectionData && (
                         <div className="text-sm text-muted-foreground space-y-1">
-                          <p>Design Price: ₹{DESIGN_PRICE}</p>
-                          <p>Fabric Price: ₹{fabricSelectionData.totalPrice}</p>
+                          <p>Design Price: {format(DESIGN_PRICE)}</p>
+                          <p>Fabric Price: {format(fabricSelectionData.totalPrice)}</p>
                         </div>
                       )}
                     </div>

@@ -1,6 +1,18 @@
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
 
+// Global loading state management
+let loadingCallbacks: Set<(loading: boolean, message?: string) => void> = new Set();
+
+export const registerLoadingCallback = (callback: (loading: boolean, message?: string) => void) => {
+  loadingCallbacks.add(callback);
+  return () => loadingCallbacks.delete(callback);
+};
+
+const setGlobalLoading = (loading: boolean, message?: string) => {
+  loadingCallbacks.forEach(cb => cb(loading, message));
+};
+
 // Helper function for API calls
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   // Check if it's an admin route
@@ -27,6 +39,14 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
   });
   
   const startTime = Date.now();
+  const minDuration = 300; // Minimum 300ms loading visibility
+  
+  // Show loading for non-GET requests or if explicitly needed
+  const shouldShowLoading = method !== 'GET' || endpoint.includes('/cart') || endpoint.includes('/checkout');
+  
+  if (shouldShowLoading) {
+    setGlobalLoading(true, 'Loading...');
+  }
   
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -43,6 +63,16 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
         error,
         duration: `${duration}ms`,
       });
+      
+      // Ensure minimum duration before hiding loading
+      if (shouldShowLoading) {
+        const remaining = Math.max(0, minDuration - duration);
+        if (remaining > 0) {
+          await new Promise(resolve => setTimeout(resolve, remaining));
+        }
+        setGlobalLoading(false);
+      }
+      
       throw new Error(error || `API Error: ${response.status}`);
     }
     
@@ -56,6 +86,15 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
       dataSize: JSON.stringify(data).length,
     });
     
+    // Ensure minimum duration before hiding loading
+    if (shouldShowLoading) {
+      const remaining = Math.max(0, minDuration - duration);
+      if (remaining > 0) {
+        await new Promise(resolve => setTimeout(resolve, remaining));
+      }
+      setGlobalLoading(false);
+    }
+    
     return data;
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -63,6 +102,16 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
       error: error instanceof Error ? error.message : error,
       duration: `${duration}ms`,
     });
+    
+    // Ensure minimum duration before hiding loading
+    if (shouldShowLoading) {
+      const remaining = Math.max(0, minDuration - duration);
+      if (remaining > 0) {
+        await new Promise(resolve => setTimeout(resolve, remaining));
+      }
+      setGlobalLoading(false);
+    }
+    
     throw error;
   }
 }
@@ -117,7 +166,46 @@ export const productsApi = {
     }),
   getDigitalFromDesign: (designProductId: number) => 
     fetchApi<any>(`/api/products/${designProductId}/digital`),
+  downloadDigitalFiles: async (productId: number): Promise<Blob> => {
+    const token = localStorage.getItem('authToken') || localStorage.getItem('adminToken');
+    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+    const response = await fetch(`${API_BASE_URL}/api/products/${productId}/download-digital`, {
+      method: 'GET',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      throw new Error('Failed to download files');
+    }
+    return response.blob();
+  },
   createFromUpload: (data: any) => fetchApi<any>('/api/products/create-from-upload', { method: 'POST', body: JSON.stringify(data) }),
+  uploadMedia: async (files: File[], folder: string = 'products'): Promise<any[]> => {
+    const formData = new FormData();
+    files.forEach(file => {
+      formData.append('files', file);
+    });
+    formData.append('folder', folder);
+    
+    const token = localStorage.getItem('adminToken');
+    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+    console.log('[Product Media Upload] Uploading', files.length, 'files to:', `${API_BASE_URL}/api/admin/products/upload-media`);
+    
+    const response = await fetch(`${API_BASE_URL}/api/admin/products/upload-media`, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[Product Media Upload] Error:', error);
+      throw new Error(error || 'Failed to upload media');
+    }
+    
+    const data = await response.json();
+    console.log('[Product Media Upload] Success:', data);
+    return data.files || [];
+  },
 };
 
 // ===============================
@@ -450,12 +538,19 @@ export const orderApi = {
   // Admin
   getAllOrders: (status?: string) => fetchApi<any[]>(`/api/admin/orders${status ? `?status=${status}` : ''}`),
   getOrderByIdAdmin: (id: number) => fetchApi<any>(`/api/admin/orders/${id}`),
-  updateOrderStatus: (id: number, status: string) => 
-    fetchApi<any>(`/api/admin/orders/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
+  updateOrderStatus: (id: number, status: string, skipWhatsApp?: boolean) =>
+    fetchApi<any>(`/api/admin/orders/${id}/status`, { 
+      method: 'PUT', 
+      body: JSON.stringify({ status, skipWhatsApp: skipWhatsApp || false }) 
+    }),
   updatePaymentStatus: (id: number, paymentStatus: string, paymentId?: string) => 
     fetchApi<any>(`/api/admin/orders/${id}/payment`, { method: 'PUT', body: JSON.stringify({ paymentStatus, paymentId }) }),
   retrySwipeInvoice: (id: number) => 
     fetchApi<any>(`/api/admin/orders/${id}/retry-swipe-invoice`, { method: 'POST' }),
+  checkSwipeInvoice: (id: number) => 
+    fetchApi<any>(`/api/admin/orders/${id}/check-swipe-invoice`),
+  updateOrderShippingAddressAdmin: (id: number, shippingAddress: any) =>
+    fetchApi<any>(`/api/admin/orders/${id}/address`, { method: 'PUT', body: JSON.stringify({ shippingAddress }) }),
 };
 
 // ===============================
@@ -463,6 +558,7 @@ export const orderApi = {
 // ===============================
 export const businessConfigApi = {
   getConfig: () => fetchApi<any>('/api/admin/business-config'),
+  getConfigWithApiKey: () => fetchApi<any>('/api/admin/business-config/with-keys'),
   updateConfig: (data: any) => fetchApi<any>('/api/admin/business-config', { method: 'PUT', body: JSON.stringify(data) }),
 };
 
@@ -676,6 +772,26 @@ export const subscribeEmail = (email: string) =>
 export const getInstagramThumbnail = (url: string) => 
   fetchApi<{ thumbnailUrl: string }>(`/api/instagram/thumbnail`, { method: 'POST', body: JSON.stringify({ url }) });
 
+// ===============================
+// Currency API
+// ===============================
+export const currencyApi = {
+  getRates: () => fetchApi<{ currencies: any[]; rates: Record<string, number> }>('/api/currency/rates'),
+  convert: (amount: number, from: string, to: string) => 
+    fetchApi<{ amount: number; converted: number; from: string; to: string }>(
+      `/api/currency/convert?amount=${amount}&from=${from}&to=${to}`
+    ),
+};
+
+// ===============================
+// Payment API
+// ===============================
+export const paymentApi = {
+  getMethods: (country: string) => fetchApi<{ country: string; gateways: string[]; methods: Record<string, string[]> }>(`/api/payment/methods?country=${encodeURIComponent(country)}`),
+  createOrder: (data: any) => fetchApi<any>('/api/payment/create-order', { method: 'POST', body: JSON.stringify(data) }),
+  verify: (data: any) => fetchApi<any>('/api/payment/verify', { method: 'POST', body: JSON.stringify(data) }),
+};
+
 export default {
   products: productsApi,
   plainProducts: plainProductsApi,
@@ -696,4 +812,6 @@ export default {
   dashboard: dashboardApi,
   user: userApi,
   auth: authApi,
+  currency: currencyApi,
+  payment: paymentApi,
 };

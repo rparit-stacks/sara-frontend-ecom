@@ -19,7 +19,7 @@ const defaultHeroSlides = [
     subtitle: 'Embrace the Art of Floral',
     image: 'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=1920&h=1080&fit=crop',
     cta: 'Shop Now',
-    link: '/products',
+    link: '/products', // This is correct - it's the products listing page
   },
   {
     id: 2,

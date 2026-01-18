@@ -16,7 +16,8 @@ import {
   Tag,
   Truck,
   MessageSquare,
-  ShoppingBag
+  ShoppingBag,
+  CreditCard
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
@@ -73,6 +74,11 @@ const adminMenuItems = [
     icon: Settings, 
     label: 'Business Config', 
     path: '/admin-sara/business-config' 
+  },
+  { 
+    icon: CreditCard, 
+    label: 'Payment Settings', 
+    path: '/admin-sara/payment-config' 
   },
   { 
     icon: Users, 

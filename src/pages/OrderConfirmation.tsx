@@ -8,11 +8,14 @@ import { Loader2, CheckCircle2, Package, ArrowRight, LogIn, Download } from 'luc
 import { orderApi, productsApi } from '@/lib/api';
 import { format } from 'date-fns';
 import ScrollReveal from '@/components/animations/ScrollReveal';
+import { toast } from 'sonner';
+import { useState } from 'react';
 
 const OrderConfirmation = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
   
   // Get order ID from URL params or location state
   const orderId = id || (location.state as any)?.orderId;
@@ -24,6 +27,41 @@ const OrderConfirmation = () => {
     queryFn: () => orderApi.getOrderById(Number(orderId)),
     enabled: !!orderId,
   });
+
+  const handleDigitalDownload = async (item: any) => {
+    if (!item.productId) {
+      toast.error('Product ID not available');
+      return;
+    }
+
+    setDownloadingIds(prev => new Set(prev).add(item.productId));
+    
+    try {
+      // Download ZIP from backend
+      const blob = await productsApi.downloadDigitalFiles(item.productId);
+      
+      // Create download link and trigger download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `product_${item.productId}_files.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Download started!');
+    } catch (error: any) {
+      console.error('Download error:', error);
+      toast.error(error.message || 'Failed to download files');
+    } finally {
+      setDownloadingIds(prev => {
+        const next = new Set(prev);
+        next.delete(item.productId);
+        return next;
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -110,21 +148,20 @@ const OrderConfirmation = () => {
                                   size="sm"
                                   variant="outline"
                                   className="mt-2 gap-2"
-                                  onClick={async () => {
-                                    try {
-                                      const product = await productsApi.getById(item.productId);
-                                      if (product.fileUrl) {
-                                        window.open(product.fileUrl, '_blank');
-                                      } else {
-                                        alert('Download file not available');
-                                      }
-                                    } catch (error) {
-                                      alert('Failed to load download link');
-                                    }
-                                  }}
+                                  onClick={() => handleDigitalDownload(item)}
+                                  disabled={downloadingIds.has(item.productId)}
                                 >
-                                  <Download className="w-4 h-4" />
-                                  Download
+                                  {downloadingIds.has(item.productId) ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      Loading...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Download className="w-4 h-4" />
+                                      Download
+                                    </>
+                                  )}
                                 </Button>
                               )}
                             </div>

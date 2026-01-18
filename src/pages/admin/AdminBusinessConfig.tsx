@@ -70,7 +70,7 @@ const AdminBusinessConfig = () => {
         businessPincode: config.businessPincode || '',
         businessPhone: config.businessPhone || '',
         businessEmail: config.businessEmail || '',
-        swipeApiKey: '', // Don't populate API key for security
+        swipeApiKey: config.swipeApiKey === '***API_KEY_SET***' ? '' : (config.swipeApiKey || ''),
         swipeEnabled: config.swipeEnabled || false,
         einvoiceEnabled: config.einvoiceEnabled || false,
       });
@@ -79,7 +79,13 @@ const AdminBusinessConfig = () => {
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateMutation.mutate(formData);
+    // Only send API key if it's been changed (not empty and not placeholder)
+    const submitData = { ...formData };
+    if (!submitData.swipeApiKey || submitData.swipeApiKey.trim() === '') {
+      // Don't send empty API key - backend will keep existing one
+      delete submitData.swipeApiKey;
+    }
+    updateMutation.mutate(submitData);
   };
   
   const handleChange = (field: string, value: any) => {
@@ -228,15 +234,17 @@ const AdminBusinessConfig = () => {
             <h2 className="text-xl font-semibold mb-4">Swipe GST Billing Integration</h2>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="swipeApiKey">Swipe API Key *</Label>
+                <Label htmlFor="swipeApiKey">
+                  Swipe API Key {config?.swipeApiKey === '***API_KEY_SET***' ? '' : '*'}
+                </Label>
                 <div className="relative">
                   <Input
                     id="swipeApiKey"
                     type={showApiKey ? 'text' : 'password'}
                     value={formData.swipeApiKey}
                     onChange={(e) => handleChange('swipeApiKey', e.target.value)}
-                    placeholder="Enter Swipe API key"
-                    required
+                    placeholder={config?.swipeApiKey === '***API_KEY_SET***' ? 'API key is set (enter new key to update)' : 'Enter Swipe API key'}
+                    required={config?.swipeApiKey !== '***API_KEY_SET***'}
                   />
                   <Button
                     type="button"
@@ -248,7 +256,11 @@ const AdminBusinessConfig = () => {
                     {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">Get your API key from Swipe dashboard</p>
+                <p className="text-xs text-muted-foreground">
+                  {config?.swipeApiKey === '***API_KEY_SET***' 
+                    ? 'API key is configured. Enter a new key to update it.' 
+                    : 'Get your API key from Swipe dashboard'}
+                </p>
               </div>
               
               <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">

@@ -196,6 +196,9 @@ const AdminProducts = () => {
     },
   });
 
+  // Loading state for admin operations (must be after all mutations are declared)
+  const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || exportMutation.isPending;
+
   // Update filter when URL param changes
   useEffect(() => {
     const typeParam = searchParams.get('type') as ProductType | null;
@@ -360,8 +363,34 @@ const AdminProducts = () => {
     );
   }
 
+  // Global admin loader overlay
+  const AdminLoader = () => {
+    const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || exportMutation.isPending;
+    
+    if (!isLoading) return null;
+    
+    const getLoadingMessage = () => {
+      if (createMutation.isPending) return 'Creating your product...';
+      if (updateMutation.isPending) return 'Updating your product...';
+      if (deleteMutation.isPending || bulkDeleteMutation.isPending) return 'Deleting products...';
+      if (toggleStatusMutation.isPending) return 'Updating product status...';
+      if (exportMutation.isPending) return 'Exporting products...';
+      return 'Processing...';
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center">
+        <div className="bg-white rounded-xl p-8 shadow-2xl flex flex-col items-center gap-4 min-w-[300px]">
+          <Loader2 className="w-12 h-12 animate-spin text-primary" />
+          <p className="text-lg font-semibold text-foreground">{getLoadingMessage()}</p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <AdminLayout>
+      <AdminLoader />
       <div className="space-y-6">
         {/* Header */}
         <motion.div
@@ -559,7 +588,7 @@ const AdminProducts = () => {
                           )}
                           <div className="flex items-center gap-2">
                             <Link 
-                              to={`/products/${product.slug || product.id}`}
+                              to={`/product/${product.slug || product.id}`}
                               target="_blank"
                               className="font-semibold hover:text-primary transition-colors"
                             >

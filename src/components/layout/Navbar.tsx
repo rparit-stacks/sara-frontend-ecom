@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import SearchPopup from '@/components/search/SearchPopup';
 import { cartApi, wishlistApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
+import { CategoryDropdown } from '@/components/categories/CategoryDropdown';
+import { CurrencySelector } from '@/components/currency/CurrencySelector';
 
 const navLinks = [
   { name: 'Home', path: '/' },
   { name: 'Shop', path: '/products' },
-  { name: 'Categories', path: '/categories' },
   { name: 'Custom Design', path: '/custom-design' },
   { name: 'Make Your Own', path: '/make-your-own' },
 ];
@@ -92,7 +93,24 @@ export const Navbar = () => {
 
           {/* Desktop Navigation - Minimal, no icons */}
           <div className="hidden lg:flex items-center gap-8">
-            {navLinks.map((link) => (
+            {/* Home */}
+            <Link
+              to="/"
+              className={cn(
+                'text-sm font-medium transition-colors duration-200 link-underline py-1',
+                location.pathname === '/'
+                  ? 'text-primary'
+                  : 'text-foreground hover:text-primary'
+              )}
+            >
+              Home
+            </Link>
+            
+            {/* Category Dropdown */}
+            <CategoryDropdown />
+            
+            {/* Other nav links */}
+            {navLinks.filter(link => link.name !== 'Home').map((link) => (
               <Link
                 key={link.name}
                 to={link.path}
@@ -144,6 +162,11 @@ export const Navbar = () => {
               </Button>
             </Link>
 
+            {/* Currency Selector */}
+            <div className="hidden md:block">
+              <CurrencySelector />
+            </div>
+
             {/* User/Login */}
             <Link to={isAuthenticated ? "/dashboard" : "/login"} className="hidden md:block">
               <Button variant="ghost" size="icon" className="w-11 h-11 rounded-full hover:bg-secondary">
@@ -177,12 +200,45 @@ export const Navbar = () => {
             <div className="container-custom py-4">
               {/* Navigation Links */}
               <div className="space-y-1">
-                {navLinks.map((link, index) => (
+                {/* Home */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0 * 0.05 }}
+                >
+                  <Link
+                    to="/"
+                    onClick={() => setIsOpen(false)}
+                    className={cn(
+                      'block py-3 px-4 rounded-lg text-sm font-medium transition-colors',
+                      location.pathname === '/'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-foreground hover:bg-secondary'
+                    )}
+                  >
+                    Home
+                  </Link>
+                </motion.div>
+                
+                {/* Category Dropdown */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 1 * 0.05 }}
+                  onClick={() => setIsOpen(false)}
+                >
+                  <div className="px-4 py-3">
+                    <CategoryDropdown />
+                  </div>
+                </motion.div>
+                
+                {/* Other nav links */}
+                {navLinks.filter(link => link.name !== 'Home').map((link, index) => (
                   <motion.div
                     key={link.name}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
+                    transition={{ delay: (index + 2) * 0.05 }}
                   >
                     <Link
                       to={link.path}

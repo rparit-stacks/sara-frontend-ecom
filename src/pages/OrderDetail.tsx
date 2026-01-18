@@ -136,14 +136,23 @@ const OrderDetail = () => {
                             className="mt-2 gap-2"
                             onClick={async () => {
                               try {
-                                const product = await productsApi.getById(item.productId);
-                                if (product.fileUrl) {
-                                  window.open(product.fileUrl, '_blank');
-                                } else {
-                                  alert('Download file not available');
-                                }
-                              } catch (error) {
-                                alert('Failed to load download link');
+                                // Download ZIP from backend
+                                const blob = await productsApi.downloadDigitalFiles(item.productId);
+                                
+                                // Create download link and trigger download
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `product_${item.productId}_files.zip`;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                window.URL.revokeObjectURL(url);
+                                
+                                alert('Download started!');
+                              } catch (error: any) {
+                                console.error('Download error:', error);
+                                alert(error.message || 'Failed to download files');
                               }
                             }}
                           >

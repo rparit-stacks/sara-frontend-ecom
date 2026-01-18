@@ -11,6 +11,7 @@ import { cartApi, couponApi, productsApi, shippingApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import CartItemDetails from '@/components/cart/CartItemDetails';
+import { usePrice } from '@/lib/currency';
 
 // Separate component for cart item to allow hooks usage
 const CartItem = ({ 
@@ -23,6 +24,8 @@ const CartItem = ({
   setSelectedItemForBreakdown,
   setShowPriceBreakdown
 }: any) => {
+  const { format } = usePrice();
+  
   // Get product slug - use from item if available, otherwise fetch it
   const { data: productData } = useQuery({
     queryKey: ['product-slug', item.productId],
@@ -31,20 +34,26 @@ const CartItem = ({
     retry: false,
   });
   
-  // Use slug from backend cart, fetched product, or fallback to ID
-  const productSlug = item.productSlug || productData?.slug || item.productId;
+  // Use slug from backend cart or fetched product - slug is required for navigation
+  const productSlug = item.productSlug || productData?.slug;
   
   return (
     <ScrollReveal key={item.id}>
       <div className="flex gap-3 xs:gap-4 sm:gap-6 p-3 xs:p-4 sm:p-6 bg-card rounded-xl sm:rounded-2xl border border-border">
         <img src={item.productImage || ''} alt={item.productName} className="w-20 h-24 xs:w-24 xs:h-32 sm:w-28 sm:h-36 lg:w-32 lg:h-40 object-cover rounded-lg sm:rounded-xl flex-shrink-0" />
         <div className="flex-1 min-w-0">
-          <Link 
-            to={`/products/${productSlug}`} 
-            className="font-cursive text-lg xs:text-xl sm:text-2xl hover:text-[#2b9d8f] line-clamp-2"
-          >
-            {item.productName}
-          </Link>
+          {productSlug ? (
+            <Link 
+              to={`/product/${productSlug}`} 
+              className="font-cursive text-lg xs:text-xl sm:text-2xl hover:text-[#2b9d8f] line-clamp-2"
+            >
+              {item.productName}
+            </Link>
+          ) : (
+            <span className="font-cursive text-lg xs:text-xl sm:text-2xl line-clamp-2">
+              {item.productName}
+            </span>
+          )}
           <p className="text-xs xs:text-sm sm:text-base text-muted-foreground mt-1">{item.productType}</p>
           
           {/* Show fabric name, variants, and quantity details */}
@@ -59,7 +68,7 @@ const CartItem = ({
           />
           
           <div className="flex items-center justify-between mt-2 xs:mt-3">
-            <p className="font-semibold text-[#2b9d8f] text-base xs:text-lg sm:text-xl">₹{item.totalPrice?.toLocaleString('en-IN') || item.unitPrice?.toLocaleString('en-IN') || 0}</p>
+            <p className="font-semibold text-[#2b9d8f] text-base xs:text-lg sm:text-xl">{format(item.totalPrice || item.unitPrice || 0)}</p>
             <Button
               variant="ghost"
               size="sm"
@@ -117,6 +126,7 @@ const Cart = () => {
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
   const [selectedItemForBreakdown, setSelectedItemForBreakdown] = useState<any>(null);
   const queryClient = useQueryClient();
+  const { format } = usePrice();
   
   // Get user email from token
   const getUserEmail = () => {
@@ -227,7 +237,7 @@ const Cart = () => {
       }
     },
     onSuccess: (data) => {
-      toast.success(`Coupon applied! You save ₹${data.discount?.toLocaleString('en-IN') || 0}`);
+      toast.success(`Coupon applied! You save ${format(data.discount || 0)}`);
       setCouponCode('');
     },
     onError: (error: Error) => {
@@ -306,15 +316,15 @@ const Cart = () => {
               <div className="bg-card p-4 xs:p-6 sm:p-8 rounded-xl sm:rounded-2xl border border-border h-fit lg:sticky lg:top-24">
                 <h3 className="font-cursive text-xl xs:text-2xl mb-4 xs:mb-6">Order Summary</h3>
                 <div className="space-y-3 xs:space-y-4 text-sm xs:text-base">
-                  <div className="flex justify-between"><span>Subtotal</span><span>₹{subtotal.toLocaleString('en-IN')}</span></div>
+                  <div className="flex justify-between"><span>Subtotal</span><span>{format(subtotal)}</span></div>
                   {gst > 0 && (
-                    <div className="flex justify-between"><span>GST</span><span>₹{gst.toLocaleString('en-IN')}</span></div>
+                    <div className="flex justify-between"><span>GST</span><span>{format(gst)}</span></div>
                   )}
-                  <div className="flex justify-between"><span>Shipping</span><span>{shipping === 0 ? (isLoggedIn ? 'Free' : 'Calculated at checkout') : `₹${shipping.toLocaleString('en-IN')}`}</span></div>
+                  <div className="flex justify-between"><span>Shipping</span><span>{shipping === 0 ? (isLoggedIn ? 'Free' : 'Calculated at checkout') : format(shipping)}</span></div>
                   {isLoggedIn && appliedCouponCode && couponDiscount > 0 && (
                     <div className="flex justify-between text-primary">
                       <span>Coupon ({appliedCouponCode})</span>
-                      <span>-₹{couponDiscount.toLocaleString('en-IN')}</span>
+                      <span>-{format(couponDiscount)}</span>
                     </div>
                   )}
                   {!isLoggedIn && (
@@ -322,7 +332,7 @@ const Cart = () => {
                   )}
                   <div className="border-t pt-3 xs:pt-4 flex justify-between font-semibold text-lg xs:text-xl">
                     <span>Total</span>
-                    <span>₹{total.toLocaleString('en-IN')}</span>
+                    <span>{format(total)}</span>
                   </div>
                 </div>
                 {isLoggedIn && (
@@ -331,7 +341,7 @@ const Cart = () => {
                       <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary/20">
                         <div>
                           <p className="text-sm font-medium">Applied: {appliedCouponCode}</p>
-                          <p className="text-xs text-muted-foreground">Discount: ₹{couponDiscount.toLocaleString('en-IN')}</p>
+                          <p className="text-xs text-muted-foreground">Discount: {format(couponDiscount)}</p>
                         </div>
                         <Button
                           variant="ghost"

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Category, CategoryTree } from '@/components/admin/CategoryTree';
 import { Button } from '@/components/ui/button';
+import { ButtonWithLoading } from '@/components/ui/ButtonWithLoading';
 import { Input } from '@/components/ui/input';
 import { Plus, FolderTree, Search, Save, Loader2, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -545,23 +546,16 @@ const AdminCategories = () => {
                 >
                   Cancel
                 </Button>
-                <Button 
+                <ButtonWithLoading 
                   type="submit" 
                   className="btn-primary gap-2"
-                  disabled={createMutation.isPending || updateMutation.isPending}
+                  isLoading={createMutation.isPending || updateMutation.isPending}
+                  loadingText={editingCategory ? 'Updating...' : 'Creating...'}
+                  minimumDuration={300}
                 >
-                  {(createMutation.isPending || updateMutation.isPending) ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      {editingCategory ? 'Update' : 'Create'} Category
-                    </>
-                  )}
-                </Button>
+                  <Save className="w-4 h-4" />
+                  {editingCategory ? 'Update' : 'Create'} Category
+                </ButtonWithLoading>
               </DialogFooter>
             </form>
             )}

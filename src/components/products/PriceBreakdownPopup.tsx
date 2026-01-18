@@ -3,6 +3,7 @@ import { Calculator, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { productsApi } from '@/lib/api';
+import { usePrice } from '@/lib/currency';
 
 interface PriceBreakdownPopupProps {
   open: boolean;
@@ -48,6 +49,8 @@ export const PriceBreakdownPopup = ({
   discountAmount,
   finalFabricPricePerMeter,
 }: PriceBreakdownPopupProps) => {
+  const { format } = usePrice();
+  
   // Fetch product data for cart items to get variant details
   const { data: fetchedProductData } = useQuery({
     queryKey: ['product-for-breakdown', item.productId],
@@ -227,7 +230,7 @@ export const PriceBreakdownPopup = ({
                     {/* Design Price */}
                     <div className="flex flex-col">
                       <p className="text-xs sm:text-sm text-muted-foreground mb-1">Design Price</p>
-                      <span className="font-semibold text-base sm:text-lg text-primary">₹{breakdown.basePrice.toLocaleString('en-IN')}</span>
+                      <span className="font-semibold text-base sm:text-lg text-primary">{format(breakdown.basePrice)}</span>
                     </div>
                     
                     {/* Plus Sign */}
@@ -240,16 +243,16 @@ export const PriceBreakdownPopup = ({
                           <p className="text-xs sm:text-sm text-muted-foreground mb-1">Fabric Price</p>
                           <div className="flex flex-col">
                             <span className="font-semibold text-base sm:text-lg text-primary">
-                              ₹{breakdown.fabricPrice.toLocaleString('en-IN')}
+                              {format(breakdown.fabricPrice)}
                             </span>
                             {breakdown.fabricBasePricePerMeter !== undefined && finalFabricPricePerMeter !== undefined && finalFabricPricePerMeter !== breakdown.fabricBasePricePerMeter && (
                               <span className="text-[10px] xs:text-xs text-muted-foreground mt-0.5 leading-tight">
-                                @ ₹{finalFabricPricePerMeter.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/meter (slab pricing)
+                                @ {format(finalFabricPricePerMeter)}/meter (slab pricing)
                               </span>
                             )}
                             {breakdown.fabricBasePricePerMeter !== undefined && (!finalFabricPricePerMeter || finalFabricPricePerMeter === breakdown.fabricBasePricePerMeter) && (
                               <span className="text-[10px] xs:text-xs text-muted-foreground mt-0.5 leading-tight">
-                                @ ₹{breakdown.fabricBasePricePerMeter.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/meter × {breakdown.quantity} meter{breakdown.quantity !== 1 ? 's' : ''}
+                                @ {format(breakdown.fabricBasePricePerMeter)}/meter × {breakdown.quantity} meter{breakdown.quantity !== 1 ? 's' : ''}
                               </span>
                             )}
                           </div>
@@ -263,7 +266,7 @@ export const PriceBreakdownPopup = ({
                         <span className="text-2xl sm:text-3xl text-muted-foreground font-light mt-4">+</span>
                         <div className="flex flex-col">
                           <p className="text-xs sm:text-sm text-muted-foreground mb-1">Variant Modifiers</p>
-                          <span className="font-semibold text-base sm:text-lg text-primary">₹{breakdown.variantModifier.toLocaleString('en-IN')}</span>
+                          <span className="font-semibold text-base sm:text-lg text-primary">{format(breakdown.variantModifier)}</span>
                         </div>
                       </>
                     )}
@@ -272,7 +275,7 @@ export const PriceBreakdownPopup = ({
                     <span className="text-2xl sm:text-3xl text-muted-foreground font-light mt-4">=</span>
                     <div className="flex flex-col">
                       <p className="text-xs sm:text-sm text-muted-foreground mb-1">Total</p>
-                      <span className="font-bold text-lg sm:text-xl text-primary">₹{breakdown.totalPrice.toLocaleString('en-IN')}</span>
+                      <span className="font-bold text-lg sm:text-xl text-primary">{format(breakdown.totalPrice)}</span>
                     </div>
                   </div>
                   
@@ -281,7 +284,7 @@ export const PriceBreakdownPopup = ({
                     <div className="flex justify-between items-center py-2 bg-green-50 dark:bg-green-950/20 rounded-md px-3 border border-green-200 dark:border-green-900/30 mt-3">
                       <span className="text-green-700 dark:text-green-400 font-medium text-sm">Discount Applied</span>
                       <span className="font-semibold text-sm text-green-700 dark:text-green-400">
-                        -₹{discountAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        -{format(discountAmount)}
                       </span>
                     </div>
                   )}
@@ -289,7 +292,7 @@ export const PriceBreakdownPopup = ({
                   {/* Unit Price Info */}
                   {breakdown.quantity > 1 && (
                     <div className="text-center text-xs text-muted-foreground pt-2 border-t border-border/50 mt-3">
-                      Unit Price: ₹{breakdown.unitPrice?.toLocaleString('en-IN', { maximumFractionDigits: 2 }) || '0'}/meter
+                      Unit Price: {format(breakdown.unitPrice || 0)}/meter
                     </div>
                   )}
                 </div>
@@ -301,26 +304,26 @@ export const PriceBreakdownPopup = ({
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between items-center py-2 border-b border-border/50">
                     <span className="text-muted-foreground font-medium">Base Price per Meter</span>
-                    <span className="font-semibold text-base">₹{breakdown.basePrice.toLocaleString('en-IN')}</span>
+                    <span className="font-semibold text-base">{format(breakdown.basePrice)}</span>
                   </div>
                   
                   {breakdown.variantModifier !== undefined && breakdown.variantModifier !== 0 && (
                     <div className="flex justify-between items-center py-2 border-b border-border/50">
                       <span className="text-muted-foreground font-medium">Variant Modifiers</span>
                       <span className="font-semibold text-base text-primary">
-                        {breakdown.variantModifier > 0 ? '+' : ''}₹{breakdown.variantModifier.toLocaleString('en-IN')}
+                        {breakdown.variantModifier > 0 ? '+' : ''}{format(breakdown.variantModifier)}
                       </span>
                     </div>
                   )}
                   
                   <div className="border-t-2 border-primary/20 pt-3 mt-3 flex justify-between items-center bg-primary/5 dark:bg-primary/10 rounded-lg px-4 py-3">
                     <span className="font-bold text-lg">Total Amount</span>
-                    <span className="font-bold text-xl text-primary">₹{breakdown.totalPrice.toLocaleString('en-IN')}</span>
+                    <span className="font-bold text-xl text-primary">{format(breakdown.totalPrice)}</span>
                   </div>
                   
                   {breakdown.quantity > 1 && (
                     <div className="text-center text-xs text-muted-foreground pt-2">
-                      Price: ₹{breakdown.pricePerMeter?.toLocaleString('en-IN', { maximumFractionDigits: 2 }) || '0'}/meter × {breakdown.quantity} meter{breakdown.quantity !== 1 ? 's' : ''}
+                      Price: {format(breakdown.pricePerMeter || 0)}/meter × {breakdown.quantity} meter{breakdown.quantity !== 1 ? 's' : ''}
                     </div>
                   )}
                 </div>
@@ -332,12 +335,12 @@ export const PriceBreakdownPopup = ({
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between items-center py-2 border-b border-border/50">
                     <span className="text-muted-foreground font-medium">Base Price</span>
-                    <span className="font-semibold text-base">₹{breakdown.basePrice.toLocaleString('en-IN')}</span>
+                    <span className="font-semibold text-base">{format(breakdown.basePrice)}</span>
                   </div>
                   
                   <div className="border-t-2 border-primary/20 pt-3 mt-3 flex justify-between items-center bg-primary/5 dark:bg-primary/10 rounded-lg px-4 py-3">
                     <span className="font-bold text-lg">Total Amount</span>
-                    <span className="font-bold text-xl text-primary">₹{breakdown.totalPrice.toLocaleString('en-IN')}</span>
+                    <span className="font-bold text-xl text-primary">{format(breakdown.totalPrice)}</span>
                   </div>
                   
                   {breakdown.quantity > 1 && (

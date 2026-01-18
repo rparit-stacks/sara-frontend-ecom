@@ -6,6 +6,7 @@ import { Minus, Plus, IndianRupee, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Fabric } from './FabricSelectionPopup';
+import { usePrice } from '@/lib/currency';
 
 export interface FabricVariant {
   id: string;
@@ -31,39 +32,6 @@ interface FabricVariantPopupProps {
   }) => void;
 }
 
-// Mock variants - in real app, fetch from API: GET /api/fabrics/{id}/variants
-const getMockVariants = (): FabricVariant[] => [
-  {
-    id: 'v1',
-    type: 'width',
-    name: 'Width',
-    options: [
-      { id: 'w1', value: '45 inches', priceModifier: 0 },
-      { id: 'w2', value: '54 inches', priceModifier: 20 },
-      { id: 'w3', value: '60 inches', priceModifier: 40 },
-    ],
-  },
-  {
-    id: 'v2',
-    type: 'gsm',
-    name: 'GSM (Weight)',
-    options: [
-      { id: 'g1', value: '120 GSM', priceModifier: 0 },
-      { id: 'g2', value: '150 GSM', priceModifier: 15 },
-      { id: 'g3', value: '180 GSM', priceModifier: 30 },
-    ],
-  },
-  {
-    id: 'v3',
-    type: 'color',
-    name: 'Color',
-    options: [
-      { id: 'c1', value: 'Natural', priceModifier: 0 },
-      { id: 'c2', value: 'Dyed', priceModifier: 10 },
-    ],
-  },
-];
-
 const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
   open,
   onOpenChange,
@@ -71,7 +39,10 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
   variants: propVariants,
   onComplete,
 }) => {
-  const variants = propVariants.length > 0 ? propVariants : getMockVariants();
+  const { format } = usePrice();
+  
+  // Use propVariants directly - no mock fallback
+  const variants = propVariants;
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     variants.forEach((variant) => {
@@ -153,59 +124,67 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
             />
             <div className="flex-1 min-w-0">
               <h3 className="font-medium text-xs sm:text-sm md:text-base truncate">{fabric.name}</h3>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Base Price: ₹{fabric.pricePerMeter}/meter</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Base Price: {format(fabric.pricePerMeter)}/meter</p>
             </div>
           </div>
 
           {/* Variant Selection */}
-          {variants.map((variant) => {
-            const selectedOptionId = selectedVariants[variant.id];
-            const selectedOption = variant.options.find(opt => opt.id === selectedOptionId);
-            
-            return (
-              <div key={variant.id} className="space-y-2 sm:space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-sm sm:text-base">
-                    {variant.name}
-                    {selectedOption && (
-                      <span className="text-muted-foreground ml-1.5 sm:ml-2 text-xs sm:text-sm">
-                        : {selectedOption.value}
-                      </span>
+          {variants.length > 0 ? (
+            variants.map((variant) => {
+              const selectedOptionId = selectedVariants[variant.id];
+              const selectedOption = variant.options.find(opt => opt.id === selectedOptionId);
+              
+              return (
+                <div key={variant.id} className="space-y-2 sm:space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-sm sm:text-base">
+                      {variant.name}
+                      {selectedOption && (
+                        <span className="text-muted-foreground ml-1.5 sm:ml-2 text-xs sm:text-sm">
+                          : {selectedOption.value}
+                        </span>
+                      )}
+                    </h4>
+                    {selectedOption?.priceModifier && selectedOption.priceModifier > 0 && (
+                      <Badge variant="secondary" className="text-[10px] sm:text-xs">
+                        +{format(selectedOption.priceModifier)}/m
+                      </Badge>
                     )}
-                  </h4>
-                  {selectedOption?.priceModifier && selectedOption.priceModifier > 0 && (
-                    <Badge variant="secondary" className="text-[10px] sm:text-xs">
-                      +₹{selectedOption.priceModifier}/m
-                    </Badge>
-                  )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 sm:gap-2.5">
+                    {variant.options.map((option) => {
+                      const isSelected = selectedOptionId === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => handleVariantChange(variant.id, option.id)}
+                          className={cn(
+                            "px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 md:py-2.5 rounded-full border-2 transition-all text-[11px] sm:text-xs md:text-sm flex items-center gap-1 sm:gap-1.5",
+                            isSelected
+                              ? "border-[#2b9d8f] bg-[#2b9d8f]/10 text-[#2b9d8f]"
+                              : "border-border hover:border-[#2b9d8f]/50"
+                          )}
+                        >
+                          <span className="truncate">{option.value}</span>
+                          {option.priceModifier && option.priceModifier > 0 && (
+                            <span className="text-[9px] sm:text-[10px] text-muted-foreground whitespace-nowrap">
+                              (+{format(option.priceModifier)})
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2 sm:gap-2.5">
-                  {variant.options.map((option) => {
-                    const isSelected = selectedOptionId === option.id;
-                    return (
-                      <button
-                        key={option.id}
-                        onClick={() => handleVariantChange(variant.id, option.id)}
-                        className={cn(
-                          "px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 md:py-2.5 rounded-full border-2 transition-all text-[11px] sm:text-xs md:text-sm flex items-center gap-1 sm:gap-1.5",
-                          isSelected
-                            ? "border-[#2b9d8f] bg-[#2b9d8f]/10 text-[#2b9d8f]"
-                            : "border-border hover:border-[#2b9d8f]/50"
-                        )}
-                      >
-                        <span className="truncate">{option.value}</span>
-                        {option.priceModifier && option.priceModifier > 0 && (
-                          <span className="text-[9px] sm:text-[10px] text-muted-foreground whitespace-nowrap">
-                            (+₹{option.priceModifier})
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          ) : (
+            <div className="p-4 sm:p-5 md:p-6 bg-secondary/30 rounded-lg border border-border text-center">
+              <p className="text-sm sm:text-base text-muted-foreground">
+                This fabric has no variant options. You can proceed with the base fabric.
+              </p>
+            </div>
+          )}
 
           {/* Quantity Selection */}
           <div className="space-y-2 sm:space-y-2.5 pt-3 sm:pt-3.5 border-t border-border">
@@ -231,7 +210,7 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
                 </Button>
               </div>
               <span className="text-xs sm:text-sm text-muted-foreground">
-                ₹{pricePerMeter}/meter
+                {format(pricePerMeter)}/meter
               </span>
             </div>
           </div>
@@ -242,11 +221,10 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
               <div>
                 <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Total Price</p>
                 <p className="text-lg sm:text-xl md:text-2xl font-semibold text-[#2b9d8f] mt-0.5 sm:mt-1">
-                  <IndianRupee className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 inline" />
-                  {totalPrice.toLocaleString('en-IN')}
+                  {format(totalPrice)}
                 </p>
                 <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground mt-0.5 sm:mt-1">
-                  {quantity} meter{quantity !== 1 ? 's' : ''} × ₹{pricePerMeter}/meter
+                  {quantity} meter{quantity !== 1 ? 's' : ''} × {format(pricePerMeter)}/meter
                 </p>
               </div>
             </div>

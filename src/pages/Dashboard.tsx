@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { userApi, orderApi, categoriesApi } from '@/lib/api';
-import { Package, MapPin, User, Edit, Trash2, Plus, Loader2, Check, Gift, ArrowRight } from 'lucide-react';
+import { Package, MapPin, User, Edit, Trash2, Plus, Loader2, Check, Gift, ArrowRight, Download } from 'lucide-react';
+import { productsApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -34,6 +35,7 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<any>(null);
+  const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
 
   const [profileFormData, setProfileFormData] = useState({
     firstName: '',
@@ -210,6 +212,53 @@ const Dashboard = () => {
     navigate('/', { replace: true });
   };
 
+  // Extract all digital products from orders
+  const digitalProducts = orders.flatMap((order: any) => 
+    (order.items || [])
+      .filter((item: any) => item.productType === 'DIGITAL')
+      .map((item: any) => ({
+        ...item,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        orderDate: order.createdAt,
+      }))
+  );
+
+  const handleDigitalDownload = async (item: any) => {
+    if (!item.productId) {
+      toast.error('Product ID not available');
+      return;
+    }
+
+    setDownloadingIds(prev => new Set(prev).add(item.productId));
+    
+    try {
+      // Download ZIP from backend
+      const blob = await productsApi.downloadDigitalFiles(item.productId);
+      
+      // Create download link and trigger download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `product_${item.productId}_files.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Download started!');
+    } catch (error: any) {
+      console.error('Download error:', error);
+      toast.error(error.message || 'Failed to download files');
+    } finally {
+      setDownloadingIds(prev => {
+        const next = new Set(prev);
+        next.delete(item.productId);
+        return next;
+      });
+    }
+  };
+
   const initials = (profile?.firstName?.[0] || '') + (profile?.lastName?.[0] || profile?.email?.[0] || '');
 
   return (
@@ -248,7 +297,7 @@ const Dashboard = () => {
                             key={cat.id}
                             variant="outline"
                             size="sm"
-                            onClick={() => navigate(`/categories/${cat.id}`)}
+                            onClick={() => navigate(`/category/${cat.id}`)}
                             className="gap-2"
                           >
                             {cat.name}
@@ -286,7 +335,7 @@ const Dashboard = () => {
             {/* Main content */}
             <div className="flex-1">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="profile" className="gap-2">
                     <User className="w-4 h-4" />
                     Profile
@@ -294,6 +343,10 @@ const Dashboard = () => {
                   <TabsTrigger value="orders" className="gap-2">
                     <Package className="w-4 h-4" />
                     Orders ({orders.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="downloads" className="gap-2">
+                    <Download className="w-4 h-4" />
+                    Downloads ({digitalProducts.length})
                   </TabsTrigger>
                   <TabsTrigger value="addresses" className="gap-2">
                     <MapPin className="w-4 h-4" />
@@ -402,6 +455,81 @@ const Dashboard = () => {
                                     onClick={() => navigate(`/orders/${order.id}`)}
                                   >
                                     View Details
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Digital Downloads Tab */}
+                <TabsContent value="downloads" className="space-y-6 mt-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Digital Downloads</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Download your purchased digital products anytime
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      {ordersLoading ? (
+                        <div className="flex justify-center py-8">
+                          <Loader2 className="w-6 h-6 animate-spin" />
+                        </div>
+                      ) : digitalProducts.length === 0 ? (
+                        <div className="text-center py-12">
+                          <Download className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                          <p className="text-muted-foreground">No digital products purchased yet</p>
+                          <Button className="mt-4" onClick={() => navigate('/products')}>
+                            Browse Products
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {digitalProducts.map((item: any, index: number) => (
+                            <Card key={`${item.orderId}-${item.productId}-${index}`} className="border">
+                              <CardContent className="p-4">
+                                <div className="flex items-start gap-4">
+                                  {item.image && (
+                                    <img
+                                      src={item.image}
+                                      alt={item.name || item.productName}
+                                      className="w-16 h-16 object-cover rounded"
+                                    />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold">{item.name || item.productName}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      From Order #{item.orderNumber || item.orderId}
+                                    </p>
+                                    {item.orderDate && (
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        Purchased on {format(new Date(item.orderDate), 'MMM dd, yyyy')}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDigitalDownload(item)}
+                                    disabled={downloadingIds.has(item.productId)}
+                                    className="gap-2"
+                                  >
+                                    {downloadingIds.has(item.productId) ? (
+                                      <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Loading...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Download className="w-4 h-4" />
+                                        Download
+                                      </>
+                                    )}
                                   </Button>
                                 </div>
                               </CardContent>

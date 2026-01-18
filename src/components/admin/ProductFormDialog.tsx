@@ -482,6 +482,35 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       return;
     }
 
+    // Upload digital file if it's a new file and product type is DIGITAL
+    let uploadedFileUrl = initialData?.fileUrl || '';
+    if (activeType === 'DIGITAL' && formData.digitalFile && mode === 'create') {
+      try {
+        // Upload file to Cloudinary
+        const uploadedFiles = await productsApi.uploadMedia([formData.digitalFile], 'products/digital');
+        if (uploadedFiles && uploadedFiles.length > 0) {
+          uploadedFileUrl = uploadedFiles[0].url;
+        } else {
+          toast.error('Failed to upload digital file');
+          return;
+        }
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to upload digital file');
+        return;
+      }
+    } else if (activeType === 'DIGITAL' && formData.digitalFile && mode === 'edit') {
+      // For edit mode, upload new file if changed
+      try {
+        const uploadedFiles = await productsApi.uploadMedia([formData.digitalFile], 'products/digital');
+        if (uploadedFiles && uploadedFiles.length > 0) {
+          uploadedFileUrl = uploadedFiles[0].url;
+        }
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to upload digital file');
+        return;
+      }
+    }
+
     const payload: any = {
       name: formData.name,
       type: activeType,
@@ -545,7 +574,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       const sellingPrice = formData.basePrice;
       payload.price = sellingPrice;
       payload.originalPrice = sellingPrice;
-      payload.fileUrl = formData.digitalFile ? 'uploaded-file-url' : initialData?.fileUrl || '';
+      payload.fileUrl = uploadedFileUrl;
     }
 
     // Add GST rate
@@ -1107,7 +1136,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                   <div className="space-y-1">
                     <p className="font-semibold">Upload Digital File *</p>
                     <p className="text-xs text-muted-foreground text-center max-w-[200px] mx-auto">
-                      PDF, JPG, PNG, or ZIP files supported. Max size 50MB.
+                      Any file type supported. Max size 5GB (actual limit depends on storage service configuration).
                     </p>
                   </div>
                   <input 

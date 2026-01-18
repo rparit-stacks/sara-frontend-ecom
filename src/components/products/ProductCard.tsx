@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { usePrice } from '@/lib/currency';
 
 export interface Product {
   id: string;
@@ -12,6 +13,7 @@ export interface Product {
   originalPrice?: number;
   image: string;
   category: string;
+  categoryId?: number;
   isNew?: boolean;
   isSale?: boolean;
   rating?: number;
@@ -23,12 +25,13 @@ interface ProductCardProps {
 }
 
 export const ProductCard = ({ product, className }: ProductCardProps) => {
+  const { format } = usePrice();
   const discount = product.originalPrice 
     ? Math.round((1 - product.price / product.originalPrice) * 100) 
     : 0;
 
   return (
-    <Link to={`/product/${product.slug || product.id}`} className="block">
+    <Link to={`/product/${product.slug}`} className="block">
       <motion.div
         whileHover={{ y: -4 }}
         className={cn('group card-floral w-full cursor-pointer', className)}
@@ -98,11 +101,11 @@ export const ProductCard = ({ product, className }: ProductCardProps) => {
           </h3>
           <div className="flex items-center gap-1 xs:gap-2 mt-1 xs:mt-2 flex-wrap">
             <span className="font-bold text-xs xs:text-sm sm:text-base text-[#2b9d8f]">
-              ₹{product.price.toLocaleString('en-IN')}
+              {format(product.price)}
             </span>
             {product.originalPrice && (
               <span className="text-[9px] xs:text-[10px] sm:text-xs text-muted-foreground line-through">
-                ₹{product.originalPrice.toLocaleString('en-IN')}
+                {format(product.originalPrice)}
               </span>
             )}
           </div>

@@ -17,11 +17,21 @@ export const Layout = ({ children, showFooter = true }: LayoutProps) => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Show loader on route change
+    // Show loader on route change with minimum visibility
     setIsLoading(true);
+    const startTime = Date.now();
+    const minDuration = 300; // Minimum 300ms visibility
+    
     const timeout = setTimeout(() => {
-      setIsLoading(false);
-    }, 500); // small delay to avoid flicker but indicate loading
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, minDuration - elapsed);
+      
+      if (remaining > 0) {
+        setTimeout(() => setIsLoading(false), remaining);
+      } else {
+        setIsLoading(false);
+      }
+    }, 100); // Start checking after 100ms
 
     return () => clearTimeout(timeout);
   }, [location.pathname]);

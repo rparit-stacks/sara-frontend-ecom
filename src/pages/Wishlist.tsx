@@ -95,7 +95,7 @@ const Wishlist = () => {
                     <div className="p-3 xs:p-4 sm:p-5">
                       <p className="text-xs xs:text-sm text-muted-foreground truncate">{item.productType}</p>
                       <Link 
-                        to={`/products/${item.productSlug || item.productId}`} 
+                        to={`/product/${item.productSlug || item.productId}`} 
                         className="font-cursive text-base xs:text-lg sm:text-xl hover:text-[#2b9d8f] block mt-1 xs:mt-2 line-clamp-2"
                       >
                         {item.productName || 'Product'}
