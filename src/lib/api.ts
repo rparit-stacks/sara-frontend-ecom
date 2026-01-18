@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://studiosara.cloud/';
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
 
 // Global loading state management
 let loadingCallbacks: Set<(loading: boolean, message?: string) => void> = new Set();
@@ -140,7 +140,7 @@ export const productsApi = {
   bulkToggleStatus: (ids: number[], action: 'pause' | 'unpause') => 
     fetchApi<any>('/api/admin/products/bulk/toggle-status', { method: 'POST', body: JSON.stringify({ ids, action }) }),
   exportToExcel: async () => {
-    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://studiosara.cloud/';
+    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
     const response = await fetch(`${API_BASE_URL}/api/admin/products/export`, {
       method: 'GET',
       headers: {
@@ -169,7 +169,7 @@ export const productsApi = {
     fetchApi<any>(`/api/products/${designProductId}/digital`),
   downloadDigitalFiles: async (productId: number): Promise<Blob> => {
     const token = localStorage.getItem('authToken') || localStorage.getItem('adminToken');
-    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://studiosara.cloud/';
+    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
     const response = await fetch(`${API_BASE_URL}/api/products/${productId}/download-digital`, {
       method: 'GET',
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
@@ -188,7 +188,7 @@ export const productsApi = {
     formData.append('folder', folder);
     
     const token = localStorage.getItem('adminToken');
-    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://studiosara.cloud/';
+    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
     console.log('[Product Media Upload] Uploading', files.length, 'files to:', `${API_BASE_URL}/api/admin/products/upload-media`);
     
     const response = await fetch(`${API_BASE_URL}/api/admin/products/upload-media`, {
@@ -239,7 +239,7 @@ export const customProductsApi = {
     
     // Use authToken for regular users (Make Your Own), adminToken for admin
     const token = localStorage.getItem('authToken') || localStorage.getItem('adminToken');
-    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://studiosara.cloud/';
+    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
     console.log('[Custom Product Media Upload] Uploading', files.length, 'files to:', `${API_BASE_URL}/api/admin/products/upload-media`);
     
     const response = await fetch(`${API_BASE_URL}/api/admin/products/upload-media`, {
@@ -311,7 +311,7 @@ export const categoriesApi = {
     const formData = new FormData();
     formData.append('file', file);
     const token = localStorage.getItem('adminToken');
-    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://studiosara.cloud/';
+    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
     console.log('[Category Image Upload] Uploading to:', `${API_BASE_URL}/api/admin/categories/upload-image`);
     const response = await fetch(`${API_BASE_URL}/api/admin/categories/upload-image`, {
       method: 'POST',
@@ -422,7 +422,7 @@ export const mediaApi = {
     formData.append('folder', folder);
     
     const token = localStorage.getItem('adminToken');
-    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://studiosara.cloud/';
+    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
     
     const response = await fetch(`${API_BASE_URL}/api/admin/media/upload`, {
       method: 'POST',

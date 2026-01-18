@@ -10,7 +10,7 @@ import { Star, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://studiosara.cloud/';
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
 
 const TestimonialSubmit = () => {
   const { linkId } = useParams<{ linkId: string }>();
