@@ -52,7 +52,7 @@ import AdminContactSubmissions from "./pages/admin/AdminContactSubmissions";
 import AdminOrders from "./pages/admin/AdminOrders";
 import AdminBusinessConfig from "./pages/admin/AdminBusinessConfig";
 import AdminPaymentConfig from "./pages/admin/AdminPaymentConfig";
-import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
+import AdminCurrencyMultipliers from "./pages/admin/AdminCurrencyMultipliers";
 import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
 
 const queryClient = new QueryClient();
@@ -234,10 +234,10 @@ const App = () => (
             }
           />
           <Route
-            path="/admin-sara/whatsapp"
+            path="/admin-sara/currency-multipliers"
             element={
               <ProtectedAdminRoute>
-                <AdminWhatsApp />
+                <AdminCurrencyMultipliers />
               </ProtectedAdminRoute>
             }
           />

@@ -17,7 +17,8 @@ import {
   Truck,
   MessageSquare,
   ShoppingBag,
-  CreditCard
+  CreditCard,
+  Percent
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
@@ -81,6 +82,11 @@ const adminMenuItems = [
     path: '/admin-sara/payment-config' 
   },
   { 
+    icon: Percent, 
+    label: 'Currency Multipliers', 
+    path: '/admin-sara/currency-multipliers' 
+  },
+  { 
     icon: Users, 
     label: 'Users', 
     path: '/admin-sara/users' 
@@ -109,11 +115,6 @@ const adminMenuItems = [
     icon: MessageSquare, 
     label: 'Contact Submissions', 
     path: '/admin-sara/contact-submissions' 
-  },
-  { 
-    icon: MessageSquare, 
-    label: 'WhatsApp', 
-    path: '/admin-sara/whatsapp' 
   },
 ];
 

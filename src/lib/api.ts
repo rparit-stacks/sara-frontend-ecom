@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
+export const API_BASE_URL = import.meta.env.VITE_API_URL as string;
 
 // Global loading state management
 let loadingCallbacks: Set<(loading: boolean, message?: string) => void> = new Set();
@@ -140,7 +140,6 @@ export const productsApi = {
   bulkToggleStatus: (ids: number[], action: 'pause' | 'unpause') => 
     fetchApi<any>('/api/admin/products/bulk/toggle-status', { method: 'POST', body: JSON.stringify({ ids, action }) }),
   exportToExcel: async () => {
-    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
     const response = await fetch(`${API_BASE_URL}/api/admin/products/export`, {
       method: 'GET',
       headers: {
@@ -169,7 +168,6 @@ export const productsApi = {
     fetchApi<any>(`/api/products/${designProductId}/digital`),
   downloadDigitalFiles: async (productId: number): Promise<Blob> => {
     const token = localStorage.getItem('authToken') || localStorage.getItem('adminToken');
-    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
     const response = await fetch(`${API_BASE_URL}/api/products/${productId}/download-digital`, {
       method: 'GET',
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
@@ -188,7 +186,6 @@ export const productsApi = {
     formData.append('folder', folder);
     
     const token = localStorage.getItem('adminToken');
-    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
     console.log('[Product Media Upload] Uploading', files.length, 'files to:', `${API_BASE_URL}/api/admin/products/upload-media`);
     
     const response = await fetch(`${API_BASE_URL}/api/admin/products/upload-media`, {
@@ -239,7 +236,6 @@ export const customProductsApi = {
     
     // Use authToken for regular users (Make Your Own), adminToken for admin
     const token = localStorage.getItem('authToken') || localStorage.getItem('adminToken');
-    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
     console.log('[Custom Product Media Upload] Uploading', files.length, 'files to:', `${API_BASE_URL}/api/admin/products/upload-media`);
     
     const response = await fetch(`${API_BASE_URL}/api/admin/products/upload-media`, {
@@ -311,7 +307,6 @@ export const categoriesApi = {
     const formData = new FormData();
     formData.append('file', file);
     const token = localStorage.getItem('adminToken');
-    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
     console.log('[Category Image Upload] Uploading to:', `${API_BASE_URL}/api/admin/categories/upload-image`);
     const response = await fetch(`${API_BASE_URL}/api/admin/categories/upload-image`, {
       method: 'POST',
@@ -422,7 +417,6 @@ export const mediaApi = {
     formData.append('folder', folder);
     
     const token = localStorage.getItem('adminToken');
-    const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
     
     const response = await fetch(`${API_BASE_URL}/api/admin/media/upload`, {
       method: 'POST',
@@ -563,67 +557,6 @@ export const businessConfigApi = {
   updateConfig: (data: any) => fetchApi<any>('/api/admin/business-config', { method: 'PUT', body: JSON.stringify(data) }),
 };
 
-// ===============================
-// WhatsApp API
-// ===============================
-export const whatsappApi = {
-  // WASender Account Management
-  accounts: {
-    getAll: () => fetchApi<any[]>('/api/admin/whatsapp/accounts'),
-    getById: (id: number) => fetchApi<any>(`/api/admin/whatsapp/accounts/${id}`),
-    create: (data: any) => fetchApi<any>('/api/admin/whatsapp/accounts', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: any) => fetchApi<any>(`/api/admin/whatsapp/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: (id: number) => fetchApi<void>(`/api/admin/whatsapp/accounts/${id}`, { method: 'DELETE' }),
-    activate: (id: number) => fetchApi<any>(`/api/admin/whatsapp/accounts/${id}/activate`, { method: 'PUT' }),
-    testConnection: (id: number) => fetchApi<any>(`/api/admin/whatsapp/accounts/${id}/test`, { method: 'POST' }),
-  },
-  
-  // Chatbot Management
-  chatbot: {
-    getConfig: () => fetchApi<any>('/api/admin/whatsapp/chatbot/config'),
-    updateConfig: (data: any) => fetchApi<any>('/api/admin/whatsapp/chatbot/config', { method: 'PUT', body: JSON.stringify(data) }),
-    rules: {
-      getAll: () => fetchApi<any[]>('/api/admin/whatsapp/chatbot/rules'),
-      getById: (id: number) => fetchApi<any>(`/api/admin/whatsapp/chatbot/rules/${id}`),
-      create: (data: any) => fetchApi<any>('/api/admin/whatsapp/chatbot/rules', { method: 'POST', body: JSON.stringify(data) }),
-      update: (id: number, data: any) => fetchApi<any>(`/api/admin/whatsapp/chatbot/rules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-      delete: (id: number) => fetchApi<void>(`/api/admin/whatsapp/chatbot/rules/${id}`, { method: 'DELETE' }),
-      toggle: (id: number) => fetchApi<any>(`/api/admin/whatsapp/chatbot/rules/${id}/toggle`, { method: 'PUT' }),
-    },
-  },
-  
-  // Order Status Templates
-  orderTemplates: {
-    getAll: () => fetchApi<any[]>('/api/admin/whatsapp/order-templates'),
-    getByStatus: (statusType: string) => fetchApi<any>(`/api/admin/whatsapp/order-templates/${statusType}`),
-    update: (statusType: string, data: any) => fetchApi<any>(`/api/admin/whatsapp/order-templates/${statusType}`, { method: 'PUT', body: JSON.stringify(data) }),
-    toggle: (statusType: string) => fetchApi<any>(`/api/admin/whatsapp/order-templates/${statusType}/toggle`, { method: 'PUT' }),
-    preview: (statusType: string) => fetchApi<any>(`/api/admin/whatsapp/order-templates/${statusType}/preview`, { method: 'POST' }),
-  },
-  
-  // Message Templates
-  templates: {
-    getAll: () => fetchApi<any[]>('/api/admin/whatsapp/templates'),
-    getById: (id: number) => fetchApi<any>(`/api/admin/whatsapp/templates/${id}`),
-    create: (data: any) => fetchApi<any>('/api/admin/whatsapp/templates', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: any) => fetchApi<any>(`/api/admin/whatsapp/templates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: (id: number) => fetchApi<void>(`/api/admin/whatsapp/templates/${id}`, { method: 'DELETE' }),
-  },
-  
-  // Messages
-  messages: {
-    send: (data: any) => fetchApi<any>('/api/admin/whatsapp/messages/send', { method: 'POST', body: JSON.stringify(data) }),
-    broadcast: (data: any) => fetchApi<any>('/api/admin/whatsapp/messages/broadcast', { method: 'POST', body: JSON.stringify(data) }),
-    getHistory: (params?: { messageType?: string; status?: string }) => {
-      const searchParams = new URLSearchParams();
-      if (params?.messageType) searchParams.set('messageType', params.messageType);
-      if (params?.status) searchParams.set('status', params.status);
-      const query = searchParams.toString();
-      return fetchApi<any[]>(`/api/admin/whatsapp/messages${query ? `?${query}` : ''}`);
-    },
-    getById: (id: number) => fetchApi<any>(`/api/admin/whatsapp/messages/${id}`),
-  },
-};
 
 // ===============================
 // Coupon API
@@ -778,6 +711,7 @@ export const getInstagramThumbnail = (url: string) =>
 // ===============================
 export const currencyApi = {
   getRates: () => fetchApi<{ currencies: any[]; rates: Record<string, number> }>('/api/currency/rates'),
+  getMultipliers: () => fetchApi<{ multipliers: Record<string, number> }>('/api/currency/multipliers'),
   convert: (amount: number, from: string, to: string) => 
     fetchApi<{ amount: number; converted: number; from: string; to: string }>(
       `/api/currency/convert?amount=${amount}&from=${from}&to=${to}`
@@ -791,6 +725,19 @@ export const paymentApi = {
   getMethods: (country: string) => fetchApi<{ country: string; gateways: string[]; methods: Record<string, string[]> }>(`/api/payment/methods?country=${encodeURIComponent(country)}`),
   createOrder: (data: any) => fetchApi<any>('/api/payment/create-order', { method: 'POST', body: JSON.stringify(data) }),
   verify: (data: any) => fetchApi<any>('/api/payment/verify', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+// ===============================
+// Admin Currency Multipliers API
+// ===============================
+export const currencyMultiplierAdminApi = {
+  getAll: () => fetchApi<any[]>('/api/admin/currency-multipliers'),
+  create: (data: { currencyCode: string; multiplier: number }) =>
+    fetchApi<any>('/api/admin/currency-multipliers', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: { currencyCode?: string; multiplier?: number }) =>
+    fetchApi<any>(`/api/admin/currency-multipliers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) =>
+    fetchApi<void>(`/api/admin/currency-multipliers/${id}`, { method: 'DELETE' }),
 };
 
 export default {

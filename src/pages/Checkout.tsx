@@ -11,7 +11,6 @@ import { toast } from 'sonner';
 import { cartApi, orderApi, userApi, shippingApi, paymentApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import { usePrice } from '@/lib/currency';
-import { useCurrency } from '@/context/CurrencyContext';
 
 // Countries list
 const COUNTRIES = [
@@ -127,8 +126,7 @@ const CITIES_BY_COUNTRY: Record<string, string[]> = {
 const Checkout = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { format } = usePrice();
-  const { currency } = useCurrency();
+  const { format, convert, currency } = usePrice();
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -599,7 +597,7 @@ const Checkout = () => {
 
       // Create payment order
       const paymentRequest = {
-        amount: total,
+        amount: convert(total),
         currency: currency,
         orderId: order.id,
         orderNumber: order.orderNumber,

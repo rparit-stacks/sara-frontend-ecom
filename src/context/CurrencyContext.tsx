@@ -6,6 +6,8 @@ interface CurrencyContextType {
   setCurrency: (currency: string) => void;
   exchangeRates: Record<string, number>;
   setExchangeRates: (rates: Record<string, number>) => void;
+  multipliers: Record<string, number>;
+  setMultipliers: (multipliers: Record<string, number>) => void;
   baseCurrency: string;
 }
 
@@ -24,29 +26,53 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
+  const [multipliers, setMultipliers] = useState<Record<string, number>>({});
 
-  // Fetch exchange rates on mount
+  // Fetch exchange rates & multipliers on mount
   useEffect(() => {
-    const fetchRates = async () => {
+    const fetchCurrencyData = async () => {
       try {
-        console.log('[CurrencyContext] Fetching exchange rates...');
-        const data = await currencyApi.getRates();
-        console.log('[CurrencyContext] Received rates:', data);
-        if (data?.rates) {
-          setExchangeRates(data.rates);
-          console.log('[CurrencyContext] Exchange rates set:', Object.keys(data.rates).length, 'currencies');
+        console.log('[CurrencyContext] Fetching exchange rates and multipliers...');
+
+        const [ratesData, multipliersData] = await Promise.allSettled([
+          currencyApi.getRates(),
+          currencyApi.getMultipliers(),
+        ]);
+
+        if (ratesData.status === 'fulfilled') {
+          const data = ratesData.value;
+          console.log('[CurrencyContext] Received rates:', data);
+          if (data?.rates) {
+            setExchangeRates(data.rates);
+            console.log('[CurrencyContext] Exchange rates set:', Object.keys(data.rates).length, 'currencies');
+          } else {
+            console.warn('[CurrencyContext] No rates in response');
+          }
         } else {
-          console.warn('[CurrencyContext] No rates in response');
+          console.error('[CurrencyContext] Failed to fetch exchange rates:', ratesData.reason);
+        }
+
+        if (multipliersData.status === 'fulfilled') {
+          const data = multipliersData.value;
+          console.log('[CurrencyContext] Received multipliers:', data);
+          if (data?.multipliers) {
+            setMultipliers(data.multipliers);
+            console.log('[CurrencyContext] Multipliers set for', Object.keys(data.multipliers).length, 'currencies');
+          } else {
+            console.warn('[CurrencyContext] No multipliers in response');
+          }
+        } else {
+          console.error('[CurrencyContext] Failed to fetch currency multipliers:', multipliersData.reason);
         }
       } catch (error) {
-        console.error('[CurrencyContext] Failed to fetch exchange rates:', error);
+        console.error('[CurrencyContext] Failed to fetch currency data:', error);
       }
     };
     
-    fetchRates();
+    fetchCurrencyData();
     
     // Refresh rates every hour
-    const interval = setInterval(fetchRates, 3600000);
+    const interval = setInterval(fetchCurrencyData, 3600000);
     return () => clearInterval(interval);
   }, []);
 
@@ -67,6 +93,8 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
         setCurrency,
         exchangeRates,
         setExchangeRates,
+        multipliers,
+        setMultipliers,
         baseCurrency: BASE_CURRENCY,
       }}
     >

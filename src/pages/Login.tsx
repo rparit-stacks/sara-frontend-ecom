@@ -7,9 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { guestCart } from '@/lib/guestCart';
-import { cartApi } from '@/lib/api';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
+import { API_BASE_URL, cartApi } from '@/lib/api';
 
 const Login = () => {
   const navigate = useNavigate();

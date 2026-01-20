@@ -9,8 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Star, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ScrollReveal from '@/components/animations/ScrollReveal';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://studiosara.cloud/';
+import { API_BASE_URL } from '@/lib/api';
 
 const TestimonialSubmit = () => {
   const { linkId } = useParams<{ linkId: string }>();

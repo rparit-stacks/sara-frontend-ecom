@@ -178,7 +178,27 @@ export const getCurrencyName = (currency: string): string => {
  * Hook to convert and format price using current currency
  */
 export const usePrice = () => {
-  const { currency, exchangeRates, baseCurrency } = useCurrency();
+  const { currency, exchangeRates, baseCurrency, multipliers } = useCurrency();
+
+  const getMultiplierForCurrency = (targetCurrency: string): number => {
+    const normalized = (targetCurrency || '').toUpperCase();
+
+    // For INR / India, multiplier should always behave as 1 (no change)
+    if (normalized === 'INR') {
+      return 1;
+    }
+
+    const value = multipliers?.[normalized];
+    if (typeof value !== 'number') {
+      return 1;
+    }
+
+    if (!Number.isFinite(value) || value <= 0) {
+      return 1;
+    }
+
+    return value;
+  };
 
   const convert = (amount: number, fromCurrency: string = baseCurrency): number => {
     // If no exchange rates available, return original amount
@@ -186,8 +206,17 @@ export const usePrice = () => {
       console.warn('Exchange rates not available, returning original amount');
       return amount;
     }
-    
-    const converted = convertPrice(amount, fromCurrency, currency, exchangeRates);
+
+    let effectiveAmount = amount;
+    let effectiveFromCurrency = fromCurrency;
+
+    // If we are converting from base INR, first apply the currency-wise multiplier
+    if (effectiveFromCurrency === 'INR') {
+      const multiplier = getMultiplierForCurrency(currency);
+      effectiveAmount = amount * multiplier;
+    }
+
+    const converted = convertPrice(effectiveAmount, effectiveFromCurrency, currency, exchangeRates);
     return converted;
   };
 
