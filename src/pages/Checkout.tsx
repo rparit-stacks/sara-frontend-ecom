@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cartApi, orderApi, userApi, shippingApi, paymentApi, businessConfigApi } from '@/lib/api';
+import { cartApi, orderApi, userApi, shippingApi, paymentApi, paymentConfigApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import { usePrice } from '@/lib/currency';
 
@@ -307,7 +307,32 @@ const Checkout = () => {
         }));
       }
       
-      return orderApi.createOrder(orderData);
+      try {
+        return await orderApi.createOrder(orderData);
+      } catch (error: any) {
+        // Better error handling for guest checkout
+        if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
+          // If unauthorized and doing guest checkout, retry without token
+          if (!isLoggedIn && orderData.guestEmail) {
+            // Remove any token from localStorage temporarily for this request
+            const tempToken = localStorage.getItem('authToken');
+            if (tempToken) {
+              localStorage.removeItem('authToken');
+              try {
+                const result = await orderApi.createOrder(orderData);
+                // Restore token
+                if (tempToken) localStorage.setItem('authToken', tempToken);
+                return result;
+              } catch (retryError) {
+                // Restore token even on retry failure
+                if (tempToken) localStorage.setItem('authToken', tempToken);
+                throw retryError;
+              }
+            }
+          }
+        }
+        throw error;
+      }
     },
     onSuccess: (data) => {
       toast.success('Order placed successfully!');
@@ -324,7 +349,17 @@ const Checkout = () => {
       navigate(`/order-confirmation/${data.id}`, { state: { orderId: data.id } });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to place order');
+      console.error('[Order Creation Error]', error);
+      // Better error messages
+      if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
+        if (!isLoggedIn) {
+          toast.error('Please ensure all required fields are filled correctly');
+        } else {
+          toast.error('Session expired. Please refresh the page and try again.');
+        }
+      } else {
+        toast.error(error.message || 'Failed to create order. Please try again.');
+      }
     },
   });
   
@@ -349,10 +384,10 @@ const Checkout = () => {
     enabled: !!formData.country,
   });
   
-  // Fetch BusinessConfig to check COD/Partial COD settings
-  const { data: businessConfig } = useQuery({
-    queryKey: ['business-config'],
-    queryFn: () => businessConfigApi.getConfig(),
+  // Fetch PaymentConfig to check COD/Partial COD settings
+  const { data: paymentConfig } = useQuery({
+    queryKey: ['payment-config'],
+    queryFn: () => paymentConfigApi.getConfig(),
   });
   
   // Calculate cart items and totals (must be before useMemo that uses items)
@@ -370,9 +405,10 @@ const Checkout = () => {
   // - Digital products: Never allow COD/Partial COD, only online payment
   useEffect(() => {
     const apiGateways = paymentMethodsData?.gateways || [];
-    const codEnabled = businessConfig?.codEnabled ?? false;
-    const partialCodEnabled = businessConfig?.partialCodEnabled ?? false;
-    const onlinePaymentEnabled = businessConfig?.onlinePaymentEnabled ?? true;
+    const codEnabled = paymentConfig?.codEnabled ?? false;
+    const partialCodEnabled = paymentConfig?.partialCodEnabled ?? false;
+    const razorpayEnabled = paymentConfig?.razorpayEnabled ?? false;
+    const stripeEnabled = paymentConfig?.stripeEnabled ?? false;
     
     const gateways: string[] = [];
     
@@ -381,43 +417,45 @@ const Checkout = () => {
       // Digital products: Only online payment gateways
       if (isIndia) {
         // India: Razorpay (if enabled) + Stripe (if enabled)
-        if (apiGateways.includes('RAZORPAY') && onlinePaymentEnabled) {
+        if (apiGateways.includes('RAZORPAY') && razorpayEnabled) {
           gateways.push('RAZORPAY');
         }
-        if (apiGateways.includes('STRIPE') && onlinePaymentEnabled) {
+        if (apiGateways.includes('STRIPE') && stripeEnabled) {
           gateways.push('STRIPE');
         }
       } else {
-        // Outside India: Only Stripe
-        if (apiGateways.includes('STRIPE') && onlinePaymentEnabled) {
+        // Outside India: Only Stripe (if enabled)
+        if (apiGateways.includes('STRIPE') && stripeEnabled) {
           gateways.push('STRIPE');
         }
       }
     } else {
       // Physical products: All available gateways based on country
       if (isIndia) {
-        // India: Razorpay + Stripe + COD/Partial COD
-        if (apiGateways.includes('RAZORPAY') && onlinePaymentEnabled) {
+        // India: Razorpay (if enabled) + Stripe (if enabled) + COD (if enabled) + Partial COD (if enabled)
+        if (apiGateways.includes('RAZORPAY') && razorpayEnabled) {
           gateways.push('RAZORPAY');
         }
-        if (apiGateways.includes('STRIPE') && onlinePaymentEnabled) {
+        if (apiGateways.includes('STRIPE') && stripeEnabled) {
           gateways.push('STRIPE');
         }
         if (codEnabled) {
           gateways.push('COD');
         }
         if (partialCodEnabled) {
-          gateways.push('PARTIAL_COD');
+          // Partial COD requires at least one gateway
+          if (razorpayEnabled || stripeEnabled) {
+            gateways.push('PARTIAL_COD');
+          }
         }
       } else {
-        // Outside India: Stripe + COD/Partial COD
-        if (apiGateways.includes('STRIPE') && onlinePaymentEnabled) {
+        // Outside India: Stripe only (if enabled) + Partial COD (if enabled and Stripe ON), COD not available
+        if (apiGateways.includes('STRIPE') && stripeEnabled) {
           gateways.push('STRIPE');
         }
-        if (codEnabled) {
-          gateways.push('COD');
-        }
-        if (partialCodEnabled) {
+        // COD not available outside India
+        // Partial COD only if Stripe is enabled
+        if (partialCodEnabled && stripeEnabled) {
           gateways.push('PARTIAL_COD');
         }
       }
@@ -452,7 +490,7 @@ const Checkout = () => {
         }
       }
     }
-  }, [formData.country, isIndia, paymentMethodsData, hasDigitalProducts, businessConfig, paymentGateway]);
+  }, [formData.country, isIndia, paymentMethodsData, hasDigitalProducts, paymentConfig, paymentGateway]);
   
   // Calculate shipping for guest checkout
   const [guestShipping, setGuestShipping] = useState(0);
@@ -648,7 +686,7 @@ const Checkout = () => {
         const order = await orderApi.createOrder(orderData);
         
         // Calculate advance amount (percentage of total)
-        const advancePercentage = businessConfig?.partialCodAdvancePercentage || 20;
+        const advancePercentage = paymentConfig?.partialCodAdvancePercentage || 20;
         const advanceAmount = (total * advancePercentage) / 100;
         
         // Process advance payment online
@@ -1338,9 +1376,33 @@ const Checkout = () => {
                           Payment will be collected when your order is delivered.
                         </div>
                       )}
-                      {paymentGateway === 'PARTIAL_COD' && businessConfig?.partialCodAdvancePercentage && (
-                        <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
-                          You will pay {businessConfig.partialCodAdvancePercentage}% online as advance, and the remaining amount will be collected on delivery.
+                      {paymentGateway === 'PARTIAL_COD' && paymentConfig?.partialCodAdvancePercentage && (
+                        <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30 rounded-lg space-y-3">
+                          <div className="flex items-center gap-2 text-blue-900 dark:text-blue-400 font-semibold">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Partial COD Payment Breakdown</span>
+                          </div>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Order Total:</span>
+                              <span className="font-medium">{format(total)}</span>
+                            </div>
+                            <div className="flex justify-between text-blue-700 dark:text-blue-300">
+                              <span>Advance Payment ({paymentConfig.partialCodAdvancePercentage}%):</span>
+                              <span className="font-semibold">{format((total * paymentConfig.partialCodAdvancePercentage) / 100)}</span>
+                            </div>
+                            <div className="flex justify-between text-green-700 dark:text-green-300">
+                              <span>Remaining (COD on Delivery):</span>
+                              <span className="font-semibold">{format(total - (total * paymentConfig.partialCodAdvancePercentage) / 100)}</span>
+                            </div>
+                            <div className="pt-2 border-t border-blue-200 dark:border-blue-800">
+                              <p className="text-xs text-muted-foreground">
+                                Pay {paymentConfig.partialCodAdvancePercentage}% online now, remaining amount will be collected when your order is delivered.
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       )}
                       <Input 
@@ -1385,10 +1447,31 @@ const Checkout = () => {
                       <span>-{format(couponDiscount)}</span>
                     </div>
                   )}
+                  {paymentGateway === 'PARTIAL_COD' && paymentConfig?.partialCodAdvancePercentage && (
+                    <>
+                      <div className="pt-3 border-t space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Advance Payment ({paymentConfig.partialCodAdvancePercentage}%):</span>
+                          <span className="font-semibold text-blue-600 dark:text-blue-400">{format((total * paymentConfig.partialCodAdvancePercentage) / 100)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Remaining (COD):</span>
+                          <span className="font-semibold text-green-600 dark:text-green-400">{format(total - (total * paymentConfig.partialCodAdvancePercentage) / 100)}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between font-semibold text-lg sm:text-xl pt-4 border-t">
                     <span>Total</span>
                     <span>{format(total)}</span>
                   </div>
+                  {paymentGateway === 'PARTIAL_COD' && paymentConfig?.partialCodAdvancePercentage && (
+                    <div className="pt-2">
+                      <p className="text-xs text-muted-foreground text-center">
+                        You'll pay <span className="font-semibold text-blue-600 dark:text-blue-400">{format((total * paymentConfig.partialCodAdvancePercentage) / 100)}</span> online now
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <Button 
                   className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white mt-6 sm:mt-8 h-12 sm:h-14 text-base"

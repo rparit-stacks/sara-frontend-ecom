@@ -545,9 +545,12 @@ export const wishlistApi = {
 // ===============================
 export const orderApi = {
   createOrder: (data: any) => {
+    // For guest checkout, don't send Authorization header even if token exists
+    // The backend will handle guest checkout based on guestEmail field
     const token = localStorage.getItem('authToken');
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) {
+    // Only add Authorization header if user is logged in AND not doing guest checkout
+    if (token && !data.guestEmail) {
       headers['Authorization'] = `Bearer ${token}`;
     }
     return fetchApi<any>('/api/orders', { 
@@ -572,14 +575,52 @@ export const orderApi = {
         skipWhatsApp: skipWhatsApp || false 
       }) 
     }),
-  updatePaymentStatus: (id: number, paymentStatus: string, paymentId?: string) => 
-    fetchApi<any>(`/api/admin/orders/${id}/payment`, { method: 'PUT', body: JSON.stringify({ paymentStatus, paymentId }) }),
+  updatePaymentStatus: (id: number, paymentStatus: string, paymentId?: string, paymentAmount?: number) => 
+    fetchApi<any>(`/api/admin/orders/${id}/payment`, { 
+      method: 'PUT', 
+      body: JSON.stringify({ paymentStatus, paymentId, paymentAmount }) 
+    }),
   retrySwipeInvoice: (id: number) => 
     fetchApi<any>(`/api/admin/orders/${id}/retry-swipe-invoice`, { method: 'POST' }),
   checkSwipeInvoice: (id: number) => 
     fetchApi<any>(`/api/admin/orders/${id}/check-swipe-invoice`),
   updateOrderShippingAddressAdmin: (id: number, shippingAddress: any) =>
     fetchApi<any>(`/api/admin/orders/${id}/address`, { method: 'PUT', body: JSON.stringify({ shippingAddress }) }),
+  updateOrderBillingAddressAdmin: (id: number, billingAddress: any) =>
+    fetchApi<any>(`/api/admin/orders/${id}/billing-address`, { method: 'PUT', body: JSON.stringify({ billingAddress }) }),
+  updateOrderNotes: (id: number, notes: string) =>
+    fetchApi<any>(`/api/admin/orders/${id}/notes`, { method: 'PUT', body: JSON.stringify({ notes }) }),
+  updateCancellationInfo: (id: number, cancellationReason: string, cancelledBy: string) =>
+    fetchApi<any>(`/api/admin/orders/${id}/cancellation`, { 
+      method: 'PUT', 
+      body: JSON.stringify({ cancellationReason, cancelledBy }) 
+    }),
+  updateRefundInfo: (id: number, data: { refundAmount?: number; refundDate?: string; refundTransactionId?: string; refundReason?: string }) =>
+    fetchApi<any>(`/api/admin/orders/${id}/refund`, { 
+      method: 'PUT', 
+      body: JSON.stringify(data) 
+    }),
+  updateOrderItem: (orderId: number, itemId: number, data: { quantity?: number; price?: number; name?: string }) =>
+    fetchApi<any>(`/api/admin/orders/${orderId}/items/${itemId}`, { 
+      method: 'PUT', 
+      body: JSON.stringify(data) 
+    }),
+  updateOrderPricing: (id: number, data: { subtotal?: number; gst?: number; shipping?: number; total?: number }) =>
+    fetchApi<any>(`/api/admin/orders/${id}/pricing`, { 
+      method: 'PUT', 
+      body: JSON.stringify(data) 
+    }),
+  recalculateOrderTotals: (id: number) =>
+    fetchApi<any>(`/api/admin/orders/${id}/recalculate`, { method: 'POST' }),
+  getPaymentHistory: (id: number) =>
+    fetchApi<any[]>(`/api/admin/orders/${id}/payment-history`),
+  addPaymentHistory: (id: number, data: any) =>
+    fetchApi<any>(`/api/admin/orders/${id}/payment-history`, { 
+      method: 'POST', 
+      body: JSON.stringify(data) 
+    }),
+  getAuditLog: (id: number) =>
+    fetchApi<any[]>(`/api/admin/orders/${id}/audit-log`),
 };
 
 // ===============================
@@ -589,6 +630,15 @@ export const businessConfigApi = {
   getConfig: () => fetchApi<any>('/api/admin/business-config'),
   getConfigWithApiKey: () => fetchApi<any>('/api/admin/business-config/with-keys'),
   updateConfig: (data: any) => fetchApi<any>('/api/admin/business-config', { method: 'PUT', body: JSON.stringify(data) }),
+};
+
+export const paymentConfigApi = {
+  getConfig: () => fetchApi<any>('/api/admin/payment-config'),
+  getConfigWithSecrets: () => fetchApi<any>('/api/admin/payment-config/with-secrets'),
+  updateConfig: (data: any) => fetchApi<any>('/api/admin/payment-config', { 
+    method: 'PUT', 
+    body: JSON.stringify(data) 
+  }),
 };
 
 // ===============================

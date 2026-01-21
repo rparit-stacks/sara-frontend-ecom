@@ -5,11 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Save, Eye, EyeOff, CreditCard, DollarSign, Globe } from 'lucide-react';
+import { Loader2, Save, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { businessConfigApi } from '@/lib/api';
+import { paymentConfigApi } from '@/lib/api';
 
 const AdminPaymentConfig = () => {
   const [formData, setFormData] = useState({
@@ -19,30 +18,32 @@ const AdminPaymentConfig = () => {
     stripePublicKey: '',
     stripeSecretKey: '',
     stripeEnabled: false,
-    currencyApiKey: '',
-    currencyApiProvider: 'exchangerate-api',
+    codEnabled: false,
+    partialCodEnabled: false,
+    partialCodAdvancePercentage: null as number | null,
   });
+  
   const [showRazorpaySecret, setShowRazorpaySecret] = useState(false);
   const [showStripeSecret, setShowStripeSecret] = useState(false);
-  const [showCurrencyKey, setShowCurrencyKey] = useState(false);
   
   const queryClient = useQueryClient();
   
-  // Fetch config
+  // Fetch config with secrets for editing
   const { data: config, isLoading } = useQuery({
-    queryKey: ['businessConfig'],
-    queryFn: () => businessConfigApi.getConfigWithApiKey(),
+    queryKey: ['paymentConfig'],
+    queryFn: () => paymentConfigApi.getConfigWithSecrets(),
   });
   
   // Update config mutation
   const updateMutation = useMutation({
-    mutationFn: (data: any) => businessConfigApi.updateConfig(data),
+    mutationFn: (data: any) => paymentConfigApi.updateConfig(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['businessConfig'] });
+      queryClient.invalidateQueries({ queryKey: ['paymentConfig'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-config'] }); // For checkout page
       toast.success('Payment configuration saved successfully!');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to save configuration');
+      toast.error(error.message || 'Failed to save payment configuration');
     },
   });
   
@@ -50,35 +51,73 @@ const AdminPaymentConfig = () => {
     if (config) {
       setFormData({
         razorpayKeyId: config.razorpayKeyId || '',
-        razorpayKeySecret: '', // Don't populate for security
+        razorpayKeySecret: config.razorpayKeySecret === '***API_KEY_SET***' || !config.razorpayKeySecret ? '' : config.razorpayKeySecret,
         razorpayEnabled: config.razorpayEnabled || false,
         stripePublicKey: config.stripePublicKey || '',
-        stripeSecretKey: '', // Don't populate for security
+        stripeSecretKey: config.stripeSecretKey === '***API_KEY_SET***' || !config.stripeSecretKey ? '' : config.stripeSecretKey,
         stripeEnabled: config.stripeEnabled || false,
-        currencyApiKey: config.currencyApiKey || '', // Show API key for admin
-        currencyApiProvider: config.currencyApiProvider || 'exchangerate-api',
+        codEnabled: config.codEnabled || false,
+        partialCodEnabled: config.partialCodEnabled || false,
+        partialCodAdvancePercentage: config.partialCodAdvancePercentage || null,
       });
     }
   }, [config]);
   
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Merge with existing config
-    const updateData = {
-      ...config,
-      ...formData,
-    };
-    updateMutation.mutate(updateData);
+  const handleChange = (field: string, value: any) => {
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value };
+      
+      // Validation Rule: COD & Partial COD Mutual Exclusivity
+      if (field === 'partialCodEnabled' && value === true) {
+        newData.codEnabled = false;
+      }
+      if (field === 'codEnabled' && value === true) {
+        newData.partialCodEnabled = false;
+      }
+      
+      return newData;
+    });
   };
   
-  const handleChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validation: Partial COD requires at least one gateway
+    if (formData.partialCodEnabled && !formData.razorpayEnabled && !formData.stripeEnabled) {
+      toast.error('Partial COD requires at least one online payment gateway (Razorpay or Stripe) to be enabled');
+      return;
+    }
+    
+    // Validation: Partial COD requires advance percentage
+    if (formData.partialCodEnabled && (!formData.partialCodAdvancePercentage || formData.partialCodAdvancePercentage < 10 || formData.partialCodAdvancePercentage > 90)) {
+      toast.error('Partial COD advance percentage must be between 10 and 90');
+      return;
+    }
+    
+    // Only send API keys if they've been changed (not empty and not placeholder)
+    const submitData: any = { ...formData };
+    
+    // Handle API keys - only send if changed
+    if (!submitData.razorpayKeyId || submitData.razorpayKeyId.trim() === '') {
+      delete submitData.razorpayKeyId;
+    }
+    if (!submitData.razorpayKeySecret || submitData.razorpayKeySecret.trim() === '') {
+      delete submitData.razorpayKeySecret;
+    }
+    if (!submitData.stripePublicKey || submitData.stripePublicKey.trim() === '') {
+      delete submitData.stripePublicKey;
+    }
+    if (!submitData.stripeSecretKey || submitData.stripeSecretKey.trim() === '') {
+      delete submitData.stripeSecretKey;
+    }
+    
+    updateMutation.mutate(submitData);
   };
   
   if (isLoading) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex justify-center items-center min-h-screen">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       </AdminLayout>
@@ -87,213 +126,237 @@ const AdminPaymentConfig = () => {
   
   return (
     <AdminLayout>
-      <div className="space-y-6">
+      <div className="max-w-4xl mx-auto p-6 space-y-6">
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.5 }}
         >
-          <h1 className="font-cursive text-4xl lg:text-5xl font-bold mb-2">
-            Payment <span className="text-primary">Configuration</span>
-          </h1>
-          <p className="text-muted-foreground text-lg">Manage payment gateways and currency API settings</p>
+          <h1 className="text-3xl font-bold mb-2">Payment Configuration</h1>
+          <p className="text-muted-foreground mb-6">
+            Configure payment gateways and COD settings
+          </p>
         </motion.div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-6">
-            {/* Razorpay Configuration */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-white rounded-xl border border-border p-6 shadow-sm"
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <CreditCard className="w-6 h-6 text-primary" />
-                <h2 className="text-2xl font-semibold">Razorpay</h2>
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Razorpay Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="bg-card p-6 rounded-lg border border-border"
+          >
+            <h2 className="text-xl font-semibold mb-4">Razorpay Configuration</h2>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="razorpayKeyId">Razorpay Key ID</Label>
+                <Input
+                  id="razorpayKeyId"
+                  type="text"
+                  value={formData.razorpayKeyId}
+                  onChange={(e) => handleChange('razorpayKeyId', e.target.value)}
+                  placeholder="Enter Razorpay Key ID"
+                  className="mt-1"
+                />
               </div>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="razorpayEnabled" className="text-base">Enable Razorpay</Label>
-                  <Switch
-                    id="razorpayEnabled"
-                    checked={formData.razorpayEnabled}
-                    onCheckedChange={(checked) => handleChange('razorpayEnabled', checked)}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="razorpayKeyId">Key ID</Label>
+              <div>
+                <Label htmlFor="razorpayKeySecret">Razorpay Key Secret</Label>
+                <div className="relative mt-1">
                   <Input
-                    id="razorpayKeyId"
-                    value={formData.razorpayKeyId}
-                    onChange={(e) => handleChange('razorpayKeyId', e.target.value)}
-                    placeholder="rzp_test_..."
+                    id="razorpayKeySecret"
+                    type={showRazorpaySecret ? 'text' : 'password'}
+                    value={formData.razorpayKeySecret}
+                    onChange={(e) => handleChange('razorpayKeySecret', e.target.value)}
+                    placeholder="Enter Razorpay Key Secret"
+                    className="pr-10"
                   />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="razorpayKeySecret">Key Secret</Label>
-                  <div className="relative">
-                    <Input
-                      id="razorpayKeySecret"
-                      type={showRazorpaySecret ? 'text' : 'password'}
-                      value={formData.razorpayKeySecret}
-                      onChange={(e) => handleChange('razorpayKeySecret', e.target.value)}
-                      placeholder="Enter key secret to update"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2"
-                      onClick={() => setShowRazorpaySecret(!showRazorpaySecret)}
-                    >
-                      {showRazorpaySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Leave empty to keep existing secret</p>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Stripe Configuration */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-white rounded-xl border border-border p-6 shadow-sm"
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <DollarSign className="w-6 h-6 text-primary" />
-                <h2 className="text-2xl font-semibold">Stripe</h2>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="stripeEnabled" className="text-base">Enable Stripe</Label>
-                  <Switch
-                    id="stripeEnabled"
-                    checked={formData.stripeEnabled}
-                    onCheckedChange={(checked) => handleChange('stripeEnabled', checked)}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="stripePublicKey">Public Key</Label>
-                  <Input
-                    id="stripePublicKey"
-                    value={formData.stripePublicKey}
-                    onChange={(e) => handleChange('stripePublicKey', e.target.value)}
-                    placeholder="pk_test_..."
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="stripeSecretKey">Secret Key</Label>
-                  <div className="relative">
-                    <Input
-                      id="stripeSecretKey"
-                      type={showStripeSecret ? 'text' : 'password'}
-                      value={formData.stripeSecretKey}
-                      onChange={(e) => handleChange('stripeSecretKey', e.target.value)}
-                      placeholder="Enter secret key to update"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2"
-                      onClick={() => setShowStripeSecret(!showStripeSecret)}
-                    >
-                      {showStripeSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Leave empty to keep existing secret</p>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Currency API Configuration */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-white rounded-xl border border-border p-6 shadow-sm"
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <Globe className="w-6 h-6 text-primary" />
-                <h2 className="text-2xl font-semibold">Currency API</h2>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currencyApiProvider">API Provider</Label>
-                  <Select
-                    value={formData.currencyApiProvider}
-                    onValueChange={(value) => handleChange('currencyApiProvider', value)}
+                  <button
+                    type="button"
+                    onClick={() => setShowRazorpaySecret(!showRazorpaySecret)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="exchangerate-api">ExchangeRate-API</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="currencyApiKey">API Key</Label>
-                  <div className="relative">
-                    <Input
-                      id="currencyApiKey"
-                      type={showCurrencyKey ? 'text' : 'password'}
-                      value={formData.currencyApiKey}
-                      onChange={(e) => handleChange('currencyApiKey', e.target.value)}
-                      placeholder="Enter API key to update"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2"
-                      onClick={() => setShowCurrencyKey(!showCurrencyKey)}
-                    >
-                      {showCurrencyKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Leave empty to keep existing key</p>
+                    {showRazorpaySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
-            </motion.div>
-
-            {/* Submit Button */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="flex justify-end gap-4"
+              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                <div>
+                  <Label htmlFor="razorpayEnabled" className="text-base font-medium">Enable Razorpay</Label>
+                  <p className="text-sm text-muted-foreground">Allow customers to pay via Razorpay (India only)</p>
+                </div>
+                <Switch
+                  id="razorpayEnabled"
+                  checked={formData.razorpayEnabled}
+                  onCheckedChange={(checked) => handleChange('razorpayEnabled', checked)}
+                />
+              </div>
+            </div>
+          </motion.div>
+          
+          {/* Stripe Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="bg-card p-6 rounded-lg border border-border"
+          >
+            <h2 className="text-xl font-semibold mb-4">Stripe Configuration</h2>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="stripePublicKey">Stripe Public Key</Label>
+                <Input
+                  id="stripePublicKey"
+                  type="text"
+                  value={formData.stripePublicKey}
+                  onChange={(e) => handleChange('stripePublicKey', e.target.value)}
+                  placeholder="Enter Stripe Public Key"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="stripeSecretKey">Stripe Secret Key</Label>
+                <div className="relative mt-1">
+                  <Input
+                    id="stripeSecretKey"
+                    type={showStripeSecret ? 'text' : 'password'}
+                    value={formData.stripeSecretKey}
+                    onChange={(e) => handleChange('stripeSecretKey', e.target.value)}
+                    placeholder="Enter Stripe Secret Key"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowStripeSecret(!showStripeSecret)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showStripeSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                <div>
+                  <Label htmlFor="stripeEnabled" className="text-base font-medium">Enable Stripe</Label>
+                  <p className="text-sm text-muted-foreground">Allow customers to pay via Stripe (All countries)</p>
+                </div>
+                <Switch
+                  id="stripeEnabled"
+                  checked={formData.stripeEnabled}
+                  onCheckedChange={(checked) => handleChange('stripeEnabled', checked)}
+                />
+              </div>
+            </div>
+          </motion.div>
+          
+          {/* COD Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="bg-card p-6 rounded-lg border border-border"
+          >
+            <h2 className="text-xl font-semibold mb-4">Cash on Delivery (COD) Configuration</h2>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                <div>
+                  <Label htmlFor="codEnabled" className="text-base font-medium">Enable Full COD</Label>
+                  <p className="text-sm text-muted-foreground">Allow customers to pay full amount on delivery (India only)</p>
+                </div>
+                <Switch
+                  id="codEnabled"
+                  checked={formData.codEnabled}
+                  onCheckedChange={(checked) => handleChange('codEnabled', checked)}
+                  disabled={formData.partialCodEnabled}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                <div>
+                  <Label htmlFor="partialCodEnabled" className="text-base font-medium">Enable Partial COD</Label>
+                  <p className="text-sm text-muted-foreground">Allow customers to pay advance online and rest on delivery</p>
+                </div>
+                <Switch
+                  id="partialCodEnabled"
+                  checked={formData.partialCodEnabled}
+                  onCheckedChange={(checked) => handleChange('partialCodEnabled', checked)}
+                  disabled={formData.codEnabled}
+                />
+              </div>
+              
+              {formData.partialCodEnabled && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="space-y-2"
+                >
+                  <Label htmlFor="partialCodAdvancePercentage">Partial COD Advance Percentage (10-90%) *</Label>
+                  <Input
+                    id="partialCodAdvancePercentage"
+                    type="number"
+                    value={formData.partialCodAdvancePercentage || ''}
+                    onChange={(e) => handleChange('partialCodAdvancePercentage', e.target.value ? parseInt(e.target.value) : null)}
+                    placeholder="e.g., 20"
+                    min={10}
+                    max={90}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Percentage of total order value to be paid online as advance for Partial COD.
+                  </p>
+                  
+                  {!formData.razorpayEnabled && !formData.stripeEnabled && (
+                    <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-md">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-400">
+                        ⚠️ Partial COD requires at least one online payment gateway (Razorpay or Stripe) to be enabled.
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+          
+          {/* Info Box */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30 rounded-lg p-4"
+          >
+            <h3 className="font-semibold text-blue-900 dark:text-blue-400 mb-2">Important Notes:</h3>
+            <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1 list-disc list-inside">
+              <li>COD and Partial COD cannot be enabled simultaneously</li>
+              <li>Partial COD requires at least one online payment gateway (Razorpay or Stripe)</li>
+              <li>Razorpay is only available for India orders</li>
+              <li>Stripe is available for all countries</li>
+              <li>Digital products always require online payment (COD/Partial COD not available)</li>
+            </ul>
+          </motion.div>
+          
+          {/* Submit Button */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className="flex justify-end"
+          >
+            <Button
+              type="submit"
+              disabled={updateMutation.isPending}
+              className="min-w-[120px]"
             >
-              <Button
-                type="submit"
-                disabled={updateMutation.isPending}
-                className="min-w-[120px]"
-              >
-                {updateMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Configuration
-                  </>
-                )}
-              </Button>
-            </motion.div>
-          </div>
+              {updateMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Configuration
+                </>
+              )}
+            </Button>
+          </motion.div>
         </form>
       </div>
     </AdminLayout>

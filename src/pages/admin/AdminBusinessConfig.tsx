@@ -36,11 +36,6 @@ const AdminBusinessConfig = () => {
     swipeApiKey: '',
     swipeEnabled: false,
     einvoiceEnabled: false,
-    paymentMode: 'ONLINE_PAYMENT',
-    partialCodAdvancePercentage: null as number | null,
-    codEnabled: false,
-    partialCodEnabled: false,
-    onlinePaymentEnabled: true,
   });
   const [showApiKey, setShowApiKey] = useState(false);
   
@@ -78,11 +73,6 @@ const AdminBusinessConfig = () => {
         swipeApiKey: config.swipeApiKey === '***API_KEY_SET***' ? '' : (config.swipeApiKey || ''),
         swipeEnabled: config.swipeEnabled || false,
         einvoiceEnabled: config.einvoiceEnabled || false,
-        paymentMode: config.paymentMode || 'ONLINE_PAYMENT',
-        partialCodAdvancePercentage: config.partialCodAdvancePercentage || null,
-        codEnabled: config.codEnabled || false,
-        partialCodEnabled: config.partialCodEnabled || false,
-        onlinePaymentEnabled: config.onlinePaymentEnabled !== undefined ? config.onlinePaymentEnabled : true,
       });
     }
   }, [config]);
@@ -296,109 +286,6 @@ const AdminBusinessConfig = () => {
                   onCheckedChange={(checked) => handleChange('einvoiceEnabled', checked)}
                 />
               </div>
-            </div>
-          </div>
-          
-          {/* Payment Mode Configuration Section */}
-          <div className="border-t pt-6">
-            <h2 className="text-xl font-semibold mb-4">Payment Mode Configuration</h2>
-            <div className="space-y-4">
-              <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-lg">
-                <p className="text-sm text-yellow-800 dark:text-yellow-400 font-medium">
-                  ⚠️ Digital products always require online payment regardless of this setting
-                </p>
-              </div>
-              
-              <div className="space-y-3">
-                <Label>Payment Mode *</Label>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="paymentMode_FULL_COD"
-                      name="paymentMode"
-                      value="FULL_COD"
-                      checked={formData.paymentMode === 'FULL_COD'}
-                      onChange={(e) => {
-                        handleChange('paymentMode', e.target.value);
-                        handleChange('codEnabled', true);
-                        handleChange('partialCodEnabled', false);
-                        handleChange('onlinePaymentEnabled', false);
-                      }}
-                      className="w-4 h-4"
-                    />
-                    <Label htmlFor="paymentMode_FULL_COD" className="font-normal cursor-pointer">
-                      Full COD (Cash on Delivery)
-                    </Label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="paymentMode_PARTIAL_COD"
-                      name="paymentMode"
-                      value="PARTIAL_COD"
-                      checked={formData.paymentMode === 'PARTIAL_COD'}
-                      onChange={(e) => {
-                        handleChange('paymentMode', e.target.value);
-                        handleChange('codEnabled', false);
-                        handleChange('partialCodEnabled', true);
-                        handleChange('onlinePaymentEnabled', false);
-                      }}
-                      className="w-4 h-4"
-                    />
-                    <Label htmlFor="paymentMode_PARTIAL_COD" className="font-normal cursor-pointer">
-                      Partial COD (Advance Payment Required)
-                    </Label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="paymentMode_ONLINE_PAYMENT"
-                      name="paymentMode"
-                      value="ONLINE_PAYMENT"
-                      checked={formData.paymentMode === 'ONLINE_PAYMENT'}
-                      onChange={(e) => {
-                        handleChange('paymentMode', e.target.value);
-                        handleChange('codEnabled', false);
-                        handleChange('partialCodEnabled', false);
-                        handleChange('onlinePaymentEnabled', true);
-                      }}
-                      className="w-4 h-4"
-                    />
-                    <Label htmlFor="paymentMode_ONLINE_PAYMENT" className="font-normal cursor-pointer">
-                      Online Payment Only
-                    </Label>
-                  </div>
-                </div>
-              </div>
-              
-              {formData.paymentMode === 'PARTIAL_COD' && (
-                <div className="space-y-2">
-                  <Label htmlFor="partialCodAdvancePercentage">
-                    Advance Payment Percentage * (10-90%)
-                  </Label>
-                  <Input
-                    id="partialCodAdvancePercentage"
-                    type="number"
-                    min="10"
-                    max="90"
-                    value={formData.partialCodAdvancePercentage || ''}
-                    onChange={(e) => {
-                      const value = e.target.value ? parseInt(e.target.value) : null;
-                      if (value === null || (value >= 10 && value <= 90)) {
-                        handleChange('partialCodAdvancePercentage', value);
-                      }
-                    }}
-                    placeholder="30"
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Percentage of order total to be paid in advance (remaining amount on delivery)
-                  </p>
-                </div>
-              )}
             </div>
           </div>
           

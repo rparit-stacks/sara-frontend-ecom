@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
@@ -43,6 +43,18 @@ const AdminOrderDetail = () => {
     },
   });
 
+  const { data: paymentHistory = [] } = useQuery({
+    queryKey: ['paymentHistory', orderId],
+    queryFn: () => orderApi.getPaymentHistory(orderId),
+    enabled: !!orderId,
+  });
+
+  const { data: auditLog = [] } = useQuery({
+    queryKey: ['auditLog', orderId],
+    queryFn: () => orderApi.getAuditLog(orderId),
+    enabled: !!orderId,
+  });
+
   const paymentCurrency: string = order?.paymentCurrency || 'INR';
   const paymentAmount: number = useMemo(
     () => Number(order?.paymentAmount ?? order?.total ?? 0),
@@ -74,6 +86,92 @@ const AdminOrderDetail = () => {
       gstin: sa.gstin || '',
     };
   });
+
+  const [editBillingAddressForm, setEditBillingAddressForm] = useState<any>(() => {
+    const ba = order?.billingAddress || {};
+    const postalCode = ba.postalCode || ba.zipCode || '';
+    return {
+      firstName: ba.firstName || '',
+      lastName: ba.lastName || '',
+      email: ba.email || order?.userEmail || '',
+      phone: ba.phone || ba.phoneNumber || '',
+      address: ba.address || '',
+      addressLine2: ba.addressLine2 || ba.address_line2 || '',
+      city: ba.city || '',
+      state: ba.state || '',
+      postalCode,
+      country: ba.country || 'IN',
+      gstin: ba.gstin || '',
+    };
+  });
+
+  const [editNotesForm, setEditNotesForm] = useState<string>('');
+  const [editPaymentForm, setEditPaymentForm] = useState({
+    paymentStatus: 'PENDING',
+    paymentId: '',
+    paymentAmount: 0,
+  });
+  const [editCancellationForm, setEditCancellationForm] = useState({
+    cancellationReason: '',
+    cancelledBy: '',
+  });
+  const [editRefundForm, setEditRefundForm] = useState({
+    refundAmount: 0,
+    refundDate: '',
+    refundTransactionId: '',
+    refundReason: '',
+  });
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [editItemForm, setEditItemForm] = useState<{ quantity: number; price: number; name: string } | null>(null);
+  const [editPricingForm, setEditPricingForm] = useState({
+    subtotal: 0,
+    gst: 0,
+    shipping: 0,
+    total: 0,
+  });
+
+  // Update forms when order data changes
+  useEffect(() => {
+    if (order) {
+      setEditNotesForm(order.notes || '');
+      setEditPaymentForm({
+        paymentStatus: order.paymentStatus || 'PENDING',
+        paymentId: order.paymentId || '',
+        paymentAmount: order.paymentAmount ? Number(order.paymentAmount) : order.total ? Number(order.total) : 0,
+      });
+      setEditCancellationForm({
+        cancellationReason: order.cancellationReason || '',
+        cancelledBy: order.cancelledBy || '',
+      });
+      setEditRefundForm({
+        refundAmount: order.refundAmount ? Number(order.refundAmount) : 0,
+        refundDate: order.refundDate ? new Date(order.refundDate).toISOString().split('T')[0] : '',
+        refundTransactionId: order.refundTransactionId || '',
+        refundReason: order.refundReason || '',
+      });
+      setEditPricingForm({
+        subtotal: order.subtotal ? Number(order.subtotal) : 0,
+        gst: order.gst ? Number(order.gst) : 0,
+        shipping: order.shipping ? Number(order.shipping) : 0,
+        total: order.total ? Number(order.total) : 0,
+      });
+      const ba = order.billingAddress || {};
+      const billingPostalCode = ba.postalCode || ba.zipCode || '';
+      setEditBillingAddressForm({
+        firstName: ba.firstName || '',
+        lastName: ba.lastName || '',
+        email: ba.email || order.userEmail || '',
+        phone: ba.phone || ba.phoneNumber || '',
+        address: ba.address || '',
+        addressLine2: ba.addressLine2 || ba.address_line2 || '',
+        city: ba.city || '',
+        state: ba.state || '',
+        postalCode: billingPostalCode,
+        country: ba.country || 'IN',
+        gstin: ba.gstin || '',
+      });
+    }
+  }, [order]);
 
   const updateStatusMutation = useMutation({
     mutationFn: ({
@@ -119,6 +217,113 @@ const AdminOrderDetail = () => {
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to update shipping address');
+    },
+  });
+
+  const updateBillingAddressMutation = useMutation({
+    mutationFn: ({ id, billingAddress }: { id: number; billingAddress: any }) =>
+      orderApi.updateOrderBillingAddressAdmin(id, billingAddress),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminOrderDetails', orderId] });
+      toast.success('Billing address updated successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update billing address');
+    },
+  });
+
+  const updateNotesMutation = useMutation({
+    mutationFn: ({ id, notes }: { id: number; notes: string }) =>
+      orderApi.updateOrderNotes(id, notes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminOrderDetails', orderId] });
+      toast.success('Notes updated successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update notes');
+    },
+  });
+
+  const updateCancellationMutation = useMutation({
+    mutationFn: ({ id, cancellationReason, cancelledBy }: { 
+      id: number; 
+      cancellationReason: string; 
+      cancelledBy: string;
+    }) => orderApi.updateCancellationInfo(id, cancellationReason, cancelledBy),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminOrderDetails', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['adminOrders'] });
+      toast.success('Cancellation information updated successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update cancellation information');
+    },
+  });
+
+  const updateRefundMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) =>
+      orderApi.updateRefundInfo(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminOrderDetails', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['adminOrders'] });
+      toast.success('Refund information updated successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update refund information');
+    },
+  });
+
+  const updateItemMutation = useMutation({
+    mutationFn: ({ orderId, itemId, data }: { orderId: number; itemId: number; data: any }) =>
+      orderApi.updateOrderItem(orderId, itemId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminOrderDetails', orderId] });
+      setEditingItemId(null);
+      setEditItemForm(null);
+      toast.success('Order item updated successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update order item');
+    },
+  });
+
+  const updatePricingMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) =>
+      orderApi.updateOrderPricing(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminOrderDetails', orderId] });
+      toast.success('Pricing updated successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update pricing');
+    },
+  });
+
+  const recalculateMutation = useMutation({
+    mutationFn: (id: number) => orderApi.recalculateOrderTotals(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminOrderDetails', orderId] });
+      toast.success('Order totals recalculated successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to recalculate totals');
+    },
+  });
+
+  const updatePaymentMutation = useMutation({
+    mutationFn: ({ id, paymentStatus, paymentId, paymentAmount }: { 
+      id: number; 
+      paymentStatus: string; 
+      paymentId?: string;
+      paymentAmount?: number;
+    }) => orderApi.updatePaymentStatus(id, paymentStatus, paymentId, paymentAmount),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminOrderDetails', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['adminOrders'] });
+      toast.success('Payment information updated successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update payment information');
     },
   });
 
@@ -256,6 +461,15 @@ const AdminOrderDetail = () => {
                     minute: '2-digit',
                   })
                 : 'N/A'}
+              {order.updatedAt && order.updatedAt !== order.createdAt && (
+                <> · Updated {new Date(order.updatedAt).toLocaleString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}</>
+              )}
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -440,10 +654,23 @@ const AdminOrderDetail = () => {
 
             {/* Order Items with customization */}
             <section className="bg-white border border-border rounded-xl p-4 space-y-4">
-              <h2 className="font-semibold text-lg">Order Items</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-lg">Order Items</h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    recalculateMutation.mutate(orderId);
+                  }}
+                  disabled={recalculateMutation.isPending}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${recalculateMutation.isPending ? 'animate-spin' : ''}`} />
+                  Recalculate Totals
+                </Button>
+              </div>
               <div className="space-y-3">
                 {order.items?.map((item: any, index: number) => (
-                  <div key={index} className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/30 rounded-lg">
+                  <div key={item.id || index} className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/30 rounded-lg">
                     {item.image && (
                       <img
                         src={item.image}
@@ -453,24 +680,114 @@ const AdminOrderDetail = () => {
                     )}
                     <div className="flex-1 space-y-2">
                       <div className="flex justify-between gap-2">
-                        <div>
-                          <div className="font-medium">{item.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            Type: {item.productType || 'N/A'}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            IDs: P#{item.productId || '—'}
-                            {item.designId && ` · D#${item.designId}`}
-                            {item.fabricId && ` · F#${item.fabricId}`}
-                          </div>
+                        <div className="flex-1">
+                          {editingItemId === item.id ? (
+                            <div className="space-y-2">
+                              <Input
+                                value={editItemForm?.name || ''}
+                                onChange={(e) =>
+                                  setEditItemForm((prev) => (prev ? { ...prev, name: e.target.value } : null))
+                                }
+                                placeholder="Product Name"
+                                className="text-sm"
+                              />
+                              <div className="flex gap-2">
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={editItemForm?.quantity || ''}
+                                  onChange={(e) =>
+                                    setEditItemForm((prev) =>
+                                      prev ? { ...prev, quantity: Number(e.target.value) } : null
+                                    )
+                                  }
+                                  placeholder="Qty"
+                                  className="w-20 text-sm"
+                                />
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={editItemForm?.price || ''}
+                                  onChange={(e) =>
+                                    setEditItemForm((prev) =>
+                                      prev ? { ...prev, price: Number(e.target.value) } : null
+                                    )
+                                  }
+                                  placeholder="Price"
+                                  className="w-32 text-sm"
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    if (editItemForm) {
+                                      updateItemMutation.mutate({
+                                        orderId,
+                                        itemId: item.id,
+                                        data: {
+                                          quantity: editItemForm.quantity,
+                                          price: editItemForm.price,
+                                          name: editItemForm.name,
+                                        },
+                                      });
+                                    }
+                                  }}
+                                  disabled={updateItemMutation.isPending}
+                                >
+                                  Save
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setEditingItemId(null);
+                                    setEditItemForm(null);
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="font-medium">{item.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                Type: {item.productType || 'N/A'}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                IDs: P#{item.productId || '—'}
+                                {item.designId && ` · D#${item.designId}`}
+                                {item.fabricId && ` · F#${item.fabricId}`}
+                              </div>
+                            </>
+                          )}
                         </div>
                         <div className="text-right text-sm">
-                          <div className="text-muted-foreground">
-                            Qty: {item.quantity} × {formatPrice(Number(item.price || 0), paymentCurrency)}
-                          </div>
-                          <div className="font-semibold">
-                            {formatPrice(Number(item.totalPrice || 0), paymentCurrency)}
-                          </div>
+                          {editingItemId !== item.id && (
+                            <>
+                              <div className="text-muted-foreground">
+                                Qty: {item.quantity} × {formatPrice(Number(item.price || 0), paymentCurrency)}
+                              </div>
+                              <div className="font-semibold">
+                                {formatPrice(Number(item.totalPrice || 0), paymentCurrency)}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="mt-2"
+                                onClick={() => {
+                                  setEditingItemId(item.id);
+                                  setEditItemForm({
+                                    quantity: item.quantity || 1,
+                                    price: Number(item.price || 0),
+                                    name: item.name || '',
+                                  });
+                                }}
+                              >
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -500,9 +817,256 @@ const AdminOrderDetail = () => {
                           </div>
                         </div>
                       )}
+
+                      {item.productType === 'DIGITAL' && (
+                        <div className="mt-2 space-y-1">
+                          <div className="text-xs font-semibold">Digital Product</div>
+                          {item.digitalDownloadUrl && (
+                            <div className="text-xs">
+                              <a
+                                href={item.digitalDownloadUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary underline"
+                              >
+                                Download ZIP
+                              </a>
+                            </div>
+                          )}
+                          {item.zipPassword && (
+                            <div className="text-xs text-muted-foreground">
+                              ZIP Password: <span className="font-mono">{item.zipPassword}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
+              </div>
+            </section>
+
+            {/* Billing Address */}
+            <section className="bg-white border border-border rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-lg">Billing Address</h2>
+                {order.billingAddress && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const ba = order.billingAddress || {};
+                      const postalCode = ba.postalCode || ba.zipCode || '';
+                      setEditBillingAddressForm({
+                        firstName: ba.firstName || '',
+                        lastName: ba.lastName || '',
+                        email: ba.email || order.userEmail || '',
+                        phone: ba.phone || ba.phoneNumber || '',
+                        address: ba.address || '',
+                        addressLine2: ba.addressLine2 || ba.address_line2 || '',
+                        city: ba.city || '',
+                        state: ba.state || '',
+                        postalCode,
+                        country: ba.country || 'IN',
+                        gstin: ba.gstin || '',
+                      });
+                    }}
+                    disabled={updateBillingAddressMutation.isPending}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    {order.billingAddress ? 'Update Address' : 'Add Address'}
+                  </Button>
+                )}
+              </div>
+              {order.billingAddress ? (
+                <div className="text-sm space-y-1">
+                  {(() => {
+                    const ba = order.billingAddress || {};
+                    const billingName = `${ba.firstName || ''} ${ba.lastName || ''}`.trim();
+                    return (
+                      <>
+                        {billingName && <div className="font-medium">{billingName}</div>}
+                        {ba.address && <div>{ba.address}</div>}
+                        {(ba.addressLine2 || ba.address_line2) && (
+                          <div>{ba.addressLine2 || ba.address_line2}</div>
+                        )}
+                        <div>
+                          {ba.city && `${ba.city}, `}
+                          {ba.state && `${ba.state} `}
+                          {(ba.postalCode || ba.zipCode) && `- ${ba.postalCode || ba.zipCode}`}
+                        </div>
+                        {ba.country && (
+                          <div>
+                            <span className="font-medium">Country:</span> {ba.country}
+                          </div>
+                        )}
+                        {(ba.phone || ba.phoneNumber) && (
+                          <div>
+                            <span className="font-medium">Phone:</span> {ba.phone || ba.phoneNumber}
+                          </div>
+                        )}
+                        {ba.email && (
+                          <div>
+                            <span className="font-medium">Email:</span> {ba.email}
+                          </div>
+                        )}
+                        {ba.gstin && (
+                          <div>
+                            <span className="font-medium">GSTIN:</span> {ba.gstin}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground italic">No billing address set</div>
+              )}
+              <div className="mt-4 grid md:grid-cols-2 gap-3">
+                <Input
+                  placeholder="First Name *"
+                  value={editBillingAddressForm.firstName}
+                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, firstName: e.target.value }))}
+                />
+                <Input
+                  placeholder="Last Name *"
+                  value={editBillingAddressForm.lastName}
+                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, lastName: e.target.value }))}
+                />
+                <Input
+                  placeholder="Phone *"
+                  value={editBillingAddressForm.phone}
+                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, phone: e.target.value }))}
+                />
+                <Input
+                  placeholder="Email"
+                  value={editBillingAddressForm.email}
+                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, email: e.target.value }))}
+                />
+                <Input
+                  placeholder="Address Line 1 *"
+                  value={editBillingAddressForm.address}
+                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, address: e.target.value }))}
+                  className="md:col-span-2"
+                />
+                <Input
+                  placeholder="Address Line 2"
+                  value={editBillingAddressForm.addressLine2}
+                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, addressLine2: e.target.value }))}
+                  className="md:col-span-2"
+                />
+                <Input
+                  placeholder="City *"
+                  value={editBillingAddressForm.city}
+                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, city: e.target.value }))}
+                />
+                <Input
+                  placeholder="State *"
+                  value={editBillingAddressForm.state}
+                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, state: e.target.value }))}
+                />
+                <Input
+                  placeholder="Postal Code *"
+                  value={editBillingAddressForm.postalCode}
+                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, postalCode: e.target.value }))}
+                />
+                <Input
+                  placeholder="Country *"
+                  value={editBillingAddressForm.country}
+                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, country: e.target.value }))}
+                />
+                <Input
+                  placeholder="GSTIN (optional)"
+                  value={editBillingAddressForm.gstin}
+                  onChange={(e) =>
+                    setEditBillingAddressForm((p: any) => ({ ...p, gstin: e.target.value.toUpperCase() }))
+                  }
+                  className="md:col-span-2"
+                />
+              </div>
+              <div className="flex justify-end mt-3">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (!editBillingAddressForm.phone || !editBillingAddressForm.address || !editBillingAddressForm.city ||
+                      !editBillingAddressForm.state || !editBillingAddressForm.postalCode) {
+                      toast.error('Please fill all required fields');
+                      return;
+                    }
+                    updateBillingAddressMutation.mutate({
+                      id: orderId,
+                      billingAddress: {
+                        firstName: editBillingAddressForm.firstName,
+                        lastName: editBillingAddressForm.lastName,
+                        email: editBillingAddressForm.email,
+                        phone: editBillingAddressForm.phone,
+                        address: editBillingAddressForm.address,
+                        addressLine2: editBillingAddressForm.addressLine2 || '',
+                        city: editBillingAddressForm.city,
+                        state: editBillingAddressForm.state,
+                        postalCode: editBillingAddressForm.postalCode,
+                        country: editBillingAddressForm.country,
+                        gstin: editBillingAddressForm.gstin || undefined,
+                      },
+                    });
+                  }}
+                  disabled={updateBillingAddressMutation.isPending}
+                >
+                  {updateBillingAddressMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Billing Address'
+                  )}
+                </Button>
+              </div>
+            </section>
+
+            {/* Order Notes */}
+            <section className="bg-white border border-border rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-lg">Order Notes</h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditNotesForm(order.notes || '');
+                  }}
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+              </div>
+              <div className="space-y-2">
+                <Textarea
+                  value={editNotesForm}
+                  onChange={(e) => setEditNotesForm(e.target.value)}
+                  placeholder="Add internal notes about this order..."
+                  rows={4}
+                  className="text-sm"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    updateNotesMutation.mutate({
+                      id: orderId,
+                      notes: editNotesForm,
+                    });
+                  }}
+                  disabled={updateNotesMutation.isPending}
+                  className="w-full"
+                >
+                  {updateNotesMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Notes'
+                  )}
+                </Button>
               </div>
             </section>
           </div>
@@ -511,44 +1075,443 @@ const AdminOrderDetail = () => {
           <div className="space-y-6">
             {/* Payment summary */}
             <section className="bg-white border border-border rounded-xl p-4 space-y-3">
-              <h2 className="font-semibold text-lg">Payment Summary</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-lg">Payment Summary</h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditPaymentForm({
+                      paymentStatus: order.paymentStatus || 'PENDING',
+                      paymentId: order.paymentId || '',
+                      paymentAmount: order.paymentAmount ? Number(order.paymentAmount) : order.total ? Number(order.total) : 0,
+                    });
+                  }}
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+              </div>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>Gateway Amount</span>
+                  <span>Payment Method</span>
+                  <span className="font-medium">{order.paymentMethod || 'N/A'}</span>
+                </div>
+                <div className="space-y-2 pt-2 border-t">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Payment Status</label>
+                    <Select
+                      value={editPaymentForm.paymentStatus}
+                      onValueChange={(value) =>
+                        setEditPaymentForm((prev) => ({ ...prev, paymentStatus: value }))
+                      }
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PENDING">Pending</SelectItem>
+                        <SelectItem value="PAID">Paid</SelectItem>
+                        <SelectItem value="FAILED">Failed</SelectItem>
+                        <SelectItem value="REFUNDED">Refunded</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Transaction ID</label>
+                    <Input
+                      value={editPaymentForm.paymentId}
+                      onChange={(e) =>
+                        setEditPaymentForm((prev) => ({ ...prev, paymentId: e.target.value }))
+                      }
+                      placeholder="Transaction ID"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Payment Amount ({paymentCurrency})</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editPaymentForm.paymentAmount}
+                      onChange={(e) =>
+                        setEditPaymentForm((prev) => ({ ...prev, paymentAmount: Number(e.target.value) }))
+                      }
+                      placeholder="0.00"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      updatePaymentMutation.mutate({
+                        id: orderId,
+                        paymentStatus: editPaymentForm.paymentStatus,
+                        paymentId: editPaymentForm.paymentId || undefined,
+                        paymentAmount: editPaymentForm.paymentAmount || undefined,
+                      });
+                    }}
+                    disabled={updatePaymentMutation.isPending}
+                    className="w-full"
+                  >
+                    {updatePaymentMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Payment Info'
+                    )}
+                  </Button>
+                </div>
+                {order.paymentId && (
+                  <div className="flex justify-between pt-2 border-t">
+                    <span>Current Transaction ID</span>
+                    <span className="font-mono text-xs">{order.paymentId}</span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-2 border-t">
+                  <span>Current Gateway Amount</span>
                   <span className="font-semibold">
                     {formatPrice(paymentAmount, paymentCurrency)}
                   </span>
                 </div>
+                {order.paymentMethod === 'PARTIAL_COD' && (
+                  <div className="pt-2 border-t border-dashed space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Advance Paid</span>
+                      <span className="font-medium text-green-600">
+                        {formatPrice(paymentAmount, paymentCurrency)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span>Remaining</span>
+                      <span className="font-medium text-orange-600">
+                        {formatPrice(Number(order.total || 0) - paymentAmount, 'INR')}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="mt-3 pt-3 border-t border-dashed space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span>Subtotal (INR)</span>
-                  <span>{formatPrice(Number(order.subtotal || 0), 'INR')}</span>
-                </div>
-                {order.gst && Number(order.gst) > 0 && (
-                  <div className="flex justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span>Subtotal (INR)</span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editPricingForm.subtotal}
+                        onChange={(e) =>
+                          setEditPricingForm((prev) => ({ ...prev, subtotal: Number(e.target.value) }))
+                        }
+                        className="w-24 h-6 text-xs"
+                      />
+                      <span className="text-xs">({formatPrice(Number(order.subtotal || 0), 'INR')})</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
                     <span>GST (INR)</span>
-                    <span>{formatPrice(Number(order.gst), 'INR')}</span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editPricingForm.gst}
+                        onChange={(e) =>
+                          setEditPricingForm((prev) => ({ ...prev, gst: Number(e.target.value) }))
+                        }
+                        className="w-24 h-6 text-xs"
+                      />
+                      <span className="text-xs">({formatPrice(Number(order.gst || 0), 'INR')})</span>
+                    </div>
                   </div>
-                )}
-                {order.shipping && Number(order.shipping) > 0 && (
-                  <div className="flex justify-between">
+                  <div className="flex items-center justify-between">
                     <span>Shipping (INR)</span>
-                    <span>{formatPrice(Number(order.shipping), 'INR')}</span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editPricingForm.shipping}
+                        onChange={(e) =>
+                          setEditPricingForm((prev) => ({ ...prev, shipping: Number(e.target.value) }))
+                        }
+                        className="w-24 h-6 text-xs"
+                      />
+                      <span className="text-xs">({formatPrice(Number(order.shipping || 0), 'INR')})</span>
+                    </div>
                   </div>
-                )}
-                {order.couponDiscount && Number(order.couponDiscount) > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount (INR){order.couponCode ? ` (${order.couponCode})` : ''}</span>
-                    <span>-{formatPrice(Number(order.couponDiscount), 'INR')}</span>
+                  {order.couponDiscount && Number(order.couponDiscount) > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Discount (INR){order.couponCode ? ` (${order.couponCode})` : ''}</span>
+                      <span>-{formatPrice(Number(order.couponDiscount), 'INR')}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between font-semibold pt-2 border-t">
+                    <span>Total (INR)</span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editPricingForm.total}
+                        onChange={(e) =>
+                          setEditPricingForm((prev) => ({ ...prev, total: Number(e.target.value) }))
+                        }
+                        className="w-24 h-6 text-xs font-semibold"
+                      />
+                      <span className="text-xs">({formatPrice(Number(order.total || 0), 'INR')})</span>
+                    </div>
                   </div>
-                )}
-                <div className="flex justify-between font-semibold pt-2 border-t">
-                  <span>Total (INR)</span>
-                  <span>{formatPrice(Number(order.total || 0), 'INR')}</span>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      // Auto-calculate total if not manually set
+                      const calculatedTotal =
+                        editPricingForm.subtotal +
+                        editPricingForm.gst +
+                        editPricingForm.shipping -
+                        (order.couponDiscount ? Number(order.couponDiscount) : 0);
+                      
+                      updatePricingMutation.mutate({
+                        id: orderId,
+                        data: {
+                          subtotal: editPricingForm.subtotal,
+                          gst: editPricingForm.gst,
+                          shipping: editPricingForm.shipping,
+                          total: editPricingForm.total || calculatedTotal,
+                        },
+                      });
+                    }}
+                    disabled={updatePricingMutation.isPending}
+                    className="w-full mt-2"
+                  >
+                    {updatePricingMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Pricing'
+                    )}
+                  </Button>
                 </div>
               </div>
             </section>
+
+            {/* Payment History */}
+            {(order.paymentMethod === 'PARTIAL_COD' || paymentHistory.length > 0) && (
+              <section className="bg-white border border-border rounded-xl p-4 space-y-4">
+                <h2 className="font-semibold text-lg">Payment History</h2>
+                {paymentHistory.length > 0 ? (
+                  <div className="space-y-2 text-sm">
+                    {paymentHistory.map((entry: any) => (
+                      <div key={entry.id} className="p-3 bg-muted/30 rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-medium">{entry.paymentType}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {entry.paidAt
+                                ? new Date(entry.paidAt).toLocaleString('en-IN', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })
+                                : 'N/A'}
+                            </div>
+                            {entry.transactionId && (
+                              <div className="text-xs font-mono text-muted-foreground mt-1">
+                                TXN: {entry.transactionId}
+                              </div>
+                            )}
+                            {entry.notes && (
+                              <div className="text-xs text-muted-foreground mt-1">{entry.notes}</div>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold">
+                              {formatPrice(Number(entry.amount || 0), entry.currency || 'INR')}
+                            </div>
+                            {entry.paymentMethod && (
+                              <div className="text-xs text-muted-foreground">{entry.paymentMethod}</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground italic">No payment history recorded</div>
+                )}
+              </section>
+            )}
+
+            {/* Cancellation Info - Show when status is CANCELLED */}
+            {order.status === 'CANCELLED' && (
+              <section className="bg-white border border-border rounded-xl p-4 space-y-4">
+                <h2 className="font-semibold text-lg">Cancellation Information</h2>
+                <div className="space-y-3 text-sm">
+                  {order.cancelledAt && (
+                    <div>
+                      <span className="text-muted-foreground">Cancelled At:</span>{' '}
+                      <span className="font-medium">
+                        {new Date(order.cancelledAt).toLocaleString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Cancellation Reason</label>
+                    <Textarea
+                      value={editCancellationForm.cancellationReason}
+                      onChange={(e) =>
+                        setEditCancellationForm((prev) => ({ ...prev, cancellationReason: e.target.value }))
+                      }
+                      placeholder="Enter reason for cancellation..."
+                      rows={3}
+                      className="text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Cancelled By</label>
+                    <Input
+                      value={editCancellationForm.cancelledBy}
+                      onChange={(e) =>
+                        setEditCancellationForm((prev) => ({ ...prev, cancelledBy: e.target.value }))
+                      }
+                      placeholder="Admin email or 'Customer'"
+                      className="text-sm"
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      updateCancellationMutation.mutate({
+                        id: orderId,
+                        cancellationReason: editCancellationForm.cancellationReason,
+                        cancelledBy: editCancellationForm.cancelledBy,
+                      });
+                    }}
+                    disabled={updateCancellationMutation.isPending}
+                    className="w-full"
+                  >
+                    {updateCancellationMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Cancellation Info'
+                    )}
+                  </Button>
+                </div>
+              </section>
+            )}
+
+            {/* Refund Info - Show when payment status is REFUNDED or refund amount exists */}
+            {(order.paymentStatus === 'REFUNDED' || order.refundAmount) && (
+              <section className="bg-white border border-border rounded-xl p-4 space-y-4">
+                <h2 className="font-semibold text-lg">Refund Information</h2>
+                <div className="space-y-3 text-sm">
+                  {order.refundDate && (
+                    <div>
+                      <span className="text-muted-foreground">Refund Date:</span>{' '}
+                      <span className="font-medium">
+                        {new Date(order.refundDate).toLocaleString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Refund Amount (INR)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editRefundForm.refundAmount}
+                      onChange={(e) =>
+                        setEditRefundForm((prev) => ({ ...prev, refundAmount: Number(e.target.value) }))
+                      }
+                      placeholder="0.00"
+                      className="text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Refund Date</label>
+                    <Input
+                      type="date"
+                      value={editRefundForm.refundDate}
+                      onChange={(e) =>
+                        setEditRefundForm((prev) => ({ ...prev, refundDate: e.target.value }))
+                      }
+                      className="text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Refund Transaction ID</label>
+                    <Input
+                      value={editRefundForm.refundTransactionId}
+                      onChange={(e) =>
+                        setEditRefundForm((prev) => ({ ...prev, refundTransactionId: e.target.value }))
+                      }
+                      placeholder="Transaction ID"
+                      className="text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Refund Reason</label>
+                    <Textarea
+                      value={editRefundForm.refundReason}
+                      onChange={(e) =>
+                        setEditRefundForm((prev) => ({ ...prev, refundReason: e.target.value }))
+                      }
+                      placeholder="Enter reason for refund..."
+                      rows={3}
+                      className="text-sm"
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      updateRefundMutation.mutate({
+                        id: orderId,
+                        data: {
+                          refundAmount: editRefundForm.refundAmount || undefined,
+                          refundDate: editRefundForm.refundDate || undefined,
+                          refundTransactionId: editRefundForm.refundTransactionId || undefined,
+                          refundReason: editRefundForm.refundReason || undefined,
+                        },
+                      });
+                    }}
+                    disabled={updateRefundMutation.isPending}
+                    className="w-full"
+                  >
+                    {updateRefundMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Refund Info'
+                    )}
+                  </Button>
+                </div>
+              </section>
+            )}
 
             {/* Status update */}
             <section className="bg-white border border-border rounded-xl p-4 space-y-4">
@@ -709,6 +1672,55 @@ const AdminOrderDetail = () => {
                 <p className="text-sm text-muted-foreground">
                   Invoice will be available after the order is confirmed.
                 </p>
+              )}
+            </section>
+
+            {/* Audit Log */}
+            <section className="bg-white border border-border rounded-xl p-4 space-y-4">
+              <h2 className="font-semibold text-lg">Change History</h2>
+              {auditLog.length > 0 ? (
+                <div className="space-y-2 text-sm max-h-96 overflow-y-auto">
+                  {auditLog.map((log: any) => (
+                    <div key={log.id} className="p-3 bg-muted/30 rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="font-medium">{log.changeType.replace(/_/g, ' ')}</div>
+                          {log.fieldName && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Field: {log.fieldName}
+                            </div>
+                          )}
+                          {log.oldValue && log.newValue && (
+                            <div className="text-xs mt-1">
+                              <span className="line-through text-red-600">{log.oldValue}</span>
+                              {' → '}
+                              <span className="text-green-600 font-medium">{log.newValue}</span>
+                            </div>
+                          )}
+                          {log.changeReason && (
+                            <div className="text-xs text-muted-foreground mt-1">{log.changeReason}</div>
+                          )}
+                          <div className="text-xs text-muted-foreground mt-1">
+                            By: {log.changedBy}
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {log.createdAt
+                            ? new Date(log.createdAt).toLocaleString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground italic">No changes recorded</div>
               )}
             </section>
           </div>
