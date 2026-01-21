@@ -19,10 +19,22 @@ export const CategoryDropdown = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  // Fetch active categories
+  // Fetch active categories with user email if logged in
   const { data: categories = [] } = useQuery({
     queryKey: ['categories', 'active'],
-    queryFn: () => categoriesApi.getAll(true),
+    queryFn: () => {
+      const userEmail = typeof window !== 'undefined' ? (() => {
+        const token = localStorage.getItem('authToken');
+        if (!token) return null;
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          return payload.sub || payload.email || null;
+        } catch {
+          return null;
+        }
+      })() : null;
+      return categoriesApi.getAll(true, userEmail || undefined);
+    },
   });
 
   // Close dropdown when clicking outside

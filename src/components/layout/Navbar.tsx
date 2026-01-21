@@ -14,7 +14,7 @@ const navLinks = [
   { name: 'Home', path: '/' },
   { name: 'Shop', path: '/products' },
   { name: 'Custom Design', path: '/custom-design' },
-  { name: 'Make Your Own', path: '/make-your-own' },
+  { name: 'Upload Your Design', path: '/make-your-own' },
 ];
 
 export const Navbar = () => {
@@ -76,8 +76,8 @@ export const Navbar = () => {
       <div className="bg-foreground text-background text-[10px] xs:text-[11px] sm:text-xs">
         <div className="container-custom overflow-hidden">
           <div className="marquee py-1">
-            <span className="mx-6">Made to order · Shipping takes 5–6 days</span>
-            <span className="mx-6">Made to order · Shipping takes 5–6 days</span>
+            <span className="mx-6">Made to order. Dispatch takes 5–6 days (India)</span>
+            <span className="mx-6">Made to order. Dispatch takes 5–6 days (India)</span>
           </div>
         </div>
       </div>
@@ -163,7 +163,7 @@ export const Navbar = () => {
             </Link>
 
             {/* Currency Selector */}
-            <div className="hidden md:block">
+            <div className="block">
               <CurrencySelector />
             </div>
 
@@ -220,12 +220,11 @@ export const Navbar = () => {
                   </Link>
                 </motion.div>
                 
-                {/* Category Dropdown */}
+                {/* Category Dropdown (mobile-friendly, full-width) */}
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 1 * 0.05 }}
-                  onClick={() => setIsOpen(false)}
                 >
                   <div className="px-4 py-3">
                     <CategoryDropdown />

@@ -296,7 +296,6 @@ const Contact = () => {
                     { icon: Mail, title: 'Email', text: contactInfo?.email || 'hello@studiosara.in', key: 'email' },
                     { icon: Phone, title: 'Phone', text: contactInfo?.phone || '+91 98765 43210', key: 'phone' },
                     { icon: MapPin, title: 'Address', text: contactInfo?.address || '123 Fashion Street, Mumbai, MH 400001', key: 'address' },
-                    { icon: Clock, title: 'Hours', text: contactInfo?.hours || 'Mon-Sat: 10AM-7PM', key: 'hours' },
                   ].map(item => (
                     <div key={item.key} className="flex gap-5">
                       <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">

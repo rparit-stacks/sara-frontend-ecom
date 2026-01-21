@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cartApi, orderApi, userApi, shippingApi, paymentApi } from '@/lib/api';
+import { cartApi, orderApi, userApi, shippingApi, paymentApi, businessConfigApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import { usePrice } from '@/lib/currency';
 
@@ -191,23 +191,23 @@ const Checkout = () => {
     queryKey: ['user-profile'],
     queryFn: () => userApi.getProfile(),
     enabled: isLoggedIn,
-    onSuccess: (data) => {
-      if (data) {
-        // Auto-fill email from profile (always, even if formData has value)
-        // Don't auto-fill other fields if address is already selected
-        setFormData(prev => ({
-          ...prev,
-          email: data.email || prev.email, // Always use profile email for logged-in users
-          // Only auto-fill name/phone if no address is selected
-          ...(prev.firstName ? {} : {
-          firstName: data.firstName || '',
-          lastName: data.lastName || '',
-          phone: data.phoneNumber || '',
-          }),
-        }));
-      }
-    },
   });
+  
+  // Auto-fill email from profile when userProfile is loaded
+  useEffect(() => {
+    if (userProfile && isLoggedIn) {
+      setFormData(prev => ({
+        ...prev,
+        email: (userProfile as any).email || prev.email, // Always use profile email for logged-in users
+        // Only auto-fill name/phone if no address is selected
+        ...(prev.firstName ? {} : {
+          firstName: (userProfile as any).firstName || '',
+          lastName: (userProfile as any).lastName || '',
+          phone: (userProfile as any).phoneNumber || '',
+        }),
+      }));
+    }
+  }, [userProfile, isLoggedIn]);
   
   // Don't auto-select default address - let user explicitly choose
   // This ensures the selected address is what user wants, not auto-selected
@@ -251,7 +251,7 @@ const Checkout = () => {
           ...prev,
           firstName: address.firstName || prev.firstName,
           lastName: address.lastName || prev.lastName,
-          email: address.email || prev.email || userProfile?.email || prev.email, // Use address email, fallback to profile
+          email: address.email || prev.email || (userProfile as any)?.email || prev.email, // Use address email, fallback to profile
           phone: address.phoneNumber || address.phone || prev.phone, // Use address phone (important for WhatsApp)
           address: address.address || address.addressLine1 || prev.address,
           addressLine2: address.addressLine2 || prev.addressLine2 || '',
@@ -339,6 +339,8 @@ const Checkout = () => {
   
   // Check if selected country is India
   const isIndia = formData.country === 'IN';
+  // Check if currently selected currency is INR
+  const isINRCurrency = currency === 'INR';
 
   // Fetch payment methods from API to check which are enabled
   const { data: paymentMethodsData } = useQuery({
@@ -347,72 +349,110 @@ const Checkout = () => {
     enabled: !!formData.country,
   });
   
+  // Fetch BusinessConfig to check COD/Partial COD settings
+  const { data: businessConfig } = useQuery({
+    queryKey: ['business-config'],
+    queryFn: () => businessConfigApi.getConfig(),
+  });
+  
   // Calculate cart items and totals (must be before useMemo that uses items)
   const items = isLoggedIn ? (cartData?.items || []) : guestCartItems;
   
-  // Check if cart contains Digital products or Design-only purchases (COD not allowed)
-  const hasDigitalOrDesignOnly = useMemo(() => {
+  // Check if cart contains Digital products (COD not allowed)
+  const hasDigitalProducts = useMemo(() => {
     return items.some((item: any) => item.productType === 'DIGITAL');
   }, [items]);
   
-  // Determine available payment gateways based on country and product types
-  // COD Rules:
-  // - ✅ Allowed: Fabric Only, Design + Fabric
-  // - ❌ Disabled: Digital Product, Design Only
+  // Determine available payment gateways based on country and BusinessConfig
+  // Rules:
+  // - For India: Razorpay (if enabled) + Stripe (if enabled) + COD/Partial COD (if enabled in config)
+  // - Outside India: Stripe (if enabled) + COD/Partial COD (if enabled in config)
+  // - Digital products: Never allow COD/Partial COD, only online payment
   useEffect(() => {
     const apiGateways = paymentMethodsData?.gateways || [];
+    const codEnabled = businessConfig?.codEnabled ?? false;
+    const partialCodEnabled = businessConfig?.partialCodEnabled ?? false;
+    const onlinePaymentEnabled = businessConfig?.onlinePaymentEnabled ?? true;
+    
+    const gateways: string[] = [];
     
     // If cart contains Digital products, COD is NOT available
-    if (hasDigitalOrDesignOnly) {
-      const gateways: string[] = [];
-      if (apiGateways.includes('RAZORPAY') && isIndia) {
-        gateways.push('RAZORPAY');
-      }
-      if (apiGateways.includes('STRIPE')) {
-        gateways.push('STRIPE');
-      }
-      setAvailableGateways(gateways);
-      // Default to first available gateway (or Stripe if available)
-      if (gateways.length > 0) {
-        const defaultGateway = gateways.includes('STRIPE') ? 'STRIPE' : gateways[0];
-        if (!paymentGateway || paymentGateway === 'COD' || !gateways.includes(paymentGateway)) {
-          setPaymentGateway(defaultGateway);
-          setPaymentMethod(defaultGateway === 'STRIPE' ? 'stripe' : 'razorpay');
+    if (hasDigitalProducts) {
+      // Digital products: Only online payment gateways
+      if (isIndia) {
+        // India: Razorpay (if enabled) + Stripe (if enabled)
+        if (apiGateways.includes('RAZORPAY') && onlinePaymentEnabled) {
+          gateways.push('RAZORPAY');
+        }
+        if (apiGateways.includes('STRIPE') && onlinePaymentEnabled) {
+          gateways.push('STRIPE');
+        }
+      } else {
+        // Outside India: Only Stripe
+        if (apiGateways.includes('STRIPE') && onlinePaymentEnabled) {
+          gateways.push('STRIPE');
         }
       }
     } else {
-      // Physical products: COD is available
-    if (isIndia) {
-      // India: Razorpay + Stripe + COD (all enabled if available in config)
-      const gateways = ['COD']; // COD always first and always available
-      if (apiGateways.includes('RAZORPAY')) {
-        gateways.push('RAZORPAY');
-      }
-      if (apiGateways.includes('STRIPE')) {
-        gateways.push('STRIPE');
-      }
-      setAvailableGateways(gateways);
-      // Default to COD if not already set or if current gateway is not available
-      if (!paymentGateway || paymentGateway === '' || !gateways.includes(paymentGateway)) {
-        setPaymentGateway('COD');
-        setPaymentMethod('cod');
-      }
-    } else {
-      // International: Stripe + COD only (Razorpay disabled)
-      const gateways = ['COD']; // COD always first and always available
-      if (apiGateways.includes('STRIPE')) {
-        gateways.push('STRIPE');
-      }
-      setAvailableGateways(gateways);
-      // Default to COD if not already set or if current gateway is not available
-      // Also switch to COD if user had selected Razorpay (not available internationally)
-      if (!paymentGateway || paymentGateway === '' || !gateways.includes(paymentGateway) || paymentGateway === 'RAZORPAY') {
-        setPaymentGateway('COD');
-        setPaymentMethod('cod');
+      // Physical products: All available gateways based on country
+      if (isIndia) {
+        // India: Razorpay + Stripe + COD/Partial COD
+        if (apiGateways.includes('RAZORPAY') && onlinePaymentEnabled) {
+          gateways.push('RAZORPAY');
+        }
+        if (apiGateways.includes('STRIPE') && onlinePaymentEnabled) {
+          gateways.push('STRIPE');
+        }
+        if (codEnabled) {
+          gateways.push('COD');
+        }
+        if (partialCodEnabled) {
+          gateways.push('PARTIAL_COD');
+        }
+      } else {
+        // Outside India: Stripe + COD/Partial COD
+        if (apiGateways.includes('STRIPE') && onlinePaymentEnabled) {
+          gateways.push('STRIPE');
+        }
+        if (codEnabled) {
+          gateways.push('COD');
+        }
+        if (partialCodEnabled) {
+          gateways.push('PARTIAL_COD');
+        }
       }
     }
+    
+    setAvailableGateways(gateways);
+    
+    // Set default gateway
+    if (gateways.length > 0) {
+      let defaultGateway = gateways[0];
+      
+      // Prefer COD for physical products if available
+      if (!hasDigitalProducts && gateways.includes('COD')) {
+        defaultGateway = 'COD';
+      } else if (gateways.includes('STRIPE')) {
+        defaultGateway = 'STRIPE';
+      } else if (gateways.includes('RAZORPAY')) {
+        defaultGateway = 'RAZORPAY';
+      }
+      
+      // Only update if current gateway is not available
+      if (!paymentGateway || !gateways.includes(paymentGateway)) {
+        setPaymentGateway(defaultGateway);
+        if (defaultGateway === 'COD') {
+          setPaymentMethod('cod');
+        } else if (defaultGateway === 'PARTIAL_COD') {
+          setPaymentMethod('partial_cod');
+        } else if (defaultGateway === 'STRIPE') {
+          setPaymentMethod('card');
+        } else if (defaultGateway === 'RAZORPAY') {
+          setPaymentMethod('razorpay');
+        }
+      }
     }
-  }, [formData.country, isIndia, paymentMethodsData, hasDigitalOrDesignOnly, paymentGateway]);
+  }, [formData.country, isIndia, paymentMethodsData, hasDigitalProducts, businessConfig, paymentGateway]);
   
   // Calculate shipping for guest checkout
   const [guestShipping, setGuestShipping] = useState(0);
@@ -453,7 +493,7 @@ const Checkout = () => {
         return {
           firstName: selectedAddress.firstName || formData.firstName,
           lastName: selectedAddress.lastName || formData.lastName,
-          email: selectedAddress.email || formData.email || userProfile?.email,
+          email: selectedAddress.email || formData.email || (userProfile as any)?.email,
           phone: selectedAddress.phoneNumber || selectedAddress.phone || formData.phone,
           address: selectedAddress.address || selectedAddress.addressLine1 || formData.address,
           addressLine2: selectedAddress.addressLine2 || formData.addressLine2 || '',
@@ -470,7 +510,7 @@ const Checkout = () => {
     return {
       firstName: formData.firstName,
       lastName: formData.lastName,
-      email: formData.email || userProfile?.email,
+          email: formData.email || (userProfile as any)?.email,
       phone: formData.phone,
       address: formData.address,
       addressLine2: formData.addressLine2 || '',
@@ -495,7 +535,7 @@ const Checkout = () => {
         dataToValidate = {
           firstName: selectedAddress.firstName || formData.firstName,
           lastName: selectedAddress.lastName || formData.lastName,
-          email: selectedAddress.email || formData.email || userProfile?.email,
+          email: selectedAddress.email || formData.email || (userProfile as any)?.email,
           phone: selectedAddress.phoneNumber || selectedAddress.phone || formData.phone,
           address: selectedAddress.address || selectedAddress.addressLine1 || formData.address,
           addressLine2: selectedAddress.addressLine2 || formData.addressLine2 || '',
@@ -514,7 +554,7 @@ const Checkout = () => {
     // Email validation - only required for guest users
     if (!isLoggedIn && !dataToValidate.email?.trim()) {
       errors.push('Email is required');
-    } else if (isLoggedIn && !dataToValidate.email?.trim() && !userProfile?.email) {
+    } else if (isLoggedIn && !dataToValidate.email?.trim() && !(userProfile as any)?.email) {
       errors.push('Email is required');
     }
     
@@ -553,9 +593,91 @@ const Checkout = () => {
       return;
     }
     
+    // Validate payment method for digital products
+    if (hasDigitalProducts && (paymentGateway === 'COD' || paymentGateway === 'PARTIAL_COD')) {
+      toast.error('Digital products require online payment only. COD is not available.');
+      return;
+    }
+    
+    // Validate payment gateway availability
+    if (availableGateways.length === 0) {
+      toast.error('We are not able to process your order right now. Please try again after some time.');
+      return;
+    }
+    
     // For COD, create order directly
     if (paymentGateway === 'COD') {
-    createOrderMutation.mutate();
+      createOrderMutation.mutate();
+      return;
+    }
+    
+    // For PARTIAL_COD, create order first, then process advance payment online
+    if (paymentGateway === 'PARTIAL_COD') {
+      setIsProcessingPayment(true);
+      try {
+        const orderData: any = {
+          shippingAddressId: isLoggedIn ? selectedAddressId : null,
+          shippingAddress: buildShippingAddress(),
+          paymentMethod: 'PARTIAL_COD',
+          notes,
+          couponCode: appliedCouponCode || null,
+        };
+
+        if (!isLoggedIn) {
+          orderData.guestEmail = formData.email;
+          orderData.guestFirstName = formData.firstName;
+          orderData.guestLastName = formData.lastName;
+          orderData.guestPhone = formData.phone;
+          orderData.guestCartItems = guestCartItems.map((item: any) => ({
+            productType: item.productType,
+            productId: item.productId,
+            productName: item.productName,
+            productImage: item.productImage,
+            designId: item.designId,
+            fabricId: item.fabricId,
+            fabricPrice: item.fabricPrice,
+            designPrice: item.designPrice,
+            uploadedDesignUrl: item.uploadedDesignUrl,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            variants: item.variants || {},
+            customFormData: item.customFormData || {},
+          }));
+        }
+
+        const order = await orderApi.createOrder(orderData);
+        
+        // Calculate advance amount (percentage of total)
+        const advancePercentage = businessConfig?.partialCodAdvancePercentage || 20;
+        const advanceAmount = (total * advancePercentage) / 100;
+        
+        // Process advance payment online
+        const paymentRequest = {
+          amount: convert(advanceAmount),
+          currency: currency,
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          country: getCountryName(),
+          paymentGateway: isIndia && paymentMethodsData?.gateways?.includes('RAZORPAY') ? 'RAZORPAY' : 'STRIPE',
+          customerEmail: formData.email,
+          customerName: `${formData.firstName} ${formData.lastName}`,
+          customerPhone: formData.phone,
+          returnUrl: `${window.location.origin}/order-confirmation/${order.id}`,
+          cancelUrl: `${window.location.origin}/checkout`,
+        };
+
+        const paymentResponse = await paymentApi.createOrder(paymentRequest);
+        const selectedGateway = paymentRequest.paymentGateway;
+
+        if (selectedGateway === 'STRIPE') {
+          await handleStripePayment(paymentResponse, order.id);
+        } else if (selectedGateway === 'RAZORPAY') {
+          await handleRazorpayPayment(paymentResponse, order.id);
+        }
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to process advance payment');
+        setIsProcessingPayment(false);
+      }
       return;
     }
 
@@ -844,10 +966,10 @@ const Checkout = () => {
                               // Reset form to allow manual entry
                               setFormData(prev => ({
                                 ...prev,
-                                firstName: userProfile?.firstName || prev.firstName,
-                                lastName: userProfile?.lastName || prev.lastName,
-                                email: userProfile?.email || prev.email,
-                                phone: userProfile?.phoneNumber || prev.phone,
+                                firstName: (userProfile as any)?.firstName || prev.firstName,
+                                lastName: (userProfile as any)?.lastName || prev.lastName,
+                                email: (userProfile as any)?.email || prev.email,
+                                phone: (userProfile as any)?.phoneNumber || prev.phone,
                               }));
                             }}
                             className="h-8 text-xs"
@@ -925,8 +1047,8 @@ const Checkout = () => {
                       {isLoggedIn && (
                         <div className="col-span-1 sm:col-span-2">
                           <label className="text-sm font-medium mb-1.5 block">Email</label>
-                          <div className="h-12 px-3 flex items-center bg-muted rounded-md text-sm">
-                            {formData.email || userProfile?.email || 'Loading...'}
+                            <div className="h-12 px-3 flex items-center bg-muted rounded-md text-sm">
+                            {formData.email || (userProfile as any)?.email || 'Loading...'}
                           </div>
                         </div>
                       )}
@@ -1158,10 +1280,10 @@ const Checkout = () => {
                 <ScrollReveal>
                   <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border">
                     <h3 className="font-serif text-lg sm:text-xl mb-6 font-semibold">Payment Method</h3>
-                    {hasDigitalOrDesignOnly && (
+                    {hasDigitalProducts && (
                       <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-lg">
                         <p className="text-sm text-yellow-800 dark:text-yellow-400 font-medium">
-                          ⚠️ Cash on Delivery is not available for digital products or design-only purchases. Please use online payment.
+                          ⚠️ Digital products require online payment only. COD is not available.
                         </p>
                       </div>
                     )}
@@ -1172,10 +1294,12 @@ const Checkout = () => {
                           setPaymentGateway(value);
                           if (value === 'COD') {
                             setPaymentMethod('cod');
+                          } else if (value === 'PARTIAL_COD') {
+                            setPaymentMethod('partial_cod');
                           } else if (value === 'STRIPE') {
                             setPaymentMethod('card');
                           } else if (value === 'RAZORPAY') {
-                            setPaymentMethod('card');
+                            setPaymentMethod('razorpay');
                           }
                         }}
                         disabled={availableGateways.length === 0}
@@ -1186,10 +1310,13 @@ const Checkout = () => {
                         <SelectContent>
                           {/* Only show available gateways */}
                           {availableGateways.includes('COD') && (
-                          <SelectItem value="COD">Cash on Delivery</SelectItem>
+                            <SelectItem value="COD">Cash on Delivery (COD)</SelectItem>
+                          )}
+                          {availableGateways.includes('PARTIAL_COD') && (
+                            <SelectItem value="PARTIAL_COD">Partial Cash on Delivery</SelectItem>
                           )}
                           {availableGateways.includes('STRIPE') && (
-                          <SelectItem value="STRIPE">Stripe (Card)</SelectItem>
+                            <SelectItem value="STRIPE">Stripe (Card)</SelectItem>
                           )}
                           {availableGateways.includes('RAZORPAY') && (
                             <SelectItem value="RAZORPAY">Razorpay (Card/UPI/Netbanking)</SelectItem>
@@ -1209,6 +1336,11 @@ const Checkout = () => {
                       {paymentGateway === 'COD' && (
                         <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
                           Payment will be collected when your order is delivered.
+                        </div>
+                      )}
+                      {paymentGateway === 'PARTIAL_COD' && businessConfig?.partialCodAdvancePercentage && (
+                        <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
+                          You will pay {businessConfig.partialCodAdvancePercentage}% online as advance, and the remaining amount will be collected on delivery.
                         </div>
                       )}
                       <Input 

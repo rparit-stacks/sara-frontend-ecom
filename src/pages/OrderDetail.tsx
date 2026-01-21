@@ -130,35 +130,62 @@ const OrderDetail = () => {
                         <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
                         <p className="text-sm text-muted-foreground">Price: ₹{item.price?.toLocaleString('en-IN')}</p>
                         {item.productType === 'DIGITAL' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="mt-2 gap-2"
-                            onClick={async () => {
-                              try {
-                                // Download ZIP from backend
-                                const blob = await productsApi.downloadDigitalFiles(item.productId);
-                                
-                                // Create download link and trigger download
-                                const url = window.URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = `product_${item.productId}_files.zip`;
-                                document.body.appendChild(a);
-                                a.click();
-                                document.body.removeChild(a);
-                                window.URL.revokeObjectURL(url);
-                                
-                                alert('Download started!');
-                              } catch (error: any) {
-                                console.error('Download error:', error);
-                                alert(error.message || 'Failed to download files');
-                              }
-                            }}
-                          >
-                            <Download className="w-4 h-4" />
-                            Download
-                          </Button>
+                          <div className="mt-2 space-y-2">
+                            {item.zipPassword && (
+                              <div className="p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded">
+                                <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-400 mb-1">
+                                  📦 ZIP Password:
+                                </p>
+                                <p className="text-sm font-mono font-bold text-yellow-900 dark:text-yellow-300 tracking-wider">
+                                  {item.zipPassword}
+                                </p>
+                                <p className="text-xs text-yellow-700 dark:text-yellow-500 mt-1 italic">
+                                  First 4 letters of email (uppercase) + Last 4 digits of mobile
+                                </p>
+                              </div>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              onClick={async () => {
+                                try {
+                                  // Check if stored ZIP URL exists
+                                  if (item.digitalDownloadUrl) {
+                                    const a = document.createElement('a');
+                                    a.href = item.digitalDownloadUrl;
+                                    a.download = `product_${item.productId}_files.zip`;
+                                    a.target = '_blank';
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    alert('Download started!');
+                                  } else {
+                                    // Fallback: Download ZIP from backend
+                                    const blob = await productsApi.downloadDigitalFiles(item.productId);
+                                    
+                                    // Create download link and trigger download
+                                    const url = window.URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `product_${item.productId}_files.zip`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    window.URL.revokeObjectURL(url);
+                                    
+                                    alert('Download started!');
+                                  }
+                                } catch (error: any) {
+                                  console.error('Download error:', error);
+                                  alert(error.message || 'Failed to download files');
+                                }
+                              }}
+                            >
+                              <Download className="w-4 h-4" />
+                              Download
+                            </Button>
+                          </div>
                         )}
                       </div>
                       <div className="text-right">

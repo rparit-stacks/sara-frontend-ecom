@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Grid, List, SlidersHorizontal, X, Loader2 } from 'lucide-react';
@@ -12,7 +12,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { productsApi, categoriesApi } from '@/lib/api';
+import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+import { productsApi, categoriesApi, cmsApi } from '@/lib/api';
 
 interface Category {
   id: number;
@@ -29,10 +30,10 @@ interface PriceRange {
 }
 
 const priceRanges: PriceRange[] = [
-  { label: 'Under ₹500', min: 0, max: 500 },
-  { label: '₹500 - ₹1000', min: 500, max: 1000 },
-  { label: '₹1000 - ₹2000', min: 1000, max: 2000 },
-  { label: 'Over ₹2000', min: 2000, max: null },
+  { label: 'Under ₹300', min: 0, max: 300 },
+  { label: '₹300 – ₹400', min: 300, max: 400 },
+  { label: '₹401 – ₹500', min: 401, max: 500 },
+  { label: 'Above ₹500', min: 500, max: null },
 ];
 
 const Products = () => {
@@ -40,24 +41,80 @@ const Products = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState('featured');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(16);
   
   // Filter states
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<number | null>(null);
   const [selectedPriceRange, setSelectedPriceRange] = useState<PriceRange | null>(null);
 
+  // Responsive page size
+  const getPageSize = () => {
+    if (window.innerWidth < 640) return 8;  // Mobile: 2 cols × 4 rows
+    if (window.innerWidth < 1024) return 12; // Tablet: 3 cols × 4 rows
+    return 16; // Desktop: 4 cols × 4 rows
+  };
+
+  useEffect(() => {
+    const handleResize = () => {
+      const newPageSize = getPageSize();
+      setPageSize(newPageSize);
+      // Reset to page 1 when page size changes
+      setCurrentPage(1);
+    };
+
+    // Set initial page size
+    setPageSize(getPageSize());
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const filter = searchParams.get('filter');
   
-  // Fetch products from API
+  // Fetch products from API with user email if logged in
   const { data: apiProducts = [], isLoading } = useQuery({
     queryKey: ['products'],
-    queryFn: () => productsApi.getAll(),
+    queryFn: () => {
+      const userEmail = typeof window !== 'undefined' ? (() => {
+        const token = localStorage.getItem('authToken');
+        if (!token) return null;
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          return payload.sub || payload.email || null;
+        } catch {
+          return null;
+        }
+      })() : null;
+      return productsApi.getAll({ userEmail: userEmail || undefined });
+    },
   });
   
-  // Fetch categories with subcategories
+  // Fetch homepage CMS data to get explicit New Arrivals selection
+  const { data: cmsData } = useQuery({
+    queryKey: ['cmsHomepage'],
+    queryFn: () => cmsApi.getHomepage(),
+    refetchOnWindowFocus: false,
+    retry: 2,
+  });
+  
+  // Fetch categories with subcategories and user email if logged in
   const { data: apiCategories = [] } = useQuery({
     queryKey: ['categoriesActive'],
-    queryFn: () => categoriesApi.getAll(true),
+    queryFn: () => {
+      const userEmail = typeof window !== 'undefined' ? (() => {
+        const token = localStorage.getItem('authToken');
+        if (!token) return null;
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          return payload.sub || payload.email || null;
+        } catch {
+          return null;
+        }
+      })() : null;
+      return categoriesApi.getAll(true, userEmail || undefined);
+    },
   });
 
   // Transform categories to include subcategories
@@ -100,6 +157,10 @@ const Products = () => {
     isSale: p.isSale,
     rating: p.rating || 4,
   }));
+  
+  // IDs explicitly marked in CMS (admin selection)
+  const bestSellerIds: Array<number | string> = cmsData?.bestSellerIds || cmsData?.bestSellers || [];
+  const newArrivalIds: Array<number | string> = cmsData?.newArrivalIds || cmsData?.newArrivals || [];
   
   const getPageTitle = () => {
     switch (filter) {
@@ -148,6 +209,25 @@ const Products = () => {
   const filteredProducts = useMemo(() => {
     let filtered = allProducts;
 
+    // Filter by URL filter param (e.g. ?filter=new, ?filter=best)
+    if (filter === 'new') {
+      if (newArrivalIds && newArrivalIds.length > 0) {
+        const idSet = new Set(newArrivalIds.map((id) => String(id)));
+        filtered = filtered.filter((product) => idSet.has(product.id));
+      } else {
+        // Fallback: use isNew flag when no explicit selection in CMS
+        filtered = filtered.filter((product) => product.isNew);
+      }
+    } else if (filter === 'best') {
+      if (bestSellerIds && bestSellerIds.length > 0) {
+        const idSet = new Set(bestSellerIds.map((id) => String(id)));
+        filtered = filtered.filter((product) => idSet.has(product.id));
+      } else {
+        // Fallback: use rating to approximate best sellers when no explicit selection in CMS
+        filtered = filtered.filter((product) => (product.rating || 0) >= 4.5);
+      }
+    }
+
     // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter(product =>
@@ -171,6 +251,10 @@ const Products = () => {
         const price = product.price;
         if (selectedPriceRange.max === null) {
           return price >= selectedPriceRange.min;
+        }
+        // Handle ₹401-₹500 range correctly (inclusive on both ends)
+        if (selectedPriceRange.min === 401 && selectedPriceRange.max === 500) {
+          return price >= 401 && price <= 500;
         }
         return price >= selectedPriceRange.min && price < selectedPriceRange.max;
       });
@@ -196,7 +280,20 @@ const Products = () => {
     }
 
     return filtered;
-  }, [allProducts, searchQuery, selectedCategoryId, selectedSubCategoryId, selectedPriceRange, sortBy]);
+  }, [allProducts, searchQuery, selectedCategoryId, selectedSubCategoryId, selectedPriceRange, sortBy, filter, newArrivalIds, bestSellerIds]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredProducts.length / pageSize);
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredProducts.slice(startIndex, endIndex);
+  }, [filteredProducts, currentPage, pageSize]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategoryId, selectedSubCategoryId, selectedPriceRange, searchQuery, filter]);
 
   const clearAllFilters = () => {
     setSelectedCategoryId(null);
@@ -323,21 +420,10 @@ const Products = () => {
                     </div>
 
                     {/* Sub-Category Filter */}
-                    {(selectedCategoryId || selectedSubCategoryId) && (
+                    {selectedCategoryId && availableSubCategories.length > 0 && (
                       <div>
                         <h4 className="font-medium mb-3">Sub-Category</h4>
                         <div className="space-y-2">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <Checkbox 
-                              checked={selectedSubCategoryId === null}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  handleSubCategoryChange(null);
-                                }
-                              }}
-                            />
-                            <span className="text-sm">All Sub-Categories</span>
-                          </label>
                           {availableSubCategories.map((sub) => (
                             <label key={sub.id} className="flex items-center gap-2 cursor-pointer">
                               <Checkbox 
@@ -454,21 +540,10 @@ const Products = () => {
                 </div>
 
                 {/* Sub-Category Filter */}
-                {(selectedCategoryId || selectedSubCategoryId) && (
+                {selectedCategoryId && availableSubCategories.length > 0 && (
                   <div className="border-t border-border pt-8">
                     <h4 className="font-cursive text-2xl mb-5">Sub-Category</h4>
                     <div className="space-y-4">
-                      <label className="flex items-center gap-3 cursor-pointer group">
-                        <Checkbox 
-                          checked={selectedSubCategoryId === null}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              handleSubCategoryChange(null);
-                            }
-                          }}
-                        />
-                        <span className="text-muted-foreground group-hover:text-foreground transition-colors text-base">All Sub-Categories</span>
-                      </label>
                       {availableSubCategories.map((sub) => (
                         <label key={sub.id} className="flex items-center gap-3 cursor-pointer group">
                           <Checkbox 
@@ -521,12 +596,12 @@ const Products = () => {
                     <div className="col-span-full flex justify-center py-12">
                       <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     </div>
-                  ) : filteredProducts.length === 0 ? (
+                  ) : paginatedProducts.length === 0 ? (
                     <div className="col-span-full text-center py-12 text-muted-foreground">
                       No products found.
                     </div>
                   ) : (
-                    filteredProducts.map((product, index) => (
+                    paginatedProducts.map((product, index) => (
                       <ScrollReveal key={product.id} delay={Math.min(index * 0.03, 0.3)}>
                         <ProductCard product={product} />
                       </ScrollReveal>
@@ -539,12 +614,12 @@ const Products = () => {
                     <div className="flex justify-center py-12">
                       <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     </div>
-                  ) : filteredProducts.length === 0 ? (
+                  ) : paginatedProducts.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
                       No products found.
                     </div>
                   ) : (
-                    filteredProducts.map((product, index) => (
+                    paginatedProducts.map((product, index) => (
                       <ScrollReveal key={product.id} delay={Math.min(index * 0.01, 0.2)}>
                         <ListViewProductCard product={product} />
                       </ScrollReveal>
@@ -554,15 +629,64 @@ const Products = () => {
               )}
 
               {/* Pagination */}
-              <div className="flex justify-center items-center gap-3 mt-16">
-                <Button variant="outline" disabled className="h-11">Previous</Button>
-                <Button variant="secondary" className="w-11 h-11">1</Button>
-                <Button variant="ghost" className="w-11 h-11">2</Button>
-                <Button variant="ghost" className="w-11 h-11">3</Button>
-                <span className="px-2">...</span>
-                <Button variant="ghost" className="w-11 h-11">10</Button>
-                <Button variant="outline" className="h-11">Next</Button>
-              </div>
+              {totalPages > 1 && (
+                <Pagination className="mt-16">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        href="#" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (currentPage > 1) setCurrentPage(currentPage - 1);
+                        }}
+                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+                    
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                      // Show first page, last page, current page, and pages around current
+                      if (
+                        page === 1 ||
+                        page === totalPages ||
+                        (page >= currentPage - 1 && page <= currentPage + 1)
+                      ) {
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setCurrentPage(page);
+                              }}
+                              isActive={currentPage === page}
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      } else if (page === currentPage - 2 || page === currentPage + 2) {
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        );
+                      }
+                      return null;
+                    })}
+                    
+                    <PaginationItem>
+                      <PaginationNext 
+                        href="#" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                        }}
+                        className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              )}
             </div>
           </div>
         </div>

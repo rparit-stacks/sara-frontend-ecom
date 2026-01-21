@@ -1,6 +1,19 @@
 // API Configuration
 export const API_BASE_URL = import.meta.env.VITE_API_URL as string;
 
+// Helper function to get user email from JWT token
+export const getUserEmailFromToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const token = localStorage.getItem('authToken');
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || payload.email || null;
+  } catch {
+    return null;
+  }
+};
+
 // Global loading state management
 let loadingCallbacks: Set<(loading: boolean, message?: string) => void> = new Set();
 
@@ -120,14 +133,20 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
 // Products API
 // ===============================
 export const productsApi = {
-  getAll: (params?: { status?: string; type?: string; categoryId?: number }) => {
+  getAll: (params?: { status?: string; type?: string; categoryId?: number; userEmail?: string }) => {
     const searchParams = new URLSearchParams();
     if (params?.status) searchParams.set('status', params.status);
     if (params?.type) searchParams.set('type', params.type);
     if (params?.categoryId) searchParams.set('categoryId', params.categoryId.toString());
+    if (params?.userEmail) searchParams.set('userEmail', params.userEmail);
     return fetchApi<any[]>(`/api/products?${searchParams}`);
   },
-  getById: (id: number) => fetchApi<any>(`/api/products/${id}`),
+  getById: (id: number, userEmail?: string) => {
+    const params = new URLSearchParams();
+    if (userEmail) params.set('userEmail', userEmail);
+    const queryString = params.toString();
+    return fetchApi<any>(`/api/products/${id}${queryString ? `?${queryString}` : ''}`);
+  },
   getBySlug: (slug: string) => fetchApi<any>(`/api/products/slug/${slug}`),
   create: (data: any) => fetchApi<any>('/api/admin/products', { method: 'POST', body: JSON.stringify(data) }),
   createPlain: (data: any) => fetchApi<any>('/api/admin/products/plain', { method: 'POST', body: JSON.stringify(data) }),
@@ -294,7 +313,13 @@ export const designsApi = {
 // Categories API
 // ===============================
 export const categoriesApi = {
-  getAll: (activeOnly?: boolean) => fetchApi<any[]>(`/api/categories${activeOnly ? '?active=true' : ''}`),
+  getAll: (activeOnly?: boolean, userEmail?: string) => {
+    const params = new URLSearchParams();
+    if (activeOnly) params.set('active', 'true');
+    if (userEmail) params.set('userEmail', userEmail);
+    const queryString = params.toString();
+    return fetchApi<any[]>(`/api/categories${queryString ? `?${queryString}` : ''}`);
+  },
   getById: (id: number) => fetchApi<any>(`/api/categories/id/${id}`),
   getBySlugPath: (slugPath: string) => fetchApi<any>(`/api/categories/${slugPath}`),
   getLeafCategories: () => fetchApi<any[]>('/api/categories/leaf'),
@@ -385,6 +410,10 @@ export const blogApi = {
   create: (data: any) => fetchApi<any>('/api/admin/blogs', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: any) => fetchApi<any>(`/api/admin/blogs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) => fetchApi<void>(`/api/admin/blogs/${id}`, { method: 'DELETE' }),
+  
+  // Homepage blogs
+  getHomepageBlogs: () => fetchApi<any[]>('/api/cms/homepage-blogs'),
+  setHomepageBlogs: (blogIds: number[]) => fetchApi<void>('/api/admin/blogs/homepage', { method: 'PUT', body: JSON.stringify(blogIds) }),
 };
 
 // ===============================
@@ -533,10 +562,15 @@ export const orderApi = {
   // Admin
   getAllOrders: (status?: string) => fetchApi<any[]>(`/api/admin/orders${status ? `?status=${status}` : ''}`),
   getOrderByIdAdmin: (id: number) => fetchApi<any>(`/api/admin/orders/${id}`),
-  updateOrderStatus: (id: number, status: string, skipWhatsApp?: boolean) =>
+  updateOrderStatus: (id: number, status: string, customStatus?: string, customMessage?: string, skipWhatsApp?: boolean) =>
     fetchApi<any>(`/api/admin/orders/${id}/status`, { 
       method: 'PUT', 
-      body: JSON.stringify({ status, skipWhatsApp: skipWhatsApp || false }) 
+      body: JSON.stringify({ 
+        status, 
+        customStatus, 
+        customMessage, 
+        skipWhatsApp: skipWhatsApp || false 
+      }) 
     }),
   updatePaymentStatus: (id: number, paymentStatus: string, paymentId?: string) => 
     fetchApi<any>(`/api/admin/orders/${id}/payment`, { method: 'PUT', body: JSON.stringify({ paymentStatus, paymentId }) }),
@@ -555,6 +589,31 @@ export const businessConfigApi = {
   getConfig: () => fetchApi<any>('/api/admin/business-config'),
   getConfigWithApiKey: () => fetchApi<any>('/api/admin/business-config/with-keys'),
   updateConfig: (data: any) => fetchApi<any>('/api/admin/business-config', { method: 'PUT', body: JSON.stringify(data) }),
+};
+
+// ===============================
+// WhatsApp API
+// ===============================
+export const whatsappApi = {
+  // Templates
+  getTemplates: () => fetchApi<any[]>('/api/admin/whatsapp/templates'),
+  createTemplate: (data: any) => fetchApi<any>('/api/admin/whatsapp/templates', { method: 'POST', body: JSON.stringify(data) }),
+  updateTemplate: (id: number, data: any) => fetchApi<any>(`/api/admin/whatsapp/templates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteTemplate: (id: number) => fetchApi<any>(`/api/admin/whatsapp/templates/${id}`, { method: 'DELETE' }),
+  
+  // Custom Statuses
+  getCustomStatuses: () => fetchApi<any[]>('/api/admin/whatsapp/custom-statuses'),
+  createCustomStatus: (data: any) => fetchApi<any>('/api/admin/whatsapp/custom-statuses', { method: 'POST', body: JSON.stringify(data) }),
+  updateCustomStatus: (id: number, data: any) => fetchApi<any>(`/api/admin/whatsapp/custom-statuses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCustomStatus: (id: number) => fetchApi<any>(`/api/admin/whatsapp/custom-statuses/${id}`, { method: 'DELETE' }),
+  
+  // Logs
+  getLogs: (page: number = 0, size: number = 20) => fetchApi<any>(`/api/admin/whatsapp/logs?page=${page}&size=${size}`),
+  getLogsByOrder: (orderId: number) => fetchApi<any[]>(`/api/admin/whatsapp/logs/order/${orderId}`),
+  
+  // Config
+  getConfig: () => fetchApi<any>('/api/admin/whatsapp/config'),
+  updateConfig: (data: any) => fetchApi<any>('/api/admin/whatsapp/config', { method: 'PUT', body: JSON.stringify(data) }),
 };
 
 

@@ -37,7 +37,19 @@ const OrderConfirmation = () => {
     setDownloadingIds(prev => new Set(prev).add(item.productId));
     
     try {
-      // Download ZIP from backend
+      // Check if stored ZIP URL exists in order item
+      if (item.digitalDownloadUrl) {
+        // Use stored Cloudinary URL directly
+        const a = document.createElement('a');
+        a.href = item.digitalDownloadUrl;
+        a.download = `product_${item.productId}_files.zip`;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        toast.success('Download started!');
+      } else {
+        // Fallback: Download ZIP from backend (generates on-demand)
       const blob = await productsApi.downloadDigitalFiles(item.productId);
       
       // Create download link and trigger download
@@ -51,6 +63,7 @@ const OrderConfirmation = () => {
       window.URL.revokeObjectURL(url);
       
       toast.success('Download started!');
+      }
     } catch (error: any) {
       console.error('Download error:', error);
       toast.error(error.message || 'Failed to download files');
@@ -144,10 +157,24 @@ const OrderConfirmation = () => {
                                 Quantity: {item.quantity} × ₹{(item.price || item.unitPrice)?.toLocaleString('en-IN')}
                               </p>
                               {item.productType === 'DIGITAL' && (
+                                <div className="mt-2 space-y-2">
+                                  {item.zipPassword && (
+                                    <div className="p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded">
+                                      <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-400 mb-1">
+                                        📦 ZIP Password:
+                                      </p>
+                                      <p className="text-sm font-mono font-bold text-yellow-900 dark:text-yellow-300 tracking-wider">
+                                        {item.zipPassword}
+                                      </p>
+                                      <p className="text-xs text-yellow-700 dark:text-yellow-500 mt-1 italic">
+                                        First 4 letters of email (uppercase) + Last 4 digits of mobile
+                                      </p>
+                                    </div>
+                                  )}
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="mt-2 gap-2"
+                                    className="gap-2"
                                   onClick={() => handleDigitalDownload(item)}
                                   disabled={downloadingIds.has(item.productId)}
                                 >
@@ -163,6 +190,7 @@ const OrderConfirmation = () => {
                                     </>
                                   )}
                                 </Button>
+                                </div>
                               )}
                             </div>
                             <p className="font-semibold">₹{item.totalPrice?.toLocaleString('en-IN')}</p>

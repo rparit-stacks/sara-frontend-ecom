@@ -172,10 +172,20 @@ const AdminBlog = () => {
       return;
     }
 
+    // Prevent DB errors from exceeding varchar(255) limits on short text fields
+    const payload = {
+      ...formData,
+      title: formData.title.trim().slice(0, 255),
+      excerpt: formData.excerpt.trim().slice(0, 250),
+      author: (formData.author || '').slice(0, 255),
+      category: (formData.category || '').slice(0, 255),
+      image: (formData.image || '').slice(0, 255),
+    };
+
     if (editingBlog) {
-      updateMutation.mutate({ id: editingBlog.id, data: formData });
+      updateMutation.mutate({ id: editingBlog.id, data: payload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload);
     }
   };
 

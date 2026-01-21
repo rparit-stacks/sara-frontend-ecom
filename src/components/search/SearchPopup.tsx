@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { productsApi, categoriesApi } from '@/lib/api';
 
 interface Product {
   id: string;
@@ -12,39 +14,15 @@ interface Product {
   image: string;
   category: string;
   categoryType?: string; // e.g., "Plain Fabric", "Design", "Digital"
+  slug: string;
 }
 
 interface Category {
   id: string;
   name: string;
+  slug: string;
   parent?: string;
 }
-
-// Mock data - in real app, fetch from API
-const mockProducts: Product[] = [
-  { id: '1', name: 'Rose Garden Silk Saree', price: 8999, image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=500&h=650&fit=crop', category: 'Sarees', categoryType: 'Design' },
-  { id: '2', name: 'Lavender Cushion Set', price: 2500, image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500&h=650&fit=crop', category: 'Home Decor', categoryType: 'Plain Fabric' },
-  { id: '3', name: 'Cherry Blossom Kurti', price: 3499, image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=500&h=650&fit=crop', category: 'Kurtis', categoryType: 'Digital' },
-  { id: '4', name: 'Wildflower Dupatta', price: 1599, image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500&h=650&fit=crop', category: 'Dupattas', categoryType: 'Design' },
-  { id: '5', name: 'Peony Blouse', price: 2199, image: 'https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=500&h=650&fit=crop', category: 'Blouses', categoryType: 'Plain Fabric' },
-  { id: '6', name: 'Tropical Bedsheet', price: 3999, image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=500&h=650&fit=crop', category: 'Bedding', categoryType: 'Digital' },
-  { id: '7', name: 'Floral Print Scarf', price: 1299, image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=500&h=650&fit=crop', category: 'Scarves', categoryType: 'Design' },
-  { id: '8', name: 'Silk Plain Fabric', price: 2999, image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=500&h=650&fit=crop', category: 'Fabrics', categoryType: 'Plain Fabric' },
-];
-
-const mockCategories: Category[] = [
-  { id: '1', name: 'Floral', parent: 'Prints' },
-  { id: '2', name: 'Botanical', parent: 'Prints' },
-  { id: '3', name: 'Abstract', parent: 'Prints' },
-  { id: '4', name: 'Traditional', parent: 'Prints' },
-  { id: '5', name: 'Sarees', parent: 'Clothing' },
-  { id: '6', name: 'Kurtis', parent: 'Clothing' },
-  { id: '7', name: 'Blouses', parent: 'Clothing' },
-  { id: '8', name: 'Dupattas', parent: 'Clothing' },
-  { id: '9', name: 'Home Decor', parent: 'Accessories' },
-  { id: '10', name: 'Bedding', parent: 'Accessories' },
-  { id: '11', name: 'Cushions', parent: 'Accessories' },
-];
 
 interface SearchPopupProps {
   open: boolean;
@@ -53,6 +31,68 @@ interface SearchPopupProps {
 
 export const SearchPopup = ({ open, onOpenChange }: SearchPopupProps) => {
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Fetch live products and categories from API
+  const { data: productsData = [] } = useQuery({
+    queryKey: ['search-products'],
+    queryFn: () => productsApi.getAll({ status: 'ACTIVE' } as any),
+  });
+
+  const { data: categoriesData = [] } = useQuery({
+    queryKey: ['search-categories'],
+    queryFn: () => categoriesApi.getAll(true),
+  });
+
+  // Normalize products into a unified shape for searching
+  const allProducts: Product[] = useMemo(() => {
+    return (productsData as any[]).map((p: any) => {
+      const id = p.id ?? p.productId ?? p.slug ?? Math.random().toString(36).slice(2);
+      const name = p.name ?? p.title ?? 'Product';
+      const price =
+        Number(
+          p.price ??
+            p.sellingPrice ??
+            p.offerPrice ??
+            p.basePrice ??
+            0
+        ) || 0;
+      const image =
+        p.thumbnailImage ||
+        p.image ||
+        (Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : '') ||
+        '/placeholder.svg';
+      const category =
+        p.categoryName ||
+        p.category ||
+        p.categoryLabel ||
+        'Products';
+      const categoryType =
+        p.productType ||
+        p.type ||
+        undefined;
+      const slug = p.slug || String(id);
+
+      return {
+        id: String(id),
+        name,
+        price,
+        image,
+        category,
+        categoryType,
+        slug,
+      };
+    });
+  }, [productsData]);
+
+  // Normalize categories
+  const allCategories: Category[] = useMemo(() => {
+    return (categoriesData as any[]).map((c: any) => ({
+      id: String(c.id),
+      name: c.name || 'Category',
+      slug: c.slugPath || c.slug || String(c.id),
+      parent: c.parentName || undefined,
+    }));
+  }, [categoriesData]);
 
   // Real-time filtering with useMemo for performance
   const { filteredProducts, filteredCategories } = useMemo(() => {
@@ -63,7 +103,7 @@ export const SearchPopup = ({ open, onOpenChange }: SearchPopupProps) => {
     const query = searchQuery.toLowerCase();
     
     // Filter products - fast real-time search
-    const products = mockProducts.filter(
+    const products = allProducts.filter(
       (product) =>
         product.name.toLowerCase().includes(query) ||
         product.category.toLowerCase().includes(query) ||
@@ -71,17 +111,17 @@ export const SearchPopup = ({ open, onOpenChange }: SearchPopupProps) => {
     );
 
     // Filter categories
-    const categories = mockCategories.filter(
+    const categories = allCategories.filter(
       (category) =>
         category.name.toLowerCase().includes(query) ||
         (category.parent && category.parent.toLowerCase().includes(query))
     );
 
     return { filteredProducts: products, filteredCategories: categories };
-  }, [searchQuery]);
+  }, [searchQuery, allProducts, allCategories]);
 
   // Group all categories by parent (for right sidebar)
-  const allCategoriesByParent = mockCategories.reduce((acc, category) => {
+  const allCategoriesByParent = allCategories.reduce((acc, category) => {
     const parent = category.parent || 'Other';
     if (!acc[parent]) {
       acc[parent] = [];
@@ -222,7 +262,7 @@ export const SearchPopup = ({ open, onOpenChange }: SearchPopupProps) => {
                             transition={{ duration: 0.2 }}
                           >
                             <Link
-                              to={`/category/${category.id}`}
+                              to={`/category/${category.slug}`}
                               onClick={() => onOpenChange(false)}
                               className="block p-3 md:p-4 rounded-lg border border-border hover:bg-primary hover:text-primary-foreground active:bg-primary/90 transition-colors text-center touch-manipulation"
                             >
@@ -251,7 +291,7 @@ export const SearchPopup = ({ open, onOpenChange }: SearchPopupProps) => {
                     {categories.map((category) => (
                       <Link
                         key={category.id}
-                        to={`/category/${category.id}`}
+                        to={`/category/${category.slug}`}
                         onClick={() => onOpenChange(false)}
                         className="block p-2.5 lg:p-3 rounded-lg hover:bg-white transition-colors text-sm font-medium"
                       >

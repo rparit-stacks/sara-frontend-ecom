@@ -45,14 +45,17 @@ import CustomProductDetail from "./pages/CustomProductDetail";
 import Blog from "./pages/Blog";
 import BlogDetail from "./pages/BlogDetail";
 import AdminBlog from "./pages/admin/AdminBlog";
+import AdminHomepageBlogs from "./pages/admin/AdminHomepageBlogs";
 import AdminFAQ from "./pages/admin/AdminFAQ";
 import AdminCoupons from "./pages/admin/AdminCoupons";
 import AdminShipping from "./pages/admin/AdminShipping";
 import AdminContactSubmissions from "./pages/admin/AdminContactSubmissions";
 import AdminOrders from "./pages/admin/AdminOrders";
+import AdminOrderDetail from "./pages/admin/AdminOrderDetail";
 import AdminBusinessConfig from "./pages/admin/AdminBusinessConfig";
 import AdminPaymentConfig from "./pages/admin/AdminPaymentConfig";
 import AdminCurrencyMultipliers from "./pages/admin/AdminCurrencyMultipliers";
+import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
 import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
 
 const queryClient = new QueryClient();
@@ -146,6 +149,14 @@ const App = () => (
             } 
           />
           <Route 
+            path="/admin-sara/homepage-blogs" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminHomepageBlogs />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
             path="/admin-sara/faq" 
             element={
               <ProtectedAdminRoute>
@@ -218,6 +229,14 @@ const App = () => (
             }
           />
           <Route
+            path="/admin-sara/orders/:id"
+            element={
+              <ProtectedAdminRoute>
+                <AdminOrderDetail />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
             path="/admin-sara/business-config"
             element={
               <ProtectedAdminRoute>
@@ -238,6 +257,14 @@ const App = () => (
             element={
               <ProtectedAdminRoute>
                 <AdminCurrencyMultipliers />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/whatsapp"
+            element={
+              <ProtectedAdminRoute>
+                <AdminWhatsApp />
               </ProtectedAdminRoute>
             }
           />

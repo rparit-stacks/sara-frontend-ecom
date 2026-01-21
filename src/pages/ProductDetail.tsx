@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Heart, ShoppingBag, Share2, Minus, Plus, ChevronRight, Download, Palette, Package, FileJson, IndianRupee, Video, Loader2, Calculator } from 'lucide-react';
+import { Heart, ShoppingBag, Share2, Minus, Plus, ChevronRight, Download, Palette, Package, FileJson, IndianRupee, Video, Loader2, Calculator, ZoomIn, X } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
@@ -149,6 +149,15 @@ const ProductDetail = () => {
 
   const [selectedMedia, setSelectedMedia] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const [zoomScale, setZoomScale] = useState(1);
+
+  // Reset zoom scale when image changes
+  useEffect(() => {
+    if (zoomImage) {
+      setZoomScale(1);
+    }
+  }, [zoomImage]);
   
   // Custom Fields and Variants States
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | File | null>>({});
@@ -499,95 +508,39 @@ const ProductDetail = () => {
     },
   } );
 
-  // Fetch or create Digital Product from Design Product
-  // Only for regular DESIGNED products, not custom products (user uploads)
-  const { data: digitalProduct, isLoading: isLoadingDigital } = useQuery({
-    queryKey: ['digitalProduct', productId],
-    queryFn: () => productsApi.getDigitalFromDesign(Number(productId!)),
-    enabled: product?.type === 'DESIGNED' && !!productId && !isCustomProduct,
-    retry: false,
-  });
-
-  // Create Digital Product mutation (not used directly, but kept for reference)
-  const createDigitalMutation = useMutation({
-    mutationFn: (price?: number) => productsApi.createDigitalFromDesign(Number(productId!), price),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['digitalProduct', productId] });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Failed to create digital product');
-    },
-  });
-
-  // State for Buy Design Only loading
-  const [isBuyingDesignOnly, setIsBuyingDesignOnly] = useState(false);
-
-  // Handle purchase design only
-  const handlePurchaseDesignOnly = async () => {
-    if (!productId || !product) return;
+  // Filter images for design products - show only image files, hide other file types
+  const displayImages = useMemo(() => {
+    if (!product?.images) return [];
     
-    setIsBuyingDesignOnly(true);
-    const startTime = Date.now();
-    
-    try {
-      let digitalProd = digitalProduct;
-      
-      // If digital product doesn't exist, create it
-      if (!digitalProd) {
-        try {
-          digitalProd = await productsApi.createDigitalFromDesign(Number(productId), product.designPrice);
-          queryClient.invalidateQueries({ queryKey: ['digitalProduct', productId] });
-        } catch (error: any) {
-          toast.error(error.message || 'Failed to create digital product');
-          const elapsed = Date.now() - startTime;
-          const remaining = Math.max(0, 300 - elapsed);
-          await new Promise(resolve => setTimeout(resolve, remaining));
-          setIsBuyingDesignOnly(false);
-          return;
-        }
+    // For design products, filter to show only image files from fileUrl
+    if (product.type === 'DESIGNED' && product.fileUrl) {
+      try {
+        // Parse fileUrl to get all files
+        const fileUrls = JSON.parse(product.fileUrl);
+        if (Array.isArray(fileUrls)) {
+          // Filter to show only image files
+          const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+          const imageFiles = fileUrls.filter((url: string) => {
+            const lowerUrl = url.toLowerCase();
+            return imageExtensions.some(ext => lowerUrl.includes(ext) || lowerUrl.includes('image'));
+          });
+          // Return filtered images, fallback to product.images if no matches
+          return imageFiles.length > 0 ? imageFiles : product.images;
       }
-      
-      if (!digitalProd?.id) {
-        toast.error('Digital product not available');
-        const elapsed = Date.now() - startTime;
-        const remaining = Math.max(0, 300 - elapsed);
-        await new Promise(resolve => setTimeout(resolve, remaining));
-        setIsBuyingDesignOnly(false);
-        return;
+      } catch {
+        // Not JSON, use product.images as-is
       }
-      
-      // Add digital product to cart
-      const cartData = {
-        productType: 'DIGITAL',
-        productId: digitalProd.id,
-        productName: digitalProd.name || `${product.name} (Digital Design)`,
-        productImage: digitalProd.images?.[0] || product.images?.[0] || '',
-        quantity: 1,
-        unitPrice: digitalProd.price || product.designPrice || 0,
-        totalPrice: digitalProd.price || product.designPrice || 0,
-      };
-      
-      if (!isLoggedIn) {
-        guestCart.addItem(cartData);
-        toast.success('Digital design added to cart!');
-        window.dispatchEvent(new Event('guestCartUpdated'));
-      } else {
-        addToCartMutation.mutate(cartData);
-      }
-      
-      // Ensure minimum visibility duration
-      const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, 300 - elapsed);
-      await new Promise(resolve => setTimeout(resolve, remaining));
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to add digital design to cart');
-      const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, 300 - elapsed);
-      await new Promise(resolve => setTimeout(resolve, remaining));
-    } finally {
-      setIsBuyingDesignOnly(false);
     }
-  };
+    
+    return product.images;
+  }, [product?.images, product?.type, product?.fileUrl]);
+  
+  // Reset selectedMedia when displayImages change
+  useEffect(() => {
+    if (selectedMedia >= displayImages.length && displayImages.length > 0) {
+      setSelectedMedia(0);
+    }
+  }, [displayImages.length]);
   
   // Check if user is logged in
   const isLoggedIn = !!localStorage.getItem('authToken');
@@ -848,14 +801,11 @@ const ProductDetail = () => {
   };
 
   const getTypeBadge = () => {
-    switch (product.type) {
-      case 'DESIGNED':
-        return <Badge className="bg-pink-100 text-pink-700 border-pink-200 gap-1"><Palette className="w-3 h-3" /> Design Product</Badge>;
-      case 'PLAIN':
-        return <Badge className="bg-blue-100 text-blue-700 border-blue-200 gap-1"><Package className="w-3 h-3" /> Fabric</Badge>;
-      case 'DIGITAL':
+    // Only show Digital Product tag, remove all other tags
+    if (product.type === 'DIGITAL') {
         return <Badge className="bg-purple-100 text-purple-700 border-purple-200 gap-1"><FileJson className="w-3 h-3" /> Digital Product</Badge>;
     }
+    return null;
   };
 
   if (productLoading) {
@@ -984,23 +934,27 @@ const ProductDetail = () => {
                         ))}
                       </div>
                     </>
-                  ) : product && product.images && product.images.length > 0 ? (
+                  ) : displayImages && displayImages.length > 0 ? (
                     <>
                       <motion.div
                         key={selectedMedia}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="aspect-square rounded-xl sm:rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-sm mx-auto w-full max-w-full sm:max-w-lg"
+                        className="aspect-square rounded-xl sm:rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-sm mx-auto w-full max-w-full sm:max-w-lg relative group cursor-zoom-in"
+                        onClick={() => setZoomImage(displayImages[selectedMedia])}
                       >
                         <img
-                          src={product.images[selectedMedia]}
+                          src={displayImages[selectedMedia]}
                           alt={product.name}
                           className="w-full h-full object-cover"
                         />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                          <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
                       </motion.div>
                       
                       <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-full sm:max-w-lg mx-auto">
-                        {product.images.map((image: string, index: number) => (
+                        {displayImages.map((image: string, index: number) => (
                           <button
                             key={index}
                             onClick={() => setSelectedMedia(index)}
@@ -1352,11 +1306,6 @@ const ProductDetail = () => {
                                   )}
                                 >
                                   {option.value}
-                                  {option.priceModifier && option.priceModifier !== 0 && (
-                                    <span className="ml-2 text-xs text-muted-foreground">
-                                      {option.priceModifier > 0 ? '+' : ''}{format(option.priceModifier)}
-                                    </span>
-                                  )}
                                 </button>
                               );
                             })}
@@ -1439,37 +1388,15 @@ const ProductDetail = () => {
                     </div>
                   )}
 
-                  {/* Price Display with Variants */}
+                  {/* Price Display - Show calculated total only, no breakdown */}
                   {effectiveVariants && effectiveVariants.length > 0 && (
                     <div className="p-4 bg-muted/30 border border-border rounded-xl">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Base Price</span>
-                        <span className="font-medium">
-                          {format(product.type === 'DESIGNED' ? (product.designPrice || 0) : (product.price || 0))}
+                        <span className="text-sm text-muted-foreground">Total Price</span>
+                        <span className="font-bold text-lg text-primary">
+                          {format(finalPrice)}
                         </span>
                       </div>
-                      {Object.keys(selectedVariants).length > 0 && (
-                        <>
-                          {effectiveVariants.map((variant: any) => {
-                            const selectedOptionId = selectedVariants[String(variant.id)];
-                            if (!selectedOptionId) return null;
-                            const selectedOption = variant.options?.find((opt: any) => String(opt.id) === selectedOptionId);
-                            if (!selectedOption || !selectedOption.priceModifier || selectedOption.priceModifier === 0) return null;
-                            return (
-                              <div key={variant.id} className="flex items-center justify-between mt-2">
-                                <span className="text-sm text-muted-foreground">{variant.name}: {selectedOption.value}</span>
-                                <span className="font-medium">
-                                  {selectedOption.priceModifier > 0 ? '+' : ''}{format(selectedOption.priceModifier)}
-                                </span>
-                              </div>
-                            );
-                          })}
-                          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-                            <span className="font-semibold">Total (×{quantity})</span>
-                            <span className="font-bold text-lg text-primary">{format(finalPrice)}</span>
-                          </div>
-                        </>
-                      )}
                     </div>
                   )}
 
@@ -1552,28 +1479,7 @@ const ProductDetail = () => {
                               <span className="text-center">Select Fabric First</span>
                             </Button>
                           )}
-                          
-                          {/* Buy Design Only - Always visible for all DESIGNED products (admin-created) */}
-                          {product.type === 'DESIGNED' && (
-                            <ButtonWithLoading
-                              size="lg"
-                              variant="outline"
-                              onClick={handlePurchaseDesignOnly}
-                              isLoading={isBuyingDesignOnly || createDigitalMutation.isPending || isLoadingDigital}
-                              loadingText="Adding to cart..."
-                              minimumDuration={300}
-                              className="flex-1 w-full border-2 border-primary text-primary hover:bg-primary hover:text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
-                            >
-                              <Download className="w-5 h-5 flex-shrink-0" />
-                              <span className="text-center">Buy Design Only</span>
-                            </ButtonWithLoading>
-                          )}
                         </div>
-                        {product.type === 'DESIGNED' && (
-                          <p className="text-xs sm:text-sm text-muted-foreground text-center px-2">
-                            Choose to purchase the physical product with fabric or just the digital design file
-                          </p>
-                        )}
                       </>
                     )}
                     
@@ -1840,6 +1746,67 @@ const ProductDetail = () => {
             : fabricPricePerMeter}
         />
       )}
+
+      {/* Image Zoom Modal */}
+      <Dialog open={!!zoomImage} onOpenChange={(open) => !open && setZoomImage(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-0 bg-black/95 border-none">
+          <div className="relative w-full h-full flex items-center justify-center">
+            <button
+              onClick={() => setZoomImage(null)}
+              className="absolute top-4 right-4 z-50 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            {zoomImage && (
+              <div 
+                className="relative w-full h-full overflow-auto flex items-center justify-center p-4"
+                onWheel={(e) => {
+                  e.preventDefault();
+                  const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                  setZoomScale(prev => Math.max(0.5, Math.min(3, prev + delta)));
+                }}
+                onTouchStart={(e) => {
+                  if (e.touches.length === 2) {
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    const distance = Math.sqrt(
+                      Math.pow(touch2.clientX - touch1.clientX, 2) +
+                      Math.pow(touch2.clientY - touch1.clientY, 2)
+                    );
+                    (e.target as HTMLElement).setAttribute('data-initial-distance', distance.toString());
+                  }
+                }}
+                onTouchMove={(e) => {
+                  if (e.touches.length === 2) {
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    const currentDistance = Math.sqrt(
+                      Math.pow(touch2.clientX - touch1.clientX, 2) +
+                      Math.pow(touch2.clientY - touch1.clientY, 2)
+                    );
+                    const initialDistance = parseFloat(
+                      (e.target as HTMLElement).getAttribute('data-initial-distance') || '0'
+                    );
+                    if (initialDistance > 0) {
+                      const scaleChange = currentDistance / initialDistance;
+                      setZoomScale(prev => Math.max(0.5, Math.min(3, prev * scaleChange)));
+                      (e.target as HTMLElement).setAttribute('data-initial-distance', currentDistance.toString());
+                    }
+                  }
+                }}
+              >
+                <img
+                  src={zoomImage}
+                  alt={product?.name || 'Product image'}
+                  className="max-w-full max-h-[90vh] object-contain transition-transform duration-200"
+                  style={{ transform: `scale(${zoomScale})` }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };

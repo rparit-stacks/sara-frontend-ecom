@@ -280,7 +280,7 @@ const CustomProductDetail = () => {
           <nav className="flex items-center text-sm text-muted-foreground flex-wrap">
             <Link to="/" className="hover:text-primary transition-colors">Home</Link>
             <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
-            <Link to="/make-your-own" className="hover:text-primary transition-colors">Make Your Own</Link>
+            <Link to="/make-your-own" className="hover:text-primary transition-colors">Upload Your Design</Link>
             <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
             <span className="text-foreground truncate">Custom Product</span>
           </nav>

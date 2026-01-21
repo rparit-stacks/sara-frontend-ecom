@@ -145,11 +145,6 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
                         </span>
                       )}
                     </h4>
-                    {selectedOption?.priceModifier && selectedOption.priceModifier > 0 && (
-                      <Badge variant="secondary" className="text-[10px] sm:text-xs">
-                        +{format(selectedOption.priceModifier)}/m
-                      </Badge>
-                    )}
                   </div>
                   <div className="flex flex-wrap gap-2 sm:gap-2.5">
                     {variant.options.map((option) => {

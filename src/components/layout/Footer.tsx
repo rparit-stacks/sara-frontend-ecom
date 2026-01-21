@@ -21,13 +21,6 @@ const footerLinks = {
   ],
 };
 
-const socialLinks = [
-  { icon: 'fa-facebook-f', href: '#', label: 'Facebook' },
-  { icon: 'fa-instagram', href: '#', label: 'Instagram' },
-  { icon: 'fa-twitter', href: '#', label: 'Twitter' },
-  { icon: 'fa-pinterest-p', href: '#', label: 'Pinterest' },
-];
-
 export const Footer = () => {
   return (
     <footer className="bg-foreground text-background">
@@ -58,30 +51,15 @@ export const Footer = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <Link to="/" className="inline-block mb-4">
+            <Link to="/" className="inline-block mb-3">
               <span className="font-cursive text-2xl font-bold">
                 <span className="text-primary">Studio</span>
                 <span className="text-white"> Sara</span>
               </span>
             </Link>
-            <p className="text-white/70 text-xs sm:text-sm mb-2">
-              Premium textiles, prints and embroideries
+            <p className="text-white/70 text-xs sm:text-sm leading-relaxed mb-4">
+              Modern prints and embroidery, created with intention and purpose.
             </p>
-            <p className="text-white/60 text-sm leading-relaxed mb-4">
-              Premium floral textiles and prints. Handcrafted with love in India.
-            </p>
-            <div className="flex gap-2">
-              {socialLinks.map((social) => (
-                <a
-                  key={social.label}
-                  href={social.href}
-                  aria-label={social.label}
-                  className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:bg-primary hover:text-white transition-colors"
-                >
-                  <i className={`fa-brands ${social.icon} text-sm`}></i>
-                </a>
-              ))}
-            </div>
           </div>
 
           {/* Shop Links */}

@@ -174,7 +174,7 @@ const MakeYourOwn = () => {
             <ScrollReveal>
               <div className="inline-flex items-center gap-1.5 sm:gap-2 bg-primary/10 text-primary px-3 xs:px-4 py-1.5 xs:py-2 rounded-full text-xs xs:text-sm font-medium mb-3 xs:mb-4">
                 <Sparkles className="w-3 h-3 xs:w-4 xs:h-4 flex-shrink-0" />
-                <span className="truncate">Make Your Own</span>
+                <span className="truncate">Upload Your Design</span>
               </div>
               <h1 className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl px-2">
                 Upload Your <span className="text-primary">Design</span>

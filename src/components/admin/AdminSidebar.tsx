@@ -57,6 +57,11 @@ const adminMenuItems = [
     path: '/admin-sara/blog' 
   },
   { 
+    icon: FileText, 
+    label: 'Homepage Blogs', 
+    path: '/admin-sara/homepage-blogs' 
+  },
+  { 
     icon: HelpCircle, 
     label: 'FAQ', 
     path: '/admin-sara/faq' 
@@ -110,6 +115,11 @@ const adminMenuItems = [
     icon: Truck, 
     label: 'Shipping', 
     path: '/admin-sara/shipping' 
+  },
+  { 
+    icon: MessageSquare, 
+    label: 'WhatsApp', 
+    path: '/admin-sara/whatsapp' 
   },
   { 
     icon: MessageSquare, 

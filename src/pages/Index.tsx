@@ -106,16 +106,48 @@ const Index = () => {
     retry: 2,
   });
   
-  // Fetch products for best sellers and new arrivals
-  const { data: apiProducts = [] } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => productsApi.getAll(),
+  // Fetch homepage featured blogs
+  const { data: homepageBlogs = [] } = useQuery({
+    queryKey: ['homepage-blogs'],
+    queryFn: () => cmsApi.getHomepageBlogs(),
+    refetchOnWindowFocus: false,
+    retry: 2,
   });
   
-  // Fetch categories
+  // Fetch products for best sellers and new arrivals with user email if logged in
+  const { data: apiProducts = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => {
+      const userEmail = typeof window !== 'undefined' ? (() => {
+        const token = localStorage.getItem('authToken');
+        if (!token) return null;
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          return payload.sub || payload.email || null;
+        } catch {
+          return null;
+        }
+      })() : null;
+      return productsApi.getAll({ userEmail: userEmail || undefined });
+    },
+  });
+  
+  // Fetch categories with user email if logged in
   const { data: apiCategories = [] } = useQuery({
     queryKey: ['categoriesActive'],
-    queryFn: () => categoriesApi.getAll(true),
+    queryFn: () => {
+      const userEmail = typeof window !== 'undefined' ? (() => {
+        const token = localStorage.getItem('authToken');
+        if (!token) return null;
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          return payload.sub || payload.email || null;
+        } catch {
+          return null;
+        }
+      })() : null;
+      return categoriesApi.getAll(true, userEmail || undefined);
+    },
   });
   
   // Email subscription mutation
@@ -406,7 +438,7 @@ const Index = () => {
       <section 
         className="relative w-full py-16 xs:py-20 sm:py-32 lg:py-44"
         style={{
-          backgroundImage: 'url(/bg_images/661653d7e241afba33eeb02dc6a09f9e%20copy.png)',
+          backgroundImage: 'url(/bg_images/bgimg.png)',
           backgroundPosition: 'center',
           backgroundSize: 'cover',
         }}
@@ -418,14 +450,14 @@ const Index = () => {
               Personalized for you
             </span>
             <h2 className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl mb-3 xs:mb-4 sm:mb-6">
-              <span className="block">Create your own design</span>
+              <span className="block">Get Your Design Customised</span>
             </h2>
             <p className="text-sm xs:text-base sm:text-lg lg:text-xl text-white/80 mb-6 xs:mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed">
-              Get personalized print and embroidery design services from a team of professionals with motifs and colour palette of your choice.
+              Personalized print and embroidery design services from a team of professionals with motifs and colour palette of your choice.
             </p>
-            <Link to="/customize">
+            <Link to="/custom-design">
               <Button className="bg-white text-foreground hover:bg-white/90 rounded-full px-6 xs:px-8 sm:px-10 py-2.5 xs:py-3 sm:py-4 text-xs xs:text-sm sm:text-base font-semibold">
-                Custom Design
+                Send Your Request Here
               </Button>
             </Link>
           </ScrollReveal>
@@ -456,7 +488,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Brand Highlights - Stats Block */}
+      {/* Brand Highlights - Stats Block (grid, no internal scroll) */}
       <section className="w-full py-10 xs:py-12 sm:py-16 lg:py-20 bg-secondary/40">
         <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 xs:gap-6 sm:gap-8 text-center">
@@ -537,31 +569,43 @@ const Index = () => {
               <h2 className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl mt-2 xs:mt-3 sm:mt-4">Why Choose Us</h2>
             </ScrollReveal>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 xs:gap-3 sm:gap-6 lg:gap-10">
-            {[
-              {
-                icon: 'fa-hand-holding-heart',
-                title: 'Crafted with love',
-                desc: 'Each piece is carefully crafted by our skilled artisans with care and attention to detail.',
-              },
-              {
-                icon: 'fa-leaf',
-                title: 'Eco-Friendly',
-                desc: 'We use sustainable materials, eco-conscious processes and azo-free dyes for printing.',
-              },
-              { icon: 'fa-medal', title: 'Premium Quality', desc: 'Only the finest fabrics and materials make it to your wardrobe' },
-              { icon: 'fa-truck', title: 'Pan India Delivery', desc: 'Reliable delivery to every corner of India' },
-            ].map((item, i) => (
-              <ScrollReveal key={item.title} delay={i * 0.1}>
-                <div className="text-center p-3 xs:p-4 sm:p-6 lg:p-10 bg-white/90 backdrop-blur-sm rounded-xl xs:rounded-2xl border border-border h-full">
-                  <div className="w-10 h-10 xs:w-12 xs:h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3 xs:mb-4 sm:mb-6">
-                    <i className={`fa-solid ${item.icon} text-base xs:text-lg sm:text-2xl lg:text-3xl text-primary`}></i>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 xs:gap-6 sm:gap-8">
+          {[
+            {
+              icon: 'fa-hand-holding-heart',
+              title: 'Personalised Support',
+              desc: 'One-on-one support for a stress-free experience from concept to delivery.',
+            },
+            {
+              icon: 'fa-medal',
+              title: 'Premium Quality',
+              desc: 'Thoughtfully chosen fabrics and finishes designed to feel luxurious and last longer.',
+            },
+            {
+              icon: 'fa-water',
+              title: 'AZO-Free Dyes',
+              desc: 'Prints made with AZO-free dyes that are safer for your skin and gentler on the planet.',
+            },
+            {
+              icon: 'fa-truck',
+              title: 'Worldwide Shipping',
+              desc: 'Reliable shipping across India and select international locations via trusted partners.',
+            },
+          ].map((item, i) => (
+              <ScrollReveal key={item.title} delay={0.05 * i}>
+                <div className="text-center p-3 xs:p-4 sm:p-6 lg:p-8 bg-white/90 backdrop-blur-sm rounded-xl xs:rounded-2xl border border-border h-full">
+                  <div className="w-10 h-10 xs:w-12 xs:h-12 sm:w-16 sm:h-16 lg:w-16 lg:h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3 xs:mb-4 sm:mb-6">
+                      <i className={`fa-solid ${item.icon} text-base xs:text-lg sm:text-2xl lg:text-3xl text-primary`}></i>
+                    </div>
+                  <h4 className="font-semibold text-xs xs:text-sm sm:text-lg lg:text-xl mb-1 xs:mb-2 sm:text-base">
+                    {item.title}
+                  </h4>
+                  <p className="text-[10px] xs:text-xs sm:text-sm lg:text-base text-muted-foreground leading-relaxed">
+                      {item.desc}
+                    </p>
                   </div>
-                  <h4 className="font-semibold text-xs xs:text-sm sm:text-lg lg:text-xl mb-1 xs:mb-2 sm:mb-3">{item.title}</h4>
-                  <p className="text-[10px] xs:text-xs sm:text-sm lg:text-base text-muted-foreground leading-relaxed hidden xs:block">{item.desc}</p>
-                </div>
-              </ScrollReveal>
-            ))}
+                </ScrollReveal>
+              ))}
           </div>
         </div>
       </section>
@@ -663,11 +707,12 @@ const Index = () => {
 
       {/* Instagram - Full Width Grid */}
       <section className="w-full py-12 xs:py-16 sm:py-20 lg:py-28">
-        <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
-          <div className="text-center mb-8 xs:mb-10 sm:mb-14">
+        <div className="max-w-[1600px] mx-auto px 3 xs:px-4 sm:px-6 lg:px-12">
+          <div className="text-center mb-8 xs:mb-10 sm:mb-8">
             <ScrollReveal>
-              <span className="text-primary uppercase tracking-[0.1em] xs:tracking-[0.15em] sm:tracking-[0.2em] text-xs xs:text-sm font-medium">Join Our Community</span>
-              <h2 className="font-cursive text-2xl xs:text-3xl sm:text-5xl md:text-6xl lg:text-7xl mt-2 xs:mt-3 sm:mt-4">Follow @studiosara</h2>
+              <span className="text-primary uppercase tracking-[0.1em] xs:tracking-[0.15em] sm:tracking-[0.2em] text-xs xs:text-sm font-medium">
+                Our Community
+              </span>
             </ScrollReveal>
           </div>
           {instagramPosts.length > 0 ? (
@@ -675,14 +720,14 @@ const Index = () => {
               {instagramPosts.map((post, index) => {
                 const imageUrl = typeof post === 'string' ? post : (post?.imageUrl || '');
                 const linkUrl = typeof post === 'string' ? '#' : (post?.linkUrl || '#');
-                
+
                 if (!imageUrl) return null;
-                
+
                 return (
                   <ScrollReveal key={index} delay={index * 0.05}>
-                    <a 
-                      href={linkUrl} 
-                      target="_blank" 
+                    <a
+                      href={linkUrl}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="group block aspect-square overflow-hidden rounded-lg xs:rounded-xl lg:rounded-2xl bg-muted"
                     >
@@ -701,9 +746,23 @@ const Index = () => {
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground">
-              <p className="text-sm">No Instagram posts available. Add posts from Admin CMS.</p>
+              <p className="text-sm">No Instagram posts available. Add posts from CMS.</p>
             </div>
           )}
+
+          <div className="mt-8 flex justify-center">
+            <ScrollReveal>
+              <a
+                href="https://www.instagram.com/_studio__sara_?igsh=ZTVvaWZ4NXk4YXhz"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button className="rounded-full px-6 xs:px-8 sm:px-10 py-2.5 xs:py-3 sm:py-3.5 text-xs xs:text-sm sm:text-base">
+                  Join us on Instagram
+                </Button>
+              </a>
+            </ScrollReveal>
+          </div>
         </div>
       </section>
 
@@ -727,24 +786,24 @@ const Index = () => {
           {/* Horizontal Scroll Blog Cards */}
           <div className="overflow-x-auto -mx-3 xs:-mx-4 sm:-mx-6 lg:-mx-12 px-3 xs:px-4 sm:px-6 lg:px-12 scrollbar-hide">
             <div className="flex gap-3 xs:gap-4 sm:gap-6 lg:gap-8 min-w-max pb-4">
-              {[
-                { id: 1, title: 'The Art of Floral Design in Indian Textiles', image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=400&h=500&fit=crop', date: 'Jan 15, 2024' },
-                { id: 2, title: 'Sustainable Fabric Choices for Modern Living', image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&h=500&fit=crop', date: 'Jan 20, 2024' },
-                { id: 3, title: 'Custom Design Tips for Your Home', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&h=500&fit=crop', date: 'Jan 25, 2024' },
-                { id: 4, title: 'Traditional Patterns Meet Modern Aesthetics', image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=400&h=500&fit=crop', date: 'Feb 1, 2024' },
-                { id: 5, title: 'Caring for Your Crafted Textiles', image: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=400&h=500&fit=crop', date: 'Feb 5, 2024' },
-              ].map((blog, index) => (
+              {homepageBlogs.length > 0 ? (
+                homepageBlogs.map((blog: any, index: number) => {
+                  const blogDate = blog.publishedAt 
+                    ? new Date(blog.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : 'Recent';
+                  
+                  return (
                 <ScrollReveal key={blog.id} delay={index * 0.1}>
                   <Link to={`/blog/${blog.id}`} className="group block flex-shrink-0">
                     <div className="relative w-[180px] xs:w-[220px] sm:w-[280px] md:w-[320px] lg:w-[360px] aspect-[3/4] rounded-xl xs:rounded-2xl overflow-hidden shadow-lg">
                       <img
-                        src={blog.image}
+                            src={blog.image || 'https://images.unsplash.com/photo-1487530811176-3780de880c2d?w=400&h=500&fit=crop'}
                         alt={blog.title}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-foreground/80 via-foreground/30 to-transparent" />
                       <div className="absolute inset-0 flex flex-col items-start justify-end text-white p-3 xs:p-4 sm:p-6 lg:p-8">
-                        <span className="text-[10px] xs:text-xs text-white/80 mb-1 xs:mb-2">{blog.date}</span>
+                            <span className="text-[10px] xs:text-xs text-white/80 mb-1 xs:mb-2">{blogDate}</span>
                         <h3 className="font-semibold text-xs xs:text-sm sm:text-lg lg:text-xl mb-1.5 xs:mb-2 sm:mb-3 line-clamp-2 group-hover:text-primary transition-colors">
                           {blog.title}
                         </h3>
@@ -756,7 +815,13 @@ const Index = () => {
                     </div>
                   </Link>
                 </ScrollReveal>
-              ))}
+                  );
+                })
+              ) : (
+                <div className="text-center py-12 text-muted-foreground w-full">
+                  <p className="text-sm">No featured blogs configured. Please select 4 blogs from admin panel.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
