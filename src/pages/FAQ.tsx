@@ -13,7 +13,7 @@ import { faqApi } from '@/lib/api';
 // Fallback FAQs for when API is not available
 const fallbackFaqs = [
   { question: 'How long does shipping take?', answer: 'Standard shipping takes 5-7 business days. Express shipping is available for 2-3 day delivery.', category: 'Shipping' },
-  { question: 'What is your return policy?', answer: 'We offer 30-day returns for unused items in original packaging. See our Refund Policy for details.', category: 'Returns' },
+  { question: 'What is your shipping policy?', answer: 'We use reliable courier services (Trackon and PNS) for shipping all over India. Air shipping with 2-3 days delivery time. See our Shipping Policy for details.', category: 'Shipping' },
   { question: 'Do you ship internationally?', answer: 'Yes! We ship to over 50 countries worldwide. Shipping costs vary by location.', category: 'Shipping' },
   { question: 'How do I track my order?', answer: 'Once shipped, you\'ll receive a tracking number via email to monitor your delivery.', category: 'Shipping' },
   { question: 'Can I customize products?', answer: 'Yes! Visit our Customize page to create personalized designs with your choice of fabrics and patterns.', category: 'Customization' },

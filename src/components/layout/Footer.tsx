@@ -17,7 +17,7 @@ const footerLinks = {
   support: [
     { name: 'Terms & Conditions', path: '/terms' },
     { name: 'Privacy Policy', path: '/privacy' },
-    { name: 'Refund Policy', path: '/refund' },
+    { name: 'Shipping Policy', path: '/shipping' },
   ],
 };
 
