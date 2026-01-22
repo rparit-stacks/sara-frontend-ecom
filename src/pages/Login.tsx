@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,11 @@ import { API_BASE_URL, cartApi } from '@/lib/api';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+  
+  // Get returnTo path from location state
+  const returnTo = (location.state as any)?.returnTo || '/dashboard';
 
   const [activeTab, setActiveTab] = useState<'otp' | 'google'>('otp');
   const [email, setEmail] = useState('');
@@ -105,7 +109,8 @@ const Login = () => {
         description: data?.message ?? 'You have been logged in successfully.',
       });
 
-      navigate('/dashboard');
+      // Navigate to returnTo path if provided, otherwise go to dashboard
+      navigate(returnTo);
     } catch (error: any) {
       toast({
         title: 'Error',

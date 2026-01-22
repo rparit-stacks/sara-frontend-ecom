@@ -103,14 +103,36 @@ const MakeYourOwn = () => {
         }
         
         // Create custom product (user-specific, never appears in public listings)
-        const guestId = getGuestIdentifier();
+        // Get user email from token if logged in, otherwise use guestId
+        const isLoggedIn = !!localStorage.getItem('authToken');
+        let userEmail: string | null = null;
+        
+        if (isLoggedIn) {
+          // Try to get email from auth token
+          try {
+            const token = localStorage.getItem('authToken');
+            if (token) {
+              const payload = JSON.parse(atob(token.split('.')[1]));
+              userEmail = payload.sub || payload.email || null;
+            }
+          } catch (e) {
+            console.error('Failed to parse auth token:', e);
+          }
+        }
+        
+        // If not logged in or couldn't get email from token, use guestId
+        if (!userEmail) {
+          const guestId = getGuestIdentifier();
+          userEmail = guestId;
+        }
+        
         const customProductData = {
           name: data.name || 'Custom Design',
           description: data.description || 'Your custom design',
           designPrice: data.designPrice || 0,
           images: [originalDesignUrl], // Use original design URL
           mockupUrls: generatedMockups.map(m => m.url), // Include all generated mockup URLs
-          userEmail: guestId, // Include guest identifier if not logged in
+          userEmail: userEmail, // Use actual email if logged in, otherwise guestId
         };
         
         return customProductsApi.create(customProductData);

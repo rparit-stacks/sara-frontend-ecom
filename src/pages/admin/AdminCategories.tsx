@@ -102,6 +102,8 @@ const AdminCategories = () => {
     description: string;
     displayOrder: string;
     isFabric: boolean;
+    isUserSpecific: boolean;
+    allowedEmails: string;
   }>({
     name: '',
     parentId: 'none',
@@ -109,7 +111,9 @@ const AdminCategories = () => {
     image: '',
     description: '',
     displayOrder: '',
-    isFabric: false
+    isFabric: false,
+    isUserSpecific: false,
+    allowedEmails: ''
   });
   
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -126,7 +130,7 @@ const AdminCategories = () => {
 
   const handleAddMain = () => {
     setEditingCategory(null);
-    setFormData({ name: '', parentId: 'none', status: 'active', image: '', description: '', displayOrder: '', isFabric: false });
+    setFormData({ name: '', parentId: 'none', status: 'active', image: '', description: '', displayOrder: '', isFabric: false, isUserSpecific: false, allowedEmails: '' });
     setImageFile(null);
     setImagePreview('');
     setIsAddDialogOpen(true);
@@ -134,7 +138,7 @@ const AdminCategories = () => {
 
   const handleAddSub = (parentId: string) => {
     setEditingCategory(null);
-    setFormData({ name: '', parentId, status: 'active', image: '', description: '', displayOrder: '', isFabric: false });
+    setFormData({ name: '', parentId, status: 'active', image: '', description: '', displayOrder: '', isFabric: false, isUserSpecific: false, allowedEmails: '' });
     setImageFile(null);
     setImagePreview('');
     setIsAddDialogOpen(true);
@@ -148,6 +152,7 @@ const AdminCategories = () => {
   // Load full category data when editing
   useEffect(() => {
     if (isDialogOpen && editingCategory && fullCategoryData) {
+      const hasAllowedEmails = fullCategoryData.allowedEmails && fullCategoryData.allowedEmails.trim().length > 0;
       setFormData({ 
         name: fullCategoryData.name || '', 
         parentId: fullCategoryData.parentId ? String(fullCategoryData.parentId) : 'none', 
@@ -155,13 +160,15 @@ const AdminCategories = () => {
         image: fullCategoryData.image || '',
         description: fullCategoryData.description || '',
         displayOrder: fullCategoryData.displayOrder ? String(fullCategoryData.displayOrder) : '',
-        isFabric: fullCategoryData.isFabric || false
+        isFabric: fullCategoryData.isFabric || false,
+        isUserSpecific: hasAllowedEmails,
+        allowedEmails: fullCategoryData.allowedEmails || ''
       });
       setImageFile(null);
       setImagePreview(fullCategoryData.image || '');
     } else if (isDialogOpen && !editingCategory) {
       // Reset form when adding new category
-      setFormData({ name: '', parentId: 'none', status: 'active', image: '', description: '', displayOrder: '', isFabric: false });
+      setFormData({ name: '', parentId: 'none', status: 'active', image: '', description: '', displayOrder: '', isFabric: false, isUserSpecific: false, allowedEmails: '' });
       setImageFile(null);
       setImagePreview('');
     }
@@ -240,6 +247,7 @@ const AdminCategories = () => {
       description: formData.description || null,
       displayOrder: formData.displayOrder ? Number(formData.displayOrder) : null,
       isFabric: formData.isFabric || false,
+      allowedEmails: formData.isUserSpecific && formData.allowedEmails.trim() ? formData.allowedEmails.trim() : null,
     };
 
     if (editingCategory) {
@@ -536,6 +544,38 @@ const AdminCategories = () => {
                   }
                 />
               </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+                <div className="space-y-0.5">
+                  <Label htmlFor="isUserSpecific">This category is specific for selected users</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Restrict this category and all its sub-categories and products to specific users
+                  </p>
+                </div>
+                <Switch
+                  id="isUserSpecific"
+                  checked={formData.isUserSpecific}
+                  onCheckedChange={(checked) => 
+                    setFormData({ ...formData, isUserSpecific: checked, allowedEmails: checked ? formData.allowedEmails : '' })
+                  }
+                />
+              </div>
+
+              {formData.isUserSpecific && (
+                <div className="space-y-2">
+                  <Label htmlFor="allowedEmails">Allowed User Emails</Label>
+                  <Textarea
+                    id="allowedEmails"
+                    placeholder="Enter email addresses separated by commas (e.g., user1@example.com, user2@example.com)"
+                    value={formData.allowedEmails}
+                    onChange={(e) => setFormData({ ...formData, allowedEmails: e.target.value })}
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Only logged-in users with these email addresses will be able to see this category, its sub-categories, and products. Leave empty to make it public.
+                  </p>
+                </div>
+              )}
 
               <DialogFooter className="flex-shrink-0 border-t pt-4 mt-4">
                 <Button 

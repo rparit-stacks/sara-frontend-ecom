@@ -28,7 +28,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import RichTextEditor from '@/components/admin/RichTextEditor';
 import { toast } from 'sonner';
-import { blogApi } from '@/lib/api';
+import { blogApi, mediaApi } from '@/lib/api';
 
 const AdminBlog = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,6 +36,7 @@ const AdminBlog = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingBlog, setEditingBlog] = useState<any>(null);
   const [deleteBlogId, setDeleteBlogId] = useState<number | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   
   const queryClient = useQueryClient();
   
@@ -71,7 +72,8 @@ const AdminBlog = () => {
   // Create mutation
   const createMutation = useMutation({
     mutationFn: blogApi.create,
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('[Blog Create] Success:', data);
       queryClient.invalidateQueries({ queryKey: ['blogs'] });
       queryClient.invalidateQueries({ queryKey: ['blogs-admin'] });
       queryClient.invalidateQueries({ queryKey: ['blog-categories'] });
@@ -80,6 +82,7 @@ const AdminBlog = () => {
       handleResetForm();
     },
     onError: (error: Error) => {
+      console.error('[Blog Create] Error:', error);
       toast.error(error.message || 'Failed to create blog');
     },
   });
@@ -87,7 +90,8 @@ const AdminBlog = () => {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => blogApi.update(id, data),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('[Blog Update] Success:', data);
       queryClient.invalidateQueries({ queryKey: ['blogs'] });
       queryClient.invalidateQueries({ queryKey: ['blogs-admin'] });
       queryClient.invalidateQueries({ queryKey: ['blog'] });
@@ -98,6 +102,7 @@ const AdminBlog = () => {
       handleResetForm();
     },
     onError: (error: Error) => {
+      console.error('[Blog Update] Error:', error);
       toast.error(error.message || 'Failed to update blog');
     },
   });
@@ -173,14 +178,21 @@ const AdminBlog = () => {
     }
 
     // Prevent DB errors from exceeding varchar(255) limits on short text fields
+    // Note: image URL can be longer (TEXT field), so don't slice it
     const payload = {
       ...formData,
       title: formData.title.trim().slice(0, 255),
       excerpt: formData.excerpt.trim().slice(0, 250),
       author: (formData.author || '').slice(0, 255),
       category: (formData.category || '').slice(0, 255),
-      image: (formData.image || '').slice(0, 255),
+      image: formData.image || '', // Don't slice image URL - it can be long (TEXT field in DB)
     };
+
+    console.log('[Blog Save] Saving blog with payload:', {
+      ...payload,
+      image: payload.image ? `${payload.image.substring(0, 50)}...` : 'empty',
+      contentLength: payload.content?.length || 0,
+    });
 
     if (editingBlog) {
       updateMutation.mutate({ id: editingBlog.id, data: payload });
@@ -394,16 +406,62 @@ const AdminBlog = () => {
 
               <div className="space-y-2">
                 <Label>Featured Image</Label>
-                <div className="border-2 border-dashed border-border rounded-xl p-8 text-center space-y-4 hover:bg-muted/30 transition-colors group cursor-pointer">
+                <div className="border-2 border-dashed border-border rounded-xl p-8 text-center space-y-4 hover:bg-muted/30 transition-colors group">
                   {formData.image ? (
-                    <div className="relative">
-                      <img src={formData.image} alt="Blog" className="w-full h-64 object-cover rounded-lg" />
-                      <button
-                        onClick={() => setFormData({ ...formData, image: '' })}
-                        className="absolute top-2 right-2 w-8 h-8 bg-destructive text-white rounded-full flex items-center justify-center"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                    <div className="relative space-y-2">
+                      <div className="relative w-full h-64 rounded-lg overflow-hidden bg-muted border border-border">
+                        <img 
+                          src={formData.image} 
+                          alt="Blog preview" 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            console.error('Image load error:', formData.image);
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            toast.error('Failed to load image. Please upload again.');
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => document.getElementById('blog-image-upload')?.click()}
+                          disabled={isUploadingImage}
+                        >
+                          {isUploadingImage ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4 mr-2" />
+                              Change Image
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => {
+                            setFormData({ ...formData, image: '' });
+                            // Reset file input
+                            const fileInput = document.getElementById('blog-image-upload') as HTMLInputElement;
+                            if (fileInput) fileInput.value = '';
+                          }}
+                          disabled={isUploadingImage}
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Remove
+                        </Button>
+                      </div>
+                      {formData.image && (
+                        <p className="text-xs text-muted-foreground break-all">
+                          {formData.image.length > 80 ? `${formData.image.substring(0, 80)}...` : formData.image}
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <>
@@ -413,7 +471,7 @@ const AdminBlog = () => {
                       <div className="space-y-1">
                         <p className="font-semibold">Upload Featured Image</p>
                         <p className="text-xs text-muted-foreground">
-                          JPG, PNG files supported. Recommended size: 1200x800px
+                          JPG, PNG files supported. Recommended size: 1200x800px (Max 10MB)
                         </p>
                       </div>
                       <input 
@@ -421,23 +479,63 @@ const AdminBlog = () => {
                         className="hidden" 
                         id="blog-image-upload" 
                         accept="image/*"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              setFormData({ ...formData, image: event.target?.result as string });
-                            };
-                            reader.readAsDataURL(file);
+                          if (!file) return;
+
+                          // Validate file type
+                          if (!file.type.startsWith('image/')) {
+                            toast.error('Please upload a valid image file');
+                            return;
+                          }
+
+                          // Validate file size (10MB max)
+                          const maxSize = 10 * 1024 * 1024; // 10MB
+                          if (file.size > maxSize) {
+                            toast.error('File size must be less than 10MB');
+                            return;
+                          }
+
+                          setIsUploadingImage(true);
+                          try {
+                            console.log('[Blog Image] Uploading image to blogs folder...');
+                            // Upload to Cloudinary in blogs folder
+                            const imageUrl = await mediaApi.upload(file, 'blogs');
+                            console.log('[Blog Image] Upload successful:', imageUrl);
+                            if (!imageUrl || imageUrl.trim() === '') {
+                              throw new Error('Received empty image URL from server');
+                            }
+                            setFormData({ ...formData, image: imageUrl });
+                            toast.success('Image uploaded successfully!');
+                          } catch (error: any) {
+                            console.error('[Blog Image] Upload error:', error);
+                            toast.error(error.message || 'Failed to upload image');
+                            // Reset file input on error
+                            const fileInput = e.target;
+                            if (fileInput) fileInput.value = '';
+                          } finally {
+                            setIsUploadingImage(false);
                           }
                         }}
+                        disabled={isUploadingImage}
                       />
                       <Button 
                         type="button" 
                         variant="outline" 
                         onClick={() => document.getElementById('blog-image-upload')?.click()}
+                        disabled={isUploadingImage}
                       >
-                        Choose Image
+                        {isUploadingImage ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Choose Image
+                          </>
+                        )}
                       </Button>
                     </>
                   )}

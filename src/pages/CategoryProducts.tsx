@@ -24,10 +24,22 @@ const CategoryProducts = () => {
     enabled: !!id,
   });
   
+  // Get user email if logged in
+  const userEmail = typeof window !== 'undefined' ? (() => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.sub || payload.email || null;
+    } catch {
+      return null;
+    }
+  })() : null;
+
   // Fetch products for this category
   const { data: apiProducts = [], isLoading: productsLoading } = useQuery({
-    queryKey: ['categoryProducts', id],
-    queryFn: () => productsApi.getAll({ categoryId: Number(id!), status: 'ACTIVE' }),
+    queryKey: ['categoryProducts', id, userEmail],
+    queryFn: () => productsApi.getAll({ categoryId: Number(id!), status: 'ACTIVE', userEmail: userEmail || undefined }),
     enabled: !!id,
   });
   

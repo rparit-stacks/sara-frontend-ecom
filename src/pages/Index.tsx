@@ -107,12 +107,27 @@ const Index = () => {
   });
   
   // Fetch homepage featured blogs
-  const { data: homepageBlogs = [] } = useQuery({
+  const { data: homepageBlogs = [], isLoading: isLoadingBlogs, error: blogsError } = useQuery({
     queryKey: ['homepage-blogs'],
-    queryFn: () => cmsApi.getHomepageBlogs(),
+    queryFn: async () => {
+      console.log('[Homepage] Fetching homepage blogs...');
+      const blogs = await cmsApi.getHomepageBlogs();
+      console.log('[Homepage] Homepage blogs received:', blogs);
+      return blogs;
+    },
     refetchOnWindowFocus: false,
     retry: 2,
   });
+
+  // Debug logs
+  useEffect(() => {
+    if (blogsError) {
+      console.error('[Homepage] Error fetching blogs:', blogsError);
+    }
+    if (homepageBlogs) {
+      console.log('[Homepage] Current homepage blogs:', homepageBlogs.length, homepageBlogs);
+    }
+  }, [homepageBlogs, blogsError]);
   
   // Fetch products for best sellers and new arrivals with user email if logged in
   const { data: apiProducts = [] } = useQuery({

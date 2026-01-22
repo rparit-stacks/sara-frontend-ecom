@@ -1,13 +1,14 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Heart, ShoppingBag, Share2, Truck, RotateCcw, Shield, Minus, Plus, ChevronRight, Palette, CheckCircle2, Info } from 'lucide-react';
+import { Heart, ShoppingBag, Share2, Truck, RotateCcw, Shield, Minus, Plus, ChevronRight, Palette, CheckCircle2, Info, ZoomIn, X } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import PlainProductSelectionPopup from '@/components/products/PlainProductSelectionPopup';
 import FabricVariantPopup from '@/components/products/FabricVariantPopup';
 import DynamicForm from '@/components/products/DynamicForm';
@@ -48,10 +49,35 @@ const CustomProductDetail = () => {
 
   // Get custom product from API if ID is in URL
   const guestId = getGuestIdentifier();
-  const { data: customProduct, isLoading: loadingProduct } = useQuery({
-    queryKey: ['customProduct', id, guestId],
-    queryFn: () => customProductsApi.getById(Number(id!), guestId || undefined),
+  const isLoggedIn = !!localStorage.getItem('authToken');
+  
+  // Get user email from token if logged in
+  const getUserEmailFromToken = () => {
+    if (!isLoggedIn) return null;
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) return null;
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.sub || payload.email || null;
+    } catch {
+      return null;
+    }
+  };
+  
+  // Determine which userEmail to use for fetching
+  // If logged in, use email from token (products created by logged-in users use their email)
+  // If not logged in, use guestId (products created by guests use guestId)
+  const userEmailForFetch = isLoggedIn ? getUserEmailFromToken() : guestId;
+  
+  const { data: customProduct, isLoading: loadingProduct, error: productError } = useQuery({
+    queryKey: ['customProduct', id, userEmailForFetch, isLoggedIn],
+    queryFn: () => {
+      // Pass userEmail: email from token if logged in, guestId if not logged in
+      // Backend will use auth token if available, otherwise use the userEmail parameter
+      return customProductsApi.getById(Number(id!), userEmailForFetch || undefined);
+    },
     enabled: !!id,
+    retry: 1, // Retry once
   });
   
   // Fallback to location.state for backward compatibility
@@ -90,37 +116,87 @@ const CustomProductDetail = () => {
     return customConfig?.formFields || [];
   }, [customConfig?.formFields]);
   
-  // Auto-delete unsaved product when user leaves
+  // Track if component is mounted and product is loaded
+  const isMountedRef = useRef(true);
+  const productLoadedRef = useRef(false);
+  
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+  
+  // Track when product is actually loaded
+  useEffect(() => {
+    if (customProduct && customProduct.id) {
+      productLoadedRef.current = true;
+    }
+  }, [customProduct]);
+  
+  // Auto-delete unsaved product when user leaves (only on actual page unload or navigation away)
+  useEffect(() => {
+    // Only set up cleanup if we have a valid product ID, it's temporary, and product is loaded
+    if (!customProductId || !isTemporary || !productLoadedRef.current) {
+      return;
+    }
+    
     const handleBeforeUnload = () => {
-      if (customProductId && isTemporary) {
-        // Delete unsaved product when user leaves
-        customProductsApi.deleteUnsaved(customProductId).catch(() => {
+      const guestId = getGuestIdentifier();
+      // Delete unsaved product when user leaves the page
+      if (guestId || localStorage.getItem('authToken')) {
+        customProductsApi.deleteUnsaved(customProductId, guestId || undefined).catch(() => {
           // Ignore errors on page unload
         });
       }
     };
     
     window.addEventListener('beforeunload', handleBeforeUnload);
+    
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Also delete when component unmounts (user navigates away)
-      if (customProductId && isTemporary) {
-        const guestId = getGuestIdentifier();
-        customProductsApi.deleteUnsaved(customProductId, guestId || undefined).catch(() => {});
-      }
+      // Only delete on actual unmount (user navigates away), not on dependency changes
+      // Check if component is still mounted after a delay
+      const timeoutId = setTimeout(() => {
+        if (!isMountedRef.current && productLoadedRef.current) {
+          const guestId = getGuestIdentifier();
+          if (guestId || localStorage.getItem('authToken')) {
+            customProductsApi.deleteUnsaved(customProductId, guestId || undefined).catch(() => {});
+          }
+        }
+      }, 1000); // Wait 1 second to ensure this is a real navigation
+      
+      return () => clearTimeout(timeoutId);
     };
-  }, [customProductId, isTemporary]);
+  }, [customProductId, isTemporary, customProduct]);
   
+  // Check if product loaded successfully
   useEffect(() => {
-    if (!designUrl && !loadingProduct) {
-      toast.error('Please upload a design first.');
-      navigate('/make-your-own');
+    // Only show error if we've finished loading and still don't have a design URL
+    if (!loadingProduct && !designUrl && id) {
+      // Give it a moment in case the product is still being created
+      const timeoutId = setTimeout(() => {
+        if (!designUrl) {
+          toast.error('Product not found. Please upload your design again.');
+          navigate('/make-your-own');
+        }
+      }, 2000); // Wait 2 seconds before showing error
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [designUrl, loadingProduct, navigate]);
+  }, [designUrl, loadingProduct, id, navigate]);
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const [zoomScale, setZoomScale] = useState(1);
+
+  // Reset zoom scale when image changes
+  useEffect(() => {
+    if (zoomImage) {
+      setZoomScale(1);
+    }
+  }, [zoomImage]);
   
   // Design Product States (same as normal Design Product)
   const [showPlainProductSelection, setShowPlainProductSelection] = useState(false);
@@ -181,6 +257,16 @@ const CustomProductDetail = () => {
   });
 
   const handleAddToCart = () => {
+    // Check if user is logged in
+    const isLoggedIn = !!localStorage.getItem('authToken');
+    if (!isLoggedIn) {
+      toast.error('Please login to add items to cart');
+      // Redirect to login page, and come back to this page after login
+      const currentPath = `/custom-product/${id || customProductId}`;
+      navigate('/login', { state: { returnTo: currentPath } });
+      return;
+    }
+    
     if (!fabricSelectionData) {
       toast.error('Please select a fabric first');
       return;
@@ -299,13 +385,17 @@ const CustomProductDetail = () => {
                     key={selectedImage}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="aspect-square rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-md"
+                    className="aspect-square rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-md relative group cursor-zoom-in"
+                    onClick={() => setZoomImage(displayImages[selectedImage])}
                   >
                     <img
                       src={displayImages[selectedImage]}
                       alt={selectedImage === 0 ? "Your custom design" : `Mockup ${selectedImage}`}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                     />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                      <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
                   </motion.div>
                   
                   {/* Thumbnail navigation if multiple images */}
@@ -558,6 +648,67 @@ const CustomProductDetail = () => {
           )}
         </>
       )}
+
+      {/* Image Zoom Modal */}
+      <Dialog open={!!zoomImage} onOpenChange={(open) => !open && setZoomImage(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-0 bg-black/95 border-none">
+          <div className="relative w-full h-full flex items-center justify-center">
+            <button
+              onClick={() => setZoomImage(null)}
+              className="absolute top-4 right-4 z-50 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            {zoomImage && (
+              <div 
+                className="relative w-full h-full overflow-auto flex items-center justify-center p-4"
+                onWheel={(e) => {
+                  e.preventDefault();
+                  const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                  setZoomScale(prev => Math.max(0.5, Math.min(3, prev + delta)));
+                }}
+                onTouchStart={(e) => {
+                  if (e.touches.length === 2) {
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    const distance = Math.sqrt(
+                      Math.pow(touch2.clientX - touch1.clientX, 2) +
+                      Math.pow(touch2.clientY - touch1.clientY, 2)
+                    );
+                    (e.target as HTMLElement).setAttribute('data-initial-distance', distance.toString());
+                  }
+                }}
+                onTouchMove={(e) => {
+                  if (e.touches.length === 2) {
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    const currentDistance = Math.sqrt(
+                      Math.pow(touch2.clientX - touch1.clientX, 2) +
+                      Math.pow(touch2.clientY - touch1.clientY, 2)
+                    );
+                    const initialDistance = parseFloat(
+                      (e.target as HTMLElement).getAttribute('data-initial-distance') || '0'
+                    );
+                    if (initialDistance > 0) {
+                      const scaleChange = currentDistance / initialDistance;
+                      setZoomScale(prev => Math.max(0.5, Math.min(3, prev * scaleChange)));
+                      (e.target as HTMLElement).setAttribute('data-initial-distance', currentDistance.toString());
+                    }
+                  }
+                }}
+              >
+                <img
+                  src={zoomImage}
+                  alt="Zoomed product image"
+                  className="max-w-full max-h-[90vh] object-contain transition-transform duration-200"
+                  style={{ transform: `scale(${zoomScale})` }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };

@@ -24,10 +24,10 @@ const ProtectedAdminRoute = ({ children }: ProtectedAdminRouteProps) => {
         return;
       }
 
-      // Check if session expired (10 minutes = 600000ms)
+      // Check if session expired (1 hour = 3600000ms)
       const loginTimestamp = parseInt(loginTime);
       const now = Date.now();
-      const sessionDuration = 10 * 60 * 1000; // 10 minutes
+      const sessionDuration = 60 * 60 * 1000; // 1 hour
       
       if (now - loginTimestamp > sessionDuration) {
         console.log('[Admin Auth] Session expired');
@@ -65,7 +65,7 @@ const ProtectedAdminRoute = ({ children }: ProtectedAdminRouteProps) => {
       if (loginTime) {
         const loginTimestamp = parseInt(loginTime);
         const now = Date.now();
-        const sessionDuration = 10 * 60 * 1000;
+        const sessionDuration = 60 * 60 * 1000; // 1 hour
         
         if (now - loginTimestamp > sessionDuration) {
           console.log('[Admin Auth] Session expired, logging out');

@@ -45,7 +45,19 @@ const ProductDetail = () => {
   // Fetch product from API using slug only
   const { data: apiProduct, isLoading: productLoading, error: productError } = useQuery({
     queryKey: ['product', slug],
-    queryFn: () => productsApi.getBySlug(slug!),
+    queryFn: () => {
+      const userEmail = typeof window !== 'undefined' ? (() => {
+        const token = localStorage.getItem('authToken');
+        if (!token) return null;
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          return payload.sub || payload.email || null;
+        } catch {
+          return null;
+        }
+      })() : null;
+      return productsApi.getBySlug(slug!, userEmail || undefined);
+    },
     enabled: !!slug,
     retry: 1,
   });
@@ -620,25 +632,38 @@ const ProductDetail = () => {
     const unitPrice = (baseDesignPrice + fabricTotalPrice + variantModifier) / fabricQuantity;
     const totalPrice = baseDesignPrice + fabricTotalPrice + variantModifier;
     
-    // Prepare variants map (variantId -> optionValue)
-    const variantsMap: Record<string, string> = {};
+    // Prepare structured variant selections (new format with both IDs and frontendIds)
+    const variantSelections: Record<string, any> = {};
     if (product.variants && product.variants.length > 0) {
       product.variants.forEach((variant: any) => {
         const selectedOptionId = selectedVariants[String(variant.id)];
         if (selectedOptionId && variant.options) {
           const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
           if (selectedOption) {
-            variantsMap[String(variant.id)] = selectedOption.value || String(selectedOption.id);
+            // Use frontendId as key if available, otherwise use variant.id
+            const variantKey = variant.frontendId || String(variant.id);
+            variantSelections[variantKey] = {
+              variantId: variant.id,
+              variantFrontendId: variant.frontendId || null,
+              variantName: variant.name,
+              variantType: variant.type,
+              variantUnit: variant.unit || null,
+              optionId: selectedOption.id,
+              optionFrontendId: selectedOption.frontendId || null,
+              optionValue: selectedOption.value,
+              priceModifier: selectedOption.priceModifier || 0,
+            };
           }
         }
       });
     }
     
-    // Add fabric variants
+    // Add fabric variants (legacy format for backward compatibility)
+    const variantsMap: Record<string, string> = {};
     Object.assign(variantsMap, selectedFabricVariants);
     
     // Prepare cart data
-    const cartData = {
+    const cartData: any = {
       productType: 'DESIGNED',
       productId: Number(product.id),
       productName: product.name,
@@ -650,7 +675,8 @@ const ProductDetail = () => {
       quantity: fabricQuantity,
       unitPrice: unitPrice,
       totalPrice: totalPrice,
-      variants: variantsMap,
+      variantSelections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
+      variants: Object.keys(variantsMap).length > 0 ? variantsMap : undefined, // Legacy format for fabric variants
       customFormData: { ...customFieldValues, ...customFormData },
     };
     
@@ -688,15 +714,27 @@ const ProductDetail = () => {
     
     const unitPrice = basePrice + variantModifier;
     
-    // Prepare variants map
-    const variantsMap: Record<string, string> = {};
+    // Prepare structured variant selections (new format with both IDs and frontendIds)
+    const variantSelections: Record<string, any> = {};
     if (product.variants && product.variants.length > 0) {
       product.variants.forEach((variant: any) => {
         const selectedOptionId = selectedVariants[String(variant.id)];
         if (selectedOptionId && variant.options) {
           const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
           if (selectedOption) {
-            variantsMap[String(variant.id)] = selectedOption.value || String(selectedOption.id);
+            // Use frontendId as key if available, otherwise use variant.id
+            const variantKey = variant.frontendId || String(variant.id);
+            variantSelections[variantKey] = {
+              variantId: variant.id,
+              variantFrontendId: variant.frontendId || null,
+              variantName: variant.name,
+              variantType: variant.type,
+              variantUnit: variant.unit || null,
+              optionId: selectedOption.id,
+              optionFrontendId: selectedOption.frontendId || null,
+              optionValue: selectedOption.value,
+              priceModifier: selectedOption.priceModifier || 0,
+            };
           }
         }
       });
@@ -704,7 +742,7 @@ const ProductDetail = () => {
     
     // Prepare cart data
     const totalPrice = unitPrice * quantity;
-    const cartData = {
+    const cartData: any = {
       productType: 'PLAIN',
       productId: Number(product.id),
       productName: product.name,
@@ -712,7 +750,8 @@ const ProductDetail = () => {
       quantity: quantity,
       unitPrice: unitPrice,
       totalPrice: totalPrice,
-      variants: variantsMap,
+      variantSelections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
+      variants: undefined, // No legacy format needed for plain products
       customFormData: { ...customFieldValues, ...customFormData },
     };
     
@@ -879,7 +918,12 @@ const ProductDetail = () => {
                         key={selectedMedia}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="aspect-square rounded-xl sm:rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-sm mx-auto w-full max-w-full sm:max-w-lg"
+                        className="aspect-square rounded-xl sm:rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-sm mx-auto w-full max-w-full sm:max-w-lg relative group cursor-zoom-in"
+                        onClick={() => {
+                          if (product.media[selectedMedia]?.type !== 'video') {
+                            setZoomImage(product.media[selectedMedia].url);
+                          }
+                        }}
                       >
                         {product.media[selectedMedia]?.type === 'video' ? (
                           <video
@@ -891,11 +935,16 @@ const ProductDetail = () => {
                             playsInline
                           />
                         ) : (
-                          <img
-                            src={product.media[selectedMedia].url}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
+                          <>
+                            <img
+                              src={product.media[selectedMedia].url}
+                              alt={product.name}
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                              <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                          </>
                         )}
                       </motion.div>
                       

@@ -22,16 +22,39 @@ const CategoryHierarchy = () => {
   const slugParts = slugPath.split('/').filter(Boolean);
   
   // Fetch category by slug path
+  // Get user email if logged in
+  const userEmail = typeof window !== 'undefined' ? (() => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.sub || payload.email || null;
+    } catch {
+      return null;
+    }
+  })() : null;
+
   const { data: category, isLoading: categoryLoading } = useQuery({
-    queryKey: ['categoryBySlug', slugPath],
-    queryFn: () => categoriesApi.getBySlugPath(slugPath),
+    queryKey: ['categoryBySlug', slugPath, userEmail],
+    queryFn: async () => {
+      const url = userEmail 
+        ? `/api/categories/${slugPath}?userEmail=${encodeURIComponent(userEmail)}`
+        : `/api/categories/${slugPath}`;
+      const response = await fetch(`${import.meta.env.VITE_API_URL}${url}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error('Failed to fetch category');
+      return response.json();
+    },
     enabled: !!slugPath,
   });
   
   // Fetch products for current category
   const { data: apiProducts = [], isLoading: productsLoading } = useQuery({
-    queryKey: ['categoryProducts', category?.id],
-    queryFn: () => productsApi.getAll({ categoryId: category?.id, status: 'ACTIVE' }),
+    queryKey: ['categoryProducts', category?.id, userEmail],
+    queryFn: () => productsApi.getAll({ categoryId: category?.id, status: 'ACTIVE', userEmail: userEmail || undefined }),
     enabled: !!category?.id,
   });
   

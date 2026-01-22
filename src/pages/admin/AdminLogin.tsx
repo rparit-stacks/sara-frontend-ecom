@@ -35,7 +35,7 @@ const AdminLogin = () => {
         if (loginTime) {
           const loginTimestamp = parseInt(loginTime);
           const now = Date.now();
-          const sessionDuration = 10 * 60 * 1000; // 10 minutes
+          const sessionDuration = 60 * 60 * 1000; // 1 hour
           
           if (now - loginTimestamp <= sessionDuration) {
             // Session still valid, redirect to dashboard
@@ -118,23 +118,30 @@ const AdminLogin = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      {/* Background Image */}
+      {/* Background Image with Gradient Overlay */}
       <div className="absolute inset-0 z-0">
-        <img 
-          src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&h=1080&fit=crop&q=80" 
-          alt="Background" 
-          className="w-full h-full object-cover"
+        <div 
+          className="w-full h-full bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: `url('/bg_images/bgimg.png')`,
+          }}
         />
-        <div className="absolute inset-0 bg-foreground/70 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-primary/70 to-primary/90 backdrop-blur-[2px]" />
+        <div className="absolute inset-0 bg-black/30" />
       </div>
 
-      <div className="relative z-10 w-full max-w-md mx-auto px-4">
-        <div className="bg-card/95 backdrop-blur-md p-8 rounded-2xl border border-white/20 shadow-2xl">
+      <div className="relative z-10 w-full max-w-md mx-auto px-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-card/95 backdrop-blur-md p-8 rounded-2xl border border-white/20 shadow-2xl hover:shadow-primary/20 transition-shadow duration-300">
           <div className="text-center mb-8">
-            <h1 className="font-cursive text-3xl md:text-4xl mb-2 text-white">
+            <div className="mb-4 flex justify-center">
+              <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary/30">
+                <Key className="w-8 h-8 text-primary" />
+              </div>
+            </div>
+            <h1 className="font-cursive text-3xl md:text-4xl mb-2 text-white drop-shadow-lg">
               Admin <span className="text-primary">{activeTab === 'login' ? 'Login' : 'Sign Up'}</span>
             </h1>
-            <p className="text-white/80">Access the admin panel</p>
+            <p className="text-white/90 text-sm">Secure access to the admin panel</p>
           </div>
 
           {/* Tabs */}

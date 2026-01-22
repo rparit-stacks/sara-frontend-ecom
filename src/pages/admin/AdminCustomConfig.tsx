@@ -93,7 +93,23 @@ const AdminCustomConfig = () => {
   // Update local state when data loads
   useEffect(() => {
     if (configData) {
-      if (configData.formFields) setFormFields(configData.formFields);
+      // Map backend formFields to frontend format
+      if (configData.formFields && Array.isArray(configData.formFields)) {
+        const mappedFields = configData.formFields.map((field: any) => ({
+          id: field.id ? String(field.id) : `field-${Date.now()}-${Math.random()}`,
+          type: field.type || 'text',
+          label: field.label || '',
+          placeholder: field.placeholder || undefined,
+          required: field.required || false,
+          options: field.options || undefined,
+          min: field.minValue || undefined,
+          max: field.maxValue || undefined,
+          validation: undefined, // Backend doesn't store validation, but frontend can add it
+        }));
+        setFormFields(mappedFields);
+      } else {
+        setFormFields([]);
+      }
       
       // Update page config with all fields
       if (configData) {
@@ -125,6 +141,18 @@ const AdminCustomConfig = () => {
   }, [configData]);
 
   const handleSave = () => {
+    // Convert formFields to backend format
+    const formFieldsPayload = formFields.map((field, index) => ({
+      type: field.type,
+      label: field.label,
+      placeholder: field.placeholder || null,
+      required: field.required || false,
+      minValue: field.min || null,
+      maxValue: field.max || null,
+      options: field.type === 'dropdown' ? field.options : null,
+      displayOrder: index,
+    }));
+    
     updateMutation.mutate({
       pageTitle: pageConfig.title,
       pageDescription: pageConfig.description,
@@ -148,6 +176,8 @@ const AdminCustomConfig = () => {
       // Variants and Pricing Slabs
       variants: variants,
       pricingSlabs: pricingSlabs,
+      // Form Fields
+      formFields: formFieldsPayload,
     });
   };
   

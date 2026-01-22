@@ -791,7 +791,23 @@ const AdminOrderDetail = () => {
                         </div>
                       </div>
 
-                      {item.variants && Object.keys(item.variants).length > 0 && (
+                      {/* Display resolved variant names if available, otherwise fallback to raw variants */}
+                      {item.variantDisplay && item.variantDisplay.length > 0 ? (
+                        <div className="mt-1">
+                          <div className="text-xs font-semibold mb-1">Variants</div>
+                          <div className="flex flex-wrap gap-1">
+                            {item.variantDisplay.map((variant: any, idx: number) => (
+                              <Badge key={idx} variant="outline" className="text-[10px]">
+                                {variant.variantName || 'Unknown'}: {variant.optionValue || 'Unknown'}
+                                {variant.variantUnit && ` (${variant.variantUnit})`}
+                                {variant.priceModifier && variant.priceModifier > 0 && (
+                                  <span className="ml-1 text-green-600">+₹{variant.priceModifier}</span>
+                                )}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      ) : item.variants && Object.keys(item.variants).length > 0 ? (
                         <div className="mt-1">
                           <div className="text-xs font-semibold mb-1">Variants</div>
                           <div className="flex flex-wrap gap-1">
@@ -802,7 +818,7 @@ const AdminOrderDetail = () => {
                             ))}
                           </div>
                         </div>
-                      )}
+                      ) : null}
 
                       {item.customData && Object.keys(item.customData).length > 0 && (
                         <div className="mt-2 space-y-1">

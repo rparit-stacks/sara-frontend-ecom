@@ -30,9 +30,13 @@ const setGlobalLoading = (loading: boolean, message?: string) => {
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   // Check if it's an admin route
   const isAdminRoute = endpoint.startsWith('/api/admin');
-  const token = isAdminRoute 
-    ? localStorage.getItem('adminToken')
-    : localStorage.getItem('authToken');
+  // If admin is logged in, use adminToken for all calls (so admin can see all products/categories)
+  const adminToken = localStorage.getItem('adminToken');
+  const authToken = localStorage.getItem('authToken');
+  // Use adminToken if it's an admin route OR if admin is logged in (for admin dashboard visibility)
+  const token = isAdminRoute || adminToken 
+    ? (adminToken || authToken)
+    : authToken;
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -147,7 +151,12 @@ export const productsApi = {
     const queryString = params.toString();
     return fetchApi<any>(`/api/products/${id}${queryString ? `?${queryString}` : ''}`);
   },
-  getBySlug: (slug: string) => fetchApi<any>(`/api/products/slug/${slug}`),
+  getBySlug: (slug: string, userEmail?: string) => {
+    const url = userEmail 
+      ? `/api/products/slug/${slug}?userEmail=${encodeURIComponent(userEmail)}`
+      : `/api/products/slug/${slug}`;
+    return fetchApi<any>(url);
+  },
   create: (data: any) => fetchApi<any>('/api/admin/products', { method: 'POST', body: JSON.stringify(data) }),
   createPlain: (data: any) => fetchApi<any>('/api/admin/products/plain', { method: 'POST', body: JSON.stringify(data) }),
   createDesigned: (data: any) => fetchApi<any>('/api/admin/products/designed', { method: 'POST', body: JSON.stringify(data) }),
@@ -362,6 +371,7 @@ export const cmsApi = {
   getBanners: () => fetchApi<any[]>('/api/cms/banners'),
   getLandingContent: () => fetchApi<Record<string, string>>('/api/cms/landing'),
   getContactInfo: () => fetchApi<Record<string, string>>('/api/cms/contact'),
+  getHomepageBlogs: () => fetchApi<any[]>('/api/cms/homepage-blogs'),
   
   // Admin
   setBestSellers: (productIds: number[]) => fetchApi<void>('/api/admin/cms/best-sellers', { method: 'PUT', body: JSON.stringify({ productIds }) }),
