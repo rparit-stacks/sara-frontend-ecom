@@ -1,4 +1,4 @@
-const WHATSAPP_NUMBER = '+918618196219';
+const WHATSAPP_NUMBER = '+918618176219';
 
 export const FloatingWhatsApp = () => {
   const handleClick = () => {
