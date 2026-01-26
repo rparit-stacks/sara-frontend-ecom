@@ -94,6 +94,7 @@ const Login = () => {
       if (data?.token) {
         localStorage.setItem('authToken', data.token);
         localStorage.setItem('authEmail', data.email ?? email);
+        console.log('[Login] Token stored successfully, length:', data.token.length);
         
         // Migrate guest cart to backend
         try {
@@ -102,6 +103,9 @@ const Login = () => {
           console.error('Failed to migrate cart:', error);
           // Don't block login if cart migration fails
         }
+      } else {
+        console.error('[Login] No token in response:', data);
+        throw new Error('No token received from server');
       }
 
       toast({
@@ -109,8 +113,11 @@ const Login = () => {
         description: data?.message ?? 'You have been logged in successfully.',
       });
 
-      // Navigate to returnTo path if provided, otherwise go to dashboard
-      navigate(returnTo);
+      // Small delay to ensure token is properly stored before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Navigate to dashboard - it will check for mandatory fields
+      navigate('/dashboard', { replace: true });
     } catch (error: any) {
       toast({
         title: 'Error',

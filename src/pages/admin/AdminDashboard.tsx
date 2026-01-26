@@ -3,8 +3,10 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Package, Palette, Image, Users, Activity, TrendingUp, ShoppingBag, Loader2, IndianRupee } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { dashboardApi } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
   // Fetch dashboard stats from API
   const { data: statsData, isLoading, error } = useQuery({
     queryKey: ['dashboardStats'],
@@ -18,35 +20,40 @@ const AdminDashboard = () => {
       label: 'Total Users', 
       value: statsData?.totalUsers?.toLocaleString() || '0', 
       change: `${statsData?.activeUsers || 0} active`, 
-      color: 'text-blue-600' 
+      color: 'text-blue-600',
+      onClick: () => navigate('/admin-sara/users') // Clickable - navigate to users
     },
     { 
       icon: ShoppingBag, 
       label: 'Total Orders', 
       value: statsData?.totalOrders?.toLocaleString() || '0', 
       change: `${statsData?.pendingOrders || 0} pending`, 
-      color: 'text-green-600' 
+      color: 'text-green-600',
+      onClick: () => navigate('/admin-sara/orders') // Clickable - navigate to orders
     },
     { 
       icon: IndianRupee, 
       label: 'Total Revenue', 
       value: `₹${(statsData?.totalRevenue || 0).toLocaleString('en-IN')}`, 
       change: 'Paid orders', 
-      color: 'text-primary' 
+      color: 'text-primary',
+      onClick: () => navigate('/admin-sara/orders') // Clickable - navigate to orders
     },
     { 
       icon: Package, 
       label: 'Total Products', 
       value: statsData?.totalProducts?.toLocaleString() || '0', 
       change: '', 
-      color: 'text-pink-600' 
+      color: 'text-pink-600',
+      onClick: () => navigate('/admin-sara/products') // Clickable - navigate to products
     },
     { 
       icon: Palette, 
       label: 'Total Categories', 
       value: statsData?.totalCategories?.toLocaleString() || '0', 
       change: '', 
-      color: 'text-purple-600' 
+      color: 'text-purple-600',
+      onClick: () => navigate('/admin-sara/categories') // Clickable - navigate to categories
     },
   ];
 
@@ -92,7 +99,10 @@ const AdminDashboard = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-white rounded-xl p-6 border border-border shadow-sm hover:shadow-md transition-shadow"
+                onClick={stat.onClick || undefined}
+                className={`bg-white rounded-xl p-6 border border-border shadow-sm hover:shadow-md transition-all ${
+                  stat.onClick ? 'cursor-pointer hover:border-primary hover:scale-[1.02]' : ''
+                }`}
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className={`w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center ${stat.color}`}>

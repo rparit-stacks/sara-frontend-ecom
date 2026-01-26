@@ -129,6 +129,7 @@ const ProductDetail = () => {
         recommendedFabrics: apiProduct.recommendedFabrics || [],
         pricingSlabs: apiProduct.pricingSlabs || [],
         plainProduct: apiProduct.plainProduct,
+        unitExtension: apiProduct.plainProduct?.unitExtension || apiProduct.unitExtension,
         fileUrl: apiProduct.fileUrl,
         isNew: apiProduct.isNew,
         isSale: apiProduct.isSale,
@@ -223,10 +224,12 @@ const ProductDetail = () => {
     return !hasDesignId || hasTimestampSlug || matchesConfigTitle;
   }, [product, apiProduct, customConfig]);
   
-  // Use config data for custom products - Single Source of Truth
+  // Use config data ONLY for custom products - strict isolation
+  // Regular DESIGNED products use their own product data exclusively
   const effectiveVariants = useMemo(() => {
+    // Only use customConfig variants for custom products
     if (isCustomProduct && customConfig?.variants && customConfig.variants.length > 0) {
-      // Use variants from config
+      // Use variants from config for custom products
       return customConfig.variants.map((v: any) => ({
         id: String(v.id || `variant-${v.displayOrder || 0}`),
         type: v.type || '',
@@ -241,31 +244,35 @@ const ProductDetail = () => {
         })),
       }));
     }
-    // Fallback to product variants
+    // For regular DESIGNED products, use ONLY product variants (never config)
     return product?.variants || [];
   }, [isCustomProduct, customConfig?.variants, product?.variants]);
   
   const effectivePricingSlabs = useMemo(() => {
+    // Only use customConfig pricing slabs for custom products
     if (isCustomProduct && customConfig?.pricingSlabs && customConfig.pricingSlabs.length > 0) {
-      // Use pricing slabs from config
+      // Use pricing slabs from config for custom products
       return customConfig.pricingSlabs;
     }
-    // Fallback to product pricing slabs
+    // For regular DESIGNED products, use ONLY product pricing slabs (never config)
     return product?.pricingSlabs || [];
   }, [isCustomProduct, customConfig?.pricingSlabs, product?.pricingSlabs]);
   
   const effectiveRecommendedFabrics = useMemo(() => {
+    // Only use customConfig recommended fabrics for custom products
     if (isCustomProduct && customConfig?.recommendedFabricIds && customConfig.recommendedFabricIds.length > 0) {
-      // Use recommended fabrics from config
+      // Use recommended fabrics from config for custom products
       return customConfig.recommendedFabricIds;
     }
-    // Fallback to product recommended fabrics
+    // For regular DESIGNED products, use ONLY product recommended fabrics (never config)
     return product?.recommendedPlainProductIds || [];
   }, [isCustomProduct, customConfig?.recommendedFabricIds, product?.recommendedPlainProductIds]);
   
-  // Update custom form fields when config loads
+  // Update custom form fields when config loads - ONLY for custom products
   useEffect(() => {
-    if (customConfig && customConfig.formFields && product?.type === 'DESIGNED') {
+    // Only load customConfig.formFields for custom products (user-uploaded)
+    // Regular DESIGNED products should use product.customFields only
+    if (isCustomProduct && customConfig && customConfig.formFields && product?.type === 'DESIGNED') {
       const fields: FormField[] = customConfig.formFields.map((field: any) => ({
         id: String(field.id || `field-${field.displayOrder || 0}`),
         type: field.type || 'text',
@@ -277,8 +284,12 @@ const ProductDetail = () => {
         options: field.options || [],
       }));
       setCustomFormFields(fields);
+    } else if (!isCustomProduct && product?.type === 'DESIGNED') {
+      // For regular DESIGNED products, clear custom form fields from config
+      // They should only use product.customFields
+      setCustomFormFields([]);
     }
-  }, [customConfig, product?.type]);
+  }, [isCustomProduct, customConfig, product?.type]);
 
   // Fetch selected fabric product data
   const { data: fabricProduct } = useQuery({
@@ -446,8 +457,8 @@ const ProductDetail = () => {
     setSelectedFabricVariants(data.selectedVariants);
     setFabricQuantity(data.quantity);
     
-    // If custom form fields exist from config, show the form
-    if (customFormFields.length > 0) {
+    // If custom form fields exist from config (only for custom products), show the form
+    if (isCustomProduct && customFormFields.length > 0) {
       setShowCustomForm(true);
     }
     
@@ -491,8 +502,8 @@ const ProductDetail = () => {
       }
     }
     
-    // Validate custom form fields from config
-    if (customFormFields.length > 0) {
+    // Validate custom form fields from config (only for custom products)
+    if (isCustomProduct && customFormFields.length > 0) {
       for (const field of customFormFields) {
         if (field.required) {
           const value = customFormData[field.id];
@@ -1053,9 +1064,9 @@ const ProductDetail = () => {
                         <div className="flex flex-col gap-2">
                           {/* Horizontal Price Breakdown */}
                           <div className="flex items-baseline gap-3 sm:gap-4 flex-wrap">
-                            {/* Design Price */}
+                            {/* Print Price */}
                             <div className="flex flex-col">
-                              <p className="text-xs sm:text-sm text-muted-foreground mb-1">Design Price</p>
+                              <p className="text-xs sm:text-sm text-muted-foreground mb-1">Print Price</p>
                               <span className="font-bold font-normal text-lg sm:text-xl text-primary not-italic">{format(product.designPrice || 0)}</span>
                             </div>
                             
@@ -1148,42 +1159,45 @@ const ProductDetail = () => {
                     
                     {product.type === 'PLAIN' && (
                       <div>
-                        <div className="flex items-baseline gap-3">
-                          <span className="font-bold font-normal text-xl sm:text-2xl text-primary not-italic">
-                            {format((() => {
-                              const basePrice = product.pricePerMeter || product.price || 0;
-                              let variantModifier = 0;
-                              if (product.variants && product.variants.length > 0) {
-                                product.variants.forEach((variant: any) => {
-                                  const selectedOptionId = selectedVariants[String(variant.id)];
-                                  if (selectedOptionId && variant.options) {
-                                    const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
-                                    if (selectedOption && selectedOption.priceModifier) {
-                                      variantModifier += selectedOption.priceModifier;
+                        {(() => {
+                          // Get unit extension from product data
+                          const unitExtension = product.plainProduct?.unitExtension || product.unitExtension || 'per meter';
+                          // Extract unit name (e.g., "per meter" -> "meter", "per piece" -> "piece")
+                          const unitName = unitExtension.replace(/^per\s+/i, '').trim() || 'meter';
+                          const unitDisplay = unitExtension;
+                          
+                          return (
+                            <>
+                              <div className="flex items-baseline gap-3">
+                                <span className="font-bold font-normal text-xl sm:text-2xl text-primary not-italic">
+                                  {format((() => {
+                                    const basePrice = product.pricePerMeter || product.price || 0;
+                                    let variantModifier = 0;
+                                    if (product.variants && product.variants.length > 0) {
+                                      product.variants.forEach((variant: any) => {
+                                        const selectedOptionId = selectedVariants[String(variant.id)];
+                                        if (selectedOptionId && variant.options) {
+                                          const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+                                          if (selectedOption && selectedOption.priceModifier) {
+                                            variantModifier += selectedOption.priceModifier;
+                                          }
+                                        }
+                                      });
                                     }
-                                  }
-                                });
-                              }
-                              return basePrice + variantModifier;
-                            })())}
-                          </span>
-                          <span className="text-sm text-muted-foreground">per meter</span>
-                        </div>
-                        {finalPrice > 0 && (
-                          <div className="mt-2 pt-2 border-t border-border/50">
-                            <p className="text-xs text-muted-foreground mb-1">Total for {quantity} meter{quantity !== 1 ? 's' : ''}</p>
-                            <span className="font-bold font-normal text-lg text-primary not-italic">{format(finalPrice)}</span>
-                          </div>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-2 gap-2"
-                          onClick={() => setShowPriceBreakdown(true)}
-                        >
-                          <Calculator className="w-4 h-4" />
-                          View Price Breakdown
-                        </Button>
+                                    return basePrice + variantModifier;
+                                  })())}
+                                </span>
+                                <span className="text-sm text-muted-foreground">{unitDisplay}</span>
+                              </div>
+                              {finalPrice > 0 && (
+                                <div className="mt-2 pt-2 border-t border-border/50">
+                                  <p className="text-xs text-muted-foreground mb-1">Total for {quantity} {unitName}{quantity !== 1 ? 's' : ''}</p>
+                                  <span className="font-bold font-normal text-lg text-primary not-italic">{format(finalPrice)}</span>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
                     
@@ -1269,7 +1283,13 @@ const ProductDetail = () => {
                   {/* Quantity */}
                   {product.type !== 'DIGITAL' && (
                     <div>
-                      <h4 className="font-bold mb-4 text-lg">Quantity {product.type === 'PLAIN' ? '(Meters)' : ''}</h4>
+                      <h4 className="font-bold mb-4 text-lg">
+                        Quantity {product.type === 'PLAIN' ? (() => {
+                          const unitExtension = product.plainProduct?.unitExtension || product.unitExtension || 'per meter';
+                          const unitName = unitExtension.replace(/^per\s+/i, '').trim() || 'meter';
+                          return `(${unitName.charAt(0).toUpperCase() + unitName.slice(1)}s)`;
+                        })() : ''}
+                      </h4>
                       <div className="flex items-center gap-5">
                         <div className="flex items-center border border-border rounded-full">
                           <Button
@@ -1292,6 +1312,19 @@ const ProductDetail = () => {
                         </div>
                       </div>
                     </div>
+                  )}
+
+                  {/* View Price Breakdown button for DESIGNED products - appears after quantity and before variants */}
+                  {product.type === 'DESIGNED' && selectedFabricId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full sm:w-auto gap-2"
+                      onClick={() => setShowPriceBreakdown(true)}
+                    >
+                      <Calculator className="w-4 h-4" />
+                      View Price Breakdown
+                    </Button>
                   )}
                   
                   {/* Digital Product Quantity (if multiple licenses needed) */}
@@ -1364,8 +1397,8 @@ const ProductDetail = () => {
                     </div>
                   )}
 
-                  {/* Custom Fields */}
-                  {product.customFields && product.customFields.length > 0 && (
+                  {/* Custom Fields - Only show for regular DESIGNED products (not custom products) */}
+                  {!isCustomProduct && product.customFields && product.customFields.length > 0 && (
                     <div className="space-y-4">
                       <h4 className="font-bold mb-4 text-lg">Additional Information</h4>
                       {product.customFields.map((field: any) => (
@@ -1494,6 +1527,19 @@ const ProductDetail = () => {
 
                   {/* Actions */}
                   <div className="flex flex-col gap-3 sm:gap-4 pt-4 sm:pt-6 border-t border-border/50">
+                    {/* View Price Breakdown button for PLAIN products - appears before Add to Cart */}
+                    {product.type === 'PLAIN' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full sm:w-auto gap-2"
+                        onClick={() => setShowPriceBreakdown(true)}
+                      >
+                        <Calculator className="w-4 h-4" />
+                        View Price Breakdown
+                      </Button>
+                    )}
+                    
                     {product.type === 'DESIGNED' && (
                       <>
                         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
@@ -1700,12 +1746,12 @@ const ProductDetail = () => {
       )}
 
       {/* Popups */}
-      {product.type === 'DESIGNED' && product.recommendedPlainProductIds && (
+      {product.type === 'DESIGNED' && (
         <>
           <PlainProductSelectionPopup
             open={showPlainProductSelection}
             onOpenChange={setShowPlainProductSelection}
-            recommendedPlainProductIds={product.recommendedPlainProductIds}
+            recommendedPlainProductIds={effectiveRecommendedFabrics || []}
             onPlainProductSelect={handleFabricSelect}
           />
           
@@ -1736,8 +1782,8 @@ const ProductDetail = () => {
         </>
       )}
       
-      {/* Custom Form Dialog (from config) */}
-      {product && product.type === 'DESIGNED' && customFormFields.length > 0 && (
+      {/* Custom Form Dialog (from config) - Only for custom products */}
+      {product && product.type === 'DESIGNED' && isCustomProduct && customFormFields.length > 0 && (
         <Dialog open={showCustomForm} onOpenChange={setShowCustomForm}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>

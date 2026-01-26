@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
@@ -9,6 +9,7 @@ import { cartApi, wishlistApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import { CategoryDropdown } from '@/components/categories/CategoryDropdown';
 import { CurrencySelector } from '@/components/currency/CurrencySelector';
+import { Package, Download, User } from 'lucide-react';
 
 const navLinks = [
   { name: 'Home', path: '/' },
@@ -20,7 +21,10 @@ const navLinks = [
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const isAuthenticated = typeof window !== 'undefined' && !!localStorage.getItem('authToken');
 
   useEffect(() => {
@@ -69,6 +73,28 @@ export const Navbar = () => {
 
   const cartItemCount = isAuthenticated ? (cartCountData?.count || 0) : guestCartCount;
   const wishlistCount = wishlistData?.length || 0;
+
+  // Handle profile menu hover
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+
+    if (isProfileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isProfileMenuOpen]);
+
+  const handleProfileMenuClick = (tab: string) => {
+    setIsProfileMenuOpen(false);
+    navigate('/dashboard', { state: { activeTab: tab } });
+  };
 
   return (
     <header className="sticky top-0 left-0 right-0 z-50 bg-white border-b border-border">
@@ -168,11 +194,59 @@ export const Navbar = () => {
             </div>
 
             {/* User/Login */}
-            <Link to={isAuthenticated ? "/dashboard" : "/login"} className="hidden md:block">
-              <Button variant="ghost" size="icon" className="w-11 h-11 rounded-full hover:bg-secondary">
-                <i className="fa-regular fa-user text-base"></i>
-              </Button>
-            </Link>
+            {isAuthenticated ? (
+              <div 
+                ref={profileMenuRef}
+                className="hidden md:block relative"
+                onMouseEnter={() => setIsProfileMenuOpen(true)}
+                onMouseLeave={() => setIsProfileMenuOpen(false)}
+              >
+                <Button variant="ghost" size="icon" className="w-11 h-11 rounded-full hover:bg-secondary">
+                  <i className="fa-regular fa-user text-base"></i>
+                </Button>
+                <AnimatePresence>
+                  {isProfileMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute top-full right-0 mt-2 w-56 bg-white border border-border rounded-lg shadow-lg z-50"
+                    >
+                      <div className="py-2">
+                        <button
+                          onClick={() => handleProfileMenuClick('orders')}
+                          className="w-full px-4 py-2.5 text-left text-sm font-medium text-foreground hover:bg-secondary transition-colors flex items-center gap-3"
+                        >
+                          <Package className="w-4 h-4" />
+                          Your Orders
+                        </button>
+                        <button
+                          onClick={() => handleProfileMenuClick('downloads')}
+                          className="w-full px-4 py-2.5 text-left text-sm font-medium text-foreground hover:bg-secondary transition-colors flex items-center gap-3"
+                        >
+                          <Download className="w-4 h-4" />
+                          Your Downloads
+                        </button>
+                        <button
+                          onClick={() => handleProfileMenuClick('profile')}
+                          className="w-full px-4 py-2.5 text-left text-sm font-medium text-foreground hover:bg-secondary transition-colors flex items-center gap-3"
+                        >
+                          <User className="w-4 h-4" />
+                          Edit Profile
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <Link to="/login" className="hidden md:block">
+                <Button variant="ghost" size="icon" className="w-11 h-11 rounded-full hover:bg-secondary">
+                  <i className="fa-regular fa-user text-base"></i>
+                </Button>
+              </Link>
+            )}
 
             {/* Mobile Menu Toggle */}
             <Button

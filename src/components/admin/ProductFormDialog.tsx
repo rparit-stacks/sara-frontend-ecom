@@ -6,14 +6,99 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { X, Save, Upload, IndianRupee, Image as ImageIcon, Plus, Video, Loader2, Trash2 } from 'lucide-react';
+import { X, Save, Upload, IndianRupee, Image as ImageIcon, Plus, Video, Loader2, Trash2, GripVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import ProductTypeSelector, { ProductType } from '@/components/admin/ProductTypeSelector';
 import RichTextEditor from '@/components/admin/RichTextEditor';
 import PlainProductSelector, { PlainProduct } from '@/components/admin/PlainProductSelector';
 import { toast } from 'sonner';
 import { productsApi } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
+
+// Sortable Variant Item Component
+interface SortableVariantItemProps {
+  id: string;
+  children: React.ReactNode;
+}
+
+const SortableVariantItem: React.FC<SortableVariantItemProps> = ({ id, children }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative">
+      <div className="absolute left-0 top-0 bottom-0 flex items-center cursor-grab active:cursor-grabbing z-10 p-2 text-muted-foreground hover:text-foreground">
+        <GripVertical className="w-5 h-5" {...attributes} {...listeners} />
+      </div>
+      <div className="pl-8">
+        {children}
+      </div>
+    </div>
+  );
+};
+
+// Sortable Option Item Component
+interface SortableOptionItemProps {
+  id: string;
+  children: React.ReactNode;
+}
+
+const SortableOptionItem: React.FC<SortableOptionItemProps> = ({ id, children }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative">
+      <div className="absolute left-0 top-0 bottom-0 flex items-center cursor-grab active:cursor-grabbing z-10 p-1 text-muted-foreground hover:text-foreground">
+        <GripVertical className="w-4 h-4" {...attributes} {...listeners} />
+      </div>
+      <div className="pl-6">
+        {children}
+      </div>
+    </div>
+  );
+};
 
 // Media Upload Component
 const MediaUploadSection: React.FC<{
@@ -225,6 +310,9 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
     basePrice: '' as string | number,
     pricePerMeter: '' as string | number,
     designPrice: '' as string | number,
+    unitExtension: 'per meter' as string,
+    unitExtensionType: 'per meter' as 'per meter' | 'per piece' | 'custom',
+    unitExtensionCustom: '' as string,
     gstRate: '' as string | number,
     hsnCode: '',
     images: [] as string[], // Deprecated - use media
@@ -246,7 +334,8 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       name: string;
       type: string;
       unit: string;
-      options: Array<{ id: string; value: string; priceModifier: number }>;
+      displayOrder: number;
+      options: Array<{ id: string; value: string; priceModifier: number; displayOrder: number }>;
     }>,
     status: 'active' as 'active' | 'inactive',
   });
@@ -278,6 +367,17 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
           basePrice: productData.basePrice || productData.price || 0,
           pricePerMeter: productData.pricePerMeter ?? productData.price ?? 0,
           designPrice: productData.designPrice || 0,
+          unitExtension: productData.plainProduct?.unitExtension || productData.unitExtension || 'per meter',
+          unitExtensionType: (() => {
+            const unit = productData.plainProduct?.unitExtension || productData.unitExtension || 'per meter';
+            if (unit === 'per meter' || unit === 'per piece') return unit;
+            return 'custom';
+          })() as 'per meter' | 'per piece' | 'custom',
+          unitExtensionCustom: (() => {
+            const unit = productData.plainProduct?.unitExtension || productData.unitExtension || 'per meter';
+            if (unit !== 'per meter' && unit !== 'per piece') return unit;
+            return '';
+          })(),
           gstRate: productData.gstRate ?? 0,
           hsnCode: productData.hsnCode || '',
           images: productData.images || [],
@@ -296,7 +396,14 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
           })) : [],
           detailSections: productData.detailSections || [],
           customFields: productData.customFields || [],
-          variants: productData.variants || [],
+          variants: (productData.variants || []).map((v: any, idx: number) => ({
+            ...v,
+            displayOrder: v.displayOrder !== undefined ? v.displayOrder : idx,
+            options: (v.options || []).map((opt: any, optIdx: number) => ({
+              ...opt,
+              displayOrder: opt.displayOrder !== undefined ? opt.displayOrder : optIdx,
+            })),
+          })),
           status: productData.status?.toLowerCase() === 'active' ? 'active' : 'inactive',
         });
       }
@@ -314,6 +421,9 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       basePrice: '' as string | number,
       pricePerMeter: '' as string | number,
       designPrice: '' as string | number,
+      unitExtension: 'per meter' as string,
+      unitExtensionType: 'per meter' as 'per meter' | 'per piece' | 'custom',
+      unitExtensionCustom: '' as string,
       gstRate: '' as string | number,
       hsnCode: '',
       images: [],
@@ -355,7 +465,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
         if (activeType === 'DESIGNED') {
           const num = typeof value === 'string' ? parseFloat(value) : Number(value);
           if (!value || isNaN(num) || num <= 0) {
-            return 'Design price must be greater than 0';
+            return 'Print price must be greater than 0';
           }
         }
         return '';
@@ -529,13 +639,15 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
         placeholder: field.placeholder,
         isRequired: field.isRequired
       })),
-      variants: formData.variants.map(variant => ({
+      variants: formData.variants.map((variant, idx) => ({
         name: variant.name,
         type: variant.type,
         unit: variant.unit,
-        options: variant.options.map(opt => ({
+        displayOrder: variant.displayOrder !== undefined ? variant.displayOrder : idx,
+        options: variant.options.map((opt, optIdx) => ({
           value: opt.value,
-          priceModifier: opt.priceModifier
+          priceModifier: opt.priceModifier,
+          displayOrder: opt.displayOrder !== undefined ? opt.displayOrder : optIdx
         }))
       })),
       status: formData.status,
@@ -544,10 +656,16 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
     // Keep a single selling price and mirror it to originalPrice for backend
     if (activeType === 'PLAIN') {
       const sellingPrice = formData.pricePerMeter;
+      // Determine unit extension value
+      const unitExtensionValue = formData.unitExtensionType === 'custom' 
+        ? formData.unitExtensionCustom 
+        : formData.unitExtensionType;
+      
       payload.plainProductId = formData.plainProductId || null;
       payload.price = sellingPrice;
       payload.pricePerMeter = sellingPrice;
       payload.originalPrice = sellingPrice;
+      payload.unitExtension = unitExtensionValue || 'per meter';
     } else if (activeType === 'DESIGNED') {
       const sellingPrice = formData.designPrice ?? formData.basePrice;
       payload.designPrice = formData.designPrice;
@@ -682,9 +800,71 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       name: '',
       type: '',
       unit: '',
+      displayOrder: formData.variants.length,
       options: [],
     };
     setFormData({ ...formData, variants: [...formData.variants, newVariant] });
+  };
+  
+  // Drag and drop handlers for variants
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleVariantDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setFormData((prev) => {
+        const oldIndex = prev.variants.findIndex((v) => v.id === active.id);
+        const newIndex = prev.variants.findIndex((v) => v.id === over.id);
+
+        const newVariants = arrayMove(prev.variants, oldIndex, newIndex);
+        // Update displayOrder values
+        const updatedVariants = newVariants.map((v, idx) => ({
+          ...v,
+          displayOrder: idx,
+        }));
+
+        return {
+          ...prev,
+          variants: updatedVariants,
+        };
+      });
+    }
+  };
+  
+  const handleOptionDragEnd = (event: DragEndEvent, variantId: string) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setFormData((prev) => {
+        const variant = prev.variants.find((v) => v.id === variantId);
+        if (!variant) return prev;
+
+        const oldIndex = variant.options.findIndex((opt) => opt.id === active.id);
+        const newIndex = variant.options.findIndex((opt) => opt.id === over.id);
+
+        const newOptions = arrayMove(variant.options, oldIndex, newIndex);
+        // Update displayOrder values
+        const updatedOptions = newOptions.map((opt, idx) => ({
+          ...opt,
+          displayOrder: idx,
+        }));
+
+        return {
+          ...prev,
+          variants: prev.variants.map((v) =>
+            v.id === variantId
+              ? { ...v, options: updatedOptions }
+              : v
+          ),
+        };
+      });
+    }
   };
 
   const removeVariant = (id: string) => {
@@ -699,16 +879,19 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
   };
 
   const addVariantOption = (variantId: string) => {
-    const newOption = {
-      id: `vo-${Date.now()}`,
-      value: '',
-      priceModifier: 0,
-    };
     setFormData({
       ...formData,
       variants: formData.variants.map(v =>
         v.id === variantId
-          ? { ...v, options: [...v.options, newOption] }
+          ? { 
+              ...v, 
+              options: [...v.options, { 
+                id: `vo-${Date.now()}`, 
+                value: '', 
+                priceModifier: 0,
+                displayOrder: v.options.length
+              }] 
+            }
           : v
       )
     });
@@ -807,7 +990,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="p-price">
-                  {activeType === 'PLAIN' ? 'Price per Meter (₹) *' : activeType === 'DESIGNED' ? 'Design Price (₹) *' : 'Price (₹) *'}
+                  {activeType === 'PLAIN' ? 'Base Price (₹) *' : activeType === 'DESIGNED' ? 'Print Price (₹) *' : 'Price (₹) *'}
                 </Label>
                 <div className="relative">
                   <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -849,6 +1032,50 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                   <p className="text-xs text-muted-foreground">Enter a valid price greater than 0</p>
                 )}
               </div>
+              {activeType === 'PLAIN' && (
+                <div className="space-y-2">
+                  <Label htmlFor="p-unit-extension">Unit Extension *</Label>
+                  <Select
+                    value={formData.unitExtensionType}
+                    onValueChange={(value: 'per meter' | 'per piece' | 'custom') => {
+                      setFormData({
+                        ...formData,
+                        unitExtensionType: value,
+                        unitExtension: value === 'custom' ? formData.unitExtensionCustom : value,
+                      });
+                    }}
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Select unit extension" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="per meter">Per Meter</SelectItem>
+                      <SelectItem value="per piece">Per Piece</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {formData.unitExtensionType === 'custom' && (
+                    <Input
+                      id="p-unit-custom"
+                      type="text"
+                      placeholder="e.g., per yard, per kg"
+                      className="h-11"
+                      value={formData.unitExtensionCustom}
+                      onChange={(e) => {
+                        const customValue = e.target.value;
+                        setFormData({
+                          ...formData,
+                          unitExtensionCustom: customValue,
+                          unitExtension: customValue,
+                        });
+                      }}
+                    />
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Choose how the price unit is displayed (e.g., "per meter", "per piece", or enter a custom unit)
+                  </p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="p-gst">GST Rate (%)</Label>
                 <Input 
@@ -1318,9 +1545,19 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                 Add Variant
               </Button>
             </div>
-            <div className="space-y-4">
-              {formData.variants.map((variant) => (
-                <div key={variant.id} className="p-4 border border-border rounded-lg space-y-3">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleVariantDragEnd}
+            >
+              <SortableContext
+                items={formData.variants.map((v) => v.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-4">
+                  {formData.variants.map((variant) => (
+                    <SortableVariantItem key={variant.id} id={variant.id}>
+                      <div className="p-4 border border-border rounded-lg space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm">Variant</Label>
                     <Button
@@ -1375,55 +1612,73 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                         Add Option
                       </Button>
                     </div>
-                    {variant.options.map((option) => (
-                      <div key={option.id} className="flex gap-2 items-end p-3 border border-border rounded-lg">
-                        <div className="flex-1">
-                          <Label className="text-xs">Option Value *</Label>
-                          <Input
-                            value={option.value}
-                            onChange={(e) => updateVariantOption(variant.id, option.id, { value: e.target.value })}
-                            placeholder="e.g. Small, Medium, Large"
-                            className="h-9"
-                          />
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(e) => handleOptionDragEnd(e, variant.id)}
+                    >
+                      <SortableContext
+                        items={variant.options.map((opt) => opt.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-2">
+                          {variant.options.map((option) => (
+                            <SortableOptionItem key={option.id} id={option.id}>
+                              <div className="flex gap-2 items-end p-3 border border-border rounded-lg">
+                                <div className="flex-1">
+                                  <Label className="text-xs">Option Value *</Label>
+                                  <Input
+                                    value={option.value}
+                                    onChange={(e) => updateVariantOption(variant.id, option.id, { value: e.target.value })}
+                                    placeholder="e.g. Small, Medium, Large"
+                                    className="h-9"
+                                  />
+                                </div>
+                                <div className="w-32">
+                                  <Label className="text-xs">Price Impact (₹)</Label>
+                                  <div className="relative">
+                                    <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                    <Input
+                                      type="number"
+                                      value={option.priceModifier}
+                                      onChange={(e) => updateVariantOption(variant.id, option.id, { priceModifier: parseFloat(e.target.value) || 0 })}
+                                      placeholder="0"
+                                      className="h-9 pl-8"
+                                    />
+                                  </div>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeVariantOption(variant.id, option.id)}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </SortableOptionItem>
+                          ))}
+                          {variant.options.length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-2">
+                              No options added. Click "Add Option" to create one.
+                            </p>
+                          )}
                         </div>
-                        <div className="w-32">
-                          <Label className="text-xs">Price Impact (₹)</Label>
-                          <div className="relative">
-                            <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                            <Input
-                              type="number"
-                              value={option.priceModifier}
-                              onChange={(e) => updateVariantOption(variant.id, option.id, { priceModifier: parseFloat(e.target.value) || 0 })}
-                              placeholder="0"
-                              className="h-9 pl-8"
-                            />
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeVariantOption(variant.id, option.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    {variant.options.length === 0 && (
-                      <p className="text-xs text-muted-foreground text-center py-2">
-                        No options added. Click "Add Option" to create one.
-                      </p>
-                    )}
+                      </SortableContext>
+                    </DndContext>
                   </div>
+                      </div>
+                    </SortableVariantItem>
+                  ))}
+                  {formData.variants.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No variants added. Click "Add Variant" to create one.
+                    </p>
+                  )}
                 </div>
-              ))}
-              {formData.variants.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No variants added. Click "Add Variant" to create one.
-                </p>
-              )}
-            </div>
+              </SortableContext>
+            </DndContext>
           </section>
 
           {/* Step 7: Media Gallery (Images & Videos) */}

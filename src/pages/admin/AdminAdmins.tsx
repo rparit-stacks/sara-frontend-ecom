@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Edit, Trash2, Eye, EyeOff, User, Mail, Calendar, Loader2, X } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Eye, EyeOff, User, Mail, Calendar, Loader2, X, Mail as MailIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { motion } from 'framer-motion';
@@ -14,10 +14,11 @@ import { adminManagementApi } from '@/lib/api';
 
 const AdminAdmins = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState<any>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
   const queryClient = useQueryClient();
   
   // Form state
@@ -46,6 +47,20 @@ const AdminAdmins = () => {
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to create admin');
+    },
+  });
+  
+  // Send invite mutation
+  const sendInviteMutation = useMutation({
+    mutationFn: (email: string) => adminManagementApi.sendInvite(email),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminAdmins'] });
+      toast.success('Invitation sent successfully!');
+      setIsInviteDialogOpen(false);
+      setInviteEmail('');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to send invitation');
     },
   });
   
@@ -98,6 +113,14 @@ const AdminAdmins = () => {
       email: '',
       status: 'ACTIVE',
     });
+  };
+  
+  const handleSendInvite = () => {
+    if (!inviteEmail.trim()) {
+      toast.error('Please enter an email address');
+      return;
+    }
+    sendInviteMutation.mutate(inviteEmail.trim());
   };
   
   const handleCreate = () => {
@@ -177,75 +200,56 @@ const AdminAdmins = () => {
             <h1 className="font-cursive text-3xl sm:text-4xl">Admin Users</h1>
             <p className="text-muted-foreground mt-1">Manage admin accounts and permissions</p>
           </div>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
             <DialogTrigger asChild>
               <Button className="btn-primary gap-2">
-                <Plus className="w-4 h-4" />
-                Add Admin
+                <MailIcon className="w-4 h-4" />
+                Send Invite
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>Create New Admin</DialogTitle>
+                <DialogTitle>Send Admin Invitation</DialogTitle>
+                <DialogDescription>
+                  Enter the email address to send an admin invitation. The recipient will receive a secure link to create their admin account.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-4">
                 <div>
-                  <Label>Username *</Label>
-                  <Input
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    placeholder="Enter username"
-                  />
-                </div>
-                <div>
-                  <Label>Password *</Label>
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? 'text' : 'password'}
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      placeholder="Enter password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <Label>Name *</Label>
-                  <Input
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Enter full name"
-                  />
-                </div>
-                <div>
-                  <Label>Email *</Label>
+                  <Label>Email Address *</Label>
                   <Input
                     type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="Enter email"
+                    placeholder="Enter email address"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="mt-1"
+                    required
+                    disabled={sendInviteMutation.isPending}
                   />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button
-                    onClick={handleCreate}
-                    disabled={createMutation.isPending}
+                    onClick={handleSendInvite}
+                    disabled={sendInviteMutation.isPending || !inviteEmail.trim()}
                     className="flex-1"
                   >
-                    {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create'}
+                    {sendInviteMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...
+                      </>
+                    ) : (
+                      <>
+                        <MailIcon className="w-4 h-4 mr-2" /> Send Invitation
+                      </>
+                    )}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => {
-                      setIsCreateDialogOpen(false);
-                      resetForm();
+                      setIsInviteDialogOpen(false);
+                      setInviteEmail('');
                     }}
+                    disabled={sendInviteMutation.isPending}
                   >
                     Cancel
                   </Button>

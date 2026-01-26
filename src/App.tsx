@@ -31,6 +31,7 @@ import OrderDetail from "./pages/OrderDetail";
 import OrderConfirmation from "./pages/OrderConfirmation";
 import TestimonialSubmit from "./pages/TestimonialSubmit";
 import AuthCallback from "./pages/AuthCallback";
+import AdminInvite from "./pages/admin/AdminInvite";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
@@ -100,6 +101,7 @@ const App = () => (
           
           {/* Admin Routes */}
           <Route path="/admin-sara/login" element={<AdminLogin />} />
+          <Route path="/admin-sara/invite/:token" element={<AdminInvite />} />
           <Route 
             path="/admin-sara" 
             element={

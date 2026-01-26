@@ -45,6 +45,10 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
   
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+    // Log token info for debugging (first 20 chars only)
+    console.log(`[API] Token being sent: ${token.substring(0, 20)}... (length: ${token.length})`);
+  } else {
+    console.warn(`[API] No token available for endpoint: ${endpoint}`);
   }
   
   // Log API call
@@ -79,6 +83,8 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
         status: response.status,
         error,
         duration: `${duration}ms`,
+        hasToken: !!token,
+        tokenPreview: token ? `${token.substring(0, 20)}...` : 'none',
       });
       
       // Ensure minimum duration before hiding loading
@@ -88,6 +94,12 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
           await new Promise(resolve => setTimeout(resolve, remaining));
         }
         setGlobalLoading(false);
+      }
+      
+      // For 401 errors, don't throw immediately - let the caller handle it
+      if (response.status === 401) {
+        const errorObj = { status: 401, message: error || 'Unauthorized', response };
+        throw errorObj;
       }
       
       throw new Error(error || `API Error: ${response.status}`);
@@ -207,6 +219,14 @@ export const productsApi = {
   },
   createFromUpload: (data: any) => fetchApi<any>('/api/products/create-from-upload', { method: 'POST', body: JSON.stringify(data) }),
   uploadMedia: async (files: File[], folder: string = 'products'): Promise<any[]> => {
+    // Client-side file size validation (10MB)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error(`File "${file.name}" exceeds 10MB limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB. Maximum allowed: 10MB`);
+      }
+    }
+    
     const formData = new FormData();
     files.forEach(file => {
       formData.append('files', file);
@@ -223,12 +243,28 @@ export const productsApi = {
     });
     
     if (!response.ok) {
-      const error = await response.text();
-      console.error('[Product Media Upload] Error:', error);
-      throw new Error(error || 'Failed to upload media');
+      try {
+        const errorData = await response.json();
+        if (errorData.source === 'cloudinary') {
+          throw new Error(`Cloudinary error: ${errorData.error || 'Upload failed'}`);
+        } else if (errorData.source === 'validation') {
+          throw new Error(`File validation error: ${errorData.error || 'File validation failed'}`);
+        } else {
+          throw new Error(`Upload failed: ${errorData.error || 'Unknown error'}`);
+        }
+      } catch (e) {
+        const errorText = await response.text();
+        console.error('[Product Media Upload] Error:', errorText);
+        throw new Error(errorText || 'Failed to upload media');
+      }
     }
     
     const data = await response.json();
+    if (data.errors && data.errors.length > 0) {
+      // Some files failed, but some succeeded
+      const errorMessages = data.errors.join(', ');
+      throw new Error(`Some files failed to upload: ${errorMessages}`);
+    }
     console.log('[Product Media Upload] Success:', data);
     return data.files || [];
   },
@@ -256,6 +292,14 @@ export const customProductsApi = {
     return fetchApi<void>(url, { method: 'DELETE' });
   },
   uploadMedia: async (files: File[], folder: string = 'products'): Promise<any[]> => {
+    // Client-side file size validation (10MB)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error(`File "${file.name}" exceeds 10MB limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB. Maximum allowed: 10MB`);
+      }
+    }
+    
     const formData = new FormData();
     files.forEach(file => {
       formData.append('files', file);
@@ -273,12 +317,28 @@ export const customProductsApi = {
     });
     
     if (!response.ok) {
-      const error = await response.text();
-      console.error('[Custom Product Media Upload] Error:', error);
-      throw new Error(error || 'Failed to upload media');
+      try {
+        const errorData = await response.json();
+        if (errorData.source === 'cloudinary') {
+          throw new Error(`Cloudinary error: ${errorData.error || 'Upload failed'}`);
+        } else if (errorData.source === 'validation') {
+          throw new Error(`File validation error: ${errorData.error || 'File validation failed'}`);
+        } else {
+          throw new Error(`Upload failed: ${errorData.error || 'Unknown error'}`);
+        }
+      } catch (e) {
+        const errorText = await response.text();
+        console.error('[Custom Product Media Upload] Error:', errorText);
+        throw new Error(errorText || 'Failed to upload media');
+      }
     }
     
     const data = await response.json();
+    if (data.errors && data.errors.length > 0) {
+      // Some files failed, but some succeeded
+      const errorMessages = data.errors.join(', ');
+      throw new Error(`Some files failed to upload: ${errorMessages}`);
+    }
     console.log('[Custom Product Media Upload] Success:', data);
     return data.files || [];
   },
@@ -338,6 +398,12 @@ export const categoriesApi = {
   update: (id: number, data: any) => fetchApi<any>(`/api/admin/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) => fetchApi<void>(`/api/admin/categories/${id}`, { method: 'DELETE' }),
   uploadImage: async (file: File): Promise<string> => {
+    // Client-side file size validation (10MB)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error(`File size exceeds 10MB limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB. Maximum allowed: 10MB`);
+    }
+    
     const formData = new FormData();
     formData.append('file', file);
     const token = localStorage.getItem('adminToken');
@@ -348,9 +414,20 @@ export const categoriesApi = {
       body: formData,
     });
     if (!response.ok) {
-      const error = await response.text();
-      console.error('[Category Image Upload] Error:', error);
-      throw new Error(error || 'Failed to upload image');
+      try {
+        const errorData = await response.json();
+        if (errorData.source === 'cloudinary') {
+          throw new Error(`Cloudinary error: ${errorData.error || 'Upload failed'}`);
+        } else if (errorData.source === 'validation') {
+          throw new Error(`File validation error: ${errorData.error || 'File validation failed'}`);
+        } else {
+          throw new Error(`Upload failed: ${errorData.error || 'Unknown error'}`);
+        }
+      } catch (e) {
+        const errorText = await response.text();
+        console.error('[Category Image Upload] Error:', errorText);
+        throw new Error(errorText || 'Failed to upload image');
+      }
     }
     const data = await response.json();
     console.log('[Category Image Upload] Success:', data.url);
@@ -369,7 +446,6 @@ export const cmsApi = {
   getOffers: () => fetchApi<any[]>('/api/cms/offers'),
   getInstagram: () => fetchApi<Array<{ imageUrl: string; linkUrl?: string }>>('/api/cms/instagram'),
   getBanners: () => fetchApi<any[]>('/api/cms/banners'),
-  getLandingContent: () => fetchApi<Record<string, string>>('/api/cms/landing'),
   getContactInfo: () => fetchApi<Record<string, string>>('/api/cms/contact'),
   getHomepageBlogs: () => fetchApi<any[]>('/api/cms/homepage-blogs'),
   
@@ -397,7 +473,6 @@ export const cmsApi = {
   updateBanner: (id: number, data: any) => fetchApi<any>(`/api/admin/cms/banners/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteBanner: (id: number) => fetchApi<void>(`/api/admin/cms/banners/${id}`, { method: 'DELETE' }),
   
-  setLandingContent: (content: Record<string, string>) => fetchApi<void>('/api/admin/cms/landing', { method: 'PUT', body: JSON.stringify({ content }) }),
   setContactInfo: (content: Record<string, string>) => fetchApi<void>('/api/admin/cms/contact', { method: 'PUT', body: JSON.stringify({ content }) }),
 };
 
@@ -451,6 +526,12 @@ export const contactApi = {
 // ===============================
 export const mediaApi = {
   upload: async (file: File, folder: string = 'banners'): Promise<string> => {
+    // Client-side file size validation (10MB)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error(`File size exceeds 10MB limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB. Maximum allowed: 10MB`);
+    }
+    
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folder', folder);
@@ -464,8 +545,20 @@ export const mediaApi = {
     });
     
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || 'Failed to upload image');
+      try {
+        const errorData = await response.json();
+        if (errorData.source === 'cloudinary') {
+          throw new Error(`Cloudinary error: ${errorData.error || 'Upload failed'}`);
+        } else if (errorData.source === 'validation') {
+          throw new Error(`File validation error: ${errorData.error || 'File validation failed'}`);
+        } else {
+          throw new Error(`Upload failed: ${errorData.error || 'Unknown error'}`);
+        }
+      } catch (e) {
+        // If response is not JSON, try text
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to upload image');
+      }
     }
     
     const data = await response.json();
@@ -478,6 +571,25 @@ export const mediaApi = {
   },
   
   delete: (imageUrl: string) => fetchApi<{ message: string }>(`/api/admin/media/delete?url=${encodeURIComponent(imageUrl)}`, { method: 'DELETE' }),
+  
+  bulkDelete: async (urls: string[]): Promise<{ success: string[]; failed: Array<{ url: string; error: string }> }> => {
+    const token = localStorage.getItem('adminToken');
+    const response = await fetch(`${API_BASE_URL}/api/admin/media/bulk-delete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ urls }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || 'Failed to delete images');
+    }
+    
+    return await response.json();
+  },
 };
 
 // ===============================
@@ -723,6 +835,7 @@ export const adminAuthApi = {
 // ===============================
 export const adminUsersApi = {
   getAll: (status?: string) => fetchApi<any[]>(`/api/admin/users${status ? `?status=${status}` : ''}`),
+  getByEmail: (email: string) => fetchApi<any>(`/api/admin/users/${encodeURIComponent(email)}`),
   updateStatus: (email: string, status: string) => 
     fetchApi<any>(`/api/admin/users/${encodeURIComponent(email)}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
 };
@@ -745,6 +858,12 @@ export const adminManagementApi = {
   updateStatus: (id: number, status: string) => 
     fetchApi<any>(`/api/admin/admins/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
   delete: (id: number) => fetchApi<void>(`/api/admin/admins/${id}`, { method: 'DELETE' }),
+  sendInvite: (email: string) => 
+    fetchApi<any>('/api/admin/admins/invite', { method: 'POST', body: JSON.stringify({ email }) }),
+  getInviteByToken: (token: string) => 
+    fetchApi<any>(`/api/admin/admins/invite/${token}`),
+  acceptInvite: (data: { token: string; name: string; password: string; confirmPassword: string }) =>
+    fetchApi<any>('/api/admin/admins/invite/accept', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ===============================

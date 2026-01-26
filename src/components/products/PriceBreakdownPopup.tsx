@@ -28,6 +28,10 @@ interface PriceBreakdownPopupProps {
     pricePerMeter?: number;
     price?: number;
     variants?: any[];
+    plainProduct?: {
+      unitExtension?: string;
+    };
+    unitExtension?: string;
   };
   selectedVariants?: Record<string, string>;
   fabricQuantity?: number;
@@ -197,6 +201,22 @@ export const PriceBreakdownPopup = ({
 
   const breakdown = calculateBreakdown();
   
+  // Get unit extension for PLAIN products
+  const getUnitExtension = () => {
+    if (item.productType === 'PLAIN') {
+      const unitExtension = effectiveProductData?.plainProduct?.unitExtension || 
+                           effectiveProductData?.unitExtension || 
+                           'per meter';
+      return unitExtension;
+    }
+    return 'per meter'; // Default for DESIGNED products
+  };
+  
+  const getUnitName = () => {
+    const unitExtension = getUnitExtension();
+    return unitExtension.replace(/^per\s+/i, '').trim() || 'meter';
+  };
+  
   if (!breakdown) return null;
 
   return (
@@ -216,7 +236,7 @@ export const PriceBreakdownPopup = ({
                 {item.productName}
                 {breakdown.quantity && breakdown.quantity > 1 && (
                   <span className="text-muted-foreground font-normal ml-2">
-                    × {breakdown.quantity} {item.productType === 'DESIGNED' ? 'meter' : item.productType === 'PLAIN' ? 'meter' : 'item'}{breakdown.quantity !== 1 ? 's' : ''}
+                    × {breakdown.quantity} {item.productType === 'DESIGNED' ? 'meter' : item.productType === 'PLAIN' ? getUnitName() : 'item'}{breakdown.quantity !== 1 ? 's' : ''}
                   </span>
                 )}
               </h4>
@@ -227,9 +247,9 @@ export const PriceBreakdownPopup = ({
                 <div className="space-y-4">
                   {/* Horizontal Price Breakdown */}
                   <div className="flex items-baseline gap-3 sm:gap-4 flex-wrap">
-                    {/* Design Price */}
+                    {/* Print Price */}
                     <div className="flex flex-col">
-                      <p className="text-xs sm:text-sm text-muted-foreground mb-1">Design Price</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-1">Print Price</p>
                       <span className="font-semibold text-base sm:text-lg text-primary">{format(breakdown.basePrice)}</span>
                     </div>
                     
@@ -303,7 +323,7 @@ export const PriceBreakdownPopup = ({
               <>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between items-center py-2 border-b border-border/50">
-                    <span className="text-muted-foreground font-medium">Base Price per Meter</span>
+                    <span className="text-muted-foreground font-medium">Base Price {getUnitExtension()}</span>
                     <span className="font-semibold text-base">{format(breakdown.basePrice)}</span>
                   </div>
                   
@@ -323,7 +343,7 @@ export const PriceBreakdownPopup = ({
                   
                   {breakdown.quantity > 1 && (
                     <div className="text-center text-xs text-muted-foreground pt-2">
-                      Price: {format(breakdown.pricePerMeter || 0)}/meter × {breakdown.quantity} meter{breakdown.quantity !== 1 ? 's' : ''}
+                      Price: {format(breakdown.pricePerMeter || 0)}/{getUnitName()} × {breakdown.quantity} {getUnitName()}{breakdown.quantity !== 1 ? 's' : ''}
                     </div>
                   )}
                 </div>

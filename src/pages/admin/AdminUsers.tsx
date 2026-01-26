@@ -3,20 +3,30 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Eye, EyeOff, Mail, Calendar, Loader2 } from 'lucide-react';
+import { Search, Eye, EyeOff, Mail, Calendar, Loader2, User, Phone, MapPin, Building, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { adminUsersApi } from '@/lib/api';
 
 const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   
   // Fetch users from API
   const { data: users = [], isLoading, error } = useQuery({
     queryKey: ['adminUsers'],
     queryFn: () => adminUsersApi.getAll(),
+  });
+  
+  // Fetch detailed user data when dialog opens
+  const { data: userDetails, isLoading: detailsLoading } = useQuery({
+    queryKey: ['adminUserDetails', selectedUser?.email],
+    queryFn: () => adminUsersApi.getByEmail(selectedUser.email),
+    enabled: !!selectedUser?.email && isDetailDialogOpen,
   });
   
   // Update status mutation
@@ -35,6 +45,11 @@ const AdminUsers = () => {
   const toggleUserStatus = (user: any) => {
     const newStatus = user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     updateStatusMutation.mutate({ email: user.email, status: newStatus });
+  };
+  
+  const handleViewDetails = (user: any) => {
+    setSelectedUser(user);
+    setIsDetailDialogOpen(true);
   };
   
   // Filter users
@@ -181,8 +196,18 @@ const AdminUsers = () => {
                             variant="ghost" 
                             size="icon" 
                             className="h-9 w-9"
+                            onClick={() => handleViewDetails(user)}
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-9 w-9"
                             onClick={() => toggleUserStatus(user)}
                             disabled={updateStatusMutation.isPending}
+                            title={user.status === 'ACTIVE' ? 'Deactivate User' : 'Activate User'}
                           >
                             {user.status === 'ACTIVE' ? (
                               <EyeOff className="w-4 h-4" />
@@ -199,6 +224,214 @@ const AdminUsers = () => {
             </table>
           </div>
         </div>
+        
+        {/* User Detail Dialog */}
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">User Details</DialogTitle>
+              <DialogDescription>
+                Complete information about the user account
+              </DialogDescription>
+            </DialogHeader>
+            
+            {detailsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : userDetails ? (
+              <div className="space-y-6 mt-4">
+                {/* Basic Information */}
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                    <User className="w-5 h-5 text-primary" />
+                    Basic Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Email</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Mail className="w-4 h-4 text-muted-foreground" />
+                        <p className="font-medium">{userDetails.email || '-'}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Full Name</label>
+                      <p className="font-medium mt-1">
+                        {userDetails.firstName || userDetails.lastName 
+                          ? `${userDetails.firstName || ''} ${userDetails.lastName || ''}`.trim() 
+                          : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">First Name</label>
+                      <p className="font-medium mt-1">{userDetails.firstName || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Last Name</label>
+                      <p className="font-medium mt-1">{userDetails.lastName || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Phone Number</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Phone className="w-4 h-4 text-muted-foreground" />
+                        <p className="font-medium">{userDetails.phoneNumber || '-'}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Auth Provider</label>
+                      <Badge className="mt-1" variant="outline">
+                        {userDetails.authProvider || '-'}
+                      </Badge>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Email Verified</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        {userDetails.emailVerified ? (
+                          <>
+                            <CheckCircle className="w-4 h-4 text-green-600" />
+                            <span className="text-green-600 font-medium">Verified</span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-4 h-4 text-red-600" />
+                            <span className="text-red-600 font-medium">Not Verified</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Status</label>
+                      <Badge 
+                        className={`mt-1 ${
+                          userDetails.status === 'ACTIVE' 
+                            ? 'bg-green-100 text-green-700' 
+                            : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {userDetails.status?.toLowerCase() || 'active'}
+                      </Badge>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">OAuth Provider ID</label>
+                      <p className="font-medium mt-1 text-sm break-all">{userDetails.oauthProviderId || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Account Created</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Calendar className="w-4 h-4 text-muted-foreground" />
+                        <p className="font-medium">
+                          {userDetails.createdAt 
+                            ? new Date(userDetails.createdAt).toLocaleString() 
+                            : '-'}
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Last Updated</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Calendar className="w-4 h-4 text-muted-foreground" />
+                        <p className="font-medium">
+                          {userDetails.updatedAt 
+                            ? new Date(userDetails.updatedAt).toLocaleString() 
+                            : '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Legacy Address (if exists) */}
+                {(userDetails.address || userDetails.city || userDetails.state) && (
+                  <div className="bg-muted/50 rounded-lg p-4">
+                    <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                      <MapPin className="w-5 h-5 text-primary" />
+                      Legacy Address
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="text-sm font-medium text-muted-foreground">Address</label>
+                        <p className="font-medium mt-1">{userDetails.address || '-'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">City</label>
+                        <p className="font-medium mt-1">{userDetails.city || '-'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">State</label>
+                        <p className="font-medium mt-1">{userDetails.state || '-'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">Zip Code</label>
+                        <p className="font-medium mt-1">{userDetails.zipCode || '-'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">Country</label>
+                        <p className="font-medium mt-1">{userDetails.country || '-'}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Saved Addresses */}
+                {userDetails.addresses && userDetails.addresses.length > 0 && (
+                  <div className="bg-muted/50 rounded-lg p-4">
+                    <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                      <Building className="w-5 h-5 text-primary" />
+                      Saved Addresses ({userDetails.addresses.length})
+                    </h3>
+                    <div className="space-y-4">
+                      {userDetails.addresses.map((addr: any, index: number) => (
+                        <div key={addr.id} className="bg-white rounded-lg p-4 border border-border">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold">
+                                  {addr.firstName} {addr.lastName}
+                                </h4>
+                                {addr.isDefault && (
+                                  <Badge className="bg-primary text-white">Default</Badge>
+                                )}
+                                {addr.addressType && (
+                                  <Badge variant="outline">{addr.addressType}</Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Phone className="w-3 h-3" />
+                                {addr.phoneNumber}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-1 text-sm">
+                            <p className="font-medium">{addr.address}</p>
+                            {addr.landmark && (
+                              <p className="text-muted-foreground">Landmark: {addr.landmark}</p>
+                            )}
+                            <p className="text-muted-foreground">
+                              {addr.city}, {addr.state} {addr.zipCode}
+                            </p>
+                            <p className="text-muted-foreground">{addr.country}</p>
+                            {addr.gstin && (
+                              <p className="text-muted-foreground">GSTIN: {addr.gstin}</p>
+                            )}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                              <Calendar className="w-3 h-3" />
+                              Created: {addr.createdAt ? new Date(addr.createdAt).toLocaleDateString() : '-'}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Failed to load user details
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );

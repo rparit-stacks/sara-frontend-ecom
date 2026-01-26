@@ -293,9 +293,9 @@ const Contact = () => {
                 <h2 className="font-cursive text-3xl lg:text-4xl mb-8">Contact Information</h2>
                 <div className="space-y-6">
                   {[
-                    { icon: Mail, title: 'Email', text: contactInfo?.email || 'hello@studiosara.in', key: 'email' },
-                    { icon: Phone, title: 'Phone', text: contactInfo?.phone || '+91 98765 43210', key: 'phone' },
-                    { icon: MapPin, title: 'Address', text: contactInfo?.address || '123 Fashion Street, Mumbai, MH 400001', key: 'address' },
+                    { icon: Mail, title: 'Email', text: contactInfo?.email || 'Email not set', key: 'email' },
+                    { icon: Phone, title: 'Phone', text: contactInfo?.phone || 'Phone not set', key: 'phone' },
+                    { icon: MapPin, title: 'Address', text: contactInfo?.address || 'Address not set', key: 'address' },
                   ].map(item => (
                     <div key={item.key} className="flex gap-5">
                       <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">

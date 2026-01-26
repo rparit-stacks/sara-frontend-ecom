@@ -111,7 +111,6 @@ const PlainProductSelectionPopup: React.FC<PlainProductSelectionPopupProps> = ({
                 }
               }}
               className="pl-9 sm:pl-10 pr-9 sm:pr-10 h-10 sm:h-12 text-sm sm:text-base"
-              autoFocus
             />
             {searchQuery && (
               <button

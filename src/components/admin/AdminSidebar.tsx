@@ -2,8 +2,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Package, 
-  Palette, 
-  Image, 
   FileText, 
   Users, 
   FolderTree,
@@ -35,16 +33,6 @@ const adminMenuItems = [
     icon: Package, 
     label: 'Products', 
     path: '/admin-sara/products' 
-  },
-  { 
-    icon: Image, 
-    label: 'Designs', 
-    path: '/admin-sara/products?type=DESIGNED' 
-  },
-  { 
-    icon: Palette, 
-    label: 'Fabrics', 
-    path: '/admin-sara/products?type=PLAIN' 
   },
   { 
     icon: FileText, 

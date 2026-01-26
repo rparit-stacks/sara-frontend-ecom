@@ -9,14 +9,12 @@ import { adminAuthApi } from '@/lib/api';
 const AdminLogin = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [authCode, setAuthCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Check if already logged in
   useEffect(() => {
@@ -64,6 +62,7 @@ const AdminLogin = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage(null); // Clear previous error
     
     try {
       console.log('[Admin Login] Attempting login with email:', email);
@@ -79,30 +78,13 @@ const AdminLogin = () => {
       navigate(from, { replace: true });
     } catch (error: any) {
       console.error('[Admin Login] Login failed:', error);
-      toast.error(error.message || 'Invalid credentials');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    try {
-      console.log('[Admin Signup] Attempting signup with email:', email);
-      const response = await adminAuthApi.signup(email, password, name, authCode);
-      localStorage.setItem('adminToken', response.token);
-      localStorage.setItem('adminUser', JSON.stringify(response.admin));
-      localStorage.setItem('adminLoginTime', Date.now().toString());
-      console.log('[Admin Signup] Signup successful, token saved, session started');
-      toast.success('Account created successfully!');
-      
-      // Redirect to dashboard
-      navigate('/admin-sara', { replace: true });
-    } catch (error: any) {
-      console.error('[Admin Signup] Signup failed:', error);
-      toast.error(error.message || 'Failed to create account');
+      // Show inline error instead of toast for wrong password
+      const errorMsg = error.message || 'Invalid credentials';
+      if (errorMsg.toLowerCase().includes('password') || errorMsg.toLowerCase().includes('wrong') || errorMsg.toLowerCase().includes('invalid')) {
+        setErrorMessage('You have entered wrong password');
+      } else {
+        setErrorMessage(errorMsg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -131,163 +113,72 @@ const AdminLogin = () => {
       </div>
 
       <div className="relative z-10 w-full max-w-md mx-auto px-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="bg-card/95 backdrop-blur-md p-8 rounded-2xl border border-white/20 shadow-2xl hover:shadow-primary/20 transition-shadow duration-300">
+        <div className="bg-white/95 backdrop-blur-md p-8 rounded-2xl border border-border shadow-2xl hover:shadow-primary/20 transition-shadow duration-300">
           <div className="text-center mb-8">
             <div className="mb-4 flex justify-center">
               <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary/30">
                 <Key className="w-8 h-8 text-primary" />
               </div>
             </div>
-            <h1 className="font-cursive text-3xl md:text-4xl mb-2 text-white drop-shadow-lg">
-              Admin <span className="text-primary">{activeTab === 'login' ? 'Login' : 'Sign Up'}</span>
+            <h1 className="font-cursive text-3xl md:text-4xl mb-2 text-foreground">
+              Admin <span className="text-primary">Login</span>
             </h1>
-            <p className="text-white/90 text-sm">Secure access to the admin panel</p>
+            <p className="text-muted-foreground text-sm">Secure access to the admin panel</p>
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-2 mb-6 bg-white/10 rounded-lg p-1">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('login');
-                setEmail('');
-                setPassword('');
-                setName('');
-                setAuthCode('');
-              }}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                activeTab === 'login'
-                  ? 'bg-primary text-white'
-                  : 'text-white/70 hover:text-white'
-              }`}
-            >
-              Login
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('signup');
-                setEmail('');
-                setPassword('');
-                setName('');
-                setAuthCode('');
-              }}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                activeTab === 'signup'
-                  ? 'bg-primary text-white'
-                  : 'text-white/70 hover:text-white'
-              }`}
-            >
-              Sign Up
-            </button>
-          </div>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setErrorMessage(null); // Clear error when user types
+                }}
+                className="pl-10 h-12 bg-white border-border text-foreground placeholder:text-muted-foreground"
+                required
+                disabled={isLoading}
+              />
+            </div>
 
-          {activeTab === 'login' ? (
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-12 bg-white/90"
-                  required
-                  disabled={isLoading}
-                />
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setErrorMessage(null); // Clear error when user types
+                }}
+                className={`pl-10 pr-10 h-12 bg-white border-border text-foreground placeholder:text-muted-foreground ${
+                  errorMessage ? 'border-destructive' : ''
+                }`}
+                required
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+
+            {/* Inline Error Message */}
+            {errorMessage && (
+              <div className="text-destructive text-sm font-medium bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                {errorMessage}
               </div>
+            )}
 
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 h-12 bg-white/90"
-                  required
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-
-              <Button type="submit" className="w-full btn-primary h-12 text-base" disabled={isLoading}>
-                {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Signing In...</> : 'Sign In'}
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={handleSignup} className="space-y-5">
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Full Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="pl-10 h-12 bg-white/90"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-12 bg-white/90"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 h-12 bg-white/90"
-                  required
-                  disabled={isLoading}
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-
-              <div className="relative">
-                <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Authentication Code"
-                  value={authCode}
-                  onChange={(e) => setAuthCode(e.target.value)}
-                  className="pl-10 h-12 bg-white/90"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-
-              <Button type="submit" className="w-full btn-primary h-12 text-base" disabled={isLoading}>
-                {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating Account...</> : 'Create Account'}
-              </Button>
-            </form>
-          )}
+            <Button type="submit" className="w-full btn-primary h-12 text-base" disabled={isLoading}>
+              {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Signing In...</> : 'Sign In'}
+            </Button>
+          </form>
         </div>
       </div>
     </div>

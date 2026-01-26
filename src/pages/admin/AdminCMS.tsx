@@ -131,19 +131,6 @@ const AdminCMS = () => {
     },
   });
   
-  // Landing Content mutation
-  const saveLandingContentMutation = useMutation({
-    mutationFn: (content: Record<string, string>) => cmsApi.setLandingContent(content),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cmsHomepage'] });
-      queryClient.invalidateQueries({ queryKey: ['cms'] });
-      toast.success('Landing content saved successfully!');
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Failed to save landing content');
-    },
-  });
-  
   // Contact Info mutation
   const saveContactContentMutation = useMutation({
     mutationFn: (content: Record<string, string>) => cmsApi.setContactInfo(content),
@@ -218,12 +205,6 @@ const AdminCMS = () => {
   };
   
   // Local state for forms
-  const [landingPageContent, setLandingPageContent] = useState({
-    heroTitle: 'Exquisite Handcrafted Textiles',
-    heroSubtitle: 'Made in Jaipur, For the World',
-    heroDescription: 'Discover timeless artistry in every thread.',
-  });
-
   const [contactPageContent, setContactPageContent] = useState({
     email: 'contact@studiosara.com',
     phone: '+91 9876543210',
@@ -313,13 +294,6 @@ const AdminCMS = () => {
       }
       if (cmsData.content) {
         const content = cmsData.content;
-        if (content.hero) {
-          setLandingPageContent({
-            heroTitle: content.hero.title || '',
-            heroSubtitle: content.hero.subtitle || '',
-            heroDescription: content.hero.description || '',
-          });
-        }
         if (content.contact) {
           setContactPageContent({
             email: content.contact.email || '',
@@ -565,9 +539,6 @@ const AdminCMS = () => {
   const [isUploadingInstagram, setIsUploadingInstagram] = useState(false);
   const instagramFileInputRef = useRef<HTMLInputElement>(null);
 
-  const saveLandingContent = () => {
-    saveLandingContentMutation.mutate(landingPageContent);
-  };
 
   const saveContactContent = () => {
     saveContactContentMutation.mutate(contactPageContent);
@@ -604,7 +575,7 @@ const AdminCMS = () => {
           transition={{ delay: 0.1, duration: 0.3 }}
         >
           <Tabs defaultValue="best-sellers" className="w-full">
-            <TabsList className="grid w-full grid-cols-5 lg:grid-cols-9 gap-2 overflow-x-auto">
+            <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-2 overflow-x-auto">
               <TabsTrigger value="best-sellers" className="gap-2 whitespace-nowrap">
                 <Star className="w-4 h-4" />
                 <span className="hidden lg:inline">Best Sellers</span>
@@ -624,10 +595,6 @@ const AdminCMS = () => {
               <TabsTrigger value="instagram" className="gap-2 whitespace-nowrap">
                 <Instagram className="w-4 h-4" />
                 <span className="hidden lg:inline">Instagram</span>
-              </TabsTrigger>
-              <TabsTrigger value="landing" className="gap-2 whitespace-nowrap">
-                <Globe className="w-4 h-4" />
-                <span className="hidden lg:inline">Landing</span>
               </TabsTrigger>
               <TabsTrigger value="contact" className="gap-2 whitespace-nowrap">
                 <FileText className="w-4 h-4" />
@@ -1299,58 +1266,6 @@ const AdminCMS = () => {
               </motion.div>
             </TabsContent>
 
-            {/* Landing Page Editor */}
-            <TabsContent value="landing" className="mt-6">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="bg-white rounded-xl border border-border shadow-sm p-6 space-y-6"
-              >
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Hero Title</label>
-                  <Input
-                    value={landingPageContent.heroTitle}
-                    onChange={(e) => setLandingPageContent({ ...landingPageContent, heroTitle: e.target.value })}
-                    className="h-11"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Hero Subtitle</label>
-                  <Input
-                    value={landingPageContent.heroSubtitle}
-                    onChange={(e) => setLandingPageContent({ ...landingPageContent, heroSubtitle: e.target.value })}
-                    className="h-11"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Hero Description</label>
-                  <textarea
-                    value={landingPageContent.heroDescription}
-                    onChange={(e) => setLandingPageContent({ ...landingPageContent, heroDescription: e.target.value })}
-                    className="w-full min-h-[120px] px-3 py-2 border border-border rounded-lg resize-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Hero Image</label>
-                  <Input type="file" accept="image/*" className="h-11" />
-                </div>
-                <Button className="btn-primary gap-2" onClick={saveLandingContent} disabled={saveLandingContentMutation.isPending}>
-                  {saveLandingContentMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      Save Changes
-                    </>
-                  )}
-                </Button>
-              </motion.div>
-            </TabsContent>
-
             {/* Contact Page Editor */}
             <TabsContent value="contact" className="mt-6">
               <motion.div
@@ -1639,6 +1554,7 @@ const MediaManager = ({ onImageSelect }: { onImageSelect?: (url: string) => void
   const [selectedFolder, setSelectedFolder] = useState<string>('all');
   const [isUploading, setIsUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { data: mediaData, isLoading, refetch } = useQuery({
@@ -1650,12 +1566,58 @@ const MediaManager = ({ onImageSelect }: { onImageSelect?: (url: string) => void
     mutationFn: (url: string) => mediaApi.delete(url),
     onSuccess: () => {
       toast.success('Image deleted successfully!');
+      setSelectedImages(new Set());
       refetch();
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to delete image');
     },
   });
+  
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (urls: string[]) => mediaApi.bulkDelete(urls),
+    onSuccess: (result) => {
+      const successCount = result.success.length;
+      const failedCount = result.failed.length;
+      if (failedCount === 0) {
+        toast.success(`Successfully deleted ${successCount} image(s)!`);
+      } else {
+        toast.warning(`Deleted ${successCount} image(s), ${failedCount} failed`);
+      }
+      setSelectedImages(new Set());
+      refetch();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to delete images');
+    },
+  });
+  
+  const toggleImageSelection = (imageUrl: string) => {
+    setSelectedImages(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(imageUrl)) {
+        newSet.delete(imageUrl);
+      } else {
+        newSet.add(imageUrl);
+      }
+      return newSet;
+    });
+  };
+  
+  const selectAllImages = () => {
+    setSelectedImages(new Set(images.map((img: any) => img.url)));
+  };
+  
+  const deselectAllImages = () => {
+    setSelectedImages(new Set());
+  };
+  
+  const handleBulkDelete = () => {
+    if (selectedImages.size === 0) return;
+    if (confirm(`Are you sure you want to delete ${selectedImages.size} image(s)?`)) {
+      bulkDeleteMutation.mutate(Array.from(selectedImages));
+    }
+  };
   
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1696,9 +1658,56 @@ const MediaManager = ({ onImageSelect }: { onImageSelect?: (url: string) => void
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold mb-2">Media Manager</h3>
-          <p className="text-sm text-muted-foreground">Manage all images from Cloudinary</p>
+          <p className="text-sm text-muted-foreground">
+            Manage all images from Cloudinary
+            {selectedImages.size > 0 && (
+              <span className="ml-2 text-primary font-medium">{selectedImages.size} selected</span>
+            )}
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {selectedImages.size > 0 && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={deselectAllImages}
+                className="gap-2"
+              >
+                <X className="w-4 h-4" />
+                Deselect All
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkDelete}
+                disabled={bulkDeleteMutation.isPending}
+                className="gap-2"
+              >
+                {bulkDeleteMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete Selected ({selectedImages.size})
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+          {selectedImages.size === 0 && images.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={selectAllImages}
+              className="gap-2"
+            >
+              Select All
+            </Button>
+          )}
           <Select value={selectedFolder} onValueChange={setSelectedFolder}>
             <SelectTrigger className="w-[180px] h-11">
               <SelectValue />
@@ -1749,61 +1758,85 @@ const MediaManager = ({ onImageSelect }: { onImageSelect?: (url: string) => void
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {images.map((image: any, index: number) => (
-            <motion.div
-              key={image.publicId || index}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: index * 0.02, duration: 0.3 }}
-              className="group relative aspect-square rounded-lg overflow-hidden bg-muted border border-border cursor-pointer hover:border-primary transition-colors"
-              onClick={() => {
-                if (onImageSelect) {
-                  onImageSelect(image.url);
-                  toast.success('Image selected!');
-                } else {
-                  setSelectedImage(image.url);
-                  navigator.clipboard.writeText(image.url);
-                  toast.success('Image URL copied to clipboard!');
-                }
-              }}
-            >
-              <img
-                src={image.url}
-                alt={image.publicId || `Image ${index}`}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="h-8 w-8"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigator.clipboard.writeText(image.url);
-                      toast.success('URL copied!');
-                    }}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="destructive"
-                    className="h-8 w-8"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm('Are you sure you want to delete this image?')) {
-                        deleteMutation.mutate(image.url);
-                      }
-                    }}
-                    disabled={deleteMutation.isPending}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+          {images.map((image: any, index: number) => {
+            const isSelected = selectedImages.has(image.url);
+            return (
+              <motion.div
+                key={image.publicId || index}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.02, duration: 0.3 }}
+                className={`group relative aspect-square rounded-lg overflow-hidden bg-muted border-2 transition-colors ${
+                  isSelected ? 'border-primary ring-2 ring-primary' : 'border-border hover:border-primary'
+                }`}
+              >
+                <div
+                  className="absolute top-2 left-2 z-10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleImageSelection(image.url);
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleImageSelection(image.url)}
+                    className="w-5 h-5 rounded border-2 border-white bg-white/90 cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
+                  />
                 </div>
-              </div>
-            </motion.div>
-          ))}
+                <div
+                  className="w-full h-full cursor-pointer"
+                  onClick={() => {
+                    if (onImageSelect) {
+                      onImageSelect(image.url);
+                      toast.success('Image selected!');
+                    } else {
+                      setSelectedImage(image.url);
+                      navigator.clipboard.writeText(image.url);
+                      toast.success('Image URL copied to clipboard!');
+                    }
+                  }}
+                >
+                  <img
+                    src={image.url}
+                    alt={image.publicId || `Image ${index}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="h-8 w-8"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(image.url);
+                        toast.success('URL copied!');
+                      }}
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      className="h-8 w-8"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm('Are you sure you want to delete this image?')) {
+                          deleteMutation.mutate(image.url);
+                        }
+                      }}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       )}
       
