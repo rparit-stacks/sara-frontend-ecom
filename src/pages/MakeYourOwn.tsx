@@ -18,7 +18,9 @@ const MakeYourOwn = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [generatedMockups, setGeneratedMockups] = useState<Array<{ url: string; template: string; width: number; height: number }>>([]);
   const [originalDesignUrl, setOriginalDesignUrl] = useState<string | null>(null);
-  
+
+  const isLoggedIn = !!localStorage.getItem('authToken');
+
   // Get or create guest identifier for non-logged-in users
   const getGuestIdentifier = () => {
     const isLoggedIn = !!localStorage.getItem('authToken');
@@ -35,6 +37,7 @@ const MakeYourOwn = () => {
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (!isLoggedIn) return;
 
     // Validate file type
     const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
@@ -209,6 +212,21 @@ const MakeYourOwn = () => {
           </div>
 
           <div className="mt-8 xs:mt-10 sm:mt-12 lg:mt-16 xl:mt-20 max-w-5xl mx-auto">
+            {!isLoggedIn && (
+              <ScrollReveal>
+                <div className="mb-8 p-6 bg-primary/10 border border-primary/20 rounded-xl text-center space-y-4">
+                  <p className="text-base sm:text-lg text-foreground font-medium">
+                    Log in to upload your design so it can be saved to your cart or wishlist.
+                  </p>
+                  <Button
+                    onClick={() => navigate('/login', { state: { returnTo: '/make-your-own' } })}
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  >
+                    Log in
+                  </Button>
+                </div>
+              </ScrollReveal>
+            )}
             <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
               {/* Left: Upload Area */}
               <ScrollReveal direction="left">
@@ -236,7 +254,7 @@ const MakeYourOwn = () => {
                       <Button 
                         type="button" 
                         variant="outline" 
-                        disabled={isUploading || isGeneratingMockups}
+                        disabled={!isLoggedIn || isUploading || isGeneratingMockups}
                         onClick={() => fileInputRef.current?.click()}
                         className="h-11 xs:h-12 sm:h-14 px-4 xs:px-6 sm:px-8 lg:px-10 text-sm xs:text-base sm:text-lg rounded-xl sm:rounded-2xl cursor-pointer w-full"
                       >
@@ -317,7 +335,7 @@ const MakeYourOwn = () => {
                   <Button 
                     size="lg" 
                     onClick={handleProceed}
-                    disabled={!previewUrl || isUploading || isGeneratingMockups || createProductMutation.isPending || !customConfig || generatedMockups.length === 0}
+                    disabled={!isLoggedIn || !previewUrl || isUploading || isGeneratingMockups || createProductMutation.isPending || !customConfig || generatedMockups.length === 0}
                     className="w-full h-12 xs:h-14 sm:h-16 text-sm xs:text-base sm:text-lg lg:text-xl rounded-xl sm:rounded-2xl bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 shadow-lg sm:shadow-xl shadow-[#2b9d8f]/20"
                   >
                     {(isUploading || createProductMutation.isPending) ? (

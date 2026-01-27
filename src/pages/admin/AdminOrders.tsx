@@ -10,6 +10,7 @@ import { Search, Eye, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { orderApi } from '@/lib/api';
 import { formatPrice } from '@/lib/currency';
+import { getPaymentStatusDisplay } from '@/lib/orderUtils';
 
 const AdminOrders = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,17 +40,6 @@ const AdminOrders = () => {
       SHIPPED: { label: 'Shipped', className: 'bg-indigo-100 text-indigo-700' },
       DELIVERED: { label: 'Delivered', className: 'bg-green-100 text-green-700' },
       CANCELLED: { label: 'Cancelled', className: 'bg-red-100 text-red-700' },
-    };
-    const config = statusConfig[status] || statusConfig.PENDING;
-    return <Badge className={config.className}>{config.label}</Badge>;
-  };
-  
-  const getPaymentStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; className: string }> = {
-      PENDING: { label: 'Pending', className: 'bg-gray-100 text-gray-700' },
-      PAID: { label: 'Paid', className: 'bg-green-100 text-green-700' },
-      FAILED: { label: 'Failed', className: 'bg-red-100 text-red-700' },
-      REFUNDED: { label: 'Refunded', className: 'bg-orange-100 text-orange-700' },
     };
     const config = statusConfig[status] || statusConfig.PENDING;
     return <Badge className={config.className}>{config.label}</Badge>;
@@ -174,7 +164,10 @@ const AdminOrders = () => {
                         {getStatusBadge(order.status)}
                       </td>
                       <td className="px-6 py-4">
-                        {getPaymentStatusBadge(order.paymentStatus)}
+                        {(() => {
+                          const d = getPaymentStatusDisplay(order);
+                          return <Badge className={d.className}>{d.label}</Badge>;
+                        })()}
                       </td>
                       <td className="px-6 py-4">
                         <Button

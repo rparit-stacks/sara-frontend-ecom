@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Heart, Trash2, ShoppingBag, Loader2 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
@@ -9,15 +9,17 @@ import { wishlistApi, cartApi } from '@/lib/api';
 
 const Wishlist = () => {
   const queryClient = useQueryClient();
-  
-  // Fetch wishlist from API
+  const navigate = useNavigate();
+  const isLoggedIn = typeof window !== 'undefined' && !!localStorage.getItem('authToken');
+
+  // Fetch wishlist from API (only when logged in)
   const { data: wishlistItems = [], isLoading } = useQuery({
     queryKey: ['wishlist'],
     queryFn: () => wishlistApi.getWishlist(),
-    enabled: !!localStorage.getItem('authToken'),
+    enabled: isLoggedIn,
   });
-  
-  // Remove from wishlist
+
+  // Hooks must run unconditionally
   const removeMutation = useMutation({
     mutationFn: wishlistApi.removeItem,
     onSuccess: () => {
@@ -28,8 +30,7 @@ const Wishlist = () => {
       toast.error(error.message || 'Failed to remove from wishlist');
     },
   });
-  
-  // Add to cart
+
   const addToCartMutation = useMutation({
     mutationFn: (item: any) => {
       const cartData: any = {
@@ -39,13 +40,8 @@ const Wishlist = () => {
         productImage: item.productImage,
         quantity: 1,
       };
-      
-      // Extract price from productPrice string (format: "₹123.45")
       const priceMatch = item.productPrice?.match(/₹?([\d.]+)/);
-      if (priceMatch) {
-        cartData.unitPrice = parseFloat(priceMatch[1]);
-      }
-      
+      if (priceMatch) cartData.unitPrice = parseFloat(priceMatch[1]);
       return cartApi.addItem(cartData);
     },
     onSuccess: () => {
@@ -57,6 +53,38 @@ const Wishlist = () => {
       toast.error(error.message || 'Failed to add to cart');
     },
   });
+
+  // Guest: show login-required state instead of empty list
+  if (!isLoggedIn) {
+    return (
+      <Layout>
+        <section className="w-full bg-secondary/30 py-8 sm:py-12 lg:py-16 xl:py-20">
+          <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
+            <ScrollReveal>
+              <h1 className="font-cursive text-3xl xs:text-4xl sm:text-5xl lg:text-6xl">My Wishlist</h1>
+              <p className="text-muted-foreground mt-2 xs:mt-3 text-sm xs:text-base sm:text-lg">Login to use your wishlist</p>
+            </ScrollReveal>
+          </div>
+        </section>
+        <section className="w-full py-8 sm:py-12 lg:py-16 xl:py-20">
+          <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
+            <div className="text-center py-12 xs:py-16 sm:py-20">
+              <Heart className="w-16 h-16 xs:w-20 xs:h-20 mx-auto text-muted-foreground mb-4 xs:mb-6" />
+              <h2 className="font-cursive text-2xl xs:text-3xl mb-2 xs:mb-3">Login to use your wishlist</h2>
+              <p className="text-muted-foreground text-sm xs:text-base sm:text-lg mb-6 xs:mb-8">Save items you love for later. Sign in to view and manage your wishlist.</p>
+              <Button
+                className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white px-4 sm:px-8 py-2 sm:py-4 text-xs sm:text-sm"
+                onClick={() => navigate('/login', { state: { returnTo: '/wishlist' } })}
+              >
+                Log in
+              </Button>
+            </div>
+          </div>
+        </section>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       {/* Hero */}

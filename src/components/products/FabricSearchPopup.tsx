@@ -76,7 +76,6 @@ const FabricSearchPopup: React.FC<FabricSearchPopupProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 pr-10 h-12 text-base"
-              autoFocus
             />
             {searchQuery && (
               <button

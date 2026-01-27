@@ -1,22 +1,219 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, Package, Download } from 'lucide-react';
-import { orderApi, productsApi } from '@/lib/api';
+import { Loader2, ArrowLeft, Download, FileText } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { orderApi } from '@/lib/api';
+import { getPaymentStatusDisplay } from '@/lib/orderUtils';
+import { formatPrice } from '@/lib/currency';
+import { renderCustomValue } from '@/lib/renderCustomValue';
 import { format } from 'date-fns';
+
+/** Renders one order item as key-value (left) + amount (right). Used in both single and all-products dialogs. */
+function OrderItemDetailBlock({
+  item,
+  currency = 'INR',
+  showDigitalActions,
+  order,
+  onDownload,
+  onPayAgain,
+  isDownloading,
+}: {
+  item: any;
+  currency?: string;
+  showDigitalActions?: boolean;
+  order?: any;
+  onDownload?: (item: any) => void;
+  onPayAgain?: () => void;
+  isDownloading?: boolean;
+}) {
+  const price = (n: number | undefined) =>
+    n != null ? formatPrice(Number(n), currency) : '—';
+  return (
+    <div className="flex gap-6 border border-border rounded-lg p-4">
+      <div className="flex-1 min-w-0 space-y-2 text-sm">
+        <div className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1 items-baseline">
+          <span className="font-medium text-muted-foreground shrink-0">Product</span>
+          <span className="font-semibold">{item.name || '—'}</span>
+        </div>
+        <div className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1 items-baseline">
+          <span className="font-medium text-muted-foreground shrink-0">Quantity</span>
+          <span>{item.quantity ?? '—'}</span>
+        </div>
+        <div className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1 items-baseline">
+          <span className="font-medium text-muted-foreground shrink-0">Unit price</span>
+          <span>{price(item.price ?? item.unitPrice)}</span>
+        </div>
+        <div className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1 items-baseline">
+          <span className="font-medium text-muted-foreground shrink-0">Type</span>
+          <span>{item.productType || 'N/A'}</span>
+        </div>
+        {item.variantDisplay && item.variantDisplay.length > 0 && (
+          <div>
+            <div className="font-medium text-muted-foreground mb-1">Variant</div>
+            <div className="space-y-1">
+              {item.variantDisplay.map((v: any, idx: number) => (
+                <div key={idx}>
+                  {v.variantName || '—'}: {v.optionValue || '—'}
+                  {v.variantUnit && ` (${v.variantUnit})`}
+                  {v.priceModifier != null && Number(v.priceModifier) !== 0 && (
+                    <span className="text-green-600 ml-1">
+                      {Number(v.priceModifier) > 0 ? '+' : ''}
+                      {price(Number(v.priceModifier))}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {item.customData && Object.keys(item.customData).length > 0 && (
+          <div>
+            <div className="font-medium text-muted-foreground mb-1">Custom fields</div>
+            <div className="space-y-1.5">
+              {Object.entries(item.customData).map(([k, v]) => (
+                <div key={k} className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-2 items-baseline">
+                  <span className="font-medium text-muted-foreground shrink-0">
+                    {item.customFieldLabels?.[k] ?? k}
+                  </span>
+                  <span className="break-words">{renderCustomValue(v)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {item.uploadedDesignUrl && (
+          <div>
+            <div className="font-medium text-muted-foreground mb-1">Uploaded design</div>
+            <a
+              href={item.uploadedDesignUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline text-sm break-all"
+            >
+              View design
+            </a>
+            {item.uploadedDesignUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i) && (
+              <div className="mt-2">
+                <img
+                  src={item.uploadedDesignUrl}
+                  alt="Uploaded design"
+                  className="max-h-24 rounded border border-border object-contain"
+                />
+              </div>
+            )}
+          </div>
+        )}
+        {item.productType === 'DIGITAL' && (item.zipPassword || item.digitalDownloadUrl) && (
+          <div className="pt-2 border-t border-border space-y-1">
+            <div className="font-medium text-muted-foreground">Digital product</div>
+            {item.zipPassword && (
+              <div className="text-muted-foreground">
+                ZIP Password: <span className="font-mono">{item.zipPassword}</span>
+              </div>
+            )}
+            {showDigitalActions && order && onDownload && (
+              <div className="pt-2">
+                {(() => {
+                  const d = getPaymentStatusDisplay(order);
+                  const canDownload = d?.label === 'Paid' || d?.label === 'Partial Paid';
+                  const status = (order?.paymentStatus || '').toUpperCase();
+                  const isRefunded = status === 'REFUNDED';
+                  const isFailed = status === 'FAILED';
+                  const isPending = status === 'PENDING';
+                  if (canDownload) {
+                    return (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => onDownload?.(item)}
+                        disabled={isDownloading}
+                      >
+                        {isDownloading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                        {isDownloading ? 'Downloading...' : 'Download'}
+                      </Button>
+                    );
+                  }
+                  if (isRefunded) {
+                    return <p className="text-xs text-muted-foreground">Refunded. Download no longer available.</p>;
+                  }
+                  if (isFailed) {
+                    return (
+                      <Button size="sm" variant="default" onClick={onPayAgain}>
+                        Pay Again
+                      </Button>
+                    );
+                  }
+                  if (isPending) {
+                    return (
+                      <Button size="sm" variant="default" onClick={onPayAgain}>
+                        Complete payment
+                      </Button>
+                    );
+                  }
+                  return <p className="text-xs text-muted-foreground">Download available after payment is confirmed.</p>;
+                })()}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="shrink-0 text-right">
+        <div className="font-semibold text-lg">{price(item.totalPrice)}</div>
+        <div className="text-xs text-muted-foreground">Incl. GST</div>
+      </div>
+    </div>
+  );
+}
 
 const OrderDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [mainDetailOpen, setMainDetailOpen] = useState(false);
+  const [productDetailItem, setProductDetailItem] = useState<any | null>(null);
+  const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['order', id],
     queryFn: () => orderApi.getOrderById(Number(id)),
     enabled: !!id,
   });
+
+  const currency = order?.paymentCurrency || 'INR';
+
+  const handleDigitalDownload = async (item: any) => {
+    if (!order?.id || !item?.productId) return;
+    setDownloadingIds((prev) => new Set(prev).add(item.productId));
+    try {
+      const blob = await orderApi.downloadDigitalForOrder(order.id, item.productId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `product_${item.productId}_files.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error('Download error:', err);
+      alert(err?.message || 'Failed to download files');
+    } finally {
+      setDownloadingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.productId);
+        return next;
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -42,7 +239,7 @@ const OrderDetail = () => {
   return (
     <Layout>
       <section className="section-padding min-h-[calc(100vh-200px)] bg-muted/40">
-        <div className="container-custom max-w-4xl mx-auto py-6 md:py-10">
+        <div className="container-custom max-w-6xl mx-auto py-6 md:py-10">
           <Button variant="ghost" onClick={() => navigate('/dashboard')} className="mb-6">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Dashboard
@@ -111,160 +308,209 @@ const OrderDetail = () => {
               </Card>
             )}
 
-            {/* Order Items */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Items</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {order.items?.map((item: any, index: number) => (
-                    <div key={index} className="flex gap-4 pb-4 border-b last:border-0">
-                      <img
-                        src={item.image || '/placeholder-product.jpg'}
-                        alt={item.name}
-                        className="w-20 h-20 object-cover rounded"
-                      />
-                      <div className="flex-1">
-                        <p className="font-semibold">{item.name}</p>
-                        <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
-                        <p className="text-sm text-muted-foreground">Price: ₹{item.price?.toLocaleString('en-IN')}</p>
-                        {item.productType === 'DIGITAL' && (
-                          <div className="mt-2 space-y-2">
-                            {item.zipPassword && (
-                              <div className="p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded">
-                                <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-400 mb-1">
-                                  📦 ZIP Password:
-                                </p>
-                                <p className="text-sm font-mono font-bold text-yellow-900 dark:text-yellow-300 tracking-wider">
-                                  {item.zipPassword}
-                                </p>
-                                <p className="text-xs text-yellow-700 dark:text-yellow-500 mt-1 italic">
-                                  ZIP is password-protected. Use your account email as the password.
-                                </p>
-                              </div>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-2"
-                              onClick={async () => {
-                                try {
-                                  // Check if stored ZIP URL exists
-                                  if (item.digitalDownloadUrl) {
-                                    const a = document.createElement('a');
-                                    a.href = item.digitalDownloadUrl;
-                                    a.download = `product_${item.productId}_files.zip`;
-                                    a.target = '_blank';
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                    alert('Download started!');
-                                  } else {
-                                    // Fallback: Download ZIP from backend
-                                    const blob = await productsApi.downloadDigitalFiles(item.productId);
-                                    
-                                    // Create download link and trigger download
-                                    const url = window.URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `product_${item.productId}_files.zip`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                    window.URL.revokeObjectURL(url);
-                                    
-                                    alert('Download started!');
-                                  }
-                                } catch (error: any) {
-                                  console.error('Download error:', error);
-                                  alert(error.message || 'Failed to download files');
-                                }
-                              }}
-                            >
-                              <Download className="w-4 h-4" />
-                              Download
-                            </Button>
-                          </div>
+            {/* 30% Shipping + Summary | 70% Order Items */}
+            <div className="grid grid-cols-1 lg:grid-cols-[3fr_7fr] gap-6">
+              {/* Left: Shipping + Order Summary */}
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Shipping Address</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {order.shippingAddress ? (
+                      <div className="text-sm space-y-1">
+                        {typeof order.shippingAddress === 'string' ? (
+                          <pre className="whitespace-pre-wrap">{order.shippingAddress}</pre>
+                        ) : (
+                          <>
+                            <p className="font-semibold">
+                              {order.shippingAddress.firstName} {order.shippingAddress.lastName}
+                            </p>
+                            <p>{order.shippingAddress.address}</p>
+                            <p>
+                              {order.shippingAddress.city}, {order.shippingAddress.state}{' '}
+                              {order.shippingAddress.postalCode}
+                            </p>
+                            <p>Phone: {order.shippingAddress.phone}</p>
+                          </>
                         )}
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold">₹{item.totalPrice?.toLocaleString('en-IN')}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Order Summary */}
-            <div className="grid md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Shipping Address</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {order.shippingAddress ? (
-                    <div className="text-sm space-y-1">
-                      {typeof order.shippingAddress === 'string' ? (
-                        <pre className="whitespace-pre-wrap">{order.shippingAddress}</pre>
-                      ) : (
-                        <>
-                          <p className="font-semibold">
-                            {order.shippingAddress.firstName} {order.shippingAddress.lastName}
-                          </p>
-                          <p>{order.shippingAddress.address}</p>
-                          <p>
-                            {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}
-                          </p>
-                          <p>Phone: {order.shippingAddress.phone}</p>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No address available</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Order Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Subtotal</span>
-                      <span>₹{order.subtotal?.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Shipping</span>
-                      <span>{order.shipping === 0 ? 'Free' : `₹${order.shipping?.toLocaleString('en-IN')}`}</span>
-                    </div>
-                    {order.couponCode && order.couponDiscount && order.couponDiscount > 0 && (
-                      <div className="flex justify-between text-primary">
-                        <span>Coupon ({order.couponCode})</span>
-                        <span>-₹{order.couponDiscount?.toLocaleString('en-IN')}</span>
-                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No address available</p>
                     )}
-                    <div className="flex justify-between font-semibold text-lg pt-2 border-t">
-                      <span>Total</span>
-                      <span>₹{order.total?.toLocaleString('en-IN')}</span>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Order Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Subtotal</span>
+                        <span>{formatPrice(Number(order.subtotal ?? 0), currency)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Shipping</span>
+                        <span>
+                          {order.shipping === 0 ? 'Free' : formatPrice(Number(order.shipping ?? 0), currency)}
+                        </span>
+                      </div>
+                      {order.couponCode && order.couponDiscount && order.couponDiscount > 0 && (
+                        <div className="flex justify-between text-primary">
+                          <span>Coupon ({order.couponCode})</span>
+                          <span>-{formatPrice(Number(order.couponDiscount), currency)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-semibold text-lg pt-2 border-t">
+                        <span>Total</span>
+                        <span>{formatPrice(Number(order.total ?? 0), currency)}</span>
+                      </div>
                     </div>
-                  </div>
-                  {order.paymentMethod && (
                     <div className="mt-4 pt-4 border-t">
-                      <p className="text-sm">
-                        <span className="font-medium">Payment Method:</span> {order.paymentMethod}
-                      </p>
+                      {(() => {
+                        const d = getPaymentStatusDisplay(order);
+                        return (
+                          <div className="space-y-1">
+                            <p className="text-sm">
+                              <span className="font-medium">Payment:</span>{' '}
+                              <Badge className={d.className}>{d.label}</Badge>
+                            </p>
+                            {d.detail && <p className="text-xs text-muted-foreground">{d.detail}</p>}
+                          </div>
+                        );
+                      })()}
                     </div>
-                  )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Right: Order Items */}
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <CardTitle>Order Items</CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMainDetailOpen(true)}
+                      className="gap-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      View in Detail
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {order.items?.map((item: any, index: number) => (
+                      <div
+                        key={item.id ?? index}
+                        className="flex items-center justify-between gap-4 py-3 border-b last:border-0"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium">{item.name}</p>
+                            {item.productType === 'DIGITAL' && (
+                              <Badge variant="secondary" className="text-xs">
+                                Digital
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {item.quantity} × {formatPrice(Number(item.price ?? item.unitPrice ?? 0), currency)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <p className="font-semibold">
+                            {formatPrice(Number(item.totalPrice ?? 0), currency)}
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => setProductDetailItem(item)}
+                          >
+                            <FileText className="w-4 h-4" />
+                            View in Detail
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Single-product "View in Detail" dialog */}
+      <Dialog open={!!productDetailItem} onOpenChange={(open) => !open && setProductDetailItem(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Product details</DialogTitle>
+          </DialogHeader>
+          {productDetailItem && (
+            <OrderItemDetailBlock
+              item={productDetailItem}
+              currency={currency}
+              showDigitalActions
+              order={order}
+              onDownload={handleDigitalDownload}
+              onPayAgain={() => navigate('/checkout')}
+              isDownloading={downloadingIds.has(productDetailItem.productId)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* All-products "View in Detail" dialog */}
+      <Dialog open={mainDetailOpen} onOpenChange={setMainDetailOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Order items – full detail</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+            {order.items?.map((item: any, index: number) => (
+              <OrderItemDetailBlock
+                key={item.id ?? index}
+                item={item}
+                currency={currency}
+              />
+            ))}
+          </div>
+          <div className="border-t pt-4 mt-4 space-y-2 text-sm shrink-0">
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span>{formatPrice(Number(order.subtotal ?? 0), currency)}</span>
+            </div>
+            {order.gst != null && Number(order.gst) !== 0 && (
+              <div className="flex justify-between">
+                <span>GST</span>
+                <span>{formatPrice(Number(order.gst), currency)}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span>Shipping</span>
+              <span>
+                {order.shipping === 0 ? 'Free' : formatPrice(Number(order.shipping ?? 0), currency)}
+              </span>
+            </div>
+            {order.couponCode && order.couponDiscount && order.couponDiscount > 0 && (
+              <div className="flex justify-between text-primary">
+                <span>Coupon ({order.couponCode})</span>
+                <span>-{formatPrice(Number(order.couponDiscount), currency)}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-semibold text-lg pt-2 border-t">
+              <span>Total (incl. GST)</span>
+              <span>{formatPrice(Number(order.total ?? 0), currency)}</span>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };

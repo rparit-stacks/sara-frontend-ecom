@@ -1,22 +1,31 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Minus, Plus, IndianRupee, X } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Fabric } from './FabricSelectionPopup';
 import { usePrice } from '@/lib/currency';
+import { toast } from 'sonner';
 
 export interface FabricVariant {
   id: string;
-  type: string; // 'width', 'gsm', 'color', etc.
+  type: string;
   name: string;
   options: {
     id: string;
     value: string;
-    priceModifier?: number; // Additional price per meter
+    priceModifier?: number;
   }[];
+}
+
+export interface FabricCustomField {
+  id: number | string;
+  label: string;
+  fieldType?: string;
+  placeholder?: string;
+  required?: boolean;
 }
 
 interface FabricVariantPopupProps {
@@ -24,11 +33,13 @@ interface FabricVariantPopupProps {
   onOpenChange: (open: boolean) => void;
   fabric: Fabric | null;
   variants: FabricVariant[];
+  customFields?: FabricCustomField[];
   onComplete: (data: {
     fabricId: string;
     selectedVariants: Record<string, string>;
     quantity: number;
     totalPrice: number;
+    customFieldValues?: Record<string, string | number>;
   }) => void;
 }
 
@@ -37,11 +48,10 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
   onOpenChange,
   fabric,
   variants: propVariants,
+  customFields = [],
   onComplete,
 }) => {
   const { format } = usePrice();
-  
-  // Use propVariants directly - no mock fallback
   const variants = propVariants;
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
@@ -53,6 +63,13 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
     return initial;
   });
   const [quantity, setQuantity] = useState(1);
+  const [fabricCustomValues, setFabricCustomValues] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (open && customFields.length > 0) {
+      setFabricCustomValues({});
+    }
+  }, [open, customFields.length]);
 
   // Calculate base price per meter with variant modifiers
   const pricePerMeter = useMemo(() => {
@@ -82,16 +99,30 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
     });
   };
 
+  const fabricRequiredFilled = useMemo(() => {
+    if (!customFields.length) return true;
+    return customFields
+      .filter((f) => f.required)
+      .every((f) => {
+        const id = String(f.id);
+        const v = fabricCustomValues[id];
+        return v != null && (typeof v !== 'string' || v.trim() !== '');
+      });
+  }, [customFields, fabricCustomValues]);
+
   const handleAddToCart = () => {
     if (!fabric) return;
-    
+    if (!fabricRequiredFilled) {
+      toast.error('Please fill all required fields');
+      return;
+    }
     onComplete({
       fabricId: fabric.id,
       selectedVariants,
       quantity,
       totalPrice,
+      customFieldValues: customFields.length > 0 ? { ...fabricCustomValues } : undefined,
     });
-    
     onOpenChange(false);
   };
 
@@ -181,6 +212,50 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
             </div>
           )}
 
+          {/* Fabric additional information (custom fields) */}
+          {customFields.length > 0 && (
+            <div className="space-y-3 pt-3 border-t border-border">
+              <h4 className="font-medium text-sm sm:text-base">Additional information</h4>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Please provide the following details for this fabric.
+              </p>
+              <div className="space-y-3">
+                {customFields.map((field) => {
+                  const id = String(field.id);
+                  const value = fabricCustomValues[id] ?? '';
+                  const isRequired = !!field.required;
+                  return (
+                    <div key={id} className="space-y-1.5">
+                      <Label className="text-sm">
+                        {field.label}
+                        {isRequired && <span className="text-destructive ml-1">*</span>}
+                      </Label>
+                      {field.fieldType === 'number' ? (
+                        <Input
+                          type="number"
+                          value={value}
+                          onChange={(e) => setFabricCustomValues((prev) => ({ ...prev, [id]: e.target.value }))}
+                          placeholder={field.placeholder || ''}
+                          required={isRequired}
+                          className="h-10"
+                        />
+                      ) : (
+                        <Input
+                          type={field.fieldType === 'url' ? 'url' : 'text'}
+                          value={value}
+                          onChange={(e) => setFabricCustomValues((prev) => ({ ...prev, [id]: e.target.value }))}
+                          placeholder={field.placeholder || ''}
+                          required={isRequired}
+                          className="h-10"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Quantity Selection */}
           <div className="space-y-2 sm:space-y-2.5 pt-3 sm:pt-3.5 border-t border-border">
             <h4 className="font-medium text-sm sm:text-base">Quantity (Meters)</h4>
@@ -231,7 +306,11 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base">
             Cancel
           </Button>
-          <Button onClick={handleAddToCart} className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-1.5 sm:gap-2 flex-1 sm:max-w-xs h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base">
+          <Button
+            onClick={handleAddToCart}
+            disabled={customFields.length > 0 && !fabricRequiredFilled}
+            className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-1.5 sm:gap-2 flex-1 sm:max-w-xs h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base"
+          >
             <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
             <span className="truncate">Add to Cart</span>
           </Button>

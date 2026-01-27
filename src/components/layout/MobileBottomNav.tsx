@@ -49,10 +49,13 @@ export const MobileBottomNav = () => {
             count = cartItemCount;
           }
           
+          const linkTo = (item.href === '/wishlist' && !isAuthenticated)
+            ? { pathname: '/login', state: { returnTo: '/wishlist' } }
+            : item.href;
           return (
             <Link
               key={item.href}
-              to={item.href}
+              to={linkTo}
               className={`relative flex flex-col items-center justify-center gap-1 flex-1 h-full transition-colors ${
                 isActive 
                   ? 'text-primary' 

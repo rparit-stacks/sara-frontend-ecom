@@ -1,34 +1,72 @@
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle2, Package, ArrowRight, LogIn, Download } from 'lucide-react';
-import { orderApi, productsApi } from '@/lib/api';
+import { orderApi, paymentApi } from '@/lib/api';
+import { getPaymentStatusDisplay } from '@/lib/orderUtils';
 import { format } from 'date-fns';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { toast } from 'sonner';
-import { useState } from 'react';
 
 const OrderConfirmation = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
-  
+  const stripeVerifyAttempted = useRef(false);
+
   // Get order ID from URL params or location state
   const orderId = id || (location.state as any)?.orderId;
-  
-  const isLoggedIn = !!localStorage.getItem('authToken');
+  const state = (location.state || {}) as { paymentIntentId?: string; orderId?: number };
 
-  const { data: order, isLoading } = useQuery({
+  const isLoggedIn = !!localStorage.getItem('authToken');
+  const queryClient = useQueryClient();
+
+  const { data: order, isLoading, refetch } = useQuery({
     queryKey: ['order', orderId],
     queryFn: () => orderApi.getOrderById(Number(orderId)),
     enabled: !!orderId,
+    staleTime: 0,
   });
 
+  // When arriving from Stripe with paymentIntentId, verify and then refetch order so status becomes PAID
+  useEffect(() => {
+    if (!orderId || !order || stripeVerifyAttempted.current) return;
+    const paymentIntentId = state.paymentIntentId;
+    if (!paymentIntentId) return;
+    const status = (order.paymentStatus || '').toUpperCase();
+    if (status !== 'PENDING') return;
+    stripeVerifyAttempted.current = true;
+    paymentApi
+      .verify({
+        orderId: String(orderId),
+        paymentId: paymentIntentId,
+        gateway: 'STRIPE',
+        verificationData: {},
+      })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+        refetch();
+      })
+      .catch(() => {});
+  }, [order, orderId, state.paymentIntentId, refetch, queryClient]);
+
+  const paymentDisplay = order ? getPaymentStatusDisplay(order) : null;
+  const paymentStatus = (order?.paymentStatus || '').toUpperCase();
+  const canDownloadDigital = paymentDisplay && (paymentDisplay.label === 'Paid' || paymentDisplay.label === 'Partial Paid');
+  const isPaymentFailed = paymentStatus === 'FAILED';
+  const isPaymentRefunded = paymentStatus === 'REFUNDED';
+  const isPaymentPending = paymentStatus === 'PENDING';
+
   const handleDigitalDownload = async (item: any) => {
+    if (!canDownloadDigital) {
+      toast.error('Download is available only after payment is confirmed.');
+      return;
+    }
     if (!item.productId) {
       toast.error('Product ID not available');
       return;
@@ -37,22 +75,7 @@ const OrderConfirmation = () => {
     setDownloadingIds(prev => new Set(prev).add(item.productId));
     
     try {
-      // Check if stored ZIP URL exists in order item
-      if (item.digitalDownloadUrl) {
-        // Use stored Cloudinary URL directly
-        const a = document.createElement('a');
-        a.href = item.digitalDownloadUrl;
-        a.download = `product_${item.productId}_files.zip`;
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        toast.success('Download started!');
-      } else {
-        // Fallback: Download ZIP from backend (generates on-demand)
-      const blob = await productsApi.downloadDigitalFiles(item.productId);
-      
-      // Create download link and trigger download
+      const blob = await orderApi.downloadDigitalForOrder(Number(orderId), item.productId);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -61,9 +84,7 @@ const OrderConfirmation = () => {
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-      
       toast.success('Download started!');
-      }
     } catch (error: any) {
       console.error('Download error:', error);
       toast.error(error.message || 'Failed to download files');
@@ -124,16 +145,26 @@ const OrderConfirmation = () => {
             <ScrollReveal>
               <Card>
                 <CardHeader>
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start flex-wrap gap-2">
                     <div>
                       <CardTitle className="text-2xl">Order #{order.id}</CardTitle>
                       <p className="text-sm text-muted-foreground mt-1">
                         Placed on {order.createdAt ? format(new Date(order.createdAt), 'MMMM dd, yyyy') : 'N/A'}
                       </p>
                     </div>
-                    <Badge variant={order.status === 'DELIVERED' ? 'default' : 'secondary'} className="text-sm">
-                      {order.status}
-                    </Badge>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant={order.status === 'DELIVERED' ? 'default' : 'secondary'} className="text-sm">
+                        {order.status}
+                      </Badge>
+                      {paymentDisplay && (
+                        <Badge className={paymentDisplay.className}>
+                          {paymentDisplay.label}
+                          {paymentDisplay.detail && (
+                            <span className="ml-1 font-normal opacity-90">({paymentDisplay.detail})</span>
+                          )}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -158,7 +189,7 @@ const OrderConfirmation = () => {
                               </p>
                               {item.productType === 'DIGITAL' && (
                                 <div className="mt-2 space-y-2">
-                                  {item.zipPassword && (
+                                  {canDownloadDigital && item.zipPassword && (
                                     <div className="p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded">
                                       <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-400 mb-1">
                                         📦 ZIP Password:
@@ -171,25 +202,61 @@ const OrderConfirmation = () => {
                                       </p>
                                     </div>
                                   )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                    className="gap-2"
-                                  onClick={() => handleDigitalDownload(item)}
-                                  disabled={downloadingIds.has(item.productId)}
-                                >
-                                  {downloadingIds.has(item.productId) ? (
-                                    <>
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                      Loading...
-                                    </>
+                                  {canDownloadDigital ? (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="gap-2"
+                                      onClick={() => handleDigitalDownload(item)}
+                                      disabled={downloadingIds.has(item.productId)}
+                                    >
+                                      {downloadingIds.has(item.productId) ? (
+                                        <>
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                          Loading...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Download className="w-4 h-4" />
+                                          Download
+                                        </>
+                                      )}
+                                    </Button>
+                                  ) : isPaymentRefunded ? (
+                                    <p className="text-xs text-muted-foreground">
+                                      Refunded. Download no longer available.
+                                    </p>
+                                  ) : isPaymentFailed ? (
+                                    <div className="space-y-2">
+                                      <p className="text-xs text-muted-foreground">
+                                        Payment failed. Pay again to get your files.
+                                      </p>
+                                      <Button
+                                        size="sm"
+                                        variant="default"
+                                        onClick={() => navigate('/checkout')}
+                                      >
+                                        Pay Again
+                                      </Button>
+                                    </div>
+                                  ) : isPaymentPending ? (
+                                    <div className="space-y-2">
+                                      <p className="text-xs text-muted-foreground">
+                                        Complete payment to download.
+                                      </p>
+                                      <Button
+                                        size="sm"
+                                        variant="default"
+                                        onClick={() => navigate('/checkout')}
+                                      >
+                                        Complete payment
+                                      </Button>
+                                    </div>
                                   ) : (
-                                    <>
-                                      <Download className="w-4 h-4" />
-                                      Download
-                                    </>
+                                    <p className="text-xs text-muted-foreground">
+                                      Download available after payment is confirmed.
+                                    </p>
                                   )}
-                                </Button>
                                 </div>
                               )}
                             </div>

@@ -649,6 +649,20 @@ export const faqApi = {
 export const customConfigApi = {
   getConfig: () => fetchApi<any>('/api/custom-config'),
   getPublicConfig: () => fetchApi<any>('/api/custom-config'),
+  async uploadReferenceImage(file: File): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_BASE_URL}/api/custom-design-requests/upload-reference`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error || `Upload failed: ${res.status}`);
+    }
+    const data = await res.json();
+    return { url: (data as { url?: string }).url ?? '' };
+  },
   submitDesignRequest: (data: any) => fetchApi<any>('/api/custom-design-requests', { method: 'POST', body: JSON.stringify(data) }),
   
   // Admin
@@ -719,7 +733,20 @@ export const orderApi = {
   },
   getUserOrders: () => fetchApi<any[]>('/api/orders'),
   getOrderById: (id: number) => fetchApi<any>(`/api/orders/${id}`),
-  
+  /** Download digital files for an order item. Backend validates order is PAID and contains the product. */
+  downloadDigitalForOrder: async (orderId: number, productId: number): Promise<Blob> => {
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/digital-download/${productId}`, {
+      method: 'GET',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      if (response.status === 403) throw new Error('Download available only after payment is confirmed.');
+      throw new Error('Failed to download files');
+    }
+    return response.blob();
+  },
+
   // Admin
   getAllOrders: (status?: string) => fetchApi<any[]>(`/api/admin/orders${status ? `?status=${status}` : ''}`),
   getOrderByIdAdmin: (id: number) => fetchApi<any>(`/api/admin/orders/${id}`),
@@ -758,10 +785,16 @@ export const orderApi = {
       method: 'PUT', 
       body: JSON.stringify(data) 
     }),
-  updateOrderItem: (orderId: number, itemId: number, data: { quantity?: number; price?: number; name?: string }) =>
-    fetchApi<any>(`/api/admin/orders/${orderId}/items/${itemId}`, { 
-      method: 'PUT', 
-      body: JSON.stringify(data) 
+  updateOrderItem: (orderId: number, itemId: number, data: {
+    quantity?: number;
+    price?: number;
+    name?: string;
+    variants?: Record<string, unknown>;
+    customData?: Record<string, unknown>;
+  }) =>
+    fetchApi<any>(`/api/admin/orders/${orderId}/items/${itemId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     }),
   updateOrderPricing: (id: number, data: { subtotal?: number; gst?: number; shipping?: number; total?: number }) =>
     fetchApi<any>(`/api/admin/orders/${id}/pricing`, { 
@@ -829,9 +862,11 @@ export const whatsappApi = {
 // Coupon API
 // ===============================
 export const couponApi = {
-  validate: (code: string, orderTotal: number, userEmail?: string) => 
+  /** Eligible coupons for current user and order total. Requires authentication. */
+  getEligible: (orderTotal: number) =>
+    fetchApi<any[]>(`/api/coupons/eligible?orderTotal=${encodeURIComponent(String(orderTotal))}`),
+  validate: (code: string, orderTotal: number, userEmail?: string) =>
     fetchApi<any>('/api/coupons/validate', { method: 'POST', body: JSON.stringify({ code, orderTotal, userEmail }) }),
-  
   // Admin
   getAll: () => fetchApi<any[]>('/api/admin/coupons'),
   getById: (id: number) => fetchApi<any>(`/api/admin/coupons/${id}`),
@@ -999,6 +1034,8 @@ export const paymentApi = {
   getMethods: (country: string) => fetchApi<{ country: string; gateways: string[]; methods: Record<string, string[]> }>(`/api/payment/methods?country=${encodeURIComponent(country)}`),
   createOrder: (data: any) => fetchApi<any>('/api/payment/create-order', { method: 'POST', body: JSON.stringify(data) }),
   verify: (data: any) => fetchApi<any>('/api/payment/verify', { method: 'POST', body: JSON.stringify(data) }),
+  recordPaymentFailed: (orderNumber: string, gateway: string) =>
+    fetchApi<{ success: boolean }>('/api/payment/record-failed', { method: 'POST', body: JSON.stringify({ orderNumber, gateway }) }),
 };
 
 // ===============================

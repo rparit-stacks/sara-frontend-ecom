@@ -171,8 +171,8 @@ export const Navbar = () => {
               <i className="fa-solid fa-search text-base"></i>
             </Button>
 
-            {/* Wishlist */}
-            <Link to="/wishlist" className="relative">
+            {/* Wishlist – guests go to login with returnTo */}
+            <Link to={isAuthenticated ? '/wishlist' : { pathname: '/login', state: { returnTo: '/wishlist' } }} className="relative">
               <Button variant="ghost" size="icon" className="w-10 h-10 xs:w-11 xs:h-11 rounded-full hover:bg-secondary">
                 <i className="fa-regular fa-heart text-sm xs:text-base"></i>
                 {wishlistCount > 0 && (

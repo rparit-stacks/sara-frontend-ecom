@@ -29,6 +29,8 @@ const AdminCoupons = () => {
     validFrom: '',
     validUntil: '',
     isActive: true,
+    applicability: 'GLOBAL' as 'GLOBAL' | 'USER_SPECIFIC',
+    allowedUserEmail: '',
   });
 
   const { data: coupons = [], isLoading } = useQuery({
@@ -86,10 +88,16 @@ const AdminCoupons = () => {
       validFrom: '',
       validUntil: '',
       isActive: true,
+      applicability: 'GLOBAL',
+      allowedUserEmail: '',
     });
   };
 
   const handleCreate = () => {
+    if (formData.applicability === 'USER_SPECIFIC' && !formData.allowedUserEmail?.trim()) {
+      toast.error('Email is required for user-specific coupons');
+      return;
+    }
     const data = {
       code: formData.code,
       type: formData.type,
@@ -101,6 +109,8 @@ const AdminCoupons = () => {
       validFrom: formData.validFrom || null,
       validUntil: formData.validUntil || null,
       isActive: formData.isActive,
+      applicability: formData.applicability,
+      allowedUserEmail: formData.applicability === 'USER_SPECIFIC' && formData.allowedUserEmail?.trim() ? formData.allowedUserEmail.trim() : null,
     };
     createMutation.mutate(data);
   };
@@ -115,15 +125,21 @@ const AdminCoupons = () => {
       maxDiscount: coupon.maxDiscount?.toString() || '',
       usageLimit: coupon.usageLimit?.toString() || '',
       perUserUsageLimit: coupon.perUserUsageLimit?.toString() || '',
-      validFrom: coupon.validFrom ? coupon.validFrom.split('T')[0] : '',
-      validUntil: coupon.validUntil ? coupon.validUntil.split('T')[0] : '',
+      validFrom: coupon.validFrom ? (coupon.validFrom.includes('T') ? coupon.validFrom.slice(0, 16) : coupon.validFrom.split('T')[0]) : '',
+      validUntil: coupon.validUntil ? (coupon.validUntil.includes('T') ? coupon.validUntil.slice(0, 16) : coupon.validUntil.split('T')[0]) : '',
       isActive: coupon.isActive !== false,
+      applicability: (coupon.applicability === 'USER_SPECIFIC' ? 'USER_SPECIFIC' : 'GLOBAL') as 'GLOBAL' | 'USER_SPECIFIC',
+      allowedUserEmail: coupon.allowedUserEmail || '',
     });
     setIsEditDialogOpen(true);
   };
 
   const handleUpdate = () => {
     if (!editingCoupon) return;
+    if (formData.applicability === 'USER_SPECIFIC' && !formData.allowedUserEmail?.trim()) {
+      toast.error('Email is required for user-specific coupons');
+      return;
+    }
     const data = {
       code: formData.code,
       type: formData.type,
@@ -135,6 +151,8 @@ const AdminCoupons = () => {
       validFrom: formData.validFrom || null,
       validUntil: formData.validUntil || null,
       isActive: formData.isActive,
+      applicability: formData.applicability,
+      allowedUserEmail: formData.applicability === 'USER_SPECIFIC' && formData.allowedUserEmail?.trim() ? formData.allowedUserEmail.trim() : null,
     };
     updateMutation.mutate({ id: editingCoupon.id, data });
   };
@@ -183,7 +201,9 @@ const AdminCoupons = () => {
                     <th className="text-left p-4">Type</th>
                     <th className="text-left p-4">Value</th>
                     <th className="text-left p-4">Min Order</th>
+                    <th className="text-left p-4">Applicability</th>
                     <th className="text-left p-4">Usage</th>
+                    <th className="text-left p-4">Validity</th>
                     <th className="text-left p-4">Status</th>
                     <th className="text-left p-4">Actions</th>
                   </tr>
@@ -205,10 +225,20 @@ const AdminCoupons = () => {
                       </td>
                       <td className="p-4">{coupon.minOrder ? `₹${coupon.minOrder}` : '-'}</td>
                       <td className="p-4">
-                        {coupon.usedCount || 0} / {coupon.usageLimit || '∞'}
-                        {coupon.perUserUsageLimit && (
+                        {coupon.applicability === 'USER_SPECIFIC' ? (
+                          <span className="text-xs" title={coupon.allowedUserEmail || ''}>User: {coupon.allowedUserEmail ? `${String(coupon.allowedUserEmail).slice(0, 20)}${String(coupon.allowedUserEmail).length > 20 ? '…' : ''}` : '-'}</span>
+                        ) : (
+                          <Badge variant="outline">Global</Badge>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        {coupon.usedCount ?? 0} / {coupon.usageLimit ?? '∞'}
+                        {coupon.perUserUsageLimit != null && (
                           <span className="text-xs text-muted-foreground block">Per user: {coupon.perUserUsageLimit}</span>
                         )}
+                      </td>
+                      <td className="p-4 text-xs text-muted-foreground">
+                        {coupon.validFrom ? new Date(coupon.validFrom).toLocaleDateString() : '-'} – {coupon.validUntil ? new Date(coupon.validUntil).toLocaleDateString() : '∞'}
                       </td>
                       <td className="p-4">
                         <Badge variant={coupon.isActive ? 'default' : 'secondary'}>
@@ -304,6 +334,44 @@ const AdminCoupons = () => {
                   />
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label>Applicability *</Label>
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="applicability-create"
+                      checked={formData.applicability === 'GLOBAL'}
+                      onChange={() => setFormData({ ...formData, applicability: 'GLOBAL', allowedUserEmail: '' })}
+                      className="w-4 h-4"
+                    />
+                    <span>Global (all users)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="applicability-create"
+                      checked={formData.applicability === 'USER_SPECIFIC'}
+                      onChange={() => setFormData({ ...formData, applicability: 'USER_SPECIFIC' })}
+                      className="w-4 h-4"
+                    />
+                    <span>For specific user</span>
+                  </label>
+                </div>
+                {formData.applicability === 'USER_SPECIFIC' && (
+                  <div className="mt-2">
+                    <Label>User email *</Label>
+                    <Input
+                      type="email"
+                      value={formData.allowedUserEmail}
+                      onChange={(e) => setFormData({ ...formData, allowedUserEmail: e.target.value })}
+                      placeholder="user@example.com"
+                      className="mt-1"
+                    />
+                  </div>
+                )}
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -433,6 +501,44 @@ const AdminCoupons = () => {
                   />
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label>Applicability *</Label>
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="applicability-edit"
+                      checked={formData.applicability === 'GLOBAL'}
+                      onChange={() => setFormData({ ...formData, applicability: 'GLOBAL', allowedUserEmail: '' })}
+                      className="w-4 h-4"
+                    />
+                    <span>Global (all users)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="applicability-edit"
+                      checked={formData.applicability === 'USER_SPECIFIC'}
+                      onChange={() => setFormData({ ...formData, applicability: 'USER_SPECIFIC' })}
+                      className="w-4 h-4"
+                    />
+                    <span>For specific user</span>
+                  </label>
+                </div>
+                {formData.applicability === 'USER_SPECIFIC' && (
+                  <div className="mt-2">
+                    <Label>User email *</Label>
+                    <Input
+                      type="email"
+                      value={formData.allowedUserEmail}
+                      onChange={(e) => setFormData({ ...formData, allowedUserEmail: e.target.value })}
+                      placeholder="user@example.com"
+                      className="mt-1"
+                    />
+                  </div>
+                )}
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

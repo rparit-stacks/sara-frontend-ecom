@@ -12,8 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { userApi, orderApi, categoriesApi } from '@/lib/api';
+import { getPaymentStatusDisplay } from '@/lib/orderUtils';
 import { Package, MapPin, User, Edit, Trash2, Plus, Loader2, Check, Gift, ArrowRight, Download, Menu, X, LogOut } from 'lucide-react';
-import { productsApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { MandatoryProfileDialog } from '@/components/MandatoryProfileDialog';
@@ -327,17 +327,19 @@ const Dashboard = () => {
     navigate('/', { replace: true });
   };
 
-  // Extract all digital products from orders
-  const digitalProducts = orders.flatMap((order: any) => 
-    (order.items || [])
-      .filter((item: any) => item.productType === 'DIGITAL')
-      .map((item: any) => ({
-        ...item,
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        orderDate: order.createdAt,
-      }))
-  );
+  // Extract digital products only from orders that are paid (downloads gated by payment status)
+  const digitalProducts = orders
+    .filter((o: any) => (o.paymentStatus || '').toUpperCase() === 'PAID')
+    .flatMap((order: any) =>
+      (order.items || [])
+        .filter((item: any) => item.productType === 'DIGITAL')
+        .map((item: any) => ({
+          ...item,
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          orderDate: order.createdAt,
+        }))
+    );
 
   const handleDigitalDownload = async (item: any) => {
     if (!item.productId) {
@@ -348,22 +350,7 @@ const Dashboard = () => {
     setDownloadingIds(prev => new Set(prev).add(item.productId));
     
     try {
-      // Check if stored ZIP URL exists in order item
-      if (item.digitalDownloadUrl) {
-        // Use stored Cloudinary URL directly
-        const a = document.createElement('a');
-        a.href = item.digitalDownloadUrl;
-        a.download = `product_${item.productId}_files.zip`;
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        toast.success('Download started!');
-      } else {
-        // Fallback: Download ZIP from backend (generates on-demand)
-      const blob = await productsApi.downloadDigitalFiles(item.productId);
-      
-      // Create download link and trigger download
+      const blob = await orderApi.downloadDigitalForOrder(item.orderId, item.productId);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -372,9 +359,7 @@ const Dashboard = () => {
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-      
       toast.success('Download started!');
-      }
     } catch (error: any) {
       console.error('Download error:', error);
       toast.error(error.message || 'Failed to download files');
@@ -708,21 +693,42 @@ const Dashboard = () => {
                                       {order.createdAt ? format(new Date(order.createdAt), 'MMM dd, yyyy') : 'N/A'}
                                     </p>
                                   </div>
-                                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                                     <Badge variant={order.status === 'DELIVERED' ? 'default' : 'secondary'} className="text-xs">
                                       {order.status}
                                     </Badge>
+                                    {(() => {
+                                      const d = getPaymentStatusDisplay(order);
+                                      return (
+                                        <>
+                                          <Badge className={`text-xs ${d.className}`}>{d.label}</Badge>
+                                          {d.detail && <span className="text-xs text-muted-foreground">{d.detail}</span>}
+                                        </>
+                                      );
+                                    })()}
                                     <p className="font-semibold text-sm md:text-base">₹{order.total?.toLocaleString('en-IN')}</p>
                                   </div>
                                 </div>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => navigate(`/orders/${order.id}`)}
-                                  className="w-full sm:w-auto"
-                                >
-                                  View Details
-                                </Button>
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => navigate(`/orders/${order.id}`)}
+                                    className="w-full sm:w-auto"
+                                  >
+                                    View Details
+                                  </Button>
+                                  {(order.paymentStatus || '').toUpperCase() === 'FAILED' &&
+                                    (order.items || []).some((i: any) => i.productType === 'DIGITAL') && (
+                                    <Button
+                                      variant="default"
+                                      size="sm"
+                                      onClick={() => navigate('/checkout')}
+                                    >
+                                      Pay again
+                                    </Button>
+                                  )}
+                                </div>
                               </CardContent>
                             </Card>
                           ))}
@@ -990,10 +996,21 @@ const Dashboard = () => {
                                       {order.createdAt ? format(new Date(order.createdAt), 'MMM dd, yyyy') : 'N/A'}
                                     </p>
                                   </div>
-                                  <div className="flex items-center justify-between">
-                                    <Badge variant={order.status === 'DELIVERED' ? 'default' : 'secondary'} className="text-xs">
-                                      {order.status}
-                                    </Badge>
+                                  <div className="flex flex-wrap items-center gap-2 justify-between">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Badge variant={order.status === 'DELIVERED' ? 'default' : 'secondary'} className="text-xs">
+                                        {order.status}
+                                      </Badge>
+                                      {(() => {
+                                        const d = getPaymentStatusDisplay(order);
+                                        return (
+                                          <>
+                                            <Badge className={`text-xs ${d.className}`}>{d.label}</Badge>
+                                            {d.detail && <span className="text-xs text-muted-foreground">{d.detail}</span>}
+                                          </>
+                                        );
+                                      })()}
+                                    </div>
                                     <p className="font-semibold text-sm">₹{order.total?.toLocaleString('en-IN')}</p>
                                   </div>
                                 </div>

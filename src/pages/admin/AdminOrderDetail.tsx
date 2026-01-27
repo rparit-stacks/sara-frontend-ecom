@@ -8,11 +8,170 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, ArrowLeft, Edit, Download, RefreshCw } from 'lucide-react';
+import { Loader2, ArrowLeft, Edit, Download, RefreshCw, ChevronDown, FileText } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { orderApi } from '@/lib/api';
 import { formatPrice } from '@/lib/currency';
+import { getPaymentStatusDisplay } from '@/lib/orderUtils';
+import { renderCustomValue } from '@/lib/renderCustomValue';
+import { OrderItemCustomFieldsModal } from '@/components/admin/OrderItemCustomFieldsModal';
+
+const LEDGER = {
+  heading: '#1F3A5F',
+  divider: '#E0E0E0',
+  label: '#6B7280',
+  value: '#111827',
+  totalAmount: '#0F766E',
+} as const;
+
+function LedgerRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-4 py-0.5 text-sm">
+      <span className="shrink-0 min-w-[7rem]" style={{ color: LEDGER.label }}>{label}</span>
+      <span className="text-right break-words" style={{ color: LEDGER.value }}>{value}</span>
+    </div>
+  );
+}
+
+function LedgerSectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <div
+        className="font-semibold uppercase tracking-wide mt-4 first:mt-0"
+        style={{ color: LEDGER.heading, fontWeight: 600 }}
+      >
+        {children}
+      </div>
+      <div className="my-2 h-px w-full" style={{ backgroundColor: LEDGER.divider }} />
+    </>
+  );
+}
+
+/** Ledger-style block: Product Details, Variant, Custom Fields; Label | Value rows; Total (Incl. GST) in green. */
+function AdminOrderItemDetailBlock({
+  item,
+  currency = 'INR',
+}: {
+  item: any;
+  currency?: string;
+}) {
+  const price = (n: number | undefined) =>
+    n != null ? formatPrice(Number(n), currency) : '—';
+  const basePrice = item.totalPrice != null ? Number(item.totalPrice) : 0;
+  const gstRate = item.gstRate != null ? Number(item.gstRate) : null;
+  const gstAmount = item.gstAmount != null ? Number(item.gstAmount) : null;
+  const hasGst = gstRate != null && gstAmount != null;
+  const finalPrice = hasGst ? basePrice + gstAmount : basePrice;
+
+  return (
+    <div className="border rounded-lg overflow-hidden" style={{ borderColor: LEDGER.divider }}>
+      {item.image && (
+        <div className="p-4 pb-0">
+          <img
+            src={item.image}
+            alt={item.name || 'Product'}
+            className="w-24 h-24 object-cover rounded border"
+            style={{ borderColor: LEDGER.divider }}
+          />
+        </div>
+      )}
+      <div className="p-4 space-y-1">
+        <LedgerSectionHeading>Product details</LedgerSectionHeading>
+        <LedgerRow label="Product Name" value={item.name || '—'} />
+        <LedgerRow label="Type" value={item.productType || 'N/A'} />
+        <LedgerRow label="Quantity" value={String(item.quantity ?? '—')} />
+        <LedgerRow label="Unit Price" value={price(item.price)} />
+        {hasGst && (
+          <LedgerRow label={`GST (${gstRate}%)`} value={price(gstAmount)} />
+        )}
+        <div className="my-2 h-px w-full" style={{ backgroundColor: LEDGER.divider }} />
+        <div className="flex justify-between gap-4 py-0.5 text-sm font-semibold">
+          <span className="shrink-0 min-w-[7rem]" style={{ color: LEDGER.label }}>Total (Incl. GST)</span>
+          <span className="text-right" style={{ color: LEDGER.totalAmount }}>{price(finalPrice)}</span>
+        </div>
+      </div>
+
+      {item.variantDisplay && item.variantDisplay.length > 0 && (
+        <div className="p-4 pt-0 space-y-1 border-t" style={{ borderColor: LEDGER.divider }}>
+          <LedgerSectionHeading>Variant</LedgerSectionHeading>
+          {item.variantDisplay.map((v: any, idx: number) => (
+            <div key={idx} className="space-y-1">
+              <LedgerRow label="Name" value={v.variantName || '—'} />
+              <LedgerRow
+                label="Value"
+                value={
+                  <>
+                    {v.optionValue || '—'}
+                    {v.variantUnit && ` (${v.variantUnit})`}
+                    {v.priceModifier != null && Number(v.priceModifier) !== 0 && (
+                      <span className="text-green-600 ml-1">
+                        {Number(v.priceModifier) > 0 ? '+' : ''}
+                        {price(Number(v.priceModifier))}
+                      </span>
+                    )}
+                  </>
+                }
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {item.customData && Object.keys(item.customData).length > 0 && (
+        <div className="p-4 pt-0 space-y-1 border-t" style={{ borderColor: LEDGER.divider }}>
+          <LedgerSectionHeading>Custom fields</LedgerSectionHeading>
+          {Object.entries(item.customData).map(([k, v]) => (
+            <LedgerRow
+              key={k}
+              label={(item as { customFieldLabels?: Record<string, string> }).customFieldLabels?.[k] ?? k}
+              value={<span className="break-words">{renderCustomValue(v, { ledgerMode: true })}</span>}
+            />
+          ))}
+        </div>
+      )}
+
+      {item.uploadedDesignUrl && (
+        <div className="p-4 pt-0 space-y-1 border-t" style={{ borderColor: LEDGER.divider }}>
+          <LedgerSectionHeading>Uploaded design</LedgerSectionHeading>
+          <LedgerRow
+            label="Design"
+            value={
+              <a
+                href={item.uploadedDesignUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline text-sm break-all"
+              >
+                View design
+              </a>
+            }
+          />
+        </div>
+      )}
+
+      {item.productType === 'DIGITAL' && (item.zipPassword || item.digitalDownloadUrl) && (
+        <div className="p-4 pt-0 space-y-1 border-t" style={{ borderColor: LEDGER.divider }}>
+          <LedgerSectionHeading>Digital product</LedgerSectionHeading>
+          {item.zipPassword && (
+            <LedgerRow label="ZIP Password" value={<span className="font-mono">{item.zipPassword}</span>} />
+          )}
+          {item.digitalDownloadUrl && (
+            <LedgerRow
+              label="Download"
+              value={
+                <a href={item.digitalDownloadUrl} target="_blank" rel="noreferrer" className="text-primary underline text-sm">
+                  [ Download ZIP ]
+                </a>
+              }
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const AdminOrderDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -122,7 +281,21 @@ const AdminOrderDetail = () => {
     refundReason: '',
   });
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
-  const [editItemForm, setEditItemForm] = useState<{ quantity: number; price: number; name: string } | null>(null);
+  const [editItemForm, setEditItemForm] = useState<{
+    quantity: number;
+    price: number;
+    name: string;
+    customData?: Record<string, unknown>;
+    customFieldLabels?: Record<string, string>;
+  } | null>(null);
+  const [customFieldsModalItem, setCustomFieldsModalItem] = useState<{
+    id: number;
+    name: string;
+    customData: Record<string, unknown>;
+    customFieldLabels?: Record<string, string>;
+  } | null>(null);
+  const [viewInDetailOpen, setViewInDetailOpen] = useState(false);
+  const [productDetailItem, setProductDetailItem] = useState<any | null>(null);
   const [editPricingForm, setEditPricingForm] = useState({
     subtotal: 0,
     gst: 0,
@@ -199,9 +372,14 @@ const AdminOrderDetail = () => {
 
   const retrySwipeMutation = useMutation({
     mutationFn: (id: number) => orderApi.retrySwipeInvoice(id),
-    onSuccess: () => {
+    onSuccess: (data: { lastInvoiceErrorSource?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['adminOrderDetails', orderId] });
-      toast.success('Swipe invoice created successfully!');
+      queryClient.invalidateQueries({ queryKey: ['swipeInvoiceCheck', orderId] });
+      if (data?.lastInvoiceErrorSource) {
+        toast.error('Invoice creation failed. See Swipe section for details.');
+      } else {
+        toast.success('Swipe invoice created successfully!');
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to create Swipe invoice');
@@ -340,15 +518,15 @@ const AdminOrderDetail = () => {
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
-  const getPaymentStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; className: string }> = {
-      PENDING: { label: 'Pending', className: 'bg-gray-100 text-gray-700' },
-      PAID: { label: 'Paid', className: 'bg-green-100 text-green-700' },
-      FAILED: { label: 'Failed', className: 'bg-red-100 text-red-700' },
-      REFUNDED: { label: 'Refunded', className: 'bg-orange-100 text-orange-700' },
-    };
-    const config = statusConfig[status] || statusConfig.PENDING;
-    return <Badge className={config.className}>{config.label}</Badge>;
+  const renderPaymentStatus = (o: typeof order) => {
+    if (!o) return null;
+    const d = getPaymentStatusDisplay({ paymentStatus: o.paymentStatus, paymentMethod: o.paymentMethod, paymentAmount: o.paymentAmount != null ? Number(o.paymentAmount) : undefined, total: o.total != null ? Number(o.total) : undefined });
+    return (
+      <div>
+        <Badge className={d.className}>{d.label}</Badge>
+        {d.detail && <p className="text-xs text-muted-foreground mt-1">{d.detail}</p>}
+      </div>
+    );
   };
 
   const handleSaveStatusUpdate = () => {
@@ -480,7 +658,7 @@ const AdminOrderDetail = () => {
               </div>
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Payment</div>
-                {getPaymentStatusBadge(order.paymentStatus)}
+                {renderPaymentStatus(order)}
               </div>
             </div>
             <div className="text-sm">
@@ -490,9 +668,10 @@ const AdminOrderDetail = () => {
           </div>
         </motion.div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            {/* Customer & Address */}
+        <div className="grid grid-cols-1 lg:grid-cols-[3fr_7fr] gap-6">
+          {/* Left column (30%): Personal & shipping */}
+          <div className="space-y-6">
+            {/* Customer & Shipping */}
             <section className="bg-white border border-border rounded-xl p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-lg">Customer & Shipping</h2>
@@ -649,216 +828,6 @@ const AdminOrderDetail = () => {
                     'Save Address'
                   )}
                 </Button>
-              </div>
-            </section>
-
-            {/* Order Items with customization */}
-            <section className="bg-white border border-border rounded-xl p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-lg">Order Items</h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    recalculateMutation.mutate(orderId);
-                  }}
-                  disabled={recalculateMutation.isPending}
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${recalculateMutation.isPending ? 'animate-spin' : ''}`} />
-                  Recalculate Totals
-                </Button>
-              </div>
-              <div className="space-y-3">
-                {order.items?.map((item: any, index: number) => (
-                  <div key={item.id || index} className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/30 rounded-lg">
-                    {item.image && (
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-24 h-24 object-cover rounded"
-                      />
-                    )}
-                    <div className="flex-1 space-y-2">
-                      <div className="flex justify-between gap-2">
-                        <div className="flex-1">
-                          {editingItemId === item.id ? (
-                            <div className="space-y-2">
-                              <Input
-                                value={editItemForm?.name || ''}
-                                onChange={(e) =>
-                                  setEditItemForm((prev) => (prev ? { ...prev, name: e.target.value } : null))
-                                }
-                                placeholder="Product Name"
-                                className="text-sm"
-                              />
-                              <div className="flex gap-2">
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  value={editItemForm?.quantity || ''}
-                                  onChange={(e) =>
-                                    setEditItemForm((prev) =>
-                                      prev ? { ...prev, quantity: Number(e.target.value) } : null
-                                    )
-                                  }
-                                  placeholder="Qty"
-                                  className="w-20 text-sm"
-                                />
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={editItemForm?.price || ''}
-                                  onChange={(e) =>
-                                    setEditItemForm((prev) =>
-                                      prev ? { ...prev, price: Number(e.target.value) } : null
-                                    )
-                                  }
-                                  placeholder="Price"
-                                  className="w-32 text-sm"
-                                />
-                                <Button
-                                  size="sm"
-                                  onClick={() => {
-                                    if (editItemForm) {
-                                      updateItemMutation.mutate({
-                                        orderId,
-                                        itemId: item.id,
-                                        data: {
-                                          quantity: editItemForm.quantity,
-                                          price: editItemForm.price,
-                                          name: editItemForm.name,
-                                        },
-                                      });
-                                    }
-                                  }}
-                                  disabled={updateItemMutation.isPending}
-                                >
-                                  Save
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setEditingItemId(null);
-                                    setEditItemForm(null);
-                                  }}
-                                >
-                                  Cancel
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="font-medium">{item.name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                Type: {item.productType || 'N/A'}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                IDs: P#{item.productId || '—'}
-                                {item.designId && ` · D#${item.designId}`}
-                                {item.fabricId && ` · F#${item.fabricId}`}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                        <div className="text-right text-sm">
-                          {editingItemId !== item.id && (
-                            <>
-                              <div className="text-muted-foreground">
-                                Qty: {item.quantity} × {formatPrice(Number(item.price || 0), paymentCurrency)}
-                              </div>
-                              <div className="font-semibold">
-                                {formatPrice(Number(item.totalPrice || 0), paymentCurrency)}
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="mt-2"
-                                onClick={() => {
-                                  setEditingItemId(item.id);
-                                  setEditItemForm({
-                                    quantity: item.quantity || 1,
-                                    price: Number(item.price || 0),
-                                    name: item.name || '',
-                                  });
-                                }}
-                              >
-                                <Edit className="w-3 h-3" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Display resolved variant names if available, otherwise fallback to raw variants */}
-                      {item.variantDisplay && item.variantDisplay.length > 0 ? (
-                        <div className="mt-1">
-                          <div className="text-xs font-semibold mb-1">Variants</div>
-                          <div className="flex flex-wrap gap-1">
-                            {item.variantDisplay.map((variant: any, idx: number) => (
-                              <Badge key={idx} variant="outline" className="text-[10px]">
-                                {variant.variantName || 'Unknown'}: {variant.optionValue || 'Unknown'}
-                                {variant.variantUnit && ` (${variant.variantUnit})`}
-                                {variant.priceModifier && variant.priceModifier > 0 && (
-                                  <span className="ml-1 text-green-600">+₹{variant.priceModifier}</span>
-                                )}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      ) : item.variants && Object.keys(item.variants).length > 0 ? (
-                        <div className="mt-1">
-                          <div className="text-xs font-semibold mb-1">Variants</div>
-                          <div className="flex flex-wrap gap-1">
-                            {Object.entries(item.variants).map(([key, value]) => (
-                              <Badge key={key} variant="outline" className="text-[10px]">
-                                {key}: {String(value)}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {item.customData && Object.keys(item.customData).length > 0 && (
-                        <div className="mt-2 space-y-1">
-                          <div className="text-xs font-semibold">Custom Fields</div>
-                          <div className="space-y-1">
-                            {Object.entries(item.customData).map(([key, value]) => (
-                              <div key={key} className="flex flex-col text-xs">
-                                <span className="font-medium">{key}</span>
-                                <span className="text-muted-foreground">{renderCustomValue(value)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {item.productType === 'DIGITAL' && (
-                        <div className="mt-2 space-y-1">
-                          <div className="text-xs font-semibold">Digital Product</div>
-                          {item.digitalDownloadUrl && (
-                            <div className="text-xs">
-                              <a
-                                href={item.digitalDownloadUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-primary underline"
-                              >
-                                Download ZIP
-                              </a>
-                            </div>
-                          )}
-                          {item.zipPassword && (
-                            <div className="text-xs text-muted-foreground">
-                              ZIP Password: <span className="font-mono">{item.zipPassword}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
               </div>
             </section>
 
@@ -1087,8 +1056,281 @@ const AdminOrderDetail = () => {
             </section>
           </div>
 
-          {/* Right column: payment & status */}
+          {/* Right column: order breakdown & actions */}
           <div className="space-y-6">
+            {/* Order Items */}
+            <section className="bg-white border border-border rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h2 className="font-semibold text-lg">Order Items</h2>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // #region agent log
+                      fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdminOrderDetail.tsx:ViewInDetail-click',message:'View in Detail clicked',data:{viewInDetailOpenBefore:viewInDetailOpen},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+                      // #endregion
+                      setViewInDetailOpen(true);
+                    }}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    View in Detail
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      recalculateMutation.mutate(orderId);
+                    }}
+                    disabled={recalculateMutation.isPending}
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${recalculateMutation.isPending ? 'animate-spin' : ''}`} />
+                    Recalculate Totals
+                  </Button>
+                </div>
+              </div>
+              <Dialog open={viewInDetailOpen} onOpenChange={setViewInDetailOpen}>
+                <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+                  <DialogHeader>
+                    <DialogTitle>Order items – full detail</DialogTitle>
+                  </DialogHeader>
+                  <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+                    {order.items?.map((item: any, index: number) => (
+                      <AdminOrderItemDetailBlock
+                        key={item.id || index}
+                        item={item}
+                        currency={paymentCurrency}
+                      />
+                    ))}
+                  </div>
+                  <div
+                    className="border-t pt-4 mt-4 space-y-2 text-sm shrink-0"
+                    style={{ borderColor: LEDGER.divider }}
+                  >
+                    <div className="flex justify-between" style={{ color: LEDGER.value }}>
+                      <span style={{ color: LEDGER.label }}>Subtotal</span>
+                      <span>{formatPrice(Number(order.subtotal ?? 0), paymentCurrency)}</span>
+                    </div>
+                    {order.gst != null && Number(order.gst) !== 0 && (
+                      <div className="flex justify-between" style={{ color: LEDGER.value }}>
+                        <span style={{ color: LEDGER.label }}>GST</span>
+                        <span>{formatPrice(Number(order.gst), paymentCurrency)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between" style={{ color: LEDGER.value }}>
+                      <span style={{ color: LEDGER.label }}>Shipping</span>
+                      <span>{formatPrice(Number(order.shipping ?? 0), paymentCurrency)}</span>
+                    </div>
+                    {order.couponCode && order.couponDiscount && Number(order.couponDiscount) > 0 && (
+                      <div className="flex justify-between text-primary">
+                        <span style={{ color: LEDGER.label }}>Coupon ({order.couponCode})</span>
+                        <span>-{formatPrice(Number(order.couponDiscount), paymentCurrency)}</span>
+                      </div>
+                    )}
+                    <div
+                      className="flex justify-between font-semibold text-lg pt-2 border-t"
+                      style={{ borderColor: LEDGER.divider }}
+                    >
+                      <span style={{ color: LEDGER.label }}>Total (incl. GST)</span>
+                      <span style={{ color: LEDGER.totalAmount }}>
+                        {formatPrice(Number(order.total ?? 0), paymentCurrency)}
+                      </span>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={!!productDetailItem} onOpenChange={(open) => !open && setProductDetailItem(null)}>
+                <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Product details</DialogTitle>
+                  </DialogHeader>
+                  {productDetailItem && (
+                    <AdminOrderItemDetailBlock
+                      item={productDetailItem}
+                      currency={paymentCurrency}
+                    />
+                  )}
+                </DialogContent>
+              </Dialog>
+              <div className="space-y-3">
+                {order.items?.map((item: any, index: number) =>
+                  editingItemId === item.id ? (
+                    <div key={item.id || index} className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/30 rounded-lg">
+                      {item.image && (
+                        <img src={item.image} alt={item.name} className="w-24 h-24 object-cover rounded shrink-0" />
+                      )}
+                      <div className="flex-1 flex flex-col sm:flex-row gap-4 min-w-0">
+                        <div className="space-y-2 w-full">
+                          <Input
+                            value={editItemForm?.name || ''}
+                            onChange={(e) =>
+                              setEditItemForm((prev) => (prev ? { ...prev, name: e.target.value } : null))
+                            }
+                            placeholder="Product Name"
+                            className="text-sm"
+                          />
+                          <div className="flex gap-2 flex-wrap items-center">
+                            <Input
+                              type="number"
+                              min="1"
+                              value={editItemForm?.quantity || ''}
+                              onChange={(e) =>
+                                setEditItemForm((prev) =>
+                                  prev ? { ...prev, quantity: Number(e.target.value) } : null
+                                )
+                              }
+                              placeholder="Qty"
+                              className="w-20 text-sm"
+                            />
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={editItemForm?.price || ''}
+                              onChange={(e) =>
+                                setEditItemForm((prev) =>
+                                  prev ? { ...prev, price: Number(e.target.value) } : null
+                                )
+                              }
+                              placeholder="Price"
+                              className="w-32 text-sm"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                if (editItemForm) {
+                                  updateItemMutation.mutate({
+                                    orderId,
+                                    itemId: item.id,
+                                    data: {
+                                      quantity: editItemForm.quantity,
+                                      price: editItemForm.price,
+                                      name: editItemForm.name,
+                                      ...(editItemForm.customData !== undefined
+                                        ? { customData: editItemForm.customData }
+                                        : {}),
+                                    },
+                                  });
+                                }
+                              }}
+                              disabled={updateItemMutation.isPending}
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingItemId(null);
+                                setEditItemForm(null);
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                          {editItemForm?.customData && Object.keys(editItemForm.customData).length > 0 && (
+                            <div className="pt-2 border-t border-border space-y-1">
+                              <div className="text-xs font-semibold text-muted-foreground">Custom fields</div>
+                              {Object.entries(editItemForm.customData).map(([k, v]) => (
+                                <div key={k} className="flex gap-2 items-center text-xs">
+                                  <span className="font-medium w-24 shrink-0 truncate">{editItemForm.customFieldLabels?.[k] ?? k}</span>
+                                  <Input
+                                    className="flex-1 h-7 text-xs"
+                                    value={typeof v === 'string' ? v : JSON.stringify(v)}
+                                    onChange={(e) =>
+                                      setEditItemForm((prev) =>
+                                        prev && prev.customData
+                                          ? {
+                                              ...prev,
+                                              customData: { ...prev.customData, [k]: e.target.value },
+                                            }
+                                          : null
+                                      )
+                                    }
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={item.id || index} className="flex items-center justify-between gap-4 py-3 border-b last:border-0">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium">{item.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.quantity} × {formatPrice(Number(item.price || 0), paymentCurrency)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <p className="font-semibold">
+                          {formatPrice(Number(item.totalPrice ?? (Number(item.price || 0) * (item.quantity || 1))), paymentCurrency)}
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => setProductDetailItem(item)}
+                        >
+                          <FileText className="w-4 h-4" />
+                          View in Detail
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingItemId(item.id);
+                            setEditItemForm({
+                              quantity: item.quantity || 1,
+                              price: Number(item.price || 0),
+                              name: item.name || '',
+                              customData:
+                                item.customData && typeof item.customData === 'object'
+                                  ? { ...(item.customData as Record<string, unknown>) }
+                                  : undefined,
+                              customFieldLabels: (item as { customFieldLabels?: Record<string, string> }).customFieldLabels,
+                            });
+                          }}
+                        >
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            </section>
+
+            {/* Order totals */}
+            <section className="bg-white border border-border rounded-xl p-4 space-y-2">
+              <h2 className="font-semibold text-lg">Order totals</h2>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>{formatPrice(Number(order.subtotal || 0), 'INR')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">GST</span>
+                  <span>{formatPrice(Number(order.gst || 0), 'INR')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Shipping</span>
+                  <span>{formatPrice(Number(order.shipping || 0), 'INR')}</span>
+                </div>
+                {order.couponDiscount && Number(order.couponDiscount) > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Discount{order.couponCode ? ` (${order.couponCode})` : ''}</span>
+                    <span>-{formatPrice(Number(order.couponDiscount), 'INR')}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-semibold pt-2 border-t border-border">
+                  <span>Total</span>
+                  <span>{formatPrice(Number(order.total || 0), 'INR')}</span>
+                </div>
+              </div>
+            </section>
+
             {/* Payment summary */}
             <section className="bg-white border border-border rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -1611,17 +1853,22 @@ const AdminOrderDetail = () => {
                 </p>
               </div>
 
-              <div className="flex items-center space-x-2 p-3 border rounded-lg">
-                <Checkbox
-                  id="skipWhatsApp"
-                  checked={statusUpdateForm.skipWhatsApp}
-                  onCheckedChange={(checked) =>
-                    setStatusUpdateForm((prev) => ({ ...prev, skipWhatsApp: !!checked }))
-                  }
-                />
-                <label htmlFor="skipWhatsApp" className="text-sm font-medium cursor-pointer">
-                  Skip WhatsApp Notification
-                </label>
+              <div className="flex flex-col gap-1 p-3 border rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="skipWhatsApp"
+                    checked={statusUpdateForm.skipWhatsApp}
+                    onCheckedChange={(checked) =>
+                      setStatusUpdateForm((prev) => ({ ...prev, skipWhatsApp: !!checked }))
+                    }
+                  />
+                  <label htmlFor="skipWhatsApp" className="text-sm font-medium cursor-pointer">
+                    Skip WhatsApp Notification
+                  </label>
+                </div>
+                <p className="text-xs text-muted-foreground pl-6">
+                  Use this when WhatsApp is not fully set up or you prefer not to send a notification for this update.
+                </p>
               </div>
 
               <div className="flex justify-end">
@@ -1668,22 +1915,49 @@ const AdminOrderDetail = () => {
                   {order.swipeIrn && <div>IRN: {order.swipeIrn}</div>}
                 </div>
               ) : order.status === 'CONFIRMED' ? (
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3 text-sm">
-                  <div>Swipe invoice not created automatically. You can retry creating it.</div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleRetrySwipe}
-                    disabled={retrySwipeMutation.isPending}
-                  >
-                    <RefreshCw
-                      className={`w-4 h-4 mr-2 ${
-                        retrySwipeMutation.isPending ? 'animate-spin' : ''
-                      }`}
-                    />
-                    Retry Invoice
-                  </Button>
-                </div>
+                (() => {
+                  const errSource = order.lastInvoiceErrorSource ?? swipeInvoiceCheck?.lastInvoiceErrorSource;
+                  const errMsg = order.lastInvoiceErrorMessage ?? swipeInvoiceCheck?.lastInvoiceErrorMessage;
+                  const errHint = order.lastInvoiceErrorHint ?? swipeInvoiceCheck?.lastInvoiceErrorHint;
+                  const isOurSystem = errSource === 'our_system';
+                  return (
+                    <div className="p-3 rounded-lg space-y-3 text-sm border border-border bg-muted/20">
+                      {errMsg ? (
+                        <>
+                          <div>
+                            <span className="font-medium text-destructive">
+                              {isOurSystem ? 'Our system' : 'Swipe'}
+                            </span>
+                            {' · '}
+                            <span className="text-muted-foreground">{errMsg}</span>
+                          </div>
+                          {errHint && (
+                            <div className="text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 text-xs">
+                              {errHint}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-muted-foreground">
+                          Swipe invoice not created yet. You can retry creating it.
+                        </div>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRetrySwipe}
+                        disabled={retrySwipeMutation.isPending}
+                      >
+                        <RefreshCw
+                          className={`w-4 h-4 mr-2 ${
+                            retrySwipeMutation.isPending ? 'animate-spin' : ''
+                          }`}
+                        />
+                        Retry Invoice
+                      </Button>
+                    </div>
+                  );
+                })()
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Invoice will be available after the order is confirmed.
@@ -1742,6 +2016,13 @@ const AdminOrderDetail = () => {
           </div>
         </div>
       </div>
+      <OrderItemCustomFieldsModal
+        open={!!customFieldsModalItem}
+        onOpenChange={(open) => !open && setCustomFieldsModalItem(null)}
+        itemName={customFieldsModalItem?.name ?? ''}
+        customData={customFieldsModalItem?.customData}
+        customFieldLabels={customFieldsModalItem?.customFieldLabels}
+      />
     </AdminLayout>
   );
 };

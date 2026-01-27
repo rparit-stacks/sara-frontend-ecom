@@ -9,6 +9,7 @@ interface CartItemDetailsProps {
     fabricId?: number;
     quantity: number;
     variants?: Record<string, string>;
+    customFormData?: Record<string, any>;
   };
 }
 
@@ -114,33 +115,49 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
         </div>
       )}
 
-      {/* Fabric Variant Names (for DESIGNED products) */}
-      {fabricVariantDisplays && fabricVariantDisplays.length > 0 && (
-        <div className="space-y-0.5 pl-2 border-l-2 border-primary/20">
+      {/* Selected Variant – Fabric (DESIGNED) and/or Product variants */}
+      {(fabricVariantDisplays?.length ?? 0) > 0 || (productVariantDisplays?.length ?? 0) > 0 ? (
+        <div className="space-y-1">
           <div className="text-[10px] sm:text-xs text-muted-foreground/70 uppercase tracking-wide font-medium mt-1">
-            Fabric Variants:
+            Selected Variant
           </div>
-          {fabricVariantDisplays.map((display, index) => (
-            <div key={index} className="text-xs sm:text-sm">
-              <span className="text-muted-foreground">{display}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Product Variant Names */}
-      {productVariantDisplays && productVariantDisplays.length > 0 && (
-        <div className="space-y-0.5">
           {fabricVariantDisplays && fabricVariantDisplays.length > 0 && (
-            <div className="text-[10px] sm:text-xs text-muted-foreground/70 uppercase tracking-wide font-medium mt-1">
-              Product Variants:
+            <div className="space-y-0.5 pl-2 border-l-2 border-primary/20">
+              {fabricVariantDisplays.map((display, index) => (
+                <div key={index} className="text-xs sm:text-sm">
+                  <span className="text-muted-foreground">{display}</span>
+                </div>
+              ))}
             </div>
           )}
-          {productVariantDisplays.map((display, index) => (
-            <div key={index} className="text-xs sm:text-sm">
-              <span className="text-muted-foreground">{display}</span>
+          {productVariantDisplays && productVariantDisplays.length > 0 && (
+            <div className="space-y-0.5">
+              {productVariantDisplays.map((display, index) => (
+                <div key={index} className="text-xs sm:text-sm">
+                  <span className="text-muted-foreground">{display}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+        </div>
+      ) : null}
+
+      {/* Selected Custom Field */}
+      {item.customFormData && Object.keys(item.customFormData).length > 0 && (
+        <div className="space-y-0.5 mt-1.5">
+          <div className="text-[10px] sm:text-xs text-muted-foreground/70 uppercase tracking-wide font-medium">
+            Selected Custom Field
+          </div>
+          {Object.entries(item.customFormData).map(([key, value]) => {
+            if (value == null || value === '') return null;
+            const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim();
+            return (
+              <div key={key} className="text-xs sm:text-sm">
+                <span className="text-muted-foreground">{label}: </span>
+                <span className="font-medium text-foreground">{String(value)}</span>
+              </div>
+            );
+          })}
         </div>
       )}
 

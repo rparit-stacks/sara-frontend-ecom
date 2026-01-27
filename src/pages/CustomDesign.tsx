@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useMutation } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
@@ -88,6 +88,8 @@ const CustomDesign = () => {
     description: '',
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [referenceFile, setReferenceFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Submit design request mutation
   const submitMutation = useMutation({
@@ -103,7 +105,17 @@ const CustomDesign = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    submitMutation.mutate(formData);
+    let payload: Record<string, unknown> = { ...formData };
+    if (referenceFile) {
+      try {
+        const { url } = await customConfigApi.uploadReferenceImage(referenceFile);
+        payload = { ...payload, referenceImage: url };
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to upload reference file');
+        return;
+      }
+    }
+    submitMutation.mutate(payload);
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -369,6 +381,8 @@ const CustomDesign = () => {
                     onClick={() => {
                       setIsSubmitted(false);
                       setFormData({ fullName: '', email: '', phone: '', designType: '', description: '' });
+                      setReferenceFile(null);
+                      fileInputRef.current && (fileInputRef.current.value = '');
                     }}
                   >
                     <span className="truncate">Submit Another Request</span>
@@ -469,7 +483,30 @@ const CustomDesign = () => {
                     <Label className="text-foreground font-medium mb-1.5 xs:mb-2 block text-xs xs:text-sm">
                       Reference Image (Optional)
                     </Label>
-                    <div className="border-2 border-dashed border-primary/20 rounded-lg p-4 xs:p-5 sm:p-6 text-center hover:border-primary hover:bg-primary/5 transition-all cursor-pointer">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 10 * 1024 * 1024) {
+                            toast.error('File must be under 10MB');
+                            e.target.value = '';
+                            return;
+                          }
+                          setReferenceFile(file);
+                        }
+                      }}
+                    />
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => fileInputRef.current?.click()}
+                      onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-primary/20 rounded-lg p-4 xs:p-5 sm:p-6 text-center hover:border-primary hover:bg-primary/5 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    >
                       <i className="fa-solid fa-cloud-upload text-2xl xs:text-3xl text-muted-foreground mb-2"></i>
                       <p className="text-xs xs:text-sm text-muted-foreground">
                         Click to upload or drag and drop
@@ -477,7 +514,11 @@ const CustomDesign = () => {
                       <p className="text-[10px] xs:text-xs text-muted-foreground mt-1">
                         PNG, JPG up to 10MB
                       </p>
-                      <input type="file" className="hidden" accept="image/*" />
+                      {referenceFile && (
+                        <p className="text-xs text-primary font-medium mt-2 truncate max-w-full" title={referenceFile.name}>
+                          {referenceFile.name}
+                        </p>
+                      )}
                     </div>
                   </div>
 

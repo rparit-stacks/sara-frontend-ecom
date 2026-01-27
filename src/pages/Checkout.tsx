@@ -1,12 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import ScrollReveal from '@/components/animations/ScrollReveal';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Truck, CreditCard, ShoppingBag, Lock, ChevronDown, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { cartApi, orderApi, userApi, shippingApi, paymentApi, paymentConfigApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
@@ -151,6 +152,7 @@ const Checkout = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [saveAddressAsDefault, setSaveAddressAsDefault] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const shippingFormRef = useRef<HTMLDivElement>(null);
   
   // Get user email from token
   const getUserEmail = () => {
@@ -179,12 +181,17 @@ const Checkout = () => {
   // Track applied coupon code separately (before useQuery to avoid circular dependency)
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   
-  // Get cart from localStorage for guests (before useQuery/useEffect to avoid initialization issues)
-  const guestCartItems = typeof window !== 'undefined' 
-    ? JSON.parse(localStorage.getItem('guestCart') || '[]') 
-    : [];
-  const subtotalFromLocalStorage = guestCartItems.reduce((sum: number, item: any) => 
-    sum + (item.totalPrice || item.unitPrice * (item.quantity || 1)), 0);
+  // Guest cart: single source via guestCart.getItems(), kept in sync with guestCartUpdated
+  const [guestCartItems, setGuestCartItems] = useState<any[]>(() =>
+    typeof window !== 'undefined' ? guestCart.getItems() : []);
+  useEffect(() => {
+    setGuestCartItems(guestCart.getItems());
+    const handler = () => setGuestCartItems(guestCart.getItems());
+    window.addEventListener('guestCartUpdated', handler);
+    return () => window.removeEventListener('guestCartUpdated', handler);
+  }, []);
+  const subtotalFromLocalStorage = guestCartItems.reduce((sum: number, item: any) =>
+    sum + (item.totalPrice || (item.unitPrice || 0) * (item.quantity || 1)), 0);
   
   // Fetch user profile for auto-prefill (only for logged-in users)
   const { data: userProfile } = useQuery({
@@ -640,7 +647,7 @@ const Checkout = () => {
     // Validate payment gateway availability
     if (availableGateways.length === 0) {
       toast.error(hasDigitalProducts
-        ? 'No payment methods available. Please try later.'
+        ? 'Payment method not available. Please try again later.'
         : 'We are not able to process your order right now. Please try again after some time.');
       return;
     }
@@ -687,13 +694,12 @@ const Checkout = () => {
 
         const order = await orderApi.createOrder(orderData);
         
-        // Calculate advance amount (percentage of total)
-        const advancePercentage = paymentConfig?.partialCodAdvancePercentage || 20;
-        const advanceAmount = (total * advancePercentage) / 100;
+        // Backend sets order.paymentAmount = advance amount (GST-inclusive). Use it for gateway.
+        const amountToCharge = Number(order.paymentAmount ?? order.total ?? total);
         
         // Process advance payment online
         const paymentRequest = {
-          amount: convert(advanceAmount),
+          amount: convert(amountToCharge),
           currency: currency,
           orderId: order.id,
           orderNumber: order.orderNumber,
@@ -712,7 +718,7 @@ const Checkout = () => {
         if (selectedGateway === 'STRIPE') {
           await handleStripePayment(paymentResponse, order.id);
         } else if (selectedGateway === 'RAZORPAY') {
-          await handleRazorpayPayment(paymentResponse, order.id);
+          await handleRazorpayPayment(paymentResponse, order.id, order.orderNumber);
         }
       } catch (error: any) {
         toast.error(error.message || 'Failed to process advance payment');
@@ -757,9 +763,12 @@ const Checkout = () => {
 
       const order = await orderApi.createOrder(orderData);
 
+      // Use order's payment amount so GST is always included (backend has correct total for guest & logged-in)
+      const amountToCharge = Number(order.paymentAmount ?? order.total ?? total);
+
       // Create payment order
       const paymentRequest = {
-        amount: convert(total),
+        amount: convert(amountToCharge),
         currency: currency,
         orderId: order.id,
         orderNumber: order.orderNumber,
@@ -778,7 +787,7 @@ const Checkout = () => {
       if (paymentGateway === 'STRIPE') {
         await handleStripePayment(paymentResponse, order.id);
       } else if (paymentGateway === 'RAZORPAY') {
-        await handleRazorpayPayment(paymentResponse, order.id);
+        await handleRazorpayPayment(paymentResponse, order.id, order.orderNumber);
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to process payment');
@@ -829,10 +838,12 @@ const Checkout = () => {
         window.dispatchEvent(new Event('guestCartUpdated'));
       }
       queryClient.invalidateQueries({ queryKey: ['cart'] });
+      const paymentIntentId = paymentResponse.orderData.payment_intent_id ?? paymentResponse.paymentId;
       navigate(`/order-confirmation/${orderId}`, { 
         state: { 
           orderId, 
           paymentIntent: clientSecret,
+          paymentIntentId,
           stripeKey: paymentResponse.orderData.key_id 
         } 
       });
@@ -842,12 +853,12 @@ const Checkout = () => {
     }
   };
 
-  const handleRazorpayPayment = async (paymentResponse: any, orderId: number) => {
+  const handleRazorpayPayment = async (paymentResponse: any, orderId: number, orderNumber?: string) => {
     return new Promise((resolve, reject) => {
       // Check if Razorpay is already loaded
       // @ts-ignore
       if (window.Razorpay) {
-        processRazorpayPayment(paymentResponse, orderId).then(resolve).catch(reject);
+        processRazorpayPayment(paymentResponse, orderId, orderNumber ?? '').then(resolve).catch(reject);
         return;
       }
 
@@ -855,7 +866,7 @@ const Checkout = () => {
       razorpayScript.src = 'https://checkout.razorpay.com/v1/checkout.js';
       razorpayScript.async = true;
       razorpayScript.onload = () => {
-        processRazorpayPayment(paymentResponse, orderId).then(resolve).catch(reject);
+        processRazorpayPayment(paymentResponse, orderId, orderNumber ?? '').then(resolve).catch(reject);
       };
       razorpayScript.onerror = () => {
         reject(new Error('Failed to load Razorpay script'));
@@ -864,7 +875,7 @@ const Checkout = () => {
     });
   };
 
-  const processRazorpayPayment = async (paymentResponse: any, orderId: number) => {
+  const processRazorpayPayment = async (paymentResponse: any, orderId: number, orderNumber: string) => {
     try {
       // @ts-ignore
       const options = {
@@ -913,6 +924,7 @@ const Checkout = () => {
           ondismiss: function() {
             setIsProcessingPayment(false);
             toast.info('Payment cancelled');
+            paymentApi.recordPaymentFailed(String(orderNumber), 'RAZORPAY').catch(() => {});
           }
         }
       };
@@ -922,6 +934,7 @@ const Checkout = () => {
       razorpay.on('payment.failed', function (response: any) {
         toast.error('Payment failed: ' + (response.error?.description || 'Unknown error'));
         setIsProcessingPayment(false);
+        paymentApi.recordPaymentFailed(String(orderNumber), 'RAZORPAY').catch(() => {});
       });
       razorpay.open();
     } catch (error: any) {
@@ -955,7 +968,16 @@ const Checkout = () => {
               <Button onClick={() => navigate('/cart')}>Go to Cart</Button>
             </div>
           ) : (
-            <div className="grid lg:grid-cols-3 gap-10 lg:gap-14">
+            <div className="relative">
+              {(createOrderMutation.isPending || isProcessingPayment) && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-2xl min-h-[400px]">
+                  <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                    <p className="text-sm font-medium">{isProcessingPayment ? 'Opening payment…' : 'Placing order…'}</p>
+                  </div>
+                </div>
+              )}
+            <div className="grid lg:grid-cols-3 gap-8 lg:gap-10">
               <div className="lg:col-span-2 space-y-8">
                 {/* Login Prompt for Guests */}
                 {!isLoggedIn && (
@@ -1019,23 +1041,42 @@ const Checkout = () => {
                         )}
                       </div>
                       {addresses.length > 0 ? (
-                        <Select 
-                          value={selectedAddressId?.toString() || ''} 
-                          onValueChange={(val) => setSelectedAddressId(Number(val))}
-                          required
-                        >
-                        <SelectTrigger className="h-12">
-                            <SelectValue placeholder="Choose an address *" />
-                        </SelectTrigger>
-                        <SelectContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2" role="group" aria-label="Address selection">
                           {addresses.map((addr: any) => (
-                            <SelectItem key={addr.id} value={addr.id.toString()}>
-                                {addr.firstName} {addr.lastName}, {addr.addressLine1 || addr.address}, {addr.city}, {addr.state}
-                              {addr.isDefault && ' (Default)'}
-                            </SelectItem>
+                            <button
+                              key={addr.id}
+                              type="button"
+                              onClick={() => setSelectedAddressId(addr.id)}
+                              className={`p-3 rounded-lg border text-left text-sm transition-colors ${
+                                selectedAddressId === addr.id
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border hover:bg-muted/50'
+                              }`}
+                            >
+                              <span className="font-medium">{addr.firstName} {addr.lastName}</span>
+                              <span className="block text-muted-foreground truncate mt-0.5">{addr.addressLine1 || addr.address}, {addr.city}, {addr.state}</span>
+                              {addr.isDefault && <span className="inline-block mt-1 text-xs text-primary">Default</span>}
+                            </button>
                           ))}
-                        </SelectContent>
-                      </Select>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedAddressId(null);
+                              setFormData(prev => ({
+                                ...prev,
+                                firstName: (userProfile as any)?.firstName || prev.firstName,
+                                lastName: (userProfile as any)?.lastName || prev.lastName,
+                                email: (userProfile as any)?.email || prev.email,
+                                phone: (userProfile as any)?.phoneNumber || prev.phone,
+                              }));
+                              shippingFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }}
+                            className="p-3 rounded-lg border border-dashed border-border hover:bg-muted/50 text-muted-foreground text-sm flex items-center justify-center gap-1.5 min-h-[72px]"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Add new address
+                          </button>
+                        </div>
                       ) : (
                         <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
                           No saved addresses. Fill in the form below and click "Save Address" to add one.
@@ -1046,9 +1087,10 @@ const Checkout = () => {
                 )}
 
                 <ScrollReveal>
-                  <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border">
-                    <h3 className="font-serif text-lg sm:text-xl mb-6 font-semibold">
-                      {isLoggedIn ? 'Shipping Information' : 'Shipping Information (Guest Checkout)'}
+                  <div ref={shippingFormRef} className="bg-card p-6 sm:p-8 rounded-2xl border border-border">
+                    <h3 className="font-serif text-lg sm:text-xl mb-6 font-semibold flex items-center gap-2">
+                      <Truck className="w-5 h-5 text-muted-foreground" />
+                      {isLoggedIn ? 'Shipping Details' : 'Shipping Details (Guest Checkout)'}
                     </h3>
                     {isLoggedIn && selectedAddressId && (
                       <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg text-sm text-primary">
@@ -1319,8 +1361,18 @@ const Checkout = () => {
 
                 <ScrollReveal>
                   <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border">
-                    <h3 className="font-serif text-lg sm:text-xl mb-6 font-semibold">Payment Method</h3>
-                    {hasDigitalProducts && (
+                    <h3 className="font-serif text-lg sm:text-xl mb-6 font-semibold flex items-center gap-2">
+                      <CreditCard className="w-5 h-5 text-muted-foreground" />
+                      Payment Method
+                    </h3>
+                    {hasDigitalProducts && availableGateways.length === 0 && (
+                      <div className="mb-4 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-lg">
+                        <p className="text-sm text-red-800 dark:text-red-400 font-medium">
+                          Payment method not available. Please try again later.
+                        </p>
+                      </div>
+                    )}
+                    {hasDigitalProducts && availableGateways.length > 0 && (
                       <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-lg">
                         <p className="text-sm text-yellow-800 dark:text-yellow-400 font-medium">
                           ⚠️ Digital products require online payment only. COD is not available.
@@ -1328,41 +1380,57 @@ const Checkout = () => {
                       </div>
                     )}
                     <div className="space-y-4">
-                      <Select 
-                        value={paymentGateway} 
-                        onValueChange={(value) => {
-                          setPaymentGateway(value);
-                          if (value === 'COD') {
-                            setPaymentMethod('cod');
-                          } else if (value === 'PARTIAL_COD') {
-                            setPaymentMethod('partial_cod');
-                          } else if (value === 'STRIPE') {
-                            setPaymentMethod('card');
-                          } else if (value === 'RAZORPAY') {
-                            setPaymentMethod('razorpay');
-                          }
-                        }}
-                        disabled={availableGateways.length === 0}
-                      >
-                        <SelectTrigger className="h-12">
-                          <SelectValue placeholder={availableGateways.length === 0 ? "No payment methods available" : "Select payment method"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {/* Only show available gateways */}
-                          {availableGateways.includes('COD') && (
-                            <SelectItem value="COD">Cash on Delivery (COD)</SelectItem>
-                          )}
-                          {availableGateways.includes('PARTIAL_COD') && (
-                            <SelectItem value="PARTIAL_COD">Partial Cash on Delivery</SelectItem>
-                          )}
-                          {availableGateways.includes('STRIPE') && (
-                            <SelectItem value="STRIPE">Stripe (Card)</SelectItem>
-                          )}
-                          {availableGateways.includes('RAZORPAY') && (
-                            <SelectItem value="RAZORPAY">Razorpay (Card/UPI/Netbanking)</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex flex-wrap gap-2" role="group" aria-label="Payment method">
+                        {availableGateways.includes('COD') && (
+                          <button
+                            type="button"
+                            onClick={() => { setPaymentGateway('COD'); setPaymentMethod('cod'); }}
+                            className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                              paymentGateway === 'COD' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
+                            }`}
+                          >
+                            Cash on Delivery (COD)
+                          </button>
+                        )}
+                        {availableGateways.includes('PARTIAL_COD') && (
+                          <button
+                            type="button"
+                            onClick={() => { setPaymentGateway('PARTIAL_COD'); setPaymentMethod('partial_cod'); }}
+                            className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                              paymentGateway === 'PARTIAL_COD' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
+                            }`}
+                          >
+                            Partial COD
+                          </button>
+                        )}
+                        {availableGateways.includes('STRIPE') && (
+                          <button
+                            type="button"
+                            onClick={() => { setPaymentGateway('STRIPE'); setPaymentMethod('card'); }}
+                            className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                              paymentGateway === 'STRIPE' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
+                            }`}
+                          >
+                            Card (Stripe)
+                          </button>
+                        )}
+                        {availableGateways.includes('RAZORPAY') && (
+                          <button
+                            type="button"
+                            onClick={() => { setPaymentGateway('RAZORPAY'); setPaymentMethod('razorpay'); }}
+                            className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                              paymentGateway === 'RAZORPAY' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
+                            }`}
+                          >
+                            Razorpay (UPI/Card)
+                          </button>
+                        )}
+                        {availableGateways.length === 0 && (
+                          <span className="text-sm text-muted-foreground py-2">
+                            {hasDigitalProducts ? 'Payment method not available. Please try again later.' : 'No payment methods available'}
+                          </span>
+                        )}
+                      </div>
                       {paymentGateway === 'STRIPE' && (
                         <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
                           You will be redirected to Stripe secure payment page after placing order.
@@ -1419,14 +1487,47 @@ const Checkout = () => {
               </div>
 
               <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border h-fit lg:sticky lg:top-24">
-                <h3 className="font-serif text-lg sm:text-xl mb-6 font-semibold">Order Summary</h3>
-                <div className="space-y-3 text-sm sm:text-base border-b pb-4 mb-4">
-                  {items.map((item: any) => (
-                    <div key={item.id} className="flex justify-between">
-                      <span className="line-clamp-1 flex-1 mr-2">{item.productName}</span>
-                      <span className="flex-shrink-0">{format(item.totalPrice || 0)}</span>
-                    </div>
-                  ))}
+                <h3 className="font-serif text-lg sm:text-xl mb-6 font-semibold flex items-center gap-2">
+                  <ShoppingBag className="w-5 h-5 text-muted-foreground" />
+                  Order Summary
+                </h3>
+                <div className="space-y-2 text-sm sm:text-base border-b pb-4 mb-4">
+                  {items.map((item: any) => {
+                    const hasBreakdown = item.productType === 'DESIGNED' && (item.designPrice != null || item.fabricPrice != null) || (item.unitPrice != null && (item.quantity || 1) > 0);
+                    return (
+                      <Collapsible key={item.id}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <span className="line-clamp-1">{item.productName}</span>
+                            {hasBreakdown && (
+                              <CollapsibleTrigger asChild>
+                                <button type="button" className="text-xs text-muted-foreground hover:text-foreground mt-0.5 flex items-center gap-0.5">
+                                  Why this price? <ChevronDown className="w-3 h-3" />
+                                </button>
+                              </CollapsibleTrigger>
+                            )}
+                          </div>
+                          <span className="flex-shrink-0 font-medium">{format(item.totalPrice || 0)}</span>
+                        </div>
+                        {hasBreakdown && (
+                          <CollapsibleContent>
+                            <div className="mt-2 pl-2 border-l-2 border-muted text-xs text-muted-foreground space-y-0.5">
+                              {item.productType === 'DESIGNED' && item.designPrice != null && (
+                                <div>Design: {format(Number(item.designPrice))}</div>
+                              )}
+                              {item.productType === 'DESIGNED' && item.fabricPrice != null && (
+                                <div>Fabric: {format(Number(item.fabricPrice))}</div>
+                              )}
+                              {item.unitPrice != null && (
+                                <div>Unit: {format(Number(item.unitPrice))} × {item.quantity || 1}</div>
+                              )}
+                              <div className="font-medium text-foreground pt-0.5">Total: {format(item.totalPrice || 0)}</div>
+                            </div>
+                          </CollapsibleContent>
+                        )}
+                      </Collapsible>
+                    );
+                  })}
                 </div>
                 <div className="space-y-3 text-sm sm:text-base">
                   <div className="flex justify-between">
@@ -1444,9 +1545,12 @@ const Checkout = () => {
                     <span>{shipping === 0 ? 'Free' : format(shipping)}</span>
                   </div>
                   {isLoggedIn && appliedCouponCode && couponDiscount > 0 && (
-                    <div className="flex justify-between text-primary">
+                    <div className="flex justify-between items-center text-primary">
                       <span>Coupon ({appliedCouponCode})</span>
-                      <span>-{format(couponDiscount)}</span>
+                      <span className="flex items-center gap-2">
+                        -{format(couponDiscount)}
+                        <Link to="/cart" className="text-xs underline hover:no-underline">Change</Link>
+                      </span>
                     </div>
                   )}
                   {paymentGateway === 'PARTIAL_COD' && paymentConfig?.partialCodAdvancePercentage && (
@@ -1476,7 +1580,7 @@ const Checkout = () => {
                   )}
                 </div>
                 <Button 
-                  className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white mt-6 sm:mt-8 h-12 sm:h-14 text-base"
+                  className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white mt-6 sm:mt-8 h-12 sm:h-14 text-base font-semibold"
                   onClick={handlePlaceOrder}
                   disabled={createOrderMutation.isPending || isProcessingPayment}
                 >
@@ -1489,7 +1593,12 @@ const Checkout = () => {
                     'Place Order'
                   )}
                 </Button>
+                <p className="mt-3 text-xs text-muted-foreground flex items-center justify-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5" />
+                  Secure checkout
+                </p>
               </div>
+            </div>
             </div>
           )}
         </div>

@@ -5,7 +5,6 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Edit, Trash2, Package, ExternalLink, Loader2, Pause, Play, Download, CheckSquare, Square, Copy } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
@@ -625,13 +624,14 @@ const AdminProducts = () => {
                             </div>
                           )}
                           <div className="flex items-center gap-2">
-                            <Link 
-                              to={`/product/${product.slug || product.id}`}
+                            <a
+                              href={`${window.location.origin}/product/${product.slug || product.id}`}
                               target="_blank"
+                              rel="noopener noreferrer"
                               className="font-semibold hover:text-primary transition-colors"
                             >
                               {product.name}
-                            </Link>
+                            </a>
                             <ExternalLink className="w-3 h-3 text-muted-foreground" />
                           </div>
                         </div>

@@ -1,116 +1,100 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, Calculator } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, Calculator, ChevronDown, ChevronUp } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import ScrollReveal from '@/components/animations/ScrollReveal';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { cartApi, couponApi, productsApi, shippingApi } from '@/lib/api';
+import { cartApi, couponApi, productsApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import CartItemDetails from '@/components/cart/CartItemDetails';
 import { usePrice } from '@/lib/currency';
 
-// Separate component for cart item to allow hooks usage
-const CartItem = ({ 
-  item, 
-  isLoggedIn, 
-  updateMutation, 
-  removeMutation, 
-  handleQuantityChange, 
+// Separate component for cart item to allow hooks usage; compact with expandable variants/details
+const CartItem = ({
+  item,
+  isLoggedIn,
+  updateMutation,
+  removeMutation,
+  handleQuantityChange,
   handleRemoveItem,
   setSelectedItemForBreakdown,
-  setShowPriceBreakdown
+  setShowPriceBreakdown,
 }: any) => {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const { format } = usePrice();
-  
-  // Get product slug - use from item if available, otherwise fetch it
+
   const { data: productData } = useQuery({
     queryKey: ['product-slug', item.productId],
     queryFn: () => productsApi.getById(item.productId),
     enabled: !!item.productId && !item.productSlug,
     retry: false,
   });
-  
-  // Use slug from backend cart or fetched product - slug is required for navigation
+
   const productSlug = item.productSlug || productData?.slug;
-  
+  const hasVariants = !!(item.variants && Object.keys(item.variants).length) || !!(item.customFormData && Object.keys(item.customFormData).length) || (item.productType === 'DESIGNED' && item.fabricId);
+
   return (
     <ScrollReveal key={item.id}>
       <div className="flex gap-3 xs:gap-4 sm:gap-6 p-3 xs:p-4 sm:p-6 bg-card rounded-xl sm:rounded-2xl border border-border">
         <img src={item.productImage || ''} alt={item.productName} className="w-20 h-24 xs:w-24 xs:h-32 sm:w-28 sm:h-36 lg:w-32 lg:h-40 object-cover rounded-lg sm:rounded-xl flex-shrink-0" />
         <div className="flex-1 min-w-0">
           {productSlug ? (
-            <Link 
-              to={`/product/${productSlug}`} 
-              className="font-cursive text-lg xs:text-xl sm:text-2xl hover:text-[#2b9d8f] line-clamp-2"
-            >
+            <Link to={`/product/${productSlug}`} className="font-cursive text-lg xs:text-xl sm:text-2xl hover:text-[#2b9d8f] line-clamp-2">
               {item.productName}
             </Link>
           ) : (
-            <span className="font-cursive text-lg xs:text-xl sm:text-2xl line-clamp-2">
-              {item.productName}
-            </span>
+            <span className="font-cursive text-lg xs:text-xl sm:text-2xl line-clamp-2">{item.productName}</span>
           )}
           <p className="text-xs xs:text-sm sm:text-base text-muted-foreground mt-1">{item.productType}</p>
-          
-          {/* Show fabric name, variants, and quantity details */}
-          <CartItemDetails 
-            item={{
-              productType: item.productType,
-              productId: item.productId,
-              fabricId: item.fabricId,
-              quantity: item.quantity || 1,
-              variants: item.variants,
-            }}
-          />
-          
+
+          <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
+            {hasVariants && (
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-1.5 text-xs mt-1.5 h-7 px-2 -ml-2 text-muted-foreground hover:text-foreground">
+                  {detailsOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  {detailsOpen ? 'Hide details' : 'View details'}
+                </Button>
+              </CollapsibleTrigger>
+            )}
+            <CollapsibleContent>
+              <div className="mt-1">
+                <CartItemDetails
+                  item={{
+                    productType: item.productType,
+                    productId: item.productId,
+                    fabricId: item.fabricId,
+                    quantity: item.quantity || 1,
+                    variants: item.variants,
+                    customFormData: item.customFormData,
+                  }}
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
           <div className="flex items-center justify-between mt-2 xs:mt-3">
             <p className="font-semibold text-[#2b9d8f] text-base xs:text-lg sm:text-xl">{format(item.totalPrice || item.unitPrice || 0)}</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-xs"
-              onClick={() => {
-                setSelectedItemForBreakdown(item);
-                setShowPriceBreakdown(true);
-              }}
-            >
+            <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => { setSelectedItemForBreakdown(item); setShowPriceBreakdown(true); }}>
               <Calculator className="w-3.5 h-3.5" />
               Breakdown
             </Button>
           </div>
           <div className="flex items-center gap-3 xs:gap-4 sm:gap-5 mt-3 xs:mt-4">
             <div className="flex items-center border border-border rounded-full">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 rounded-full"
-                onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                disabled={isLoggedIn && updateMutation.isPending}
-              >
+              <Button variant="ghost" size="icon" className="h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 rounded-full" onClick={() => handleQuantityChange(item.id, item.quantity - 1)} disabled={isLoggedIn && updateMutation.isPending}>
                 <Minus className="w-3 h-3 xs:w-4 xs:h-4" />
               </Button>
               <span className="w-8 xs:w-9 sm:w-10 text-center text-xs xs:text-sm sm:text-base">{item.quantity || 1}</span>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 rounded-full"
-                onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                disabled={isLoggedIn && updateMutation.isPending}
-              >
+              <Button variant="ghost" size="icon" className="h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 rounded-full" onClick={() => handleQuantityChange(item.id, item.quantity + 1)} disabled={isLoggedIn && updateMutation.isPending}>
                 <Plus className="w-3 h-3 xs:w-4 xs:h-4" />
               </Button>
             </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-destructive w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10"
-              onClick={() => handleRemoveItem(item.id)}
-              disabled={isLoggedIn && removeMutation.isPending}
-            >
+            <Button variant="ghost" size="icon" className="text-destructive w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10" onClick={() => handleRemoveItem(item.id)} disabled={isLoggedIn && removeMutation.isPending}>
               <Trash2 className="w-4 h-4 xs:w-5 xs:h-5" />
             </Button>
           </div>
@@ -214,7 +198,15 @@ const Cart = () => {
     ? (cartData?.couponDiscount ? Number(cartData.couponDiscount) : 0)
     : 0; // Coupons only for logged-in users
   const total = subtotal + gst + shipping - couponDiscount;
-  
+  const orderTotalBeforeCoupon = subtotal + gst + shipping;
+
+  // Eligible coupons for logged-in users (order total before discount)
+  const { data: eligibleCoupons = [] } = useQuery({
+    queryKey: ['coupons-eligible', orderTotalBeforeCoupon],
+    queryFn: () => couponApi.getEligible(orderTotalBeforeCoupon),
+    enabled: isLoggedIn && orderTotalBeforeCoupon > 0,
+  });
+
   // Update applied coupon code from cart data
   useEffect(() => {
     if (cartData?.appliedCouponCode) {
@@ -335,44 +327,70 @@ const Cart = () => {
                     <span>{format(total)}</span>
                   </div>
                 </div>
-                {isLoggedIn && (
-                  <div className="mt-4 xs:mt-6 space-y-2">
-                    {appliedCouponCode ? (
+                <div className="mt-4 xs:mt-6 space-y-3">
+                  {isLoggedIn ? (
+                    appliedCouponCode ? (
                       <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary/20">
                         <div>
                           <p className="text-sm font-medium">Applied: {appliedCouponCode}</p>
                           <p className="text-xs text-muted-foreground">Discount: {format(couponDiscount)}</p>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={removeCoupon}
-                          className="text-xs"
-                        >
+                        <Button variant="ghost" size="sm" onClick={removeCoupon} className="text-xs">
                           Remove
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex gap-2 xs:gap-3">
-                        <Input 
-                          placeholder="Coupon code" 
-                          className="flex-1 h-10 xs:h-11 sm:h-12 text-sm sm:text-base" 
-                          value={couponCode}
-                          onChange={(e) => setCouponCode(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleApplyCoupon()}
-                        />
-                        <Button 
-                          variant="outline" 
-                          className="h-10 xs:h-11 sm:h-12 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap"
-                          onClick={handleApplyCoupon}
-                          disabled={applyCouponMutation.isPending || !couponCode.trim()}
-                        >
-                          {applyCouponMutation.isPending ? 'Applying...' : 'Apply'}
+                      <>
+                        {eligibleCoupons.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-2">Available coupons</p>
+                            <div className="flex flex-wrap gap-2">
+                              {eligibleCoupons.map((c: any) => (
+                                <Button
+                                  key={c.code}
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 text-xs"
+                                  onClick={() => applyCouponMutation.mutate({ code: c.code })}
+                                  disabled={applyCouponMutation.isPending}
+                                >
+                                  {c.code} — {c.message}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex gap-2 xs:gap-3">
+                          <Input
+                            placeholder="Have a code? Enter here"
+                            className="flex-1 h-10 xs:h-11 sm:h-12 text-sm sm:text-base"
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
+                          />
+                          <Button
+                            variant="outline"
+                            className="h-10 xs:h-11 sm:h-12 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap"
+                            onClick={handleApplyCoupon}
+                            disabled={applyCouponMutation.isPending || !couponCode.trim()}
+                          >
+                            {applyCouponMutation.isPending ? 'Applying...' : 'Apply'}
+                          </Button>
+                        </div>
+                      </>
+                    )
+                  ) : (
+                    <div className="p-3 rounded-lg border border-border bg-muted/30">
+                      <p className="text-xs sm:text-sm font-medium">Discount / Coupon</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Log in to see and use discount coupons.</p>
+                      <Link to="/login" state={{ returnTo: '/cart' }} className="inline-block mt-2">
+                        <Button variant="outline" size="sm" className="h-8 text-xs">
+                          Log in
                         </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      </Link>
+                    </div>
+                  )}
+                </div>
                 <Link to="/checkout" className="block mt-4 xs:mt-6">
                   <Button className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white h-12 xs:h-14 text-sm sm:text-base">
                     <span className="truncate">Checkout</span>

@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Save, Type, FileText, Loader2, Search, Eye, Calendar, Mail, Phone, Image as ImageIcon, Plus, X, Trash2 } from 'lucide-react';
+import { Save, Type, FileText, Loader2, Search, Eye, Calendar, Mail, Phone, Image as ImageIcon, Plus, X, Trash2, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FormBuilder, { FormField } from '@/components/admin/FormBuilder';
@@ -844,10 +844,16 @@ const AdminCustomConfig = () => {
                             </p>
                           </div>
                           {request.referenceImage && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <a
+                              href={request.referenceImage}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                            >
                               <ImageIcon className="w-4 h-4" />
-                              <span>Reference image attached</span>
-                            </div>
+                              <span>View uploaded file</span>
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
                           )}
                         </div>
                         <div className="flex gap-2 lg:flex-col">
@@ -915,11 +921,20 @@ const AdminCustomConfig = () => {
                 
                 {selectedRequest.referenceImage && (
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Reference Image</label>
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Reference Image / Uploaded File</label>
+                    <a
+                      href={selectedRequest.referenceImage}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm text-primary hover:underline mb-2"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Open uploaded file in new tab
+                    </a>
                     <img 
                       src={selectedRequest.referenceImage} 
                       alt="Reference" 
-                      className="max-w-full h-auto rounded-lg border border-border"
+                      className="max-w-full max-h-[280px] object-contain rounded-lg border border-border mt-1"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}

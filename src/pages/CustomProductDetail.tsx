@@ -7,6 +7,7 @@ import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import PlainProductSelectionPopup from '@/components/products/PlainProductSelectionPopup';
@@ -16,7 +17,7 @@ import { FormField } from '@/components/admin/FormBuilder';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { IndianRupee } from 'lucide-react';
-import { customProductsApi, cartApi, wishlistApi, customConfigApi } from '@/lib/api';
+import { customProductsApi, cartApi, wishlistApi, customConfigApi, productsApi } from '@/lib/api';
 import { usePrice } from '@/lib/currency';
 
 const CustomProductDetail = () => {
@@ -83,7 +84,7 @@ const CustomProductDetail = () => {
   // Fallback to location.state for backward compatibility
   const designUrl = customProduct?.designUrl || (location.state as any)?.designUrl;
   const customProductId = customProduct?.id || (id ? Number(id) : null);
-  const isTemporary = !customProduct?.isSaved ?? true;
+  const isTemporary = customProduct?.isSaved !== true;
   
   // Parse mockup URLs from customProduct (stored as JSON string)
   const mockupUrls = useMemo(() => {
@@ -115,10 +116,29 @@ const CustomProductDetail = () => {
   const customFormFields = useMemo(() => {
     return customConfig?.formFields || [];
   }, [customConfig?.formFields]);
-  
+
+  // Config variants from Make Your Own config (same shape as ProductDetail effectiveVariants)
+  const effectiveConfigVariants = useMemo(() => {
+    if (!customConfig?.variants || customConfig.variants.length === 0) return [];
+    return customConfig.variants.map((v: any) => ({
+      id: String(v.id ?? `variant-${v.displayOrder ?? 0}`),
+      type: v.type || '',
+      name: v.name || '',
+      unit: v.unit || '',
+      frontendId: v.frontendId || '',
+      options: (v.options || []).map((opt: any) => ({
+        id: String(opt.id ?? `opt-${opt.displayOrder ?? 0}`),
+        value: opt.value || '',
+        frontendId: opt.frontendId || '',
+        priceModifier: Number(opt.priceModifier || 0),
+      })),
+    }));
+  }, [customConfig?.variants]);
+
   // Track if component is mounted and product is loaded
   const isMountedRef = useRef(true);
   const productLoadedRef = useRef(false);
+  const unsavedCleanupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   useEffect(() => {
     isMountedRef.current = true;
@@ -155,18 +175,19 @@ const CustomProductDetail = () => {
     
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Only delete on actual unmount (user navigates away), not on dependency changes
-      // Check if component is still mounted after a delay
-      const timeoutId = setTimeout(() => {
+      if (unsavedCleanupTimeoutRef.current) {
+        clearTimeout(unsavedCleanupTimeoutRef.current);
+        unsavedCleanupTimeoutRef.current = null;
+      }
+      // Only delete on actual unmount (user navigates away), after a short delay
+      unsavedCleanupTimeoutRef.current = setTimeout(() => {
         if (!isMountedRef.current && productLoadedRef.current) {
           const guestId = getGuestIdentifier();
           if (guestId || localStorage.getItem('authToken')) {
             customProductsApi.deleteUnsaved(customProductId, guestId || undefined).catch(() => {});
           }
         }
-      }, 1000); // Wait 1 second to ensure this is a real navigation
-      
-      return () => clearTimeout(timeoutId);
+      }, 1000);
     };
   }, [customProductId, isTemporary, customProduct]);
   
@@ -203,34 +224,75 @@ const CustomProductDetail = () => {
   const [showFabricVariant, setShowFabricVariant] = useState(false);
   const [selectedPlainProductId, setSelectedPlainProductId] = useState<string | null>(null);
   const [fabricSelectionData, setFabricSelectionData] = useState<any>(null);
-  
-  // Custom Form State
-  const [showCustomForm, setShowCustomForm] = useState(false);
+
+  // Config variant selections (variantId -> optionId) from customConfig.variants
+  const [selectedConfigVariants, setSelectedConfigVariants] = useState<Record<string, string>>({});
+
+  // Fetch selected plain product (fabric) for Make Your Own fabric popup
+  const { data: selectedFabricProduct } = useQuery({
+    queryKey: ['plainProduct', selectedPlainProductId],
+    queryFn: () => productsApi.getById(Number(selectedPlainProductId!)),
+    enabled: !!selectedPlainProductId,
+  });
+
+  // Custom Form State (only used when customConfig.formFields has items)
   const [customFormData, setCustomFormData] = useState<Record<string, any>>({});
 
-  // Calculate combined price (Design Price + Fabric Price)
+  // Normalized field id for form data keys (align with DynamicForm / ProductDetail)
+  const getFieldId = (f: { id?: string | number; displayOrder?: number }, index: number) =>
+    String(f.id ?? f.displayOrder ?? index);
+
+  // True when all required custom form fields are filled (align with DynamicForm.validateField)
+  const requiredFieldsFilled = useMemo(() => {
+    const required = customFormFields.filter((f: any) => f.required);
+    if (required.length === 0) return true;
+    return required.every((f: any, i: number) => {
+      const id = getFieldId(f, i);
+      const v = customFormData[id];
+      if (v == null || v === '') return false;
+      if (typeof v === 'string' && v.trim() === '') return false;
+      return true;
+    });
+  }, [customFormFields, customFormData]);
+
+  // Calculate combined price (Design Price + Fabric Price + Config variant modifiers)
   const combinedPrice = useMemo(() => {
-    if (!fabricSelectionData) return DESIGN_PRICE;
-    return DESIGN_PRICE + fabricSelectionData.totalPrice;
-  }, [fabricSelectionData, DESIGN_PRICE]);
+    const fabricTotal = fabricSelectionData?.totalPrice ?? 0;
+    const qty = fabricSelectionData?.quantity ?? 1;
+    let configVariantModifier = 0;
+    if (effectiveConfigVariants.length > 0 && qty > 0) {
+      effectiveConfigVariants.forEach((variant: any) => {
+        const optionId = selectedConfigVariants[String(variant.id)];
+        if (optionId && variant.options) {
+          const opt = variant.options.find((o: any) => String(o.id) === optionId);
+          if (opt && opt.priceModifier) configVariantModifier += Number(opt.priceModifier) * qty;
+        }
+      });
+    }
+    return DESIGN_PRICE + fabricTotal + configVariantModifier;
+  }, [DESIGN_PRICE, fabricSelectionData, effectiveConfigVariants, selectedConfigVariants]);
 
   const handlePlainProductSelect = (productId: string) => {
     setSelectedPlainProductId(productId);
     setShowPlainProductSelection(false);
-    setShowFabricVariant(true);
+    // Fabric variant popup will open in useEffect when selectedFabricProduct has loaded
   };
+
+  // Open fabric variant popup once the selected plain product (fabric) has been fetched
+  useEffect(() => {
+    if (selectedPlainProductId && selectedFabricProduct) {
+      setShowFabricVariant(true);
+    }
+  }, [selectedPlainProductId, selectedFabricProduct]);
 
   const handleFabricVariantComplete = (data: any) => {
     setFabricSelectionData(data);
     setShowFabricVariant(false);
-    // After fabric selection, show custom form
-    setShowCustomForm(true);
   };
 
   const handleCustomFormSubmit = (formData: Record<string, any>) => {
     setCustomFormData(formData);
-    setShowCustomForm(false);
-    toast.success('Custom information saved!');
+    toast.success('Details saved.');
   };
 
   // Save custom product mutation
@@ -271,11 +333,33 @@ const CustomProductDetail = () => {
       toast.error('Please select a fabric first');
       return;
     }
-    if (customFormFields.length > 0 && Object.keys(customFormData).length === 0) {
-      toast.error('Please fill the custom form first');
-      setShowCustomForm(true);
+    if (!requiredFieldsFilled) {
+      toast.error('Please fill all required fields');
       return;
     }
+
+    // Config variant selections (same shape as ProductDetail)
+    const variantSelections: Record<string, any> = {};
+    effectiveConfigVariants.forEach((variant: any) => {
+      const selectedOptionId = selectedConfigVariants[String(variant.id)];
+      if (selectedOptionId && variant.options) {
+        const selectedOption = variant.options.find((o: any) => String(o.id) === selectedOptionId);
+        if (selectedOption) {
+          const variantKey = variant.frontendId || String(variant.id);
+          variantSelections[variantKey] = {
+            variantId: variant.id,
+            variantFrontendId: variant.frontendId || null,
+            variantName: variant.name,
+            variantType: variant.type,
+            variantUnit: variant.unit || null,
+            optionId: selectedOption.id,
+            optionFrontendId: selectedOption.frontendId || null,
+            optionValue: selectedOption.value,
+            priceModifier: selectedOption.priceModifier || 0,
+          };
+        }
+      }
+    });
 
     const cartData = {
       productType: 'CUSTOM',
@@ -288,17 +372,18 @@ const CustomProductDetail = () => {
       quantity: fabricSelectionData.quantity,
       unitPrice: combinedPrice,
       variants: fabricSelectionData.selectedVariants,
+      variantSelections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
       customFormData: customFormData,
       uploadedDesignUrl: designUrl,
       customProductId: customProductId, // Include custom product ID
     };
-    
+
     addToCartMutation.mutate(cartData);
   };
 
-  // Add to wishlist mutation
+  // Add to wishlist mutation (wishlist API takes productType + productId)
   const addToWishlistMutation = useMutation({
-    mutationFn: (wishlistData: any) => wishlistApi.addItem(wishlistData),
+    mutationFn: () => wishlistApi.addItem('CUSTOM', Number(customProductId!)),
     onSuccess: () => {
       if (customProductId) {
         // Save custom product when added to wishlist
@@ -312,26 +397,21 @@ const CustomProductDetail = () => {
   });
 
   const handleAddToWishlist = () => {
+    if (!isLoggedIn) {
+      toast.error('Please log in to add items to your wishlist');
+      navigate('/login', { state: { returnTo: `/custom-product/${id || customProductId}` } });
+      return;
+    }
     if (!fabricSelectionData) {
       toast.error('Please select a fabric first');
       return;
     }
+    if (!requiredFieldsFilled) {
+      toast.error('Please fill all required fields');
+      return;
+    }
 
-    const wishlistData = {
-      productType: 'CUSTOM',
-      productId: customProductId || 0,
-      productName: customFormData['field-1'] || 'Custom Studio Sara Piece',
-      productImage: designUrl,
-      designPrice: DESIGN_PRICE,
-      fabricId: Number(fabricSelectionData.fabricId),
-      fabricPrice: fabricSelectionData.totalPrice,
-      variants: fabricSelectionData.selectedVariants,
-      customFormData: customFormData,
-      uploadedDesignUrl: designUrl,
-      customProductId: customProductId,
-    };
-    
-    addToWishlistMutation.mutate(wishlistData);
+    addToWishlistMutation.mutate();
   };
 
   if (!designUrl || displayImages.length === 0) return null;
@@ -458,6 +538,16 @@ const CustomProductDetail = () => {
                         <div className="text-sm text-muted-foreground space-y-1">
                           <p>Design Price: {format(DESIGN_PRICE)}</p>
                           <p>Fabric Price: {format(fabricSelectionData.totalPrice)}</p>
+                          {(() => {
+                            const qty = fabricSelectionData.quantity ?? 1;
+                            let mod = 0;
+                            effectiveConfigVariants.forEach((v: any) => {
+                              const oid = selectedConfigVariants[String(v.id)];
+                              const opt = oid && v.options ? v.options.find((o: any) => String(o.id) === oid) : null;
+                              if (opt && opt.priceModifier) mod += Number(opt.priceModifier) * qty;
+                            });
+                            return mod > 0 ? <p>Options: {format(mod)}</p> : null;
+                          })()}
                         </div>
                       )}
                     </div>
@@ -522,37 +612,61 @@ const CustomProductDetail = () => {
                     </div>
                   )}
 
-                  {/* Custom Form Section */}
-                  {fabricSelectionData && customFormFields.length > 0 && !showCustomForm && Object.keys(customFormData).length === 0 && (
-                    <div className="space-y-4 p-4 border border-border rounded-lg">
-                      <h4 className="font-medium text-lg">Additional Information</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Please provide some additional details about your custom product.
-                      </p>
-                      <Button
-                        onClick={() => setShowCustomForm(true)}
-                        variant="outline"
-                        className="w-full"
-                      >
-                        Fill Custom Form
-                      </Button>
+                  {/* Config variants (from Make Your Own config) */}
+                  {effectiveConfigVariants.length > 0 && (
+                    <div className="space-y-4">
+                      <h4 className="font-bold mb-4 text-lg">Select Options</h4>
+                      {effectiveConfigVariants.map((variant: any) => (
+                        <div key={variant.id} className="space-y-2">
+                          <Label className="text-sm font-medium">
+                            {variant.name}
+                            {variant.unit && <span className="text-muted-foreground ml-1">({variant.unit})</span>}
+                          </Label>
+                          <div className="flex flex-wrap gap-2">
+                            {variant.options && variant.options.map((option: any) => {
+                              const isSelected = selectedConfigVariants[String(variant.id)] === String(option.id);
+                              return (
+                                <button
+                                  key={option.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedConfigVariants((prev) => ({
+                                      ...prev,
+                                      [String(variant.id)]: String(option.id),
+                                    }));
+                                  }}
+                                  className={cn(
+                                    'px-4 py-2 rounded-lg border-2 transition-all text-sm',
+                                    isSelected
+                                      ? 'border-primary bg-primary/10 text-primary font-medium'
+                                      : 'border-border hover:border-primary/50'
+                                  )}
+                                >
+                                  {option.value}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
 
-                  {showCustomForm && (
+                  {/* Custom Form: only when config has form fields */}
+                  {fabricSelectionData && customFormFields.length > 0 && (
                     <div className="space-y-4 p-6 border border-border rounded-lg bg-white">
-                      <h4 className="font-medium text-lg">Custom Product Information</h4>
+                      <h4 className="font-medium text-lg">Additional information</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Fill the details below, then click Add to Cart.
+                      </p>
                       <DynamicForm
                         fields={customFormFields}
                         onSubmit={handleCustomFormSubmit}
                         initialData={customFormData}
                       />
-                    </div>
-                  )}
-
-                  {customFormData && Object.keys(customFormData).length > 0 && (
-                    <div className="space-y-2 p-4 border border-border rounded-lg bg-green-50">
-                      <p className="text-sm font-medium text-green-700">Custom information saved ✓</p>
+                      {Object.keys(customFormData).length > 0 && (
+                        <p className="text-sm font-medium text-green-700">Details saved ✓</p>
+                      )}
                     </div>
                   )}
 
@@ -561,7 +675,7 @@ const CustomProductDetail = () => {
                     <Button 
                       size="lg" 
                       onClick={handleAddToCart}
-                      disabled={!fabricSelectionData || (customFormFields.length > 0 && Object.keys(customFormData).length === 0)}
+                      disabled={!fabricSelectionData || !requiredFieldsFilled}
                       className="flex-1 min-w-[220px] btn-primary gap-3 h-14 text-base"
                     >
                       <ShoppingBag className="w-5 h-5" />
@@ -572,7 +686,7 @@ const CustomProductDetail = () => {
                       variant="outline" 
                       className="rounded-full w-14 h-14"
                       onClick={handleAddToWishlist}
-                      disabled={isSaved || !fabricSelectionData}
+                      disabled={!isLoggedIn || isSaved || !fabricSelectionData || !requiredFieldsFilled}
                     >
                       <Heart className={`w-5 h-5 ${isSaved ? 'fill-primary text-primary' : ''}`} />
                     </Button>
@@ -635,14 +749,30 @@ const CustomProductDetail = () => {
             <FabricVariantPopup
               open={showFabricVariant}
               onOpenChange={setShowFabricVariant}
-              fabric={{
-                id: selectedPlainProductId,
-                name: 'Selected Plain Product',
-                image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=300&h=300&fit=crop',
-                pricePerMeter: 100,
-                status: 'active',
-              }}
-              variants={[]}
+              fabric={
+                selectedFabricProduct
+                  ? {
+                      id: String(selectedFabricProduct.id),
+                      name: selectedFabricProduct.name || 'Selected Fabric',
+                      image: selectedFabricProduct.images?.[0] || selectedFabricProduct.media?.[0]?.url || '',
+                      pricePerMeter: Number(selectedFabricProduct.pricePerMeter || selectedFabricProduct.price || 0),
+                      status: (selectedFabricProduct.status?.toLowerCase() === 'active' ? 'active' : 'inactive') as 'active' | 'inactive',
+                    }
+                  : null
+              }
+              variants={
+                selectedFabricProduct?.variants?.map((v: any) => ({
+                  id: String(v.id),
+                  type: v.type || '',
+                  name: v.name || '',
+                  options: (v.options?.map((opt: any) => ({
+                    id: String(opt.id),
+                    value: opt.value || '',
+                    priceModifier: Number(opt.priceModifier || 0),
+                  })) ?? []),
+                })) ?? []
+              }
+              customFields={selectedFabricProduct?.customFields ?? []}
               onComplete={handleFabricVariantComplete}
             />
           )}
