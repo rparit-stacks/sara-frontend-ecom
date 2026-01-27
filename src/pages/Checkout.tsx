@@ -639,7 +639,9 @@ const Checkout = () => {
     
     // Validate payment gateway availability
     if (availableGateways.length === 0) {
-      toast.error('We are not able to process your order right now. Please try again after some time.');
+      toast.error(hasDigitalProducts
+        ? 'No payment methods available. Please try later.'
+        : 'We are not able to process your order right now. Please try again after some time.');
       return;
     }
     

@@ -9,7 +9,7 @@ import { cartApi, wishlistApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import { CategoryDropdown } from '@/components/categories/CategoryDropdown';
 import { CurrencySelector } from '@/components/currency/CurrencySelector';
-import { Package, Download, User } from 'lucide-react';
+import { Package, LayoutDashboard, Settings, LogOut } from 'lucide-react';
 
 const navLinks = [
   { name: 'Home', path: '/' },
@@ -94,6 +94,13 @@ export const Navbar = () => {
   const handleProfileMenuClick = (tab: string) => {
     setIsProfileMenuOpen(false);
     navigate('/dashboard', { state: { activeTab: tab } });
+  };
+
+  const handleLogout = () => {
+    setIsProfileMenuOpen(false);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('authEmail');
+    navigate('/', { replace: true });
   };
 
   return (
@@ -219,21 +226,28 @@ export const Navbar = () => {
                           className="w-full px-4 py-2.5 text-left text-sm font-medium text-foreground hover:bg-secondary transition-colors flex items-center gap-3"
                         >
                           <Package className="w-4 h-4" />
-                          Your Orders
+                          Orders
                         </button>
                         <button
-                          onClick={() => handleProfileMenuClick('downloads')}
+                          onClick={() => { setIsProfileMenuOpen(false); navigate('/dashboard'); }}
                           className="w-full px-4 py-2.5 text-left text-sm font-medium text-foreground hover:bg-secondary transition-colors flex items-center gap-3"
                         >
-                          <Download className="w-4 h-4" />
-                          Your Downloads
+                          <LayoutDashboard className="w-4 h-4" />
+                          Dashboard
                         </button>
                         <button
                           onClick={() => handleProfileMenuClick('profile')}
                           className="w-full px-4 py-2.5 text-left text-sm font-medium text-foreground hover:bg-secondary transition-colors flex items-center gap-3"
                         >
-                          <User className="w-4 h-4" />
-                          Edit Profile
+                          <Settings className="w-4 h-4" />
+                          Settings
+                        </button>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full px-4 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center gap-3"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Logout
                         </button>
                       </div>
                     </motion.div>

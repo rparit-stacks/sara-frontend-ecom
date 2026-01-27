@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { productsApi, categoriesApi, cmsApi } from '@/lib/api';
+import { ProductCardSkeleton } from '@/components/skeletons';
 
 interface Category {
   id: number;
@@ -593,9 +594,9 @@ const Products = () => {
               {viewMode === 'grid' ? (
                 <div className="grid gap-6 lg:gap-8 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {isLoading ? (
-                    <div className="col-span-full flex justify-center py-12">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                    </div>
+                    Array.from({ length: pageSize }).map((_, i) => (
+                      <ProductCardSkeleton key={i} />
+                    ))
                   ) : paginatedProducts.length === 0 ? (
                     <div className="col-span-full text-center py-12 text-muted-foreground">
                       No products found.
@@ -611,8 +612,10 @@ const Products = () => {
               ) : (
                 <div className="space-y-0 border border-border rounded-lg overflow-hidden bg-background">
                   {isLoading ? (
-                    <div className="flex justify-center py-12">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    <div className="grid gap-6 lg:gap-8 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 p-6">
+                      {Array.from({ length: pageSize }).map((_, i) => (
+                        <ProductCardSkeleton key={i} />
+                      ))}
                     </div>
                   ) : paginatedProducts.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">

@@ -100,6 +100,34 @@ const SortableOptionItem: React.FC<SortableOptionItemProps> = ({ id, children })
   );
 };
 
+// Sortable Detail Section Item
+const SortableDetailSectionItem: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="relative">
+      <div className="absolute left-0 top-0 bottom-0 flex items-center cursor-grab active:cursor-grabbing z-10 p-2 text-muted-foreground hover:text-foreground">
+        <GripVertical className="w-5 h-5" {...attributes} {...listeners} />
+      </div>
+      <div className="pl-8">{children}</div>
+    </div>
+  );
+};
+
+// Sortable Custom Field Item
+const SortableCustomFieldItem: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="relative">
+      <div className="absolute left-0 top-0 bottom-0 flex items-center cursor-grab active:cursor-grabbing z-10 p-2 text-muted-foreground hover:text-foreground">
+        <GripVertical className="w-5 h-5" {...attributes} {...listeners} />
+      </div>
+      <div className="pl-8">{children}</div>
+    </div>
+  );
+};
+
 // Media Upload Component
 const MediaUploadSection: React.FC<{
   media: Array<{ url: string; type: 'image' | 'video'; displayOrder: number }>;
@@ -481,6 +509,12 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
         if (activeType === 'DIGITAL' && mode === 'create' && !value) {
           return 'Digital file is required';
         }
+        if (activeType === 'DIGITAL' && value && value instanceof File) {
+          const MAX_MB = 10;
+          if (value.size > MAX_MB * 1024 * 1024) {
+            return 'Upload failed: Cloudinary supports max 10MB. Please adjust file size or upgrade Cloudinary limits.';
+          }
+        }
         return '';
       default:
         // Handle pricing slab validation
@@ -605,7 +639,10 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
           return;
         }
       } catch (error: any) {
-        toast.error(error.message || 'Failed to upload digital file');
+        const msg = error?.message || '';
+        const cloudinaryMsg = 'Upload failed: Cloudinary supports max 10MB. Please adjust file size or upgrade Cloudinary limits.';
+        const show = /10MB|Cloudinary|File size|exceeds/i.test(msg) ? cloudinaryMsg : (msg || 'Upload failed. Please check your connection and try again.');
+        toast.error(show);
         return;
       }
     } else if (activeType === 'DIGITAL' && formData.digitalFile && mode === 'edit') {
@@ -616,7 +653,10 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
           uploadedFileUrl = uploadedFiles[0].url;
         }
       } catch (error: any) {
-        toast.error(error.message || 'Failed to upload digital file');
+        const msg = error?.message || '';
+        const cloudinaryMsg = 'Upload failed: Cloudinary supports max 10MB. Please adjust file size or upgrade Cloudinary limits.';
+        const show = /10MB|Cloudinary|File size|exceeds/i.test(msg) ? cloudinaryMsg : (msg || 'Upload failed. Please check your connection and try again.');
+        toast.error(show);
         return;
       }
     }
@@ -837,6 +877,32 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
     }
   };
   
+  const handleDetailSectionDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setFormData((prev) => {
+        const oldIndex = prev.detailSections.findIndex((s) => s.id === active.id);
+        const newIndex = prev.detailSections.findIndex((s) => s.id === over.id);
+        if (oldIndex === -1 || newIndex === -1) return prev;
+        const reordered = arrayMove(prev.detailSections, oldIndex, newIndex);
+        return { ...prev, detailSections: reordered };
+      });
+    }
+  };
+
+  const handleCustomFieldDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setFormData((prev) => {
+        const oldIndex = prev.customFields.findIndex((f) => f.id === active.id);
+        const newIndex = prev.customFields.findIndex((f) => f.id === over.id);
+        if (oldIndex === -1 || newIndex === -1) return prev;
+        const reordered = arrayMove(prev.customFields, oldIndex, newIndex);
+        return { ...prev, customFields: reordered };
+      });
+    }
+  };
+
   const handleOptionDragEnd = (event: DragEndEvent, variantId: string) => {
     const { active, over } = event;
 
@@ -1363,7 +1429,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                   <div className="space-y-1">
                     <p className="font-semibold">Upload Digital File *</p>
                     <p className="text-xs text-muted-foreground text-center max-w-[200px] mx-auto">
-                      Any file type supported. Max size 5GB (actual limit depends on storage service configuration).
+                      Any file type supported. Max 10MB (Cloudinary limit).
                     </p>
                   </div>
                   <input 
@@ -1406,47 +1472,53 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                 Add Section
               </Button>
             </div>
-            <div className="space-y-4">
-              {formData.detailSections.map((section) => (
-                <div key={section.id} className="p-4 border border-border rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Detail Section</Label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeDetailSection(section.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <div>
-                    <Label className="text-xs">Title</Label>
-                    <Input
-                      value={section.title}
-                      onChange={(e) => updateDetailSection(section.id, { title: e.target.value })}
-                      placeholder="e.g. Product Details"
-                      className="h-9"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Content</Label>
-                    <textarea
-                      value={section.content}
-                      onChange={(e) => updateDetailSection(section.id, { content: e.target.value })}
-                      placeholder="Enter section content..."
-                      className="w-full min-h-[100px] p-3 border border-border rounded-lg resize-y"
-                    />
-                  </div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDetailSectionDragEnd}>
+              <SortableContext items={formData.detailSections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-4">
+                  {formData.detailSections.map((section) => (
+                    <SortableDetailSectionItem key={section.id} id={section.id}>
+                      <div className="p-4 border border-border rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm">Detail Section</Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeDetailSection(section.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Title</Label>
+                          <Input
+                            value={section.title}
+                            onChange={(e) => updateDetailSection(section.id, { title: e.target.value })}
+                            placeholder="e.g. Product Details"
+                            className="h-9"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Content</Label>
+                          <textarea
+                            value={section.content}
+                            onChange={(e) => updateDetailSection(section.id, { content: e.target.value })}
+                            placeholder="Enter section content..."
+                            className="w-full min-h-[100px] p-3 border border-border rounded-lg resize-y"
+                          />
+                        </div>
+                      </div>
+                    </SortableDetailSectionItem>
+                  ))}
+                  {formData.detailSections.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No detail sections added. Click "Add Section" to create one.
+                    </p>
+                  )}
                 </div>
-              ))}
-              {formData.detailSections.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No detail sections added. Click "Add Section" to create one.
-                </p>
-              )}
-            </div>
+              </SortableContext>
+            </DndContext>
           </section>
 
           {/* Step 5: Custom Fields */}
@@ -1461,76 +1533,82 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                 Add Field
               </Button>
             </div>
-            <div className="space-y-4">
-              {formData.customFields.map((field) => (
-                <div key={field.id} className="p-4 border border-border rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Custom Field</Label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeCustomField(field.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs">Field Name (shown to customer) *</Label>
-                      <Input
-                        value={field.label}
-                        onChange={(e) => updateCustomField(field.id, { label: e.target.value })}
-                        placeholder="e.g. Upload Design"
-                        className="h-9"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Field Type *</Label>
-                      <Select
-                        value={field.fieldType}
-                        onValueChange={(value) => updateCustomField(field.id, { fieldType: value })}
-                      >
-                        <SelectTrigger className="h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="text">Text</SelectItem>
-                          <SelectItem value="number">Number</SelectItem>
-                          <SelectItem value="url">URL</SelectItem>
-                          <SelectItem value="image">Image / File Upload</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-xs">Placeholder / Suggestion</Label>
-                    <Input
-                      value={field.placeholder}
-                      onChange={(e) => updateCustomField(field.id, { placeholder: e.target.value })}
-                      placeholder="e.g. Upload high-resolution PNG/JPG"
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-                    <div>
-                      <Label className="text-sm">Required Field</Label>
-                      <p className="text-xs text-muted-foreground">Customer must fill this field</p>
-                    </div>
-                    <Switch
-                      checked={field.isRequired}
-                      onCheckedChange={(checked) => updateCustomField(field.id, { isRequired: checked })}
-                    />
-                  </div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCustomFieldDragEnd}>
+              <SortableContext items={formData.customFields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-4">
+                  {formData.customFields.map((field) => (
+                    <SortableCustomFieldItem key={field.id} id={field.id}>
+                      <div className="p-4 border border-border rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm">Custom Field</Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeCustomField(field.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs">Field Name (shown to customer) *</Label>
+                            <Input
+                              value={field.label}
+                              onChange={(e) => updateCustomField(field.id, { label: e.target.value })}
+                              placeholder="e.g. Upload Design"
+                              className="h-9"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Field Type *</Label>
+                            <Select
+                              value={field.fieldType}
+                              onValueChange={(value) => updateCustomField(field.id, { fieldType: value })}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="text">Text</SelectItem>
+                                <SelectItem value="number">Number</SelectItem>
+                                <SelectItem value="url">URL</SelectItem>
+                                <SelectItem value="image">Image / File Upload</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Placeholder / Suggestion</Label>
+                          <Input
+                            value={field.placeholder}
+                            onChange={(e) => updateCustomField(field.id, { placeholder: e.target.value })}
+                            placeholder="e.g. Upload high-resolution PNG/JPG"
+                            className="h-9"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+                          <div>
+                            <Label className="text-sm">Required Field</Label>
+                            <p className="text-xs text-muted-foreground">Customer must fill this field</p>
+                          </div>
+                          <Switch
+                            checked={field.isRequired}
+                            onCheckedChange={(checked) => updateCustomField(field.id, { isRequired: checked })}
+                          />
+                        </div>
+                      </div>
+                    </SortableCustomFieldItem>
+                  ))}
+                  {formData.customFields.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No custom fields added. Click "Add Field" to create one.
+                    </p>
+                  )}
                 </div>
-              ))}
-              {formData.customFields.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No custom fields added. Click "Add Field" to create one.
-                </p>
-              )}
-            </div>
+              </SortableContext>
+            </DndContext>
           </section>
 
           {/* Step 6: Variants */}

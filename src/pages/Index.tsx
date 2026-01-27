@@ -10,6 +10,14 @@ import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
 import { cmsApi, productsApi, categoriesApi, subscribeEmail } from '@/lib/api';
 import { toast } from 'sonner';
+import {
+  ProductCardSkeleton,
+  CategoryCardSkeleton,
+  TestimonialCardSkeleton,
+  BlogCardSkeleton,
+  InstagramGridSkeleton,
+  OfferSkeleton,
+} from '@/components/skeletons';
 
 // Default hero slides
 const defaultHeroSlides = [
@@ -91,7 +99,7 @@ const Index = () => {
   }, [heroApi]);
   
   // Fetch CMS homepage data
-  const { data: cmsData } = useQuery({
+  const { data: cmsData, isLoading: isLoadingCms } = useQuery({
     queryKey: ['cmsHomepage'],
     queryFn: () => cmsApi.getHomepage(),
     refetchOnWindowFocus: false,
@@ -130,7 +138,7 @@ const Index = () => {
   }, [homepageBlogs, blogsError]);
   
   // Fetch products for best sellers and new arrivals with user email if logged in
-  const { data: apiProducts = [] } = useQuery({
+  const { data: apiProducts = [], isLoading: isLoadingProducts } = useQuery({
     queryKey: ['products'],
     queryFn: () => {
       const userEmail = typeof window !== 'undefined' ? (() => {
@@ -148,7 +156,7 @@ const Index = () => {
   });
   
   // Fetch categories with user email if logged in
-  const { data: apiCategories = [] } = useQuery({
+  const { data: apiCategories = [], isLoading: isLoadingCategories } = useQuery({
     queryKey: ['categoriesActive'],
     queryFn: () => {
       const userEmail = typeof window !== 'undefined' ? (() => {
@@ -400,24 +408,30 @@ const Index = () => {
           </div>
           <div className="overflow-x-auto -mx-3 xs:-mx-4 sm:-mx-6 lg:-mx-12 px-3 xs:px-4 sm:px-6 lg:px-12 scrollbar-hide">
             <div className="flex gap-3 xs:gap-4 sm:gap-6 lg:gap-8 min-w-max pb-4">
-              {categories.map((category, index) => (
-                <ScrollReveal key={category.id} delay={index * 0.1}>
-                  <Link to={`/category/${category.slug}`} className="group block flex-shrink-0">
-                    <div className="relative w-[180px] xs:w-[220px] sm:w-[280px] md:w-[320px] lg:w-[360px] aspect-[3/4] rounded-xl xs:rounded-2xl overflow-hidden shadow-lg">
-                      <img
-                        src={category.image}
-                        alt={category.name}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/20 to-transparent" />
-                      <div className="absolute inset-0 flex flex-col items-center justify-end text-white pb-4 xs:pb-6 sm:pb-8 lg:pb-10">
-                        <h3 className="font-cursive text-2xl xs:text-3xl sm:text-4xl lg:text-5xl mb-1 xs:mb-2">{category.name}</h3>
-                        <p className="text-xs xs:text-sm lg:text-base text-white/80">{category.count} {category.count === 1 ? 'Category' : 'Categories'}</p>
+              {isLoadingCategories ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <CategoryCardSkeleton key={i} className="w-[180px] xs:w-[220px] sm:w-[280px] md:w-[320px] lg:w-[360px]" />
+                ))
+              ) : (
+                categories.map((category, index) => (
+                  <ScrollReveal key={category.id} delay={index * 0.1}>
+                    <Link to={`/category/${category.slug}`} className="group block flex-shrink-0">
+                      <div className="relative w-[180px] xs:w-[220px] sm:w-[280px] md:w-[320px] lg:w-[360px] aspect-[3/4] rounded-xl xs:rounded-2xl overflow-hidden shadow-lg">
+                        <img
+                          src={category.image}
+                          alt={category.name}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/20 to-transparent" />
+                        <div className="absolute inset-0 flex flex-col items-center justify-end text-white pb-4 xs:pb-6 sm:pb-8 lg:pb-10">
+                          <h3 className="font-cursive text-2xl xs:text-3xl sm:text-4xl lg:text-5xl mb-1 xs:mb-2">{category.name}</h3>
+                          <p className="text-xs xs:text-sm lg:text-base text-white/80">{category.count} {category.count === 1 ? 'Category' : 'Categories'}</p>
+                        </div>
                       </div>
-                    </div>
-                  </Link>
-                </ScrollReveal>
-              ))}
+                    </Link>
+                  </ScrollReveal>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -439,11 +453,19 @@ const Index = () => {
           </div>
           <div ref={productsRef} className="overflow-hidden -mx-2 xs:-mx-3">
             <div className="flex gap-3 xs:gap-4 sm:gap-6 lg:gap-8 px-2 xs:px-3">
-              {featuredProducts.map((product) => (
-                <div key={product.id} className="flex-[0_0_160px] xs:flex-[0_0_200px] sm:flex-[0_0_260px] md:flex-[0_0_300px] lg:flex-[0_0_340px]">
-                  <ProductCard product={product} />
-                </div>
-              ))}
+              {isLoadingProducts ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex-[0_0_160px] xs:flex-[0_0_200px] sm:flex-[0_0_260px] md:flex-[0_0_300px] lg:flex-[0_0_340px]">
+                    <ProductCardSkeleton />
+                  </div>
+                ))
+              ) : (
+                featuredProducts.map((product) => (
+                  <div key={product.id} className="flex-[0_0_160px] xs:flex-[0_0_200px] sm:flex-[0_0_260px] md:flex-[0_0_300px] lg:flex-[0_0_340px]">
+                    <ProductCard product={product} />
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -494,11 +516,17 @@ const Index = () => {
             </Link>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 xs:gap-3 sm:gap-6 lg:gap-8">
-            {newArrivals.map((product, index) => (
-              <ScrollReveal key={product.id} delay={index * 0.1}>
-                <ProductCard product={product} />
-              </ScrollReveal>
-            ))}
+            {isLoadingProducts ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <ProductCardSkeleton key={i} />
+              ))
+            ) : (
+              newArrivals.map((product, index) => (
+                <ScrollReveal key={product.id} delay={index * 0.1}>
+                  <ProductCard product={product} />
+                </ScrollReveal>
+              ))
+            )}
           </div>
         </div>
       </section>
@@ -554,22 +582,28 @@ const Index = () => {
           </div>
           <div className="overflow-x-auto -mx-3 xs:-mx-4 sm:-mx-6 lg:-mx-12 px-3 xs:px-4 sm:px-6 lg:px-12 scrollbar-hide">
             <div className="flex gap-3 xs:gap-4 sm:gap-6 lg:gap-8 min-w-max pb-4">
-              {testimonials.map((testimonial, index) => (
-                <ScrollReveal key={testimonial.id} delay={index * 0.1}>
-                  <div className="bg-white p-4 xs:p-6 sm:p-8 lg:p-10 rounded-xl xs:rounded-2xl border border-border h-full flex flex-col w-[240px] xs:w-[280px] sm:w-[320px] md:w-[380px] lg:w-[420px] flex-shrink-0">
-                    <div className="flex gap-0.5 xs:gap-1 mb-3 xs:mb-4 sm:mb-6">
-                      {[...Array(testimonial.rating)].map((_, i) => (
-                        <i key={i} className="fa-solid fa-star text-sm xs:text-base sm:text-lg text-primary"></i>
-                      ))}
+              {isLoadingCms ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TestimonialCardSkeleton key={i} />
+                ))
+              ) : (
+                testimonials.map((testimonial, index) => (
+                  <ScrollReveal key={testimonial.id} delay={index * 0.1}>
+                    <div className="bg-white p-4 xs:p-6 sm:p-8 lg:p-10 rounded-xl xs:rounded-2xl border border-border h-full flex flex-col w-[240px] xs:w-[280px] sm:w-[320px] md:w-[380px] lg:w-[420px] flex-shrink-0">
+                      <div className="flex gap-0.5 xs:gap-1 mb-3 xs:mb-4 sm:mb-6">
+                        {[...Array(testimonial.rating)].map((_, i) => (
+                          <i key={i} className="fa-solid fa-star text-sm xs:text-base sm:text-lg text-primary"></i>
+                        ))}
+                      </div>
+                      <p className="text-xs xs:text-sm sm:text-base lg:text-lg text-muted-foreground mb-4 xs:mb-6 sm:mb-8 leading-relaxed flex-1">"{testimonial.text}"</p>
+                      <div>
+                        <p className="font-semibold text-sm xs:text-base sm:text-lg">{testimonial.name}</p>
+                        <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground">{testimonial.location}</p>
+                      </div>
                     </div>
-                    <p className="text-xs xs:text-sm sm:text-base lg:text-lg text-muted-foreground mb-4 xs:mb-6 sm:mb-8 leading-relaxed flex-1">"{testimonial.text}"</p>
-                    <div>
-                      <p className="font-semibold text-sm xs:text-base sm:text-lg">{testimonial.name}</p>
-                      <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground">{testimonial.location}</p>
-                    </div>
-                  </div>
-                </ScrollReveal>
-              ))}
+                  </ScrollReveal>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -671,21 +705,17 @@ const Index = () => {
 
 
       {/* Offer Section - CMS Managed */}
-      {(() => {
-        // Fetch active offers from CMS API
-        const activeOffers = cmsData?.offers || [];
-        
-        // Fallback to mock data if DB is empty
-        const mockOffer = { id: '1', title: 'Get 20% Off Your First Order', description: 'Join our community and be the first to know about new collections, exclusive offers, and style inspiration' };
-        const offersToDisplay = activeOffers.length > 0 ? activeOffers : [mockOffer];
-        
-        if (offersToDisplay.length === 0) return null;
-        
-        const offer = offersToDisplay[0]; // Display first active offer
-        
-        return (
-          <section className="w-full py-12 xs:py-16 sm:py-20 lg:py-28 bg-foreground text-white">
-            <div className="max-w-3xl mx-auto text-center px-3 xs:px-4 sm:px-6">
+      <section className="w-full py-12 xs:py-16 sm:py-20 lg:py-28 bg-foreground text-white">
+        <div className="max-w-3xl mx-auto text-center px-3 xs:px-4 sm:px-6">
+          {isLoadingCms ? (
+            <OfferSkeleton />
+          ) : (() => {
+            const activeOffers = cmsData?.offers || [];
+            const mockOffer = { id: '1', title: 'Get 20% Off Your First Order', description: 'Join our community and be the first to know about new collections, exclusive offers, and style inspiration' };
+            const offersToDisplay = activeOffers.length > 0 ? activeOffers : [mockOffer];
+            if (offersToDisplay.length === 0) return null;
+            const offer = offersToDisplay[0];
+            return (
               <ScrollReveal>
                 <span className="inline-block px-3 xs:px-4 sm:px-5 py-1.5 xs:py-2 bg-primary text-white rounded-full text-[10px] xs:text-xs sm:text-sm uppercase tracking-wider mb-3 xs:mb-4 sm:mb-6">
                   Limited Time Offer
@@ -715,14 +745,14 @@ const Index = () => {
                   </Button>
                 </form>
               </ScrollReveal>
-            </div>
-          </section>
-        );
-      })()}
+            );
+          })()}
+        </div>
+      </section>
 
       {/* Instagram - Full Width Grid */}
       <section className="w-full py-12 xs:py-16 sm:py-20 lg:py-28">
-        <div className="max-w-[1600px] mx-auto px 3 xs:px-4 sm:px-6 lg:px-12">
+        <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
           <div className="text-center mb-8 xs:mb-10 sm:mb-8">
             <ScrollReveal>
               <span className="text-primary uppercase tracking-[0.1em] xs:tracking-[0.15em] sm:tracking-[0.2em] text-xs xs:text-sm font-medium">
@@ -730,7 +760,9 @@ const Index = () => {
               </span>
             </ScrollReveal>
           </div>
-          {instagramPosts.length > 0 ? (
+          {isLoadingCms ? (
+            <InstagramGridSkeleton />
+          ) : instagramPosts.length > 0 ? (
             <div className="grid grid-cols-3 lg:grid-cols-6 gap-1.5 xs:gap-2 sm:gap-3 lg:gap-5">
               {instagramPosts.map((post, index) => {
                 const imageUrl = typeof post === 'string' ? post : (post?.imageUrl || '');
@@ -801,7 +833,11 @@ const Index = () => {
           {/* Horizontal Scroll Blog Cards */}
           <div className="overflow-x-auto -mx-3 xs:-mx-4 sm:-mx-6 lg:-mx-12 px-3 xs:px-4 sm:px-6 lg:px-12 scrollbar-hide">
             <div className="flex gap-3 xs:gap-4 sm:gap-6 lg:gap-8 min-w-max pb-4">
-              {homepageBlogs.length > 0 ? (
+              {isLoadingBlogs ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <BlogCardSkeleton key={i} />
+                ))
+              ) : homepageBlogs.length > 0 ? (
                 homepageBlogs.map((blog: any, index: number) => {
                   const blogDate = blog.publishedAt 
                     ? new Date(blog.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })

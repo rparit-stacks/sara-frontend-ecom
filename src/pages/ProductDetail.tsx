@@ -1528,7 +1528,8 @@ const ProductDetail = () => {
                   {/* Actions */}
                   <div className="flex flex-col gap-3 sm:gap-4 pt-4 sm:pt-6 border-t border-border/50">
                     {/* View Price Breakdown button for PLAIN products - appears before Add to Cart */}
-                    {product.type === 'PLAIN' && (
+                    {/* View Price Breakdown - PLAIN and DIGITAL (above Add to Cart) */}
+                    {(product.type === 'PLAIN' || product.type === 'DIGITAL') && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1813,6 +1814,7 @@ const ProductDetail = () => {
           item={{
             productType: product.type,
             productName: product.name,
+            productId: product.id,
             designPrice: product.designPrice,
             fabricPrice: selectedFabricId ? (() => {
               const effectivePrice = effectivePricingSlabs && effectivePricingSlabs.length > 0

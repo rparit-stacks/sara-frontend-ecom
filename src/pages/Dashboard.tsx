@@ -786,7 +786,7 @@ const Dashboard = () => {
                                           {item.zipPassword}
                                         </p>
                                         <p className="text-xs text-yellow-700 dark:text-yellow-500 mt-1 italic">
-                                          First 4 letters of email (uppercase) + Last 4 digits of mobile
+                                          ZIP is password-protected. Use your account email as the password.
                                         </p>
                                       </div>
                                     )}
@@ -1067,7 +1067,7 @@ const Dashboard = () => {
                                           {item.zipPassword}
                                         </p>
                                         <p className="text-xs text-yellow-700 dark:text-yellow-500 mt-1 italic">
-                                          First 4 letters of email (uppercase) + Last 4 digits of mobile
+                                          ZIP is password-protected. Use your account email as the password.
                                         </p>
                                       </div>
                                     )}

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, Package, ExternalLink, Loader2, Pause, Play, Download, CheckSquare, Square } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Package, ExternalLink, Loader2, Pause, Play, Download, CheckSquare, Square, Copy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -185,6 +185,25 @@ const AdminProducts = () => {
     },
   });
 
+  // Bulk copy mutation
+  const bulkCopyMutation = useMutation({
+    mutationFn: (ids: number[]) => productsApi.bulkCopy(ids),
+    onSuccess: (data: { copied: number; failed: number; errors?: string[] }) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      if (data.failed && data.failed > 0) {
+        toast.success(`${data.copied} product(s) copied. ${data.failed} failed.`, {
+          description: data.errors?.slice(0, 3).join('; '),
+        });
+      } else {
+        toast.success(`${data.copied} product(s) copied successfully!`);
+      }
+      setSelectedProducts(new Set());
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to copy products');
+    },
+  });
+
   // Export mutation
   const exportMutation = useMutation({
     mutationFn: productsApi.exportToExcel,
@@ -197,7 +216,7 @@ const AdminProducts = () => {
   });
 
   // Loading state for admin operations (must be after all mutations are declared)
-  const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || exportMutation.isPending;
+  const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || bulkCopyMutation.isPending || exportMutation.isPending;
 
   // Update filter when URL param changes
   useEffect(() => {
@@ -314,6 +333,15 @@ const AdminProducts = () => {
     toggleStatusMutation.mutate(productId);
   };
 
+  const handleBulkCopy = () => {
+    const ids = Array.from(selectedProducts);
+    if (ids.length === 0) {
+      toast.error('Please select at least one product');
+      return;
+    }
+    bulkCopyMutation.mutate(ids);
+  };
+
   const handleExport = () => {
     exportMutation.mutate();
   };
@@ -365,7 +393,7 @@ const AdminProducts = () => {
 
   // Global admin loader overlay
   const AdminLoader = () => {
-    const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || exportMutation.isPending;
+    const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || bulkCopyMutation.isPending || exportMutation.isPending;
     
     if (!isLoading) return null;
     
@@ -374,6 +402,7 @@ const AdminProducts = () => {
       if (updateMutation.isPending) return 'Updating your product...';
       if (deleteMutation.isPending || bulkDeleteMutation.isPending) return 'Deleting products...';
       if (toggleStatusMutation.isPending) return 'Updating product status...';
+      if (bulkCopyMutation.isPending) return 'Copying products...';
       if (exportMutation.isPending) return 'Exporting products...';
       return 'Processing...';
     };
@@ -438,6 +467,15 @@ const AdminProducts = () => {
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete ({selectedProducts.size})
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="gap-2"
+                  onClick={handleBulkCopy}
+                  disabled={bulkCopyMutation.isPending}
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy ({selectedProducts.size})
                 </Button>
               </motion.div>
             )}

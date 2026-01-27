@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { LoadingProvider } from "@/context/LoadingContext";
 import ScrollToTop from "./components/ScrollToTop";
+import AuthSessionListener from "./components/AuthSessionListener";
 import Index from "./pages/Index";
 import Categories from "./pages/Categories";
 import CategoryProducts from "./pages/CategoryProducts";
@@ -70,6 +71,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ScrollToTop />
+        <AuthSessionListener />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/categories" element={<Categories />} />
