@@ -216,13 +216,13 @@ export const productsApi = {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   },
-  createDigitalFromDesign: (designProductId: number, price?: number) => 
-    fetchApi<any>(`/api/products/${designProductId}/create-digital`, { 
+  createDigitalFromDesign: (designProductIdOrSlug: number | string, price?: number) => 
+    fetchApi<any>(`/api/products/${encodeURIComponent(String(designProductIdOrSlug))}/create-digital`, { 
       method: 'POST', 
       body: JSON.stringify(price ? { price } : {}) 
     }),
-  getDigitalFromDesign: (designProductId: number) => 
-    fetchApi<any>(`/api/products/${designProductId}/digital`),
+  getDigitalFromDesign: (designProductIdOrSlug: number | string) => 
+    fetchApi<any>(`/api/products/${encodeURIComponent(String(designProductIdOrSlug))}/digital`),
   downloadDigitalFiles: async (productId: number): Promise<Blob> => {
     const token = localStorage.getItem('authToken') || localStorage.getItem('adminToken');
     const response = await fetch(`${API_BASE_URL}/api/products/${productId}/download-digital`, {

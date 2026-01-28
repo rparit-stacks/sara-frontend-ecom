@@ -35,17 +35,32 @@ export interface DetailSection {
   content: string;
 }
 
+/** Digital product: show extension (ZIP, PDF, etc.) or default ZIP; never raw URL. */
+function getDigitalFileFormat(fileUrl: string | undefined): string {
+  if (!fileUrl?.trim()) return 'ZIP';
+  let url = fileUrl.trim();
+  try {
+    const parsed = JSON.parse(fileUrl);
+    if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') url = parsed[0];
+    else if (typeof parsed === 'string') url = parsed;
+  } catch {
+    /* use url as-is */
+  }
+  const match = url.match(/\.(zip|pdf|png|jpe?g|gif|psd|ai|svg|eps|dll)(\?|$)/i);
+  return match ? match[1].toUpperCase() : 'ZIP';
+}
+
 // Removed mock data - now using API for all product data
 
 const ProductDetail = () => {
-  const { slug } = useParams();
+  const { slug: slugOrId } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { format } = usePrice();
   
-  // Fetch product from API using slug only
+  // Fetch product by slug or by id (All Products links use slug || id; id used when slug missing)
   const { data: apiProduct, isLoading: productLoading, error: productError } = useQuery({
-    queryKey: ['product', slug],
+    queryKey: ['product', slugOrId],
     queryFn: () => {
       const userEmail = typeof window !== 'undefined' ? (() => {
         const token = localStorage.getItem('authToken');
@@ -57,9 +72,13 @@ const ProductDetail = () => {
           return null;
         }
       })() : null;
-      return productsApi.getBySlug(slug!, userEmail || undefined);
+      const param = slugOrId!;
+      if (/^\d+$/.test(param)) {
+        return productsApi.getById(Number(param), userEmail || undefined);
+      }
+      return productsApi.getBySlug(param, userEmail || undefined);
     },
-    enabled: !!slug,
+    enabled: !!slugOrId,
     retry: 1,
   });
   
@@ -92,6 +111,7 @@ const ProductDetail = () => {
         .slice(0, 4)
         .map((p: any) => ({
           id: String(p.id),
+          slug: p.slug || String(p.id),
           name: p.name || 'Untitled Product',
           price: Number(p.price || 0),
           originalPrice: p.originalPrice ? Number(p.originalPrice) : undefined,
@@ -359,21 +379,21 @@ const ProductDetail = () => {
       
       const fabricTotalPrice = effectivePricePerMeter * fabricQuantity;
       
-      // Add product variant price modifiers (these are for the design product, not fabric)
-      let variantModifier = 0;
+      // Print/design variant modifiers: add ONCE, NOT multiplied by meters
+      let printVariantModifier = 0;
       if (product.variants && product.variants.length > 0) {
         product.variants.forEach((variant: any) => {
           const selectedOptionId = selectedVariants[String(variant.id)];
           if (selectedOptionId && variant.options) {
             const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
             if (selectedOption && selectedOption.priceModifier) {
-              variantModifier += selectedOption.priceModifier * fabricQuantity;
+              printVariantModifier += selectedOption.priceModifier;
             }
           }
         });
       }
       
-      setCombinedPrice(baseDesignPrice + fabricTotalPrice + variantModifier);
+      setCombinedPrice(baseDesignPrice + fabricTotalPrice + printVariantModifier);
     }
   }, [product, selectedFabricId, fabricPricePerMeter, fabricQuantity, selectedVariants]);
 
@@ -458,24 +478,28 @@ const ProductDetail = () => {
       setShowCustomForm(true);
     }
     
-    // Calculate combined price: Design Price + Fabric Price + Product Variant Modifiers
+    // Calculate combined price: Design Price + Fabric Price + Print Variant Modifiers
+    // IMPORTANT: Print/Design variants are added ONCE (not multiplied by meters)
+    // Fabric variants are already included in data.totalPrice from the fabric popup
     const baseDesignPrice = product.designPrice || 0;
     
-    // Add product variant price modifiers
-    let variantModifier = 0;
+    // Add print/design variant price modifiers (these add ONCE, not per meter)
+    let printVariantModifier = 0;
     if (product.variants && product.variants.length > 0) {
       product.variants.forEach((variant: any) => {
         const selectedOptionId = selectedVariants[String(variant.id)];
         if (selectedOptionId && variant.options) {
           const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
           if (selectedOption && selectedOption.priceModifier) {
-            variantModifier += selectedOption.priceModifier * data.quantity;
+            // Print variants add once, NOT multiplied by fabric meters
+            printVariantModifier += selectedOption.priceModifier;
           }
         }
       });
     }
     
-    const totalPrice = baseDesignPrice + data.totalPrice + variantModifier;
+    // Combined unit price = Fabric Total (with fabric variants × meters) + Print Total (base + print variant)
+    const totalPrice = data.totalPrice + baseDesignPrice + printVariantModifier;
     setCombinedPrice(totalPrice);
     setFabricPricePerMeter(data.totalPrice / data.quantity);
     setShowFabricVariant(false);
@@ -626,31 +650,42 @@ const ProductDetail = () => {
       return;
     }
     
-    // Calculate combined price: Design Price + Fabric Price + Variant Modifiers
+    // PRICING LOGIC:
+    // 1. Fabric: (Base + Fabric Variant) × Meters = Fabric Total
+    //    - Fabric variants are already included in fabricPricePerMeter from fabric popup
+    // 2. Print: Base + Print Variant = Print Total (NO meter multiplication)
+    // 3. Combined Unit Price = Fabric Total + Print Total
+    // 4. Final Total = Combined Unit Price × Product Quantity
+    
     const baseDesignPrice = product.designPrice || 0;
-    // Calculate price per meter using slabs if available
+    
+    // Calculate fabric total: effective price per meter × fabric meters
+    // Note: fabricPricePerMeter already includes fabric variants from the popup
     const effectivePricePerMeter = effectivePricingSlabs && effectivePricingSlabs.length > 0
       ? calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs)
       : fabricPricePerMeter;
-    
     const fabricTotalPrice = effectivePricePerMeter * fabricQuantity;
     
-    // Add variant price modifiers
-    let variantModifier = 0;
+    // Add print/design variant modifiers (these add ONCE, NOT multiplied by meters)
+    let printVariantModifier = 0;
     if (product.variants && product.variants.length > 0) {
       product.variants.forEach((variant: any) => {
         const selectedOptionId = selectedVariants[String(variant.id)];
         if (selectedOptionId && variant.options) {
           const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
           if (selectedOption && selectedOption.priceModifier) {
-            variantModifier += selectedOption.priceModifier * fabricQuantity;
+            // Print variants add ONCE, not per meter
+            printVariantModifier += selectedOption.priceModifier;
           }
         }
       });
     }
     
-    const unitPrice = (baseDesignPrice + fabricTotalPrice + variantModifier) / fabricQuantity;
-    const totalPrice = baseDesignPrice + fabricTotalPrice + variantModifier;
+    // Combined unit price = Fabric Total + Print Total (base + variant)
+    // This is ONE COMPLETE PRODUCT UNIT
+    const unitPrice = fabricTotalPrice + baseDesignPrice + printVariantModifier;
+    // Final total = unit price × product quantity
+    const totalPrice = unitPrice * quantity;
 
     // #region agent log
     try {
@@ -659,19 +694,19 @@ const ProductDetail = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: 'debug-session',
-          runId: 'pre-fix',
+          runId: 'post-fix-v2',
           hypothesisId: 'H2',
-          location: 'ProductDetail.tsx:618',
-          message: 'handleAddToCart DESIGNED pricing',
+          location: 'ProductDetail.tsx:handleAddToCart',
+          message: 'DESIGNED pricing - print variant NOT multiplied by meters',
           data: {
             productType: product.type,
-            baseDesignPrice,
-            fabricQuantity,
-            fabricPricePerMeter,
+            fabricMeters: fabricQuantity,
+            fabricPricePerMeter: effectivePricePerMeter,
             fabricTotalPrice,
-            variantModifier,
-            uiQuantity: quantity,
+            baseDesignPrice,
+            printVariantModifier,
             unitPrice,
+            productQuantity: quantity,
             totalPrice,
           },
           timestamp: Date.now(),
@@ -712,7 +747,7 @@ const ProductDetail = () => {
     const variantsMap: Record<string, string> = {};
     Object.assign(variantsMap, selectedFabricVariants);
     
-    // Prepare cart data
+    // Prepare cart data: quantity = product quantity (units), unitPrice = per-unit total, totalPrice = unitPrice × quantity
     const cartData: any = {
       productType: 'DESIGNED',
       productId: Number(product.id),
@@ -722,12 +757,12 @@ const ProductDetail = () => {
       designPrice: baseDesignPrice,
       fabricId: Number(selectedFabricId),
       fabricPrice: fabricTotalPrice,
-      quantity: fabricQuantity,
+      quantity: quantity,
       unitPrice: unitPrice,
       totalPrice: totalPrice,
       variantSelections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
       variants: Object.keys(variantsMap).length > 0 ? variantsMap : undefined, // Legacy format for fabric variants
-      customFormData: { ...customFieldValues, ...customFormData, ...fabricCustomFieldValues },
+      customFormData: { ...customFieldValues, ...customFormData, ...fabricCustomFieldValues, fabricMeters: fabricQuantity },
     };
 
     // Use guest cart if not logged in, otherwise use API
@@ -1097,11 +1132,25 @@ const ProductDetail = () => {
                     <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">{product.category}</p>
                     <h1 className="font-sans font-semibold text-lg xs:text-xl sm:text-2xl lg:text-3xl xl:text-3xl break-words not-italic" style={{ fontFamily: "'Poppins', sans-serif" }}>{product.name}</h1>
 
-                    {/* DESIGNED: Price Section – Total once, big and bold (no breakdown here) */}
-                    {product.type === 'DESIGNED' && selectedFabricId && combinedPrice != null && (
-                      <p className="text-xl sm:text-2xl font-bold text-primary" style={{ fontFamily: "'Poppins', sans-serif" }}>
-                        Total Price: {format(combinedPrice)}
-                      </p>
+                    {/* DESIGNED: Always show Print Price; show Total Price once fabric selected */}
+                    {/* #region agent log */}
+                    {product.type === 'DESIGNED' && (() => {
+                      const showTotal = !!(selectedFabricId && combinedPrice != null);
+                      fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProductDetail.tsx:price-section',message:'DESIGNED price render',data:{type:product.type,selectedFabricId:selectedFabricId ?? null,combinedPrice:combinedPrice ?? null,designPrice:product.designPrice ?? null,showTotal},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H1'})}).catch(()=>{});
+                      return null;
+                    })()}
+                    {/* #endregion */}
+                    {product.type === 'DESIGNED' && (
+                      <div className="space-y-1">
+                        <p className="text-lg sm:text-xl font-semibold text-primary" style={{ fontFamily: "'Poppins', sans-serif" }}>
+                          Print Price: {format(product.designPrice || 0)}
+                        </p>
+                        {selectedFabricId && combinedPrice != null && (
+                          <p className="text-xl sm:text-2xl font-bold text-primary" style={{ fontFamily: "'Poppins', sans-serif" }}>
+                            Total Price: {format(combinedPrice)}
+                          </p>
+                        )}
+                      </div>
                     )}
                     
                     {product.type === 'PLAIN' && (
@@ -1235,7 +1284,7 @@ const ProductDetail = () => {
                           const unitExtension = product.plainProduct?.unitExtension || product.unitExtension || 'per meter';
                           const unitName = unitExtension.replace(/^per\s+/i, '').trim() || 'meter';
                           return `(${unitName.charAt(0).toUpperCase() + unitName.slice(1)}s)`;
-                        })() : ''}
+                        })() : product.type === 'DESIGNED' && selectedFabricId ? '(units)' : ''}
                       </h4>
                       <div className="flex items-center gap-5">
                         <div className="flex items-center border border-border rounded-full">
@@ -1309,10 +1358,16 @@ const ProductDetail = () => {
                                 <button
                                   key={option.id}
                                   onClick={() => {
-                                    setSelectedVariants({
-                                      ...selectedVariants,
-                                      [String(variant.id)]: String(option.id)
-                                    });
+                                    if (isSelected) {
+                                      const next = { ...selectedVariants };
+                                      delete next[String(variant.id)];
+                                      setSelectedVariants(next);
+                                    } else {
+                                      setSelectedVariants({
+                                        ...selectedVariants,
+                                        [String(variant.id)]: String(option.id)
+                                      });
+                                    }
                                   }}
                                   className={cn(
                                     "px-4 py-2 rounded-lg border-2 transition-all text-sm",
@@ -1452,33 +1507,12 @@ const ProductDetail = () => {
                     </div>
                   )}
 
-                  {/* DIGITAL PRODUCT: Download Info */}
+                  {/* DIGITAL PRODUCT: compact format + delivery */}
                   {product.type === 'DIGITAL' && (
                     <div className="space-y-4">
-                      <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-xl">
-                        <div className="flex items-start gap-3 mb-3">
-                          <div className="p-2 bg-purple-100 rounded-lg">
-                            <FileJson className="w-5 h-5 text-purple-600" />
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-purple-900 mb-1">Digital Download Product</h4>
-                            <p className="text-sm text-purple-700">
-                              Instant access after purchase. High-resolution files ready for printing or personal use.
-                            </p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-purple-200">
-                          <div>
-                            <p className="text-xs text-purple-600 font-medium">File Format</p>
-                            <p className="text-sm text-purple-900 font-semibold">
-                              {product.fileUrl?.split('.').pop()?.toUpperCase() || 'PDF/PNG/JPG'}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-purple-600 font-medium">Delivery</p>
-                            <p className="text-sm text-purple-900 font-semibold">Instant</p>
-                          </div>
-                        </div>
+                      <div className="px-3 py-2 bg-muted/40 border border-border rounded-lg flex items-center gap-2 text-sm">
+                        <FileJson className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-muted-foreground">{getDigitalFileFormat(product.fileUrl)} · Instant</span>
                       </div>
                       
                       {product.description && (
@@ -1516,7 +1550,7 @@ const ProductDetail = () => {
                         {selectedFabricId && combinedPrice != null ? (
                           <div className="flex flex-col gap-3">
                             <p className="text-lg sm:text-xl font-bold text-primary" style={{ fontFamily: "'Poppins', sans-serif" }}>
-                              Total: {format(combinedPrice)}
+                              Total: {format(combinedPrice * quantity)}
                             </p>
                             <Collapsible open={designPriceBreakdownOpen} onOpenChange={setDesignPriceBreakdownOpen}>
                               <CollapsibleTrigger asChild>
@@ -1527,36 +1561,90 @@ const ProductDetail = () => {
                                 </Button>
                               </CollapsibleTrigger>
                               <CollapsibleContent>
-                                <div className="mt-3 pt-3 border-t border-border/50 space-y-2 text-sm">
-                                  <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Print Price</span>
-                                    <span>{format(product.designPrice || 0)}</span>
+                                <div className="mt-3 pt-3 border-t border-border/50 space-y-3 text-sm">
+                                  {/* FABRIC SECTION */}
+                                  <div className="space-y-1.5">
+                                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fabric</div>
+                                    {(() => {
+                                      const effectivePrice = effectivePricingSlabs && effectivePricingSlabs.length > 0
+                                        ? calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs)
+                                        : fabricPricePerMeter;
+                                      const fabricTotal = effectivePrice * fabricQuantity;
+                                      return (
+                                        <>
+                                          <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Price per meter</span>
+                                            <span>{format(effectivePrice)}/m</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Meters</span>
+                                            <span>× {fabricQuantity}</span>
+                                          </div>
+                                          <div className="flex justify-between font-medium">
+                                            <span>Fabric Total</span>
+                                            <span>{format(fabricTotal)}</span>
+                                          </div>
+                                        </>
+                                      );
+                                    })()}
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Fabric Price</span>
-                                    <span>
-                                      {format((() => {
-                                        const effectivePrice = effectivePricingSlabs && effectivePricingSlabs.length > 0
-                                          ? calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs)
-                                          : fabricPricePerMeter;
-                                        return effectivePrice * fabricQuantity;
-                                      })())}
-                                    </span>
+                                  
+                                  {/* PRINT SECTION */}
+                                  <div className="space-y-1.5 pt-2 border-t border-border/30">
+                                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Print / Design</div>
+                                    {(() => {
+                                      const basePrint = product.designPrice || 0;
+                                      // Calculate print variant modifier (added once, not per meter)
+                                      let printVariant = 0;
+                                      if (product.variants && product.variants.length > 0) {
+                                        product.variants.forEach((variant: any) => {
+                                          const selectedOptionId = selectedVariants[String(variant.id)];
+                                          if (selectedOptionId && variant.options) {
+                                            const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+                                            if (selectedOption && selectedOption.priceModifier) {
+                                              printVariant += selectedOption.priceModifier;
+                                            }
+                                          }
+                                        });
+                                      }
+                                      const printTotal = basePrint + printVariant;
+                                      return (
+                                        <>
+                                          <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Base Print Price</span>
+                                            <span>{format(basePrint)}</span>
+                                          </div>
+                                          {printVariant > 0 && (
+                                            <div className="flex justify-between">
+                                              <span className="text-muted-foreground">Print Variant</span>
+                                              <span>+{format(printVariant)}</span>
+                                            </div>
+                                          )}
+                                          <div className="flex justify-between font-medium">
+                                            <span>Print Total</span>
+                                            <span>{format(printTotal)}</span>
+                                          </div>
+                                        </>
+                                      );
+                                    })()}
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Fabric Used</span>
-                                    <span>
-                                      {(() => {
-                                        const effectivePrice = effectivePricingSlabs && effectivePricingSlabs.length > 0
-                                          ? calculatePricePerMeter(fabricQuantity, fabricPricePerMeter, effectivePricingSlabs)
-                                          : fabricPricePerMeter;
-                                        return `${format(effectivePrice)}/m × ${fabricQuantity} m`;
-                                      })()}
-                                    </span>
+                                  
+                                  {/* COMBINED UNIT & QUANTITY */}
+                                  <div className="space-y-1.5 pt-2 border-t border-border/50">
+                                    <div className="flex justify-between font-semibold">
+                                      <span>Per Unit Total</span>
+                                      <span className="text-primary">{format(combinedPrice)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">Quantity (units)</span>
+                                      <span>× {quantity}</span>
+                                    </div>
                                   </div>
-                                  <div className="flex justify-between pt-2 border-t border-border/50 font-semibold">
-                                    <span>Total</span>
-                                    <span>{format(combinedPrice)}</span>
+                                  
+                                  {/* GRAND TOTAL */}
+                                  <div className="flex justify-between pt-2 border-t-2 border-primary/30 font-bold text-base">
+                                    <span>Grand Total</span>
+                                    <span className="text-primary">{format(combinedPrice * quantity)}</span>
                                   </div>
                                 </div>
                               </CollapsibleContent>
@@ -1839,9 +1927,9 @@ const ProductDetail = () => {
                 : fabricPricePerMeter;
               return effectivePrice * fabricQuantity;
             })() : undefined,
-            unitPrice: product.type === 'DESIGNED' ? (combinedPrice ? combinedPrice / fabricQuantity : undefined) : (product.pricePerMeter || product.price),
-            totalPrice: product.type === 'DESIGNED' ? combinedPrice : finalPrice,
-            quantity: product.type === 'DESIGNED' ? fabricQuantity : quantity,
+            unitPrice: product.type === 'DESIGNED' ? (combinedPrice ?? undefined) : (product.pricePerMeter || product.price),
+            totalPrice: product.type === 'DESIGNED' ? (combinedPrice != null ? combinedPrice * quantity : undefined) : finalPrice,
+            quantity: product.type === 'DESIGNED' ? quantity : quantity,
             pricePerMeter: product.pricePerMeter || product.price,
             basePrice: product.pricePerMeter || product.price || product.designPrice,
           }}

@@ -16,7 +16,7 @@ export const ListViewProductCard = ({ product, className }: ListViewProductCardP
     : 0;
 
   return (
-    <Link to={`/product/${product.slug}`} className="block">
+    <Link to={`/product/${product.slug || product.id}`} className="block">
       <div className={cn('group w-full cursor-pointer border-b border-border hover:bg-muted/30 transition-colors', className)}>
         <div className="flex gap-4 p-4">
           {/* Left: Small Image */}

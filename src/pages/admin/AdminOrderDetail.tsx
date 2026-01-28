@@ -95,7 +95,7 @@ function AdminOrderItemDetailBlock({
 
       {item.variantDisplay && item.variantDisplay.length > 0 && (
         <div className="p-4 pt-0 space-y-1 border-t" style={{ borderColor: LEDGER.divider }}>
-          <LedgerSectionHeading>Variant</LedgerSectionHeading>
+          <LedgerSectionHeading>{item.productType === 'DESIGNED' ? 'Design variant' : 'Variant'}</LedgerSectionHeading>
           {item.variantDisplay.map((v: any, idx: number) => (
             <div key={idx} className="space-y-1">
               <LedgerRow label="Name" value={v.variantName || '—'} />
@@ -119,18 +119,54 @@ function AdminOrderItemDetailBlock({
         </div>
       )}
 
-      {item.customData && Object.keys(item.customData).length > 0 && (
+      {item.productType === 'DESIGNED' && (item.fabricId || item.fabricName) && (
         <div className="p-4 pt-0 space-y-1 border-t" style={{ borderColor: LEDGER.divider }}>
-          <LedgerSectionHeading>Custom fields</LedgerSectionHeading>
-          {Object.entries(item.customData).map(([k, v]) => (
-            <LedgerRow
-              key={k}
-              label={(item as { customFieldLabels?: Record<string, string> }).customFieldLabels?.[k] ?? k}
-              value={<span className="break-words">{renderCustomValue(v, { ledgerMode: true })}</span>}
-            />
-          ))}
+          <LedgerSectionHeading>Fabric</LedgerSectionHeading>
+          {item.fabricName && (
+            <LedgerRow label="Fabric" value={item.fabricName} />
+          )}
+          {item.customData && typeof item.customData.fabricMeters !== 'undefined' && item.customData.fabricMeters != null && (
+            <LedgerRow label="Fabric (meters)" value={String(item.customData.fabricMeters)} />
+          )}
         </div>
       )}
+
+      {(() => {
+        const customData = item.customData && typeof item.customData === 'object' ? item.customData as Record<string, unknown> : {};
+        const labels = (item as { customFieldLabels?: Record<string, string> }).customFieldLabels ?? {};
+        const source = (item as { customFieldSource?: Record<string, string> }).customFieldSource ?? {};
+        const skipKeys = new Set<string>(['fabricMeters']);
+        const entries = Object.entries(customData).filter(([k]) => !skipKeys.has(k));
+        if (entries.length === 0) return null;
+
+        const designEntries = entries.filter(([k]) => source[k] === 'design');
+        const fabricEntries = entries.filter(([k]) => source[k] === 'fabric');
+        const otherEntries = entries.filter(([k]) => !source[k] || (source[k] !== 'design' && source[k] !== 'fabric'));
+
+        const renderBlock = (heading: string, list: [string, unknown][]) => {
+          if (list.length === 0) return null;
+          return (
+            <div key={heading} className="p-4 pt-0 space-y-1 border-t" style={{ borderColor: LEDGER.divider }}>
+              <LedgerSectionHeading>{heading}</LedgerSectionHeading>
+              {list.map(([k, v]) => (
+                <LedgerRow
+                  key={k}
+                  label={labels[k] ?? k}
+                  value={<span className="break-words">{renderCustomValue(v, { ledgerMode: true })}</span>}
+                />
+              ))}
+            </div>
+          );
+        };
+
+        return (
+          <>
+            {designEntries.length > 0 && renderBlock('Design custom fields', designEntries)}
+            {fabricEntries.length > 0 && renderBlock('Fabric custom fields', fabricEntries)}
+            {otherEntries.length > 0 && renderBlock('Custom fields', otherEntries)}
+          </>
+        );
+      })()}
 
       {item.uploadedDesignUrl && (
         <div className="p-4 pt-0 space-y-1 border-t" style={{ borderColor: LEDGER.divider }}>

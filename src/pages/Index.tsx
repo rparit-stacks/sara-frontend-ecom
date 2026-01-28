@@ -194,10 +194,10 @@ const Index = () => {
     subscribeMutation.mutate(email);
   };
   
-  // Transform products for display
+  // Transform products for display (slug || id for /product links; ProductDetail supports both)
   const transformProduct = (p: any): Product => ({
     id: String(p.id),
-    slug: p.slug,
+    slug: p.slug || String(p.id),
     name: p.name,
     price: p.price || p.basePrice || 0,
     originalPrice: p.originalPrice,

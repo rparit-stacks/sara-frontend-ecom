@@ -144,10 +144,10 @@ const Products = () => {
     }));
   }, [apiCategories]);
   
-  // Transform products
+  // Transform products (slug || id for links; ProductDetail supports both)
   const allProducts: Product[] = apiProducts.map((p: any) => ({
     id: String(p.id),
-    slug: p.slug,
+    slug: p.slug || String(p.id),
     name: p.name,
     price: p.price || p.basePrice || 0,
     originalPrice: p.originalPrice,

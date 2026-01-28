@@ -482,6 +482,7 @@ const Cart = () => {
             variants: selectedItemForBreakdown.variants,
             pricePerMeter: selectedItemForBreakdown.unitPrice ? Number(selectedItemForBreakdown.unitPrice) : undefined,
             basePrice: selectedItemForBreakdown.designPrice ? Number(selectedItemForBreakdown.designPrice) : (selectedItemForBreakdown.unitPrice ? Number(selectedItemForBreakdown.unitPrice) : undefined),
+            customFormData: selectedItemForBreakdown.customFormData,
           }}
         />
       )}

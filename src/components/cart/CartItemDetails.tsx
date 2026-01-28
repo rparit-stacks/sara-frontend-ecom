@@ -127,12 +127,23 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
         </div>
       )}
 
-      {(item.productType === 'DESIGNED' || isCustom) && (
-        <div className="text-xs sm:text-sm">
-          <span className="text-muted-foreground">Fabric Quantity: </span>
-          <span className="font-medium text-foreground">{item.quantity} meter{item.quantity !== 1 ? 's' : ''}</span>
-        </div>
-      )}
+      {(item.productType === 'DESIGNED' || isCustom) && (() => {
+        const fabricMeters = (item as any).customFormData?.fabricMeters;
+        return (
+          <>
+            {typeof fabricMeters === 'number' && fabricMeters > 0 && (
+              <div className="text-xs sm:text-sm">
+                <span className="text-muted-foreground">Fabric: </span>
+                <span className="font-medium text-foreground">{fabricMeters} meter{fabricMeters !== 1 ? 's' : ''}</span>
+              </div>
+            )}
+            <div className="text-xs sm:text-sm">
+              <span className="text-muted-foreground">Quantity: </span>
+              <span className="font-medium text-foreground">{item.quantity} unit{item.quantity !== 1 ? 's' : ''}</span>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Pricing for CUSTOM: design + fabric */}
       {isCustom && (item.designPrice != null || item.fabricPrice != null) && (

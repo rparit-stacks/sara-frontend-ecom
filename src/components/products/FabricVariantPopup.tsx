@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Fabric } from './FabricSelectionPopup';
 import { usePrice } from '@/lib/currency';
 import { toast } from 'sonner';
+import { customProductsApi } from '@/lib/api';
 
 export interface FabricVariant {
   id: string;
@@ -64,6 +65,9 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
   });
   const [quantity, setQuantity] = useState(1);
   const [fabricCustomValues, setFabricCustomValues] = useState<Record<string, string>>({});
+  const [uploadingCustomFieldId, setUploadingCustomFieldId] = useState<string | null>(null);
+  const MAX_CUSTOM_FILE_MB = 10;
+  const MAX_CUSTOM_FILE_BYTES = MAX_CUSTOM_FILE_MB * 1024 * 1024;
 
   useEffect(() => {
     if (open && customFields.length > 0) {
@@ -93,10 +97,17 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
   }, [pricePerMeter, quantity]);
 
   const handleVariantChange = (variantId: string, optionId: string) => {
-    setSelectedVariants({
-      ...selectedVariants,
-      [variantId]: optionId,
-    });
+    const isSelected = selectedVariants[variantId] === optionId;
+    if (isSelected) {
+      const next = { ...selectedVariants };
+      delete next[variantId];
+      setSelectedVariants(next);
+    } else {
+      setSelectedVariants({
+        ...selectedVariants,
+        [variantId]: optionId,
+      });
+    }
   };
 
   const fabricRequiredFilled = useMemo(() => {
@@ -230,7 +241,52 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
                         {field.label}
                         {isRequired && <span className="text-destructive ml-1">*</span>}
                       </Label>
-                      {field.fieldType === 'number' ? (
+                      {field.fieldType === 'image' ? (
+                        <div className="space-y-2">
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            disabled={uploadingCustomFieldId === id}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0] || null;
+                              if (!file) return;
+                              if (file.size > MAX_CUSTOM_FILE_BYTES) {
+                                toast.error(`File must be ${MAX_CUSTOM_FILE_MB} MB or less.`);
+                                e.target.value = '';
+                                return;
+                              }
+                              if (!localStorage.getItem('authToken')) {
+                                toast.error('Please sign in to upload files.');
+                                e.target.value = '';
+                                return;
+                              }
+                              setUploadingCustomFieldId(id);
+                              try {
+                                const uploaded = await customProductsApi.uploadMedia([file], 'products/custom-fields');
+                                const url = uploaded?.[0]?.url ?? '';
+                                setFabricCustomValues((prev) => ({ ...prev, [id]: url }));
+                                if (url) toast.success('File uploaded.');
+                              } catch (err: any) {
+                                toast.error(err?.message || 'Upload failed.');
+                                setFabricCustomValues((prev) => ({ ...prev, [id]: '' }));
+                              } finally {
+                                setUploadingCustomFieldId(null);
+                              }
+                            }}
+                            className="h-10"
+                          />
+                          {value && (
+                            <a
+                              href={value}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-primary hover:underline inline-block"
+                            >
+                              View uploaded file
+                            </a>
+                          )}
+                        </div>
+                      ) : field.fieldType === 'number' ? (
                         <Input
                           type="number"
                           value={value}
