@@ -7,7 +7,8 @@ const navItems = [
   { href: '/categories', label: 'Categories', icon: 'fa-th-large' },
   { href: '/products', label: 'Shop', icon: 'fa-bag-shopping' },
   { href: '/wishlist', label: 'Wishlist', icon: 'fa-heart' },
-  { href: '/login', label: 'Account', icon: 'fa-user' },
+  // Account should show dashboard when logged in, login when logged out
+  { href: '/dashboard', label: 'Account', icon: 'fa-user' },
 ];
 
 export const MobileBottomNav = () => {
@@ -49,9 +50,12 @@ export const MobileBottomNav = () => {
             count = cartItemCount;
           }
           
-          const linkTo = (item.href === '/wishlist' && !isAuthenticated)
-            ? { pathname: '/login', state: { returnTo: '/wishlist' } }
-            : item.href;
+          const linkTo =
+            item.href === '/wishlist' && !isAuthenticated
+              ? { pathname: '/login', state: { returnTo: '/wishlist' } }
+              : item.href === '/dashboard' && !isAuthenticated
+              ? { pathname: '/login', state: { returnTo: '/dashboard' } }
+              : item.href;
           return (
             <Link
               key={item.href}
