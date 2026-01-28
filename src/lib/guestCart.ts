@@ -15,6 +15,7 @@ export interface GuestCartItem {
   unitPrice: number;
   totalPrice: number;
   variants?: Record<string, string>;
+  variantSelections?: Record<string, any>;
   customFormData?: Record<string, any>;
 }
 
@@ -55,10 +56,26 @@ export const guestCart = {
     }
   },
 
+  /** Full replace of a cart item (for CUSTOM edit-from-cart). Dispatches guestCartUpdated. */
+  updateItemFull: (itemId: string, item: Omit<GuestCartItem, 'id'>): void => {
+    const items = guestCart.getItems();
+    const idx = items.findIndex(i => i.id === itemId);
+    if (idx === -1) return;
+    const totalPrice = (item.unitPrice ?? 0) * (item.quantity ?? 1);
+    items[idx] = { ...item, id: itemId, totalPrice };
+    localStorage.setItem(GUEST_CART_KEY, JSON.stringify(items));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('guestCartUpdated'));
+    }
+  },
+
   // Remove item from cart
   removeItem: (itemId: string): void => {
     const items = guestCart.getItems().filter(i => i.id !== itemId);
     localStorage.setItem(GUEST_CART_KEY, JSON.stringify(items));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('guestCartUpdated'));
+    }
   },
 
   // Clear cart
@@ -97,6 +114,7 @@ export const guestCart = {
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           variants: item.variants,
+          variantSelections: item.variantSelections,
           customFormData: item.customFormData,
         });
       }

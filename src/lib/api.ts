@@ -693,6 +693,9 @@ export const cartApi = {
     return fetchApi<any>('/api/cart', { method: 'POST', body: JSON.stringify(data) });
   },
   updateItem: (itemId: number, quantity: number) => fetchApi<any>(`/api/cart/${itemId}`, { method: 'PUT', body: JSON.stringify({ quantity }) }),
+  /** Full update of a CUSTOM cart item (design, fabric, variants, form, quantity, prices). */
+  updateItemFull: (itemId: number, data: any) =>
+    fetchApi<any>(`/api/cart/items/${itemId}`, { method: 'PUT', body: JSON.stringify(data) }),
   removeItem: (itemId: number) => fetchApi<void>(`/api/cart/${itemId}`, { method: 'DELETE' }),
   clearCart: () => fetchApi<void>('/api/cart', { method: 'DELETE' }),
   getCartCount: () => fetchApi<{ count: number }>('/api/cart/count'),

@@ -651,7 +651,37 @@ const ProductDetail = () => {
     
     const unitPrice = (baseDesignPrice + fabricTotalPrice + variantModifier) / fabricQuantity;
     const totalPrice = baseDesignPrice + fabricTotalPrice + variantModifier;
-    
+
+    // #region agent log
+    try {
+      fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H2',
+          location: 'ProductDetail.tsx:618',
+          message: 'handleAddToCart DESIGNED pricing',
+          data: {
+            productType: product.type,
+            baseDesignPrice,
+            fabricQuantity,
+            fabricPricePerMeter,
+            fabricTotalPrice,
+            variantModifier,
+            uiQuantity: quantity,
+            unitPrice,
+            totalPrice,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    } catch {
+      // ignore
+    }
+    // #endregion
+
     // Prepare structured variant selections (new format with both IDs and frontendIds)
     const variantSelections: Record<string, any> = {};
     if (product.variants && product.variants.length > 0) {

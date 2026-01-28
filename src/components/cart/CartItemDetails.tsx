@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { productsApi } from '@/lib/api';
+import { usePrice } from '@/lib/currency';
 import { Loader2 } from 'lucide-react';
 
 interface CartItemDetailsProps {
@@ -9,23 +10,30 @@ interface CartItemDetailsProps {
     fabricId?: number;
     quantity: number;
     variants?: Record<string, string>;
+    variantSelections?: Record<string, { variantName?: string; optionValue?: string }>;
     customFormData?: Record<string, any>;
+    designPrice?: number;
+    fabricPrice?: number;
+    uploadedDesignUrl?: string;
   };
 }
 
 export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
-  // Fetch product details to get variant names
+  const isCustom = item.productType === 'CUSTOM';
+  const { format } = usePrice();
+
+  // Fetch product details (skip for CUSTOM - catalog product not used)
   const { data: productData, isLoading: productLoading } = useQuery({
     queryKey: ['product-details', item.productId],
     queryFn: () => productsApi.getById(item.productId),
-    enabled: !!item.productId,
+    enabled: !!item.productId && !isCustom,
   });
 
-  // Fetch fabric details if it's a DESIGNED product
+  // Fetch fabric details for DESIGNED or CUSTOM with fabricId
   const { data: fabricData, isLoading: fabricLoading } = useQuery({
     queryKey: ['fabric-details', item.fabricId],
     queryFn: () => productsApi.getById(item.fabricId!),
-    enabled: !!item.fabricId && item.productType === 'DESIGNED',
+    enabled: !!item.fabricId && (item.productType === 'DESIGNED' || isCustom),
   });
 
   if (productLoading || fabricLoading) {
@@ -62,23 +70,22 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
     return variantDisplays.length > 0 ? variantDisplays : null;
   };
 
-  // Get fabric variant display names
+  // Get fabric variant display names (DESIGNED or CUSTOM with fabric)
   const getFabricVariantDisplay = () => {
-    if (!item.variants || !fabricData?.variants || item.productType !== 'DESIGNED') return null;
+    if (!fabricData?.variants || (item.productType !== 'DESIGNED' && !isCustom)) return null;
+    const v = item.variants;
+    if (!v || !Object.keys(v).length) return null;
 
     const variantDisplays: string[] = [];
-    
     fabricData.variants.forEach((variant: any) => {
-      const selectedValue = item.variants[String(variant.id)];
+      const selectedValue = v[String(variant.id)];
       if (selectedValue && variant.options) {
-        // Try to find option by ID or value
-        const selectedOption = variant.options.find((opt: any) => 
+        const selectedOption = variant.options.find((opt: any) =>
           String(opt.id) === selectedValue || opt.value === selectedValue
         );
         if (selectedOption) {
           variantDisplays.push(`${variant.name}: ${selectedOption.value}`);
         } else {
-          // Fallback to just show the value
           variantDisplays.push(`${variant.name}: ${selectedValue}`);
         }
       }
@@ -87,13 +94,25 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
     return variantDisplays.length > 0 ? variantDisplays : null;
   };
 
+  // Variant display from structured variantSelections (CUSTOM and DESIGNED)
+  const variantSelectionsDisplays = (() => {
+    const vs = item.variantSelections;
+    if (!vs || !Object.keys(vs).length) return null;
+    const arr = Object.values(vs)
+      .filter((s): s is { variantName?: string; optionValue?: string } => s != null && (s.variantName != null || s.optionValue != null))
+      .map((s) => `${s.variantName ?? 'Option'}: ${s.optionValue ?? ''}`)
+      .filter(Boolean);
+    return arr.length > 0 ? arr : null;
+  })();
+
   const productVariantDisplays = getProductVariantDisplay();
   const fabricVariantDisplays = getFabricVariantDisplay();
+  const showVariantSelections = !!variantSelectionsDisplays?.length;
 
   return (
     <div className="space-y-1.5 mt-2">
-      {/* Fabric Name for DESIGNED products */}
-      {item.productType === 'DESIGNED' && fabricData && (
+      {/* Fabric Name for DESIGNED / CUSTOM */}
+      {(item.productType === 'DESIGNED' || isCustom) && fabricData && (
         <div className="text-xs sm:text-sm">
           <span className="text-muted-foreground">Fabric: </span>
           <span className="font-medium text-foreground">{fabricData.name}</span>
@@ -108,15 +127,33 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
         </div>
       )}
 
-      {item.productType === 'DESIGNED' && (
+      {(item.productType === 'DESIGNED' || isCustom) && (
         <div className="text-xs sm:text-sm">
           <span className="text-muted-foreground">Fabric Quantity: </span>
           <span className="font-medium text-foreground">{item.quantity} meter{item.quantity !== 1 ? 's' : ''}</span>
         </div>
       )}
 
-      {/* Selected Variant – Fabric (DESIGNED) and/or Product variants */}
-      {(fabricVariantDisplays?.length ?? 0) > 0 || (productVariantDisplays?.length ?? 0) > 0 ? (
+      {/* Pricing for CUSTOM: design + fabric */}
+      {isCustom && (item.designPrice != null || item.fabricPrice != null) && (
+        <div className="space-y-0.5 text-xs sm:text-sm">
+          {item.designPrice != null && (
+            <div>
+              <span className="text-muted-foreground">Design: </span>
+              <span className="font-medium text-foreground">{format(Number(item.designPrice))}</span>
+            </div>
+          )}
+          {item.fabricPrice != null && (
+            <div>
+              <span className="text-muted-foreground">Fabric: </span>
+              <span className="font-medium text-foreground">{format(Number(item.fabricPrice))}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Selected Variant – Fabric (DESIGNED/CUSTOM) and/or Product variants, or variantSelections */}
+      {((fabricVariantDisplays?.length ?? 0) > 0 || (productVariantDisplays?.length ?? 0) > 0 || showVariantSelections) ? (
         <div className="space-y-1">
           <div className="text-[10px] sm:text-xs text-muted-foreground/70 uppercase tracking-wide font-medium mt-1">
             Selected Variant
@@ -139,6 +176,11 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
               ))}
             </div>
           )}
+          {showVariantSelections && variantSelectionsDisplays?.map((display, index) => (
+            <div key={index} className="text-xs sm:text-sm">
+              <span className="text-muted-foreground">{display}</span>
+            </div>
+          ))}
         </div>
       ) : null}
 

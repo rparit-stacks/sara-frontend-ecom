@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useLocation, useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Heart, ShoppingBag, Share2, Truck, RotateCcw, Shield, Minus, Plus, ChevronRight, Palette, CheckCircle2, Info, ZoomIn, X } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import PlainProductSelectionPopup from '@/components/products/PlainProductSelectionPopup';
 import FabricVariantPopup from '@/components/products/FabricVariantPopup';
 import DynamicForm from '@/components/products/DynamicForm';
@@ -18,13 +18,18 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { IndianRupee } from 'lucide-react';
 import { customProductsApi, cartApi, wishlistApi, customConfigApi, productsApi } from '@/lib/api';
+import { guestCart } from '@/lib/guestCart';
 import { usePrice } from '@/lib/currency';
 
 const CustomProductDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { format } = usePrice();
+
+  const cartItemId = searchParams.get('cartItemId') || (location.state as any)?.cartItemId;
   
   // This is always a custom design page
   const isCustomDesign = true;
@@ -35,22 +40,39 @@ const CustomProductDetail = () => {
     queryFn: () => customConfigApi.getPublicConfig(),
   });
 
-  // Get or create guest identifier for non-logged-in users
+  const isLoggedIn = !!localStorage.getItem('authToken');
   const getGuestIdentifier = () => {
-    const isLoggedIn = !!localStorage.getItem('authToken');
     if (isLoggedIn) return null;
-    
-    let guestId = localStorage.getItem('guestId');
-    if (!guestId) {
-      guestId = `guest_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-      localStorage.setItem('guestId', guestId);
+    let g = localStorage.getItem('guestId');
+    if (!g) {
+      g = `guest_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      localStorage.setItem('guestId', g);
     }
-    return guestId;
+    return g;
   };
+  const guestId = getGuestIdentifier();
+
+  // Resolve cart item when editing from cart
+  const { data: cartData } = useQuery({
+    queryKey: ['cart'],
+    queryFn: () => cartApi.getCart(),
+    enabled: !!cartItemId && isLoggedIn,
+  });
+  const resolvedCartItem = (() => {
+    if (!cartItemId) return null;
+    if (isLoggedIn && cartData?.items) {
+      const found = cartData.items.find((i: any) => String(i.id) === String(cartItemId));
+      return found || null;
+    }
+    if (!isLoggedIn) {
+      const items = guestCart.getItems();
+      return items.find((i) => i.id === cartItemId) || null;
+    }
+    return null;
+  })();
+  const isEditFromCart = !!cartItemId && !!resolvedCartItem;
 
   // Get custom product from API if ID is in URL
-  const guestId = getGuestIdentifier();
-  const isLoggedIn = !!localStorage.getItem('authToken');
   
   // Get user email from token if logged in
   const getUserEmailFromToken = () => {
@@ -81,8 +103,10 @@ const CustomProductDetail = () => {
     retry: 1, // Retry once
   });
   
-  // Fallback to location.state for backward compatibility
-  const designUrl = customProduct?.designUrl || (location.state as any)?.designUrl;
+  // Fallback to location.state; when editing from cart, prefer cart's design URL
+  const designUrl = (isEditFromCart && (resolvedCartItem as any)?.uploadedDesignUrl)
+    ? (resolvedCartItem as any).uploadedDesignUrl
+    : (customProduct?.designUrl || (location.state as any)?.designUrl);
   const customProductId = customProduct?.id || (id ? Number(id) : null);
   const isTemporary = customProduct?.isSaved !== true;
   
@@ -191,21 +215,19 @@ const CustomProductDetail = () => {
     };
   }, [customProductId, isTemporary, customProduct]);
   
-  // Check if product loaded successfully
+  // Check if product loaded successfully (skip when editing from cart – design comes from cart)
   useEffect(() => {
-    // Only show error if we've finished loading and still don't have a design URL
+    if (cartItemId) return; // editing from cart: design may come from cart item
     if (!loadingProduct && !designUrl && id) {
-      // Give it a moment in case the product is still being created
       const timeoutId = setTimeout(() => {
         if (!designUrl) {
           toast.error('Product not found. Please upload your design again.');
           navigate('/make-your-own');
         }
-      }, 2000); // Wait 2 seconds before showing error
-      
+      }, 2000);
       return () => clearTimeout(timeoutId);
     }
-  }, [designUrl, loadingProduct, id, navigate]);
+  }, [designUrl, loadingProduct, id, navigate, cartItemId]);
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
@@ -273,17 +295,79 @@ const CustomProductDetail = () => {
   }, [DESIGN_PRICE, fabricSelectionData, effectiveConfigVariants, selectedConfigVariants]);
 
   const handlePlainProductSelect = (productId: string) => {
+    didPreloadFromCartRef.current = false; // user chose fabric; allow popup to open
     setSelectedPlainProductId(productId);
     setShowPlainProductSelection(false);
-    // Fabric variant popup will open in useEffect when selectedFabricProduct has loaded
   };
 
-  // Open fabric variant popup once the selected plain product (fabric) has been fetched
+  const skipFabricPopupOpenRef = useRef(false);
+  const preloadFabricDoneRef = useRef(false);
+  const didPreloadFromCartRef = useRef(false);
+
+  // Open fabric variant popup once the selected plain product (fabric) has been fetched (unless preloading from cart)
   useEffect(() => {
+    if (didPreloadFromCartRef.current) return;
+    if (skipFabricPopupOpenRef.current) {
+      skipFabricPopupOpenRef.current = false;
+      return;
+    }
     if (selectedPlainProductId && selectedFabricProduct) {
       setShowFabricVariant(true);
     }
   }, [selectedPlainProductId, selectedFabricProduct]);
+
+  // Preload from cart item when editing from cart
+  useEffect(() => {
+    if (!isEditFromCart || !resolvedCartItem) return;
+    const item = resolvedCartItem as any;
+
+    if (item.fabricId) {
+      didPreloadFromCartRef.current = true;
+      skipFabricPopupOpenRef.current = true;
+      setSelectedPlainProductId(String(item.fabricId));
+    }
+
+    const vs = item.variantSelections || {};
+    const configVar: Record<string, string> = {};
+    effectiveConfigVariants.forEach((v: any) => {
+      const key = v.frontendId || String(v.id);
+      const sel = vs[key];
+      const optId = sel?.optionId ?? sel?.optionValue;
+      if (optId != null) configVar[String(v.id)] = String(optId);
+    });
+    if (Object.keys(configVar).length) setSelectedConfigVariants(configVar);
+
+    if (item.customFormData && typeof item.customFormData === 'object' && Object.keys(item.customFormData).length) {
+      setCustomFormData(item.customFormData);
+    }
+  }, [isEditFromCart, resolvedCartItem, effectiveConfigVariants]);
+
+  // Preload fabricSelectionData once fabric is loaded (edit-from-cart)
+  useEffect(() => {
+    if (preloadFabricDoneRef.current) return;
+    if (!isEditFromCart || !resolvedCartItem || !selectedFabricProduct || !selectedPlainProductId) return;
+    const item = resolvedCartItem as any;
+    const qty = item.quantity ?? 1;
+    const total = item.fabricPrice != null ? Number(item.fabricPrice) : 0;
+
+    const fabricVar: Record<string, string> = {};
+    const vs = item.variantSelections || {};
+    const variants = (selectedFabricProduct as any)?.variants || [];
+    variants.forEach((v: any) => {
+      const key = v.frontendId || String(v.id);
+      const sel = vs[key];
+      const optId = sel?.optionId ?? (item.variants && item.variants[key]);
+      if (optId != null) fabricVar[String(v.id)] = String(optId);
+    });
+
+    setFabricSelectionData({
+      fabricId: selectedPlainProductId,
+      quantity: qty,
+      totalPrice: total,
+      selectedVariants: fabricVar,
+    });
+    preloadFabricDoneRef.current = true;
+  }, [isEditFromCart, resolvedCartItem, selectedFabricProduct, selectedPlainProductId]);
 
   const handleFabricVariantComplete = (data: any) => {
     setFabricSelectionData(data);
@@ -295,50 +379,7 @@ const CustomProductDetail = () => {
     toast.success('Details saved.');
   };
 
-  // Save custom product mutation
-  const saveCustomProductMutation = useMutation({
-    mutationFn: () => customProductId ? customProductsApi.save(customProductId) : Promise.resolve(null),
-    onSuccess: () => {
-      setIsSaved(true);
-    },
-  });
-
-  // Add to cart mutation
-  const addToCartMutation = useMutation({
-    mutationFn: (cartData: any) => cartApi.addItem(cartData),
-    onSuccess: () => {
-      if (customProductId) {
-        // Save custom product when added to cart
-        saveCustomProductMutation.mutate();
-      }
-      toast.success('Custom product added to cart and saved!');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to add to cart');
-    },
-  });
-
-  const handleAddToCart = () => {
-    // Check if user is logged in
-    const isLoggedIn = !!localStorage.getItem('authToken');
-    if (!isLoggedIn) {
-      toast.error('Please login to add items to cart');
-      // Redirect to login page, and come back to this page after login
-      const currentPath = `/custom-product/${id || customProductId}`;
-      navigate('/login', { state: { returnTo: currentPath } });
-      return;
-    }
-    
-    if (!fabricSelectionData) {
-      toast.error('Please select a fabric first');
-      return;
-    }
-    if (!requiredFieldsFilled) {
-      toast.error('Please fill all required fields');
-      return;
-    }
-
-    // Config variant selections (same shape as ProductDetail)
+  const buildCartPayload = () => {
     const variantSelections: Record<string, any> = {};
     effectiveConfigVariants.forEach((variant: any) => {
       const selectedOptionId = selectedConfigVariants[String(variant.id)];
@@ -360,25 +401,114 @@ const CustomProductDetail = () => {
         }
       }
     });
-
-    const cartData = {
-      productType: 'CUSTOM',
-      productId: customProductId || 0, // Custom products don't have regular product ID
-      productName: customFormData['field-1'] || 'Custom Studio Sara Piece',
+    return {
+      productType: 'CUSTOM' as const,
+      productId: customProductId || 0,
+      productName: (customFormData && (customFormData['field-1'] ?? customFormData['field-0'])) || 'Custom Studio Sara Piece',
       productImage: designUrl,
       designPrice: DESIGN_PRICE,
-      fabricId: Number(fabricSelectionData.fabricId),
-      fabricPrice: fabricSelectionData.totalPrice,
-      quantity: fabricSelectionData.quantity,
+      fabricId: Number(fabricSelectionData!.fabricId),
+      fabricPrice: fabricSelectionData!.totalPrice,
+      quantity: fabricSelectionData!.quantity,
       unitPrice: combinedPrice,
-      variants: fabricSelectionData.selectedVariants,
+      variants: fabricSelectionData!.selectedVariants,
       variantSelections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
-      customFormData: customFormData,
+      customFormData,
       uploadedDesignUrl: designUrl,
-      customProductId: customProductId, // Include custom product ID
+      customProductId: customProductId ?? undefined,
     };
+  };
 
-    addToCartMutation.mutate(cartData);
+  // Save custom product mutation
+  const saveCustomProductMutation = useMutation({
+    mutationFn: () => customProductId ? customProductsApi.save(customProductId) : Promise.resolve(null),
+    onSuccess: () => {
+      setIsSaved(true);
+    },
+  });
+
+  // Add to cart mutation
+  const addToCartMutation = useMutation({
+    mutationFn: (cartData: any) => cartApi.addItem(cartData),
+    onSuccess: () => {
+      if (customProductId) {
+        saveCustomProductMutation.mutate();
+      }
+      toast.success('Custom product added to cart and saved!');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to add to cart');
+    },
+  });
+
+  const updateCartItemMutation = useMutation({
+    mutationFn: ({ itemId, payload }: { itemId: number; payload: any }) =>
+      cartApi.updateItemFull(itemId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+      toast.success('Cart updated');
+      navigate('/cart');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update cart');
+    },
+  });
+
+  const [showAddAsNewConfirm, setShowAddAsNewConfirm] = useState(false);
+
+  const handleAddToCart = () => {
+    if (!isLoggedIn) {
+      toast.error('Please login to add items to cart');
+      navigate('/login', { state: { returnTo: `/custom-product/${id || customProductId}` } });
+      return;
+    }
+    if (!fabricSelectionData) {
+      toast.error('Please select a fabric first');
+      return;
+    }
+    if (!requiredFieldsFilled) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+    addToCartMutation.mutate(buildCartPayload());
+  };
+
+  const handleUpdateCartItem = () => {
+    if (!cartItemId || !fabricSelectionData || !requiredFieldsFilled) return;
+    const payload = buildCartPayload();
+    if (isLoggedIn) {
+      updateCartItemMutation.mutate({ itemId: Number(cartItemId), payload });
+    } else {
+      guestCart.updateItemFull(String(cartItemId), payload);
+      toast.success('Cart updated');
+      navigate('/cart');
+      window.dispatchEvent(new Event('guestCartUpdated'));
+    }
+  };
+
+  const handleAddAsNew = async (removeOriginal: boolean) => {
+    setShowAddAsNewConfirm(false);
+    if (!fabricSelectionData || !requiredFieldsFilled) return;
+    const payload = buildCartPayload();
+    try {
+      if (isLoggedIn) {
+        await cartApi.addItem(payload);
+        if (customProductId) saveCustomProductMutation.mutate();
+        if (removeOriginal && cartItemId) {
+          await cartApi.removeItem(Number(cartItemId));
+        }
+        queryClient.invalidateQueries({ queryKey: ['cart'] });
+        toast.success(removeOriginal ? 'Added as new; original removed from cart.' : 'Added as new.');
+      } else {
+        guestCart.addItem(payload);
+        if (removeOriginal && cartItemId) guestCart.removeItem(cartItemId);
+        toast.success(removeOriginal ? 'Added as new; original removed from cart.' : 'Added as new.');
+        window.dispatchEvent(new Event('guestCartUpdated'));
+      }
+      navigate('/cart');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to add to cart');
+    }
   };
 
   // Add to wishlist mutation (wishlist API takes productType + productId)
@@ -436,6 +566,18 @@ const CustomProductDetail = () => {
               <CheckCircle2 className="w-4 h-4" />
               Product saved! It has been added to your cart or wishlist.
             </div>
+          </div>
+        </section>
+      )}
+      {isEditFromCart && (
+        <section className="w-full bg-primary/5 py-4 border-b border-primary/10">
+          <div className="max-w-[1600px] mx-auto px-6 lg:px-12 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 text-primary font-medium text-sm">
+              Editing item from cart. Update the cart item or add as new.
+            </div>
+            <Link to="/cart" className="text-sm text-primary hover:underline">
+              Back to cart
+            </Link>
           </div>
         </section>
       )}
@@ -672,18 +814,41 @@ const CustomProductDetail = () => {
 
                   {/* Actions */}
                   <div className="flex gap-4 flex-wrap pt-4">
-                    <Button 
-                      size="lg" 
-                      onClick={handleAddToCart}
-                      disabled={!fabricSelectionData || !requiredFieldsFilled}
-                      className="flex-1 min-w-[220px] btn-primary gap-3 h-14 text-base"
-                    >
-                      <ShoppingBag className="w-5 h-5" />
-                      {customConfig?.addToCartButtonText || 'Add to Cart'}
-                    </Button>
-                    <Button 
-                      size="lg" 
-                      variant="outline" 
+                    {isEditFromCart ? (
+                      <>
+                        <Button
+                          size="lg"
+                          onClick={handleUpdateCartItem}
+                          disabled={!fabricSelectionData || !requiredFieldsFilled || updateCartItemMutation.isPending}
+                          className="flex-1 min-w-[180px] btn-primary gap-3 h-14 text-base"
+                        >
+                          {updateCartItemMutation.isPending ? 'Updating…' : 'Update cart item'}
+                        </Button>
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          onClick={() => setShowAddAsNewConfirm(true)}
+                          disabled={!fabricSelectionData || !requiredFieldsFilled}
+                          className="flex-1 min-w-[180px] gap-3 h-14 text-base"
+                        >
+                          <ShoppingBag className="w-5 h-5" />
+                          Add as new
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        size="lg"
+                        onClick={handleAddToCart}
+                        disabled={!fabricSelectionData || !requiredFieldsFilled}
+                        className="flex-1 min-w-[220px] btn-primary gap-3 h-14 text-base"
+                      >
+                        <ShoppingBag className="w-5 h-5" />
+                        {customConfig?.addToCartButtonText || 'Add to Cart'}
+                      </Button>
+                    )}
+                    <Button
+                      size="lg"
+                      variant="outline"
                       className="rounded-full w-14 h-14"
                       onClick={handleAddToWishlist}
                       disabled={!isLoggedIn || isSaved || !fabricSelectionData || !requiredFieldsFilled}
@@ -836,6 +1001,26 @@ const CustomProductDetail = () => {
                 />
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add as new – remove original? */}
+      <Dialog open={showAddAsNewConfirm} onOpenChange={setShowAddAsNewConfirm}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add as new</DialogTitle>
+            <DialogDescription>
+              Add this configuration as a new cart item. Do you want to remove the original item from your cart?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 justify-end mt-4">
+            <Button variant="outline" onClick={() => handleAddAsNew(false)}>
+              No, add only
+            </Button>
+            <Button onClick={() => handleAddAsNew(true)}>
+              Yes, remove original
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

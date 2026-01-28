@@ -161,7 +161,7 @@ export const Navbar = () => {
 
           {/* Right Actions - Compact */}
           <div className="flex items-center gap-2 xs:gap-3">
-            {/* Search */}
+            {/* Search - desktop */}
             <Button 
               variant="ghost" 
               size="icon" 
@@ -171,12 +171,25 @@ export const Navbar = () => {
               <i className="fa-solid fa-search text-base"></i>
             </Button>
 
-            {/* Wishlist – guests go to login with returnTo */}
-            <Link to={isAuthenticated ? '/wishlist' : { pathname: '/login', state: { returnTo: '/wishlist' } }} className="relative">
-              <Button variant="ghost" size="icon" className="w-10 h-10 xs:w-11 xs:h-11 rounded-full hover:bg-secondary">
-                <i className="fa-regular fa-heart text-sm xs:text-base"></i>
+            {/* Search - mobile (replaces wishlist icon) */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="flex md:hidden w-10 h-10 xs:w-11 xs:h-11 rounded-full hover:bg-secondary"
+              onClick={() => setIsSearchOpen(true)}
+            >
+              <i className="fa-solid fa-search text-sm xs:text-base"></i>
+            </Button>
+
+            {/* Wishlist – guests go to login with returnTo (desktop only) */}
+            <Link
+              to={isAuthenticated ? '/wishlist' : { pathname: '/login', state: { returnTo: '/wishlist' } }}
+              className="relative hidden md:block"
+            >
+              <Button variant="ghost" size="icon" className="w-11 h-11 rounded-full hover:bg-secondary">
+                <i className="fa-regular fa-heart text-base"></i>
                 {wishlistCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 xs:w-5.5 xs:h-5.5 bg-primary text-primary-foreground text-[10px] xs:text-[11px] font-bold rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-[10px] xs:text-[11px] font-bold rounded-full flex items-center justify-center">
                     {wishlistCount > 99 ? '99+' : wishlistCount}
                   </span>
                 )}

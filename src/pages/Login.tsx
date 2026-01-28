@@ -133,7 +133,7 @@ const Login = () => {
   
   return (
     <Layout>
-      <section className="section-padding relative min-h-[calc(100vh-200px)] flex items-center">
+      <section className="section-padding relative min-h-[calc(100vh-200px)] flex items-start md:items-center py-16 md:py-0">
         {/* Background Image - themed with stronger blur */}
         <div className="absolute inset-0 z-0">
           <img 
@@ -144,17 +144,21 @@ const Login = () => {
           <div className="absolute inset-0 bg-primary/70 backdrop-blur-md" />
         </div>
         
-        <div className="container-custom max-w-xl mx-auto relative z-10 px-4">
-          <div className="text-center mb-10">
-            <h1 className="font-serif text-3xl md:text-4xl mb-2 text-white">Welcome Back</h1>
-            <p className="text-white/90">Sign in to your account to continue</p>
+        <div className="container-custom max-w-md md:max-w-xl mx-auto relative z-10 px-4">
+          <div className="text-center mb-8 md:mb-10">
+            <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl mb-2 text-white">
+              Welcome Back
+            </h1>
+            <p className="text-sm sm:text-base text-white/90">
+              Sign in to your account to continue
+            </p>
           </div>
           
-          <div className="bg-card/95 backdrop-blur-lg p-8 md:p-10 rounded-2xl border border-white/20 shadow-2xl">
+          <div className="bg-card/95 backdrop-blur-lg p-6 sm:p-8 md:p-10 rounded-2xl border border-white/20 shadow-2xl">
             {/* Google - prominent at top */}
             <Button
               type="button"
-              className="w-full h-12 md:h-14 text-base font-semibold gap-3 rounded-xl btn-primary"
+              className="w-full h-11 sm:h-12 md:h-14 text-sm sm:text-base font-semibold gap-3 rounded-xl btn-primary"
               onClick={handleGoogleLogin}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -199,7 +203,7 @@ const Login = () => {
                   <>
                     <Button
                       type="button"
-                      className="w-full h-12 text-base font-semibold btn-primary rounded-xl"
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base font-semibold btn-primary rounded-xl"
                       onClick={handleVerifyOtp}
                       disabled={isVerifying}
                     >
