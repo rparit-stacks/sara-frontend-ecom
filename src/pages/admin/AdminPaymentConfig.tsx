@@ -19,6 +19,7 @@ const AdminPaymentConfig = () => {
     stripeSecretKey: '',
     stripeEnabled: false,
     codEnabled: false,
+    codCharge: null as number | null,
     partialCodEnabled: false,
     partialCodAdvancePercentage: null as number | null,
   });
@@ -57,6 +58,7 @@ const AdminPaymentConfig = () => {
         stripeSecretKey: config.stripeSecretKey === '***API_KEY_SET***' || !config.stripeSecretKey ? '' : config.stripeSecretKey,
         stripeEnabled: config.stripeEnabled || false,
         codEnabled: config.codEnabled || false,
+        codCharge: config.codCharge != null ? Number(config.codCharge) : null,
         partialCodEnabled: config.partialCodEnabled || false,
         partialCodAdvancePercentage: config.partialCodAdvancePercentage || null,
       });
@@ -64,19 +66,7 @@ const AdminPaymentConfig = () => {
   }, [config]);
   
   const handleChange = (field: string, value: any) => {
-    setFormData(prev => {
-      const newData = { ...prev, [field]: value };
-      
-      // Validation Rule: COD & Partial COD Mutual Exclusivity
-      if (field === 'partialCodEnabled' && value === true) {
-        newData.codEnabled = false;
-      }
-      if (field === 'codEnabled' && value === true) {
-        newData.partialCodEnabled = false;
-      }
-      
-      return newData;
-    });
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
   
   const handleSubmit = (e: React.FormEvent) => {
@@ -259,14 +249,30 @@ const AdminPaymentConfig = () => {
               <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
                 <div>
                   <Label htmlFor="codEnabled" className="text-base font-medium">Enable Full COD</Label>
-                  <p className="text-sm text-muted-foreground">Allow customers to pay full amount on delivery (India only)</p>
+                  <p className="text-sm text-muted-foreground">Allow customers to pay full amount on delivery</p>
                 </div>
                 <Switch
                   id="codEnabled"
                   checked={formData.codEnabled}
                   onCheckedChange={(checked) => handleChange('codEnabled', checked)}
-                  disabled={formData.partialCodEnabled}
                 />
+              </div>
+              
+              <div>
+                <Label htmlFor="codCharge">COD charge (optional)</Label>
+                <Input
+                  id="codCharge"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={formData.codCharge ?? ''}
+                  onChange={(e) => handleChange('codCharge', e.target.value === '' ? null : Number(e.target.value))}
+                  placeholder="e.g. 50"
+                  className="mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Extra amount (e.g. ₹50) added to order total when COD is selected.
+                </p>
               </div>
               
               <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
@@ -278,7 +284,6 @@ const AdminPaymentConfig = () => {
                   id="partialCodEnabled"
                   checked={formData.partialCodEnabled}
                   onCheckedChange={(checked) => handleChange('partialCodEnabled', checked)}
-                  disabled={formData.codEnabled}
                 />
               </div>
               
@@ -324,7 +329,7 @@ const AdminPaymentConfig = () => {
           >
             <h3 className="font-semibold text-blue-900 dark:text-blue-400 mb-2">Important Notes:</h3>
             <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1 list-disc list-inside">
-              <li>COD and Partial COD cannot be enabled simultaneously</li>
+              <li>COD and Partial COD can both be enabled; customer chooses per order</li>
               <li>Partial COD requires at least one online payment gateway (Razorpay or Stripe)</li>
               <li>Razorpay is only available for India orders</li>
               <li>Stripe is available for all countries</li>

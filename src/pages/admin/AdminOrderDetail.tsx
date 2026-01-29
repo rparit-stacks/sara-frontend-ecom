@@ -1472,18 +1472,29 @@ const AdminOrderDetail = () => {
                 </div>
                 {order.paymentMethod === 'PARTIAL_COD' && (
                   <div className="pt-2 border-t border-dashed space-y-1">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                      Payment breakdown
+                    </div>
                     <div className="flex justify-between text-xs">
-                      <span>Advance Paid</span>
+                      <span>Paid amount</span>
                       <span className="font-medium text-green-600">
                         {formatPrice(paymentAmount, paymentCurrency)}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span>Remaining</span>
+                      <span>Pending amount</span>
                       <span className="font-medium text-orange-600">
-                        {formatPrice(Number(order.total || 0) - paymentAmount, 'INR')}
+                        {formatPrice(Number(order.total || 0) - paymentAmount, paymentCurrency)}
                       </span>
                     </div>
+                    {Number(order.total || 0) > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span>Percentage paid</span>
+                        <span className="font-medium">
+                          {((paymentAmount / Number(order.total || 0)) * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

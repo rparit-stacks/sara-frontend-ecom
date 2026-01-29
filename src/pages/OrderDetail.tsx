@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowLeft, Download, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { orderApi } from '@/lib/api';
+import { orderApi, paymentApi } from '@/lib/api';
 import { getPaymentStatusDisplay } from '@/lib/orderUtils';
+import { toast } from 'sonner';
 import { formatPrice } from '@/lib/currency';
 import { renderCustomValue } from '@/lib/renderCustomValue';
 import { format } from 'date-fns';
@@ -236,6 +237,101 @@ const OrderDetail = () => {
     );
   }
 
+  const isPartialCodWithPending =
+    (order.paymentMethod || '').toUpperCase() === 'PARTIAL_COD' &&
+    (order.paymentStatus || '').toUpperCase() === 'PAID' &&
+    Number(order.paymentAmount ?? 0) < Number(order.total ?? 0);
+  const pendingAmount = isPartialCodWithPending
+    ? Number(order.total ?? 0) - Number(order.paymentAmount ?? 0)
+    : 0;
+
+  const handlePayRemaining = async () => {
+    if (!order?.id || pendingAmount <= 0) return;
+    try {
+      const res = await paymentApi.payRemaining(order.id);
+      const gateway = (res?.gateway || 'STRIPE').toUpperCase();
+      if (gateway === 'RAZORPAY') {
+        await openRazorpayPayRemaining(res, order.id, order.orderNumber, pendingAmount);
+      } else {
+        navigate(`/order-confirmation/${order.id}`, {
+          state: {
+            orderId: order.id,
+            paymentIntentId: res?.orderData?.payment_intent_id ?? res?.paymentId,
+            paymentIntent: res?.orderData?.client_secret,
+            stripeKey: res?.orderData?.key_id,
+            isPayRemaining: true,
+            remainingAmount: pendingAmount,
+          },
+        });
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to start payment');
+    }
+  };
+
+  const openRazorpayPayRemaining = async (
+    paymentResponse: any,
+    orderId: number,
+    orderNumber: string,
+    remainingAmount: number
+  ) => {
+    return new Promise<void>((resolve, reject) => {
+      if ((window as any).Razorpay) {
+        runRazorpayPayRemaining(paymentResponse, orderId, orderNumber, remainingAmount).then(resolve).catch(reject);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () =>
+        runRazorpayPayRemaining(paymentResponse, orderId, orderNumber, remainingAmount).then(resolve).catch(reject);
+      script.onerror = () => reject(new Error('Failed to load Razorpay'));
+      document.body.appendChild(script);
+    });
+  };
+
+  const runRazorpayPayRemaining = async (
+    paymentResponse: any,
+    orderId: number,
+    orderNumber: string,
+    remainingAmount: number
+  ) => {
+    const Razorpay = (window as any).Razorpay;
+    if (!Razorpay) return;
+    const options = {
+      key: paymentResponse.orderData?.key_id,
+      amount: paymentResponse.orderData?.amount,
+      currency: paymentResponse.orderData?.currency,
+      name: 'Studio Sara',
+      description: `Pay remaining for Order #${orderId}`,
+      order_id: paymentResponse.orderData?.order_id,
+      handler: async (response: any) => {
+        try {
+          await paymentApi.verify({
+            paymentId: response.razorpay_payment_id,
+            orderId: String(orderId),
+            gateway: 'RAZORPAY',
+            amount: remainingAmount,
+            verificationData: {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+            },
+          });
+          toast.success('Payment successful!');
+          navigate(`/orders/${orderId}`);
+          window.location.reload();
+        } catch (e: any) {
+          toast.error(e?.message || 'Verification failed');
+        }
+      },
+      modal: { ondismiss: () => {} },
+    };
+    const rp = new Razorpay(options);
+    rp.on('payment.failed', () => toast.error('Payment failed'));
+    rp.open();
+  };
+
   return (
     <Layout>
       <section className="section-padding min-h-[calc(100vh-200px)] bg-muted/40">
@@ -378,6 +474,20 @@ const OrderDetail = () => {
                               <Badge className={d.className}>{d.label}</Badge>
                             </p>
                             {d.detail && <p className="text-xs text-muted-foreground">{d.detail}</p>}
+                            {isPartialCodWithPending && pendingAmount > 0 && (
+                              <div className="mt-3 p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20">
+                                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                                  Pending amount: {formatPrice(pendingAmount, currency)}
+                                </p>
+                                <Button
+                                  size="sm"
+                                  className="mt-2 bg-[#2b9d8f] hover:bg-[#238a7d] text-white"
+                                  onClick={handlePayRemaining}
+                                >
+                                  Pay remaining
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         );
                       })()}

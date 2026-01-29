@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { cartApi, couponApi, productsApi } from '@/lib/api';
+import { cartApi, productsApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import CartItemDetails from '@/components/cart/CartItemDetails';
@@ -160,31 +160,16 @@ const CartItem = ({
 };
 
 const Cart = () => {
-  const [couponCode, setCouponCode] = useState('');
-  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
   const [selectedItemForBreakdown, setSelectedItemForBreakdown] = useState<any>(null);
   const queryClient = useQueryClient();
   const { format } = usePrice();
-  
-  // Get user email from token
-  const getUserEmail = () => {
-    const token = localStorage.getItem('authToken');
-    if (!token) return null;
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.sub || payload.email || null;
-    } catch {
-      return null;
-    }
-  };
-  
   const isLoggedIn = !!localStorage.getItem('authToken');
   
-  // Fetch cart from API with coupon code (only if logged in)
-  const { data: cartData, isLoading, refetch: refetchCart } = useQuery({
-    queryKey: ['cart', appliedCouponCode],
-    queryFn: () => cartApi.getCart(undefined, appliedCouponCode || undefined),
+  // Fetch cart from API (coupons applied at checkout only)
+  const { data: cartData, isLoading } = useQuery({
+    queryKey: ['cart'],
+    queryFn: () => cartApi.getCart(),
     enabled: isLoggedIn,
   });
   
@@ -249,57 +234,8 @@ const Cart = () => {
   const shipping = isLoggedIn 
     ? (cartData?.shipping ? Number(cartData.shipping) : 0)
     : 0; // Guest shipping calculated at checkout
-  const couponDiscount = isLoggedIn 
-    ? (cartData?.couponDiscount ? Number(cartData.couponDiscount) : 0)
-    : 0; // Coupons only for logged-in users
-  const total = subtotal + gst + shipping - couponDiscount;
-  const orderTotalBeforeCoupon = subtotal + gst + shipping;
+  const total = subtotal + gst + shipping;
 
-  // Eligible coupons for logged-in users (order total before discount)
-  const { data: eligibleCoupons = [] } = useQuery({
-    queryKey: ['coupons-eligible', orderTotalBeforeCoupon],
-    queryFn: () => couponApi.getEligible(orderTotalBeforeCoupon),
-    enabled: isLoggedIn && orderTotalBeforeCoupon > 0,
-  });
-
-  // Update applied coupon code from cart data
-  useEffect(() => {
-    if (cartData?.appliedCouponCode) {
-      setAppliedCouponCode(cartData.appliedCouponCode);
-    }
-  }, [cartData?.appliedCouponCode]);
-  
-  // Apply coupon
-  const applyCouponMutation = useMutation({
-    mutationFn: async ({ code }: { code: string }) => {
-      const userEmail = getUserEmail();
-      const totalBeforeCoupon = subtotal + gst + shipping;
-      const validation = await couponApi.validate(code, totalBeforeCoupon, userEmail || undefined);
-      if (validation.valid) {
-        setAppliedCouponCode(code);
-        await refetchCart();
-        return validation;
-      } else {
-        throw new Error(validation.message || 'Invalid coupon code');
-      }
-    },
-    onSuccess: (data) => {
-      toast.success(`Coupon applied! You save ${format(data.discount || 0)}`);
-      setCouponCode('');
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Invalid coupon code');
-    },
-  });
-  
-  // Remove coupon
-  const removeCoupon = () => {
-    setAppliedCouponCode(null);
-    setCouponCode('');
-    refetchCart();
-    toast.success('Coupon removed');
-  };
-  
   const handleQuantityChange = (itemId: number | string, newQuantity: number) => {
     if (newQuantity > 0) {
       if (isLoggedIn) {
@@ -315,12 +251,6 @@ const Cart = () => {
       removeMutation.mutate(itemId as number);
     } else {
       handleGuestCartRemove(itemId as string);
-    }
-  };
-  
-  const handleApplyCoupon = () => {
-    if (couponCode.trim()) {
-      applyCouponMutation.mutate({ code: couponCode.trim().toUpperCase() });
     }
   };
 
@@ -368,12 +298,6 @@ const Cart = () => {
                     <div className="flex justify-between"><span>GST</span><span>{format(gst)}</span></div>
                   )}
                   <div className="flex justify-between"><span>Shipping</span><span>{shipping === 0 ? (isLoggedIn ? 'Free' : 'Calculated at checkout') : format(shipping)}</span></div>
-                  {isLoggedIn && appliedCouponCode && couponDiscount > 0 && (
-                    <div className="flex justify-between text-primary">
-                      <span>Coupon ({appliedCouponCode})</span>
-                      <span>-{format(couponDiscount)}</span>
-                    </div>
-                  )}
                   {!isLoggedIn && (
                     <p className="text-xs text-muted-foreground mt-2">Shipping, GST, and coupons calculated at checkout</p>
                   )}
@@ -381,70 +305,6 @@ const Cart = () => {
                     <span>Total</span>
                     <span>{format(total)}</span>
                   </div>
-                </div>
-                <div className="mt-4 xs:mt-6 space-y-3">
-                  {isLoggedIn ? (
-                    appliedCouponCode ? (
-                      <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary/20">
-                        <div>
-                          <p className="text-sm font-medium">Applied: {appliedCouponCode}</p>
-                          <p className="text-xs text-muted-foreground">Discount: {format(couponDiscount)}</p>
-                        </div>
-                        <Button variant="ghost" size="sm" onClick={removeCoupon} className="text-xs">
-                          Remove
-                        </Button>
-                      </div>
-                    ) : (
-                      <>
-                        {eligibleCoupons.length > 0 && (
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-2">Available coupons</p>
-                            <div className="flex flex-wrap gap-2">
-                              {eligibleCoupons.map((c: any) => (
-                                <Button
-                                  key={c.code}
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 text-xs"
-                                  onClick={() => applyCouponMutation.mutate({ code: c.code })}
-                                  disabled={applyCouponMutation.isPending}
-                                >
-                                  {c.code} — {c.message}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        <div className="flex gap-2 xs:gap-3">
-                          <Input
-                            placeholder="Have a code? Enter here"
-                            className="flex-1 h-10 xs:h-11 sm:h-12 text-sm sm:text-base"
-                            value={couponCode}
-                            onChange={(e) => setCouponCode(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
-                          />
-                          <Button
-                            variant="outline"
-                            className="h-10 xs:h-11 sm:h-12 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap"
-                            onClick={handleApplyCoupon}
-                            disabled={applyCouponMutation.isPending || !couponCode.trim()}
-                          >
-                            {applyCouponMutation.isPending ? 'Applying...' : 'Apply'}
-                          </Button>
-                        </div>
-                      </>
-                    )
-                  ) : (
-                    <div className="p-3 rounded-lg border border-border bg-muted/30">
-                      <p className="text-xs sm:text-sm font-medium">Discount / Coupon</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Log in to see and use discount coupons.</p>
-                      <Link to="/login" state={{ returnTo: '/cart' }} className="inline-block mt-2">
-                        <Button variant="outline" size="sm" className="h-8 text-xs">
-                          Log in
-                        </Button>
-                      </Link>
-                    </div>
-                  )}
                 </div>
                 <Link to="/checkout" className="block mt-4 xs:mt-6">
                   <Button className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white h-12 xs:h-14 text-sm sm:text-base">

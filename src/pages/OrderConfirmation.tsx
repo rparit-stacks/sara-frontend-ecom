@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle2, Package, ArrowRight, LogIn, Download } from 'lucide-react';
 import { orderApi, paymentApi } from '@/lib/api';
+import { guestCart } from '@/lib/guestCart';
 import { getPaymentStatusDisplay } from '@/lib/orderUtils';
 import { format } from 'date-fns';
 import ScrollReveal from '@/components/animations/ScrollReveal';
@@ -21,7 +22,12 @@ const OrderConfirmation = () => {
 
   // Get order ID from URL params or location state
   const orderId = id || (location.state as any)?.orderId;
-  const state = (location.state || {}) as { paymentIntentId?: string; orderId?: number };
+  const state = (location.state || {}) as {
+    paymentIntentId?: string;
+    orderId?: number;
+    isPayRemaining?: boolean;
+    remainingAmount?: number;
+  };
 
   const isLoggedIn = !!localStorage.getItem('authToken');
   const queryClient = useQueryClient();
@@ -41,15 +47,24 @@ const OrderConfirmation = () => {
     const status = (order.paymentStatus || '').toUpperCase();
     if (status !== 'PENDING') return;
     stripeVerifyAttempted.current = true;
+    const verifyPayload: any = {
+      orderId: String(orderId),
+      paymentId: paymentIntentId,
+      gateway: 'STRIPE',
+      verificationData: {},
+    };
+    if (state.isPayRemaining && state.remainingAmount != null) {
+      verifyPayload.amount = state.remainingAmount;
+    }
     paymentApi
-      .verify({
-        orderId: String(orderId),
-        paymentId: paymentIntentId,
-        gateway: 'STRIPE',
-        verificationData: {},
-      })
+      .verify(verifyPayload)
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+        queryClient.invalidateQueries({ queryKey: ['cart'] });
+        if (!localStorage.getItem('authToken')) {
+          guestCart.clear();
+          window.dispatchEvent(new Event('guestCartUpdated'));
+        }
         refetch();
       })
       .catch(() => {});

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,9 +9,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Loader2, Truck, CreditCard, ShoppingBag, Lock, ChevronDown, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { cartApi, orderApi, userApi, shippingApi, paymentApi, paymentConfigApi } from '@/lib/api';
+import { cartApi, orderApi, userApi, shippingApi, paymentApi, paymentConfigApi, couponApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import { usePrice } from '@/lib/currency';
+import { lookupPincode } from '@/lib/pincodeLookup';
 
 // Countries list
 const COUNTRIES = [
@@ -152,8 +153,33 @@ const Checkout = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [saveAddressAsDefault, setSaveAddressAsDefault] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const shippingFormRef = useRef<HTMLDivElement>(null);
-  
+
+  /** Returns validation errors for address data. Used on submit and for inline display. */
+  const getAddressValidationErrors = (
+    data: { firstName?: string; lastName?: string; email?: string; phone?: string; address?: string; city?: string; state?: string; postalCode?: string; country?: string },
+    requireAddressSelection: boolean,
+    options?: { skipEmailRequired?: boolean }
+  ): Record<string, string> => {
+    const err: Record<string, string> = {};
+    if (!data.firstName?.trim()) err.firstName = 'First name is required';
+    if (!data.lastName?.trim()) err.lastName = 'Last name is required';
+    if (!options?.skipEmailRequired && !data.email?.trim()) err.email = 'Email is required';
+    if (!data.phone?.trim()) err.phone = 'Phone number is required';
+    else {
+      const digits = (data.phone || '').replace(/\D/g, '');
+      if (digits.length < 10) err.phone = 'Phone must be at least 10 digits';
+    }
+    if (!data.address?.trim()) err.address = 'Address line 1 is required';
+    if (!data.city?.trim()) err.city = 'City is required';
+    if (!data.state?.trim()) err.state = 'State is required';
+    if (!data.postalCode?.trim()) err.postalCode = 'Postal code is required';
+    if (!data.country?.trim()) err.country = 'Country is required';
+    if (requireAddressSelection) err.addressSelection = 'Please select an address or fill in the form below';
+    return err;
+  };
+
   // Get user email from token
   const getUserEmail = () => {
     const token = localStorage.getItem('authToken');
@@ -274,7 +300,31 @@ const Checkout = () => {
       }
     }
   }, [selectedAddressId, addresses, isLoggedIn, userProfile]);
-  
+
+  // Auto-fill state and city from pincode (Zippopotam) when postal code + country are entered
+  useEffect(() => {
+    const country = formData.country?.trim();
+    const postal = formData.postalCode?.trim().replace(/\s/g, '');
+    const minLen = country === 'IN' ? 6 : 3;
+    if (!country || !postal || postal.length < minLen) return;
+    if (isLoggedIn && selectedAddressId !== null) return;
+    const t = setTimeout(() => {
+      lookupPincode(country, postal).then((result) => {
+        if (result) {
+          setFormData((prev) => ({
+            ...prev,
+            state: result.state || prev.state,
+            city: result.city || prev.city,
+          }));
+          if (result.state) {
+            queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
+          }
+        }
+      });
+    }, 450);
+    return () => clearTimeout(t);
+  }, [formData.postalCode, formData.country, isLoggedIn, selectedAddressId, queryClient]);
+
   // Create order mutation (supports both logged-in and guest checkout)
   const createOrderMutation = useMutation({
     mutationFn: async () => {
@@ -407,8 +457,8 @@ const Checkout = () => {
   
   // Determine available payment gateways based on country and BusinessConfig
   // Rules:
-  // - For India: Razorpay (if enabled) + Stripe (if enabled) + COD/Partial COD (if enabled in config)
-  // - Outside India: Stripe (if enabled) + COD/Partial COD (if enabled in config)
+  // - India: Razorpay (if enabled) + Stripe (if enabled) + COD (if enabled) + Partial COD (if enabled and at least one gateway)
+  // - Non-India: Only Stripe (if enabled) + COD (if enabled); no Razorpay, no Partial COD
   // - Digital products: Never allow COD/Partial COD, only online payment
   useEffect(() => {
     const apiGateways = paymentMethodsData?.gateways || [];
@@ -423,7 +473,6 @@ const Checkout = () => {
     if (hasDigitalProducts) {
       // Digital products: Only online payment gateways
       if (isIndia) {
-        // India: Razorpay (if enabled) + Stripe (if enabled)
         if (apiGateways.includes('RAZORPAY') && razorpayEnabled) {
           gateways.push('RAZORPAY');
         }
@@ -431,15 +480,12 @@ const Checkout = () => {
           gateways.push('STRIPE');
         }
       } else {
-        // Outside India: Only Stripe (if enabled)
         if (apiGateways.includes('STRIPE') && stripeEnabled) {
           gateways.push('STRIPE');
         }
       }
     } else {
-      // Physical products: All available gateways based on country
       if (isIndia) {
-        // India: Razorpay (if enabled) + Stripe (if enabled) + COD (if enabled) + Partial COD (if enabled)
         if (apiGateways.includes('RAZORPAY') && razorpayEnabled) {
           gateways.push('RAZORPAY');
         }
@@ -449,21 +495,16 @@ const Checkout = () => {
         if (codEnabled) {
           gateways.push('COD');
         }
-        if (partialCodEnabled) {
-          // Partial COD requires at least one gateway
-          if (razorpayEnabled || stripeEnabled) {
-            gateways.push('PARTIAL_COD');
-          }
+        if (partialCodEnabled && (razorpayEnabled || stripeEnabled)) {
+          gateways.push('PARTIAL_COD');
         }
       } else {
-        // Outside India: Stripe only (if enabled) + Partial COD (if enabled and Stripe ON), COD not available
+        // Non-India: Only Stripe (if enabled) and COD (if enabled); no Razorpay, no Partial COD
         if (apiGateways.includes('STRIPE') && stripeEnabled) {
           gateways.push('STRIPE');
         }
-        // COD not available outside India
-        // Partial COD only if Stripe is enabled
-        if (partialCodEnabled && stripeEnabled) {
-          gateways.push('PARTIAL_COD');
+        if (codEnabled) {
+          gateways.push('COD');
         }
       }
     }
@@ -524,9 +565,53 @@ const Checkout = () => {
     ? (cartData?.couponDiscount ? Number(cartData.couponDiscount) : 0)
     : 0;
   const total = subtotal + gst + shipping - couponDiscount;
-  
+  const orderTotalBeforeCoupon = subtotal + gst + shipping;
+  const codCharge = paymentGateway === 'COD' && paymentConfig?.codCharge != null && Number(paymentConfig.codCharge) > 0 ? Number(paymentConfig.codCharge) : 0;
+  const displayTotal = total + codCharge;
+
+  // Discount section: coupon input for collapsible
+  const [couponCodeInput, setCouponCodeInput] = useState('');
+  const [discountOpen, setDiscountOpen] = useState(false);
+  const { data: eligibleCoupons = [] } = useQuery({
+    queryKey: ['coupons-eligible-checkout', orderTotalBeforeCoupon],
+    queryFn: () => couponApi.getEligible(orderTotalBeforeCoupon),
+    enabled: isLoggedIn && orderTotalBeforeCoupon > 0,
+  });
+  const applyCouponMutation = useMutation({
+    mutationFn: async ({ code }: { code: string }) => {
+      const userEmail = getUserEmail();
+      const validation = await couponApi.validate(code, orderTotalBeforeCoupon, userEmail || undefined);
+      if (validation.valid) return { ...validation, code };
+      throw new Error(validation.message || 'Invalid coupon code');
+    },
+    onSuccess: (data: { discount?: number; code?: string }) => {
+      if (data.code) {
+        setAppliedCouponCode(data.code);
+        queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
+      }
+      toast.success(`Coupon applied! You save ${format(data.discount || 0)}`);
+      setCouponCodeInput('');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Invalid coupon code');
+    },
+  });
+  const removeCoupon = () => {
+    setAppliedCouponCode(null);
+    setCouponCodeInput('');
+    queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
+    toast.success('Coupon removed');
+  };
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
   };
   
   // Helper function to build shipping address object - ensures single source of truth
@@ -568,15 +653,14 @@ const Checkout = () => {
   };
   
   const handlePlaceOrder = async () => {
-    // Smart validation - check actual data that will be used
-    const errors: string[] = [];
-    
-    // For logged-in users with selected address, validate from selected address
-    let dataToValidate: any = formData;
+    // Build data to validate (same source as buildShippingAddress)
+    let dataToValidate: any = {
+      ...formData,
+      email: formData.email || (userProfile as any)?.email,
+    };
     if (isLoggedIn && selectedAddressId && addresses.length > 0) {
       const selectedAddress = addresses.find((a: any) => a.id === selectedAddressId);
       if (selectedAddress) {
-        // Validate selected address data
         dataToValidate = {
           firstName: selectedAddress.firstName || formData.firstName,
           lastName: selectedAddress.lastName || formData.lastName,
@@ -591,50 +675,14 @@ const Checkout = () => {
         };
       }
     }
-    
-    // Basic fields validation
-    if (!dataToValidate.firstName?.trim()) errors.push('First name is required');
-    if (!dataToValidate.lastName?.trim()) errors.push('Last name is required');
-    
-    // Email validation - only required for guest users
-    if (!isLoggedIn && !dataToValidate.email?.trim()) {
-      errors.push('Email is required');
-    } else if (isLoggedIn && !dataToValidate.email?.trim() && !(userProfile as any)?.email) {
-      errors.push('Email is required');
-    }
-    
-    // Phone number validation (mandatory for all)
-    if (!dataToValidate.phone?.trim()) {
-      errors.push('Phone number is required');
-    } else {
-      const phoneDigits = dataToValidate.phone.replace(/\D/g, '');
-      if (phoneDigits.length < 10) {
-        errors.push('Phone number must be at least 10 digits');
-      }
-    }
-    
-    // Address fields (all mandatory)
-    if (!dataToValidate.address?.trim()) errors.push('Address Line 1 is required');
-    if (!dataToValidate.city?.trim()) errors.push('City is required');
-    if (!dataToValidate.state?.trim()) errors.push('State is required');
-    if (!dataToValidate.postalCode?.trim()) errors.push('Postal code is required');
-    if (!dataToValidate.country?.trim()) errors.push('Country is required');
-    
-    // For logged-in users, validate address selection only if addresses exist
-    if (isLoggedIn && addresses.length > 0 && !selectedAddressId) {
-      errors.push('Please select an address or fill in the form below');
-    }
-    
-    if (errors.length > 0) {
-      // Show all errors for better debugging
-      const errorMessage = errors.length === 1 
-        ? errors[0] 
-        : `${errors[0]} (${errors.length - 1} more: ${errors.slice(1).join(', ')})`;
-      toast.error(errorMessage);
-      console.log('Validation errors:', errors);
-      console.log('Form data:', formData);
-      console.log('Selected address ID:', selectedAddressId);
-      console.log('Data being validated:', dataToValidate);
+    const formFilled = !!(dataToValidate.firstName?.trim() && dataToValidate.lastName?.trim() && dataToValidate.phone?.trim() && dataToValidate.address?.trim() && dataToValidate.city?.trim() && dataToValidate.state?.trim() && dataToValidate.postalCode?.trim() && dataToValidate.country?.trim());
+    const requireAddressSelection = isLoggedIn && addresses.length > 0 && !selectedAddressId && !formFilled;
+    const skipEmailRequired = isLoggedIn && !!(userProfile as any)?.email;
+    const validationErrors = getAddressValidationErrors(dataToValidate, requireAddressSelection, { skipEmailRequired });
+    setFieldErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0) {
+      toast.error('Please fix the highlighted fields');
+      shippingFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
     
@@ -833,11 +881,7 @@ const Checkout = () => {
       toast.info('Order placed! Please complete payment using the link sent to your email, or payment will be processed automatically.');
       
       setIsProcessingPayment(false);
-      if (!isLoggedIn) {
-        guestCart.clear();
-        window.dispatchEvent(new Event('guestCartUpdated'));
-      }
-      queryClient.invalidateQueries({ queryKey: ['cart'] });
+      // Do not clear cart here—user may cancel or fail; cart is cleared only after successful payment (OrderConfirmation verify or backend updatePaymentStatus).
       const paymentIntentId = paymentResponse.orderData.payment_intent_id ?? paymentResponse.paymentId;
       navigate(`/order-confirmation/${orderId}`, { 
         state: { 
@@ -1008,7 +1052,10 @@ const Checkout = () => {
                 {/* Address Selection - Mandatory for logged-in users */}
                 {isLoggedIn && (
                   <ScrollReveal>
-                    <div className="bg-card p-6 rounded-2xl border border-border">
+                    <div className={`bg-card p-6 rounded-2xl border ${fieldErrors.addressSelection ? 'border-destructive' : 'border-border'}`}>
+                      {fieldErrors.addressSelection && (
+                        <p className="text-destructive text-sm mb-3">{fieldErrors.addressSelection}</p>
+                      )}
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-serif text-lg font-semibold">
                           Select Address *
@@ -1046,7 +1093,14 @@ const Checkout = () => {
                             <button
                               key={addr.id}
                               type="button"
-                              onClick={() => setSelectedAddressId(addr.id)}
+                              onClick={() => {
+                                setSelectedAddressId(addr.id);
+                                setFieldErrors(prev => {
+                                  const next = { ...prev };
+                                  delete next.addressSelection;
+                                  return next;
+                                });
+                              }}
                               className={`p-3 rounded-lg border text-left text-sm transition-colors ${
                                 selectedAddressId === addr.id
                                   ? 'border-primary bg-primary/10 text-primary'
@@ -1098,32 +1152,41 @@ const Checkout = () => {
                       </div>
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-                      <Input 
-                        placeholder="First name *" 
-                        className="h-12" 
-                        value={formData.firstName}
-                        onChange={(e) => handleInputChange('firstName', e.target.value)}
-                        disabled={isLoggedIn && selectedAddressId !== null}
-                        required
-                      />
-                      <Input 
-                        placeholder="Last name *" 
-                        className="h-12" 
-                        value={formData.lastName}
-                        onChange={(e) => handleInputChange('lastName', e.target.value)}
-                        disabled={isLoggedIn && selectedAddressId !== null}
-                        required
-                      />
+                      <div className="space-y-1">
+                        <Input
+                          placeholder="First name *"
+                          className={`h-12 ${fieldErrors.firstName ? 'border-destructive' : ''}`}
+                          value={formData.firstName}
+                          onChange={(e) => handleInputChange('firstName', e.target.value)}
+                          disabled={isLoggedIn && selectedAddressId !== null}
+                          required
+                        />
+                        {fieldErrors.firstName && <p className="text-destructive text-xs">{fieldErrors.firstName}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <Input
+                          placeholder="Last name *"
+                          className={`h-12 ${fieldErrors.lastName ? 'border-destructive' : ''}`}
+                          value={formData.lastName}
+                          onChange={(e) => handleInputChange('lastName', e.target.value)}
+                          disabled={isLoggedIn && selectedAddressId !== null}
+                          required
+                        />
+                        {fieldErrors.lastName && <p className="text-destructive text-xs">{fieldErrors.lastName}</p>}
+                      </div>
                       {/* Email field - only show for guest users */}
                       {!isLoggedIn && (
-                      <Input 
-                        placeholder="Email *" 
-                        className="col-span-1 sm:col-span-2 h-12" 
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => handleInputChange('email', e.target.value)}
-                        required
-                      />
+                      <div className="col-span-1 sm:col-span-2 space-y-1">
+                        <Input
+                          placeholder="Email *"
+                          className={`h-12 ${fieldErrors.email ? 'border-destructive' : ''}`}
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => handleInputChange('email', e.target.value)}
+                          required
+                        />
+                        {fieldErrors.email && <p className="text-destructive text-xs">{fieldErrors.email}</p>}
+                      </div>
                       )}
                       {/* For logged-in users, email is auto-filled from profile and shown as read-only */}
                       {isLoggedIn && (
@@ -1134,22 +1197,28 @@ const Checkout = () => {
                           </div>
                         </div>
                       )}
-                      <Input 
-                        placeholder="Phone *" 
-                        className="col-span-1 sm:col-span-2 h-12" 
-                        value={formData.phone}
-                        onChange={(e) => handleInputChange('phone', e.target.value)}
-                        disabled={isLoggedIn && selectedAddressId !== null}
-                        required
-                      />
-                      <Input 
-                        placeholder="Address Line 1 *" 
-                        className="col-span-1 sm:col-span-2 h-12" 
-                        value={formData.address}
-                        onChange={(e) => handleInputChange('address', e.target.value)}
-                        disabled={isLoggedIn && selectedAddressId !== null}
-                        required
-                      />
+                      <div className="col-span-1 sm:col-span-2 space-y-1">
+                        <Input
+                          placeholder="Phone *"
+                          className={`h-12 ${fieldErrors.phone ? 'border-destructive' : ''}`}
+                          value={formData.phone}
+                          onChange={(e) => handleInputChange('phone', e.target.value)}
+                          disabled={isLoggedIn && selectedAddressId !== null}
+                          required
+                        />
+                        {fieldErrors.phone && <p className="text-destructive text-xs">{fieldErrors.phone}</p>}
+                      </div>
+                      <div className="col-span-1 sm:col-span-2 space-y-1">
+                        <Input
+                          placeholder="Address Line 1 *"
+                          className={`h-12 ${fieldErrors.address ? 'border-destructive' : ''}`}
+                          value={formData.address}
+                          onChange={(e) => handleInputChange('address', e.target.value)}
+                          disabled={isLoggedIn && selectedAddressId !== null}
+                          required
+                        />
+                        {fieldErrors.address && <p className="text-destructive text-xs">{fieldErrors.address}</p>}
+                      </div>
                       <Input 
                         placeholder="Address Line 2 (Apartment, Suite, etc.)" 
                         className="col-span-1 sm:col-span-2 h-12" 
@@ -1157,85 +1226,98 @@ const Checkout = () => {
                         onChange={(e) => handleInputChange('addressLine2', e.target.value)}
                         disabled={isLoggedIn && selectedAddressId !== null}
                       />
-                      <Select 
-                        value={formData.country} 
-                        onValueChange={(val) => {
-                          handleInputChange('country', val);
-                          // Reset city when country changes
-                          handleInputChange('city', '');
-                          // Reset state for non-India countries
-                          if (val !== 'IN') {
-                            handleInputChange('state', '');
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="h-12">
-                          <SelectValue placeholder="Country *" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {COUNTRIES.map((country) => (
-                            <SelectItem key={country.code} value={country.code}>
-                              {country.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {isIndia ? (
-                        <Select 
-                          value={formData.state} 
+                      <div className="space-y-1">
+                        <Select
+                          value={formData.country}
                           onValueChange={(val) => {
-                            handleInputChange('state', val);
-                            queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
+                            handleInputChange('country', val);
+                            handleInputChange('city', '');
+                            if (val !== 'IN') handleInputChange('state', '');
                           }}
                         >
-                          <SelectTrigger className="h-12">
-                            <SelectValue placeholder="State *" />
+                          <SelectTrigger className={`h-12 ${fieldErrors.country ? 'border-destructive' : ''}`}>
+                            <SelectValue placeholder="Country *" />
                           </SelectTrigger>
                           <SelectContent>
-                            {INDIAN_STATES.map((state) => (
-                              <SelectItem key={state} value={state}>{state}</SelectItem>
+                            {COUNTRIES.map((country) => (
+                              <SelectItem key={country.code} value={country.code}>
+                                {country.name}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
+                        {fieldErrors.country && <p className="text-destructive text-xs">{fieldErrors.country}</p>}
+                      </div>
+                      {isIndia ? (
+                        <div className="space-y-1">
+                          <Select
+                            value={formData.state}
+                            onValueChange={(val) => {
+                              handleInputChange('state', val);
+                              queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
+                            }}
+                          >
+                            <SelectTrigger className={`h-12 ${fieldErrors.state ? 'border-destructive' : ''}`}>
+                              <SelectValue placeholder="State *" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {INDIAN_STATES.map((state) => (
+                                <SelectItem key={state} value={state}>{state}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldErrors.state && <p className="text-destructive text-xs">{fieldErrors.state}</p>}
+                        </div>
                       ) : (
-                        <Input 
-                          placeholder="State/Province *" 
-                          className="h-12" 
-                          value={formData.state}
-                          onChange={(e) => handleInputChange('state', e.target.value)}
+                        <div className="space-y-1">
+                          <Input
+                            placeholder="State/Province *"
+                            className={`h-12 ${fieldErrors.state ? 'border-destructive' : ''}`}
+                            value={formData.state}
+                            onChange={(e) => handleInputChange('state', e.target.value)}
+                            required
+                          />
+                          {fieldErrors.state && <p className="text-destructive text-xs">{fieldErrors.state}</p>}
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        {availableCities.length > 0 && !(formData.city && !availableCities.includes(formData.city)) ? (
+                          <Select
+                            value={formData.city}
+                            onValueChange={(val) => handleInputChange('city', val)}
+                            disabled={!formData.country}
+                          >
+                            <SelectTrigger className={`h-12 ${fieldErrors.city ? 'border-destructive' : ''}`}>
+                              <SelectValue placeholder="City *" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableCities.map((city) => (
+                                <SelectItem key={city} value={city}>{city}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            placeholder="City *"
+                            className={`h-12 ${fieldErrors.city ? 'border-destructive' : ''}`}
+                            value={formData.city}
+                            onChange={(e) => handleInputChange('city', e.target.value)}
+                            disabled={isLoggedIn && selectedAddressId !== null}
+                            required
+                          />
+                        )}
+                        {fieldErrors.city && <p className="text-destructive text-xs">{fieldErrors.city}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <Input
+                          placeholder="Postal code *"
+                          className={`h-12 ${fieldErrors.postalCode ? 'border-destructive' : ''}`}
+                          value={formData.postalCode}
+                          onChange={(e) => handleInputChange('postalCode', e.target.value)}
                           required
                         />
-                      )}
-                      <Select 
-                        value={formData.city} 
-                        onValueChange={(val) => handleInputChange('city', val)}
-                        disabled={!formData.country || availableCities.length === 0}
-                      >
-                        <SelectTrigger className="h-12">
-                          <SelectValue placeholder={availableCities.length > 0 ? "City *" : "Select country first"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableCities.map((city) => (
-                            <SelectItem key={city} value={city}>{city}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {availableCities.length === 0 && formData.country && (
-                        <Input 
-                          placeholder="City *" 
-                          className="h-12" 
-                          value={formData.city}
-                          onChange={(e) => handleInputChange('city', e.target.value)}
-                          required
-                        />
-                      )}
-                      <Input 
-                        placeholder="Postal code *" 
-                        className="h-12" 
-                        value={formData.postalCode}
-                        onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                        required
-                      />
+                        {fieldErrors.postalCode && <p className="text-destructive text-xs">{fieldErrors.postalCode}</p>}
+                      </div>
                     </div>
                     
                     {/* GSTIN Field (Optional for B2B) */}
@@ -1358,135 +1440,9 @@ const Checkout = () => {
                     )}
                   </div>
                 </ScrollReveal>
-
-                <ScrollReveal>
-                  <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border">
-                    <h3 className="font-serif text-lg sm:text-xl mb-6 font-semibold flex items-center gap-2">
-                      <CreditCard className="w-5 h-5 text-muted-foreground" />
-                      Payment Method
-                    </h3>
-                    {hasDigitalProducts && availableGateways.length === 0 && (
-                      <div className="mb-4 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-lg">
-                        <p className="text-sm text-red-800 dark:text-red-400 font-medium">
-                          Payment method not available. Please try again later.
-                        </p>
-                      </div>
-                    )}
-                    {hasDigitalProducts && availableGateways.length > 0 && (
-                      <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-lg">
-                        <p className="text-sm text-yellow-800 dark:text-yellow-400 font-medium">
-                          ⚠️ Digital products require online payment only. COD is not available.
-                        </p>
-                      </div>
-                    )}
-                    <div className="space-y-4">
-                      <div className="flex flex-wrap gap-2" role="group" aria-label="Payment method">
-                        {availableGateways.includes('COD') && (
-                          <button
-                            type="button"
-                            onClick={() => { setPaymentGateway('COD'); setPaymentMethod('cod'); }}
-                            className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                              paymentGateway === 'COD' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
-                            }`}
-                          >
-                            Cash on Delivery (COD)
-                          </button>
-                        )}
-                        {availableGateways.includes('PARTIAL_COD') && (
-                          <button
-                            type="button"
-                            onClick={() => { setPaymentGateway('PARTIAL_COD'); setPaymentMethod('partial_cod'); }}
-                            className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                              paymentGateway === 'PARTIAL_COD' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
-                            }`}
-                          >
-                            Partial COD
-                          </button>
-                        )}
-                        {availableGateways.includes('STRIPE') && (
-                          <button
-                            type="button"
-                            onClick={() => { setPaymentGateway('STRIPE'); setPaymentMethod('card'); }}
-                            className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                              paymentGateway === 'STRIPE' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
-                            }`}
-                          >
-                            Card (Stripe)
-                          </button>
-                        )}
-                        {availableGateways.includes('RAZORPAY') && (
-                          <button
-                            type="button"
-                            onClick={() => { setPaymentGateway('RAZORPAY'); setPaymentMethod('razorpay'); }}
-                            className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                              paymentGateway === 'RAZORPAY' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
-                            }`}
-                          >
-                            Razorpay (UPI/Card)
-                          </button>
-                        )}
-                        {availableGateways.length === 0 && (
-                          <span className="text-sm text-muted-foreground py-2">
-                            {hasDigitalProducts ? 'Payment method not available. Please try again later.' : 'No payment methods available'}
-                          </span>
-                        )}
-                      </div>
-                      {paymentGateway === 'STRIPE' && (
-                        <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
-                          You will be redirected to Stripe secure payment page after placing order.
-                        </div>
-                      )}
-                      {paymentGateway === 'RAZORPAY' && (
-                        <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
-                          You will be redirected to Razorpay secure payment page after placing order.
-                          </div>
-                      )}
-                      {paymentGateway === 'COD' && (
-                        <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
-                          Payment will be collected when your order is delivered.
-                        </div>
-                      )}
-                      {paymentGateway === 'PARTIAL_COD' && paymentConfig?.partialCodAdvancePercentage && (
-                        <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30 rounded-lg space-y-3">
-                          <div className="flex items-center gap-2 text-blue-900 dark:text-blue-400 font-semibold">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span>Partial COD Payment Breakdown</span>
-                          </div>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Order Total:</span>
-                              <span className="font-medium">{format(total)}</span>
-                            </div>
-                            <div className="flex justify-between text-blue-700 dark:text-blue-300">
-                              <span>Advance Payment ({paymentConfig.partialCodAdvancePercentage}%):</span>
-                              <span className="font-semibold">{format((total * paymentConfig.partialCodAdvancePercentage) / 100)}</span>
-                            </div>
-                            <div className="flex justify-between text-green-700 dark:text-green-300">
-                              <span>Remaining (COD on Delivery):</span>
-                              <span className="font-semibold">{format(total - (total * paymentConfig.partialCodAdvancePercentage) / 100)}</span>
-                            </div>
-                            <div className="pt-2 border-t border-blue-200 dark:border-blue-800">
-                              <p className="text-xs text-muted-foreground">
-                                Pay {paymentConfig.partialCodAdvancePercentage}% online now, remaining amount will be collected when your order is delivered.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      <Input 
-                        placeholder="Order notes (optional)" 
-                        className="h-12" 
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </ScrollReveal>
               </div>
 
-              <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border h-fit lg:sticky lg:top-24">
+              <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border h-fit lg:sticky lg:top-24 space-y-6">
                 <h3 className="font-serif text-lg sm:text-xl mb-6 font-semibold flex items-center gap-2">
                   <ShoppingBag className="w-5 h-5 text-muted-foreground" />
                   Order Summary
@@ -1542,15 +1498,25 @@ const Checkout = () => {
                   )}
                   <div className="flex justify-between">
                     <span>Shipping</span>
-                    <span>{shipping === 0 ? 'Free' : format(shipping)}</span>
+                    <span>
+                      {!isIndia ? (shipping === 0 ? 'To be confirmed' : format(shipping)) : (shipping === 0 ? 'Free' : format(shipping))}
+                    </span>
                   </div>
+                  {!isIndia && (
+                    <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 text-sm text-amber-800 dark:text-amber-200">
+                      Shipping is not included for this country. Our team will contact you to confirm shipping costs.
+                    </div>
+                  )}
+                  {paymentGateway === 'COD' && codCharge > 0 && (
+                    <div className="flex justify-between text-primary">
+                      <span>COD charge</span>
+                      <span>+{format(codCharge)}</span>
+                    </div>
+                  )}
                   {isLoggedIn && appliedCouponCode && couponDiscount > 0 && (
                     <div className="flex justify-between items-center text-primary">
                       <span>Coupon ({appliedCouponCode})</span>
-                      <span className="flex items-center gap-2">
-                        -{format(couponDiscount)}
-                        <Link to="/cart" className="text-xs underline hover:no-underline">Change</Link>
-                      </span>
+                      <span>-{format(couponDiscount)}</span>
                     </div>
                   )}
                   {paymentGateway === 'PARTIAL_COD' && paymentConfig?.partialCodAdvancePercentage && (
@@ -1569,7 +1535,7 @@ const Checkout = () => {
                   )}
                   <div className="flex justify-between font-semibold text-lg sm:text-xl pt-4 border-t">
                     <span>Total</span>
-                    <span>{format(total)}</span>
+                    <span>{format(displayTotal)}</span>
                   </div>
                   {paymentGateway === 'PARTIAL_COD' && paymentConfig?.partialCodAdvancePercentage && (
                     <div className="pt-2">
@@ -1579,8 +1545,180 @@ const Checkout = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Payment Method - right column */}
+                <div className="border-t pt-4">
+                  <h3 className="font-serif text-base font-semibold flex items-center gap-2 mb-4">
+                    <CreditCard className="w-4 h-4 text-muted-foreground" />
+                    Payment Method
+                  </h3>
+                  {hasDigitalProducts && availableGateways.length === 0 && (
+                    <div className="mb-3 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-lg">
+                      <p className="text-sm text-red-800 dark:text-red-400 font-medium">
+                        Payment method not available. Please try again later.
+                      </p>
+                    </div>
+                  )}
+                  {hasDigitalProducts && availableGateways.length > 0 && (
+                    <div className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-lg">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-400 font-medium">
+                        Digital products require online payment only. COD is not available.
+                      </p>
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2" role="group" aria-label="Payment method">
+                      {availableGateways.includes('COD') && (
+                        <button
+                          type="button"
+                          onClick={() => { setPaymentGateway('COD'); setPaymentMethod('cod'); }}
+                          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                            paymentGateway === 'COD' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
+                          }`}
+                        >
+                          Cash on Delivery (COD)
+                        </button>
+                      )}
+                      {availableGateways.includes('PARTIAL_COD') && (
+                        <button
+                          type="button"
+                          onClick={() => { setPaymentGateway('PARTIAL_COD'); setPaymentMethod('partial_cod'); }}
+                          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                            paymentGateway === 'PARTIAL_COD' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
+                          }`}
+                        >
+                          Partial COD
+                        </button>
+                      )}
+                      {availableGateways.includes('STRIPE') && (
+                        <button
+                          type="button"
+                          onClick={() => { setPaymentGateway('STRIPE'); setPaymentMethod('card'); }}
+                          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                            paymentGateway === 'STRIPE' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
+                          }`}
+                        >
+                          Card (Stripe)
+                        </button>
+                      )}
+                      {availableGateways.includes('RAZORPAY') && (
+                        <button
+                          type="button"
+                          onClick={() => { setPaymentGateway('RAZORPAY'); setPaymentMethod('razorpay'); }}
+                          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                            paymentGateway === 'RAZORPAY' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
+                          }`}
+                        >
+                          Razorpay (UPI/Card)
+                        </button>
+                      )}
+                      {availableGateways.length === 0 && (
+                        <span className="text-sm text-muted-foreground py-2">
+                          {hasDigitalProducts ? 'Payment method not available.' : 'No payment methods available'}
+                        </span>
+                      )}
+                    </div>
+                    {paymentGateway === 'STRIPE' && (
+                      <p className="text-xs text-muted-foreground">Redirect to Stripe secure payment after placing order.</p>
+                    )}
+                    {paymentGateway === 'RAZORPAY' && (
+                      <p className="text-xs text-muted-foreground">Redirect to Razorpay secure payment after placing order.</p>
+                    )}
+                    {paymentGateway === 'COD' && (
+                      <p className="text-xs text-muted-foreground">Payment collected on delivery.</p>
+                    )}
+                    {paymentGateway === 'PARTIAL_COD' && paymentConfig?.partialCodAdvancePercentage && (
+                      <p className="text-xs text-muted-foreground">
+                        Pay {paymentConfig.partialCodAdvancePercentage}% online now, rest on delivery.
+                      </p>
+                    )}
+                    <Input
+                      placeholder="Order notes (optional)"
+                      className="h-10 text-sm"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Discount / Coupon - collapsible */}
+                <Collapsible open={discountOpen} onOpenChange={setDiscountOpen} className="border-t pt-4">
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between text-left font-medium text-sm hover:opacity-80"
+                    >
+                      <span>
+                        {appliedCouponCode && couponDiscount > 0
+                          ? `Coupon: ${appliedCouponCode} — -${format(couponDiscount)}`
+                          : 'Discount / Coupon'}
+                      </span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${discountOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="pt-3 space-y-3">
+                      {!isLoggedIn ? (
+                        <div className="p-3 rounded-lg border border-border bg-muted/30 text-sm text-muted-foreground">
+                          Log in to use discount coupons.
+                        </div>
+                      ) : appliedCouponCode && couponDiscount > 0 ? (
+                        <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary/20">
+                          <div>
+                            <p className="text-sm font-medium">Applied: {appliedCouponCode}</p>
+                            <p className="text-xs text-muted-foreground">Discount: {format(couponDiscount)}</p>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={removeCoupon} className="text-xs h-8">
+                            Remove
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          {eligibleCoupons.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-2">Available coupons</p>
+                              <div className="flex flex-wrap gap-2">
+                                {eligibleCoupons.map((c: any) => (
+                                  <Button
+                                    key={c.code}
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 text-xs"
+                                    onClick={() => applyCouponMutation.mutate({ code: c.code })}
+                                    disabled={applyCouponMutation.isPending}
+                                  >
+                                    {c.code} — {c.message}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Have a code? Enter here"
+                              className="flex-1 h-9 text-sm"
+                              value={couponCodeInput}
+                              onChange={(e) => setCouponCodeInput(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && (applyCouponMutation.mutate({ code: couponCodeInput.trim().toUpperCase() }), e.preventDefault())}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-9 text-xs px-3 whitespace-nowrap"
+                              onClick={() => couponCodeInput.trim() && applyCouponMutation.mutate({ code: couponCodeInput.trim().toUpperCase() })}
+                              disabled={applyCouponMutation.isPending || !couponCodeInput.trim()}
+                            >
+                              {applyCouponMutation.isPending ? 'Applying...' : 'Apply'}
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+
                 <Button 
-                  className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white mt-6 sm:mt-8 h-12 sm:h-14 text-base font-semibold"
+                  className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white mt-2 h-12 sm:h-14 text-base font-semibold"
                   onClick={handlePlaceOrder}
                   disabled={createOrderMutation.isPending || isProcessingPayment}
                 >

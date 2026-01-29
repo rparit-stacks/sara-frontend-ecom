@@ -1036,6 +1036,11 @@ export const currencyApi = {
 export const paymentApi = {
   getMethods: (country: string) => fetchApi<{ country: string; gateways: string[]; methods: Record<string, string[]> }>(`/api/payment/methods?country=${encodeURIComponent(country)}`),
   createOrder: (data: any) => fetchApi<any>('/api/payment/create-order', { method: 'POST', body: JSON.stringify(data) }),
+  payRemaining: (orderId: number, paymentGateway?: string) =>
+    fetchApi<any>('/api/payment/pay-remaining', {
+      method: 'POST',
+      body: JSON.stringify(paymentGateway ? { orderId, paymentGateway } : { orderId }),
+    }),
   verify: (data: any) => fetchApi<any>('/api/payment/verify', { method: 'POST', body: JSON.stringify(data) }),
   recordPaymentFailed: (orderNumber: string, gateway: string) =>
     fetchApi<{ success: boolean }>('/api/payment/record-failed', { method: 'POST', body: JSON.stringify({ orderNumber, gateway }) }),
