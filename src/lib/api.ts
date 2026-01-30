@@ -681,10 +681,11 @@ export const customConfigApi = {
 // Cart API
 // ===============================
 export const cartApi = {
-  getCart: (state?: string, couponCode?: string) => {
+  getCart: (state?: string, couponCode?: string, country?: string) => {
     const params = new URLSearchParams();
     if (state) params.set('state', state);
     if (couponCode) params.set('couponCode', couponCode);
+    if (country) params.set('country', country);
     const query = params.toString();
     return fetchApi<any>(`/api/cart${query ? `?${query}` : ''}`);
   },
@@ -879,18 +880,21 @@ export const couponApi = {
 };
 
 // ===============================
-// Shipping API
+// Shipping API (quantity slabs)
 // ===============================
 export const shippingApi = {
-  calculate: (cartValue: number, state?: string) => 
-    fetchApi<any>('/api/shipping/calculate', { method: 'POST', body: JSON.stringify({ cartValue, state }) }),
-  
-  // Admin
-  getAllRules: () => fetchApi<any[]>('/api/admin/shipping-rules'),
-  getRuleById: (id: number) => fetchApi<any>(`/api/admin/shipping-rules/${id}`),
-  createRule: (data: any) => fetchApi<any>('/api/admin/shipping-rules', { method: 'POST', body: JSON.stringify(data) }),
-  updateRule: (id: number, data: any) => fetchApi<any>(`/api/admin/shipping-rules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteRule: (id: number) => fetchApi<void>(`/api/admin/shipping-rules/${id}`, { method: 'DELETE' }),
+  /** Guest checkout: India = total quantity from items, then slab; non-India = 0. */
+  calculateForItems: (country: string, items: Array<{ productId: number; productType: string; quantity: number }>) =>
+    fetchApi<{ shipping: number }>('/api/shipping/calculate-for-items', {
+      method: 'POST',
+      body: JSON.stringify({ country, items }),
+    }),
+  getQuantitySlabs: () => fetchApi<Array<{ id: number; minQuantity: number; maxQuantity: number | null; shippingPrice: number; displayOrder: number }>>('/api/admin/shipping-quantity-slabs'),
+  createQuantitySlab: (data: { minQuantity: number; maxQuantity?: number | null; shippingPrice: number; displayOrder?: number }) =>
+    fetchApi<any>('/api/admin/shipping-quantity-slabs', { method: 'POST', body: JSON.stringify(data) }),
+  updateQuantitySlab: (id: number, data: { minQuantity: number; maxQuantity?: number | null; shippingPrice: number; displayOrder?: number }) =>
+    fetchApi<any>(`/api/admin/shipping-quantity-slabs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteQuantitySlab: (id: number) => fetchApi<void>(`/api/admin/shipping-quantity-slabs/${id}`, { method: 'DELETE' }),
 };
 
 // ===============================
@@ -919,7 +923,56 @@ export const adminUsersApi = {
 // ===============================
 export const dashboardApi = {
   getStats: () => fetchApi<any>('/api/admin/dashboard/stats'),
+  getVisitorStats: () => fetchApi<{
+    today: number;
+    yesterday: number;
+    thisWeek: number;
+    prevWeek: number;
+    thisMonth: number;
+    threeMonths: number;
+    sixMonths: number;
+    oneYear: number;
+  }>('/api/admin/dashboard/visitor-stats'),
 };
+
+// Public visit tracking (no auth). Call once per hour per visitor to avoid double count.
+const VISITOR_ID_KEY = 'quout_visitor_id';
+const LAST_VISIT_HOUR_KEY = 'quout_last_visit_hour';
+
+export function getOrCreateVisitorId(): string {
+  if (typeof window === 'undefined') return '';
+  let id = localStorage.getItem(VISITOR_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID?.() ?? `v_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    localStorage.setItem(VISITOR_ID_KEY, id);
+  }
+  return id;
+}
+
+export function shouldRecordVisitThisHour(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hourKey = new Date().toISOString().slice(0, 13); // "2025-01-30T14"
+  const last = localStorage.getItem(LAST_VISIT_HOUR_KEY);
+  if (last === hourKey) return false;
+  localStorage.setItem(LAST_VISIT_HOUR_KEY, hourKey);
+  return true;
+}
+
+export async function recordVisit(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (!shouldRecordVisitThisHour()) return;
+  const visitorId = getOrCreateVisitorId();
+  if (!visitorId) return;
+  try {
+    await fetch(`${API_BASE_URL}/api/visit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visitorId }),
+    });
+  } catch {
+    // ignore; don't block app
+  }
+}
 
 // ===============================
 // Admin Management API

@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Minus, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Fabric } from './FabricSelectionPopup';
 import { usePrice } from '@/lib/currency';
@@ -63,7 +63,6 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
     });
     return initial;
   });
-  const [quantity, setQuantity] = useState(1);
   const [fabricCustomValues, setFabricCustomValues] = useState<Record<string, string>>({});
   const [uploadingCustomFieldId, setUploadingCustomFieldId] = useState<string | null>(null);
   const MAX_CUSTOM_FILE_MB = 10;
@@ -91,10 +90,8 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
     return basePrice;
   }, [fabric, selectedVariants, variants]);
 
-  // Calculate total price
-  const totalPrice = useMemo(() => {
-    return pricePerMeter * quantity;
-  }, [pricePerMeter, quantity]);
+  // 1-meter base: totalPrice is fabric price per meter (quantity always 1)
+  const totalPrice = pricePerMeter;
 
   const handleVariantChange = (variantId: string, optionId: string) => {
     const isSelected = selectedVariants[variantId] === optionId;
@@ -130,7 +127,7 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
     onComplete({
       fabricId: fabric.id,
       selectedVariants,
-      quantity,
+      quantity: 1,
       totalPrice,
       customFieldValues: customFields.length > 0 ? { ...fabricCustomValues } : undefined,
     });
@@ -150,7 +147,7 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
             <div className="min-w-0">
               <div className="break-words text-sm sm:text-base md:text-lg">{fabric.name}</div>
               <p className="text-[10px] sm:text-xs font-normal text-muted-foreground mt-0.5 sm:mt-1">
-                Select variants and quantity
+                Select variants (1 meter base)
               </p>
             </div>
           </DialogTitle>
@@ -312,45 +309,13 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
             </div>
           )}
 
-          {/* Quantity Selection */}
-          <div className="space-y-2 sm:space-y-2.5 pt-3 sm:pt-3.5 border-t border-border">
-            <h4 className="font-medium text-sm sm:text-base">Quantity (Meters)</h4>
-            <div className="flex items-center gap-3 sm:gap-4 md:gap-5">
-              <div className="flex items-center border border-border rounded-full">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                >
-                  <Minus className="w-4 h-4 sm:w-5 sm:h-5" />
-                </Button>
-                <span className="w-12 sm:w-14 md:w-16 text-center font-medium text-sm sm:text-base md:text-lg">{quantity}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12"
-                  onClick={() => setQuantity(quantity + 1)}
-                >
-                  <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-                </Button>
-              </div>
-              <span className="text-xs sm:text-sm text-muted-foreground">
-                {format(pricePerMeter)}/meter
-              </span>
-            </div>
-          </div>
-
-          {/* Price Summary */}
+          {/* Price summary: per meter only (1-meter base) */}
           <div className="p-2.5 sm:p-3 md:p-4 bg-[#2b9d8f]/5 rounded-lg border border-[#2b9d8f]/20">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Total Price</p>
+                <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Fabric price per meter</p>
                 <p className="text-lg sm:text-xl md:text-2xl font-semibold text-[#2b9d8f] mt-0.5 sm:mt-1">
-                  {format(totalPrice)}
-                </p>
-                <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground mt-0.5 sm:mt-1">
-                  {quantity} meter{quantity !== 1 ? 's' : ''} × {format(pricePerMeter)}/meter
+                  {format(pricePerMeter)}/meter
                 </p>
               </div>
             </div>

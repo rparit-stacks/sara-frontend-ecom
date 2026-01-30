@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { Package, Palette, Image, Users, Activity, TrendingUp, ShoppingBag, Loader2, IndianRupee } from 'lucide-react';
+import { Package, Palette, Image, Users, Activity, TrendingUp, ShoppingBag, Loader2, IndianRupee, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { dashboardApi } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,11 @@ const AdminDashboard = () => {
   const { data: statsData, isLoading, error } = useQuery({
     queryKey: ['dashboardStats'],
     queryFn: () => dashboardApi.getStats(),
+  });
+
+  const { data: visitorStats, isLoading: visitorLoading } = useQuery({
+    queryKey: ['visitorStats'],
+    queryFn: () => dashboardApi.getVisitorStats(),
   });
   
   // Build stats from API data
@@ -88,6 +93,53 @@ const AdminDashboard = () => {
           </h1>
           <p className="text-muted-foreground text-lg">Welcome back! Here's what's happening today.</p>
         </div>
+
+        {/* Visitor Stats Section - unique visitors per period (one per hour = no double count) */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
+          className="bg-white rounded-xl p-6 border border-border shadow-sm"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <Eye className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="font-cursive text-2xl font-bold">Visitor Stats</h2>
+              <p className="text-sm text-muted-foreground">Unique visitors (max 1 per hour per person)</p>
+            </div>
+          </div>
+          {visitorLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
+              {[
+                { label: 'Today', value: visitorStats?.today ?? 0 },
+                { label: 'Yesterday', value: visitorStats?.yesterday ?? 0 },
+                { label: 'This Week', value: visitorStats?.thisWeek ?? 0 },
+                { label: 'Prev Week', value: visitorStats?.prevWeek ?? 0 },
+                { label: 'This Month', value: visitorStats?.thisMonth ?? 0 },
+                { label: '3 Months', value: visitorStats?.threeMonths ?? 0 },
+                { label: '6 Months', value: visitorStats?.sixMonths ?? 0 },
+                { label: '1 Year', value: visitorStats?.oneYear ?? 0 },
+              ].map((item, index) => (
+                <motion.div
+                  key={item.label}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.4 + index * 0.05 }}
+                  className="rounded-lg bg-muted/50 p-4 text-center border border-border/50"
+                >
+                  <p className="text-2xl font-bold text-foreground">{item.value.toLocaleString()}</p>
+                  <p className="text-xs font-medium text-muted-foreground mt-1">{item.label}</p>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </motion.section>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

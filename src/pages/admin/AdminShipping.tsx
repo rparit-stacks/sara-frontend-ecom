@@ -3,211 +3,160 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Edit, Trash2, Loader2, X, Truck, MapPin } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Plus, Edit, Trash2, Loader2, Truck } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { shippingApi } from '@/lib/api';
 
-const INDIAN_STATES = [
-  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
-  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
-  'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
-  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
-  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli',
-  'Daman and Diu', 'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
-];
+type Slab = { id: number; minQuantity: number; maxQuantity: number | null; shippingPrice: number; displayOrder: number };
 
 const AdminShipping = () => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingRule, setEditingRule] = useState<any>(null);
+  const [editingSlab, setEditingSlab] = useState<Slab | null>(null);
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
-    ruleName: '',
-    scope: 'ALL_INDIA',
-    state: '',
-    calculationType: 'FLAT',
-    flatPrice: '',
-    freeShippingAbove: '',
-    priority: '0',
-    isActive: true,
-    ranges: [] as Array<{ minCartValue: string; maxCartValue: string; shippingPrice: string; displayOrder: number }>,
+    minQuantity: '',
+    maxQuantity: '',
+    shippingPrice: '',
+    displayOrder: '0',
   });
 
-  const { data: rules = [], isLoading } = useQuery({
-    queryKey: ['admin-shipping-rules'],
-    queryFn: () => shippingApi.getAllRules(),
+  const { data: slabs = [], isLoading } = useQuery({
+    queryKey: ['admin-shipping-quantity-slabs'],
+    queryFn: () => shippingApi.getQuantitySlabs(),
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => shippingApi.createRule(data),
+    mutationFn: (data: { minQuantity: number; maxQuantity?: number | null; shippingPrice: number; displayOrder?: number }) =>
+      shippingApi.createQuantitySlab(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-shipping-rules'] });
-      toast.success('Shipping rule created successfully');
+      queryClient.invalidateQueries({ queryKey: ['admin-shipping-quantity-slabs'] });
+      toast.success('Quantity slab created');
       setIsCreateDialogOpen(false);
       resetForm();
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to create shipping rule');
+      toast.error(error.message || 'Failed to create slab');
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => shippingApi.updateRule(id, data),
+    mutationFn: ({ id, data }: { id: number; data: { minQuantity: number; maxQuantity?: number | null; shippingPrice: number; displayOrder?: number } }) =>
+      shippingApi.updateQuantitySlab(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-shipping-rules'] });
-      toast.success('Shipping rule updated successfully');
+      queryClient.invalidateQueries({ queryKey: ['admin-shipping-quantity-slabs'] });
+      toast.success('Quantity slab updated');
       setIsEditDialogOpen(false);
-      setEditingRule(null);
+      setEditingSlab(null);
       resetForm();
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to update shipping rule');
+      toast.error(error.message || 'Failed to update slab');
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: shippingApi.deleteRule,
+    mutationFn: (id: number) => shippingApi.deleteQuantitySlab(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-shipping-rules'] });
-      toast.success('Shipping rule deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['admin-shipping-quantity-slabs'] });
+      toast.success('Quantity slab deleted');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to delete shipping rule');
+      toast.error(error.message || 'Failed to delete slab');
     },
   });
 
   const resetForm = () => {
     setFormData({
-      ruleName: '',
-      scope: 'ALL_INDIA',
-      state: '',
-      calculationType: 'FLAT',
-      flatPrice: '',
-      freeShippingAbove: '',
-      priority: '0',
-      isActive: true,
-      ranges: [],
+      minQuantity: '',
+      maxQuantity: '',
+      shippingPrice: '',
+      displayOrder: '0',
     });
   };
 
   const handleCreate = () => {
-    const data = {
-      ruleName: formData.ruleName,
-      scope: formData.scope,
-      state: formData.scope === 'STATE_WISE' ? formData.state : null,
-      calculationType: formData.calculationType,
-      flatPrice: formData.calculationType === 'FLAT' ? (formData.flatPrice ? parseFloat(formData.flatPrice) : null) : null,
-      freeShippingAbove: formData.freeShippingAbove ? parseFloat(formData.freeShippingAbove) : null,
-      priority: parseInt(formData.priority) || 0,
-      isActive: formData.isActive,
-      ranges: formData.calculationType === 'RANGE_BASED' ? formData.ranges.map(r => ({
-        minCartValue: r.minCartValue ? parseFloat(r.minCartValue) : null,
-        maxCartValue: r.maxCartValue ? parseFloat(r.maxCartValue) : null,
-        shippingPrice: parseFloat(r.shippingPrice) || 0,
-        displayOrder: r.displayOrder || 0,
-      })) : [],
-    };
-    createMutation.mutate(data);
+    const min = parseInt(formData.minQuantity, 10);
+    if (isNaN(min) || min < 0) {
+      toast.error('Min quantity must be 0 or greater');
+      return;
+    }
+    const max = formData.maxQuantity.trim() === '' ? null : parseInt(formData.maxQuantity, 10);
+    if (max !== null && (isNaN(max) || max < min)) {
+      toast.error('Max quantity must be empty or >= min quantity');
+      return;
+    }
+    const price = parseFloat(formData.shippingPrice);
+    if (isNaN(price) || price < 0) {
+      toast.error('Shipping price must be 0 or greater');
+      return;
+    }
+    const displayOrder = parseInt(formData.displayOrder, 10) || 0;
+    createMutation.mutate({ minQuantity: min, maxQuantity: max, shippingPrice: price, displayOrder });
   };
 
-  const handleEdit = (rule: any) => {
-    setEditingRule(rule);
+  const handleEdit = (slab: Slab) => {
+    setEditingSlab(slab);
     setFormData({
-      ruleName: rule.ruleName || '',
-      scope: rule.scope || 'ALL_INDIA',
-      state: rule.state || '',
-      calculationType: rule.calculationType || 'FLAT',
-      flatPrice: rule.flatPrice?.toString() || '',
-      freeShippingAbove: rule.freeShippingAbove?.toString() || '',
-      priority: rule.priority?.toString() || '0',
-      isActive: rule.isActive !== false,
-      ranges: rule.ranges?.map((r: any) => ({
-        minCartValue: r.minCartValue?.toString() || '',
-        maxCartValue: r.maxCartValue?.toString() || '',
-        shippingPrice: r.shippingPrice?.toString() || '',
-        displayOrder: r.displayOrder || 0,
-      })) || [],
+      minQuantity: String(slab.minQuantity),
+      maxQuantity: slab.maxQuantity == null ? '' : String(slab.maxQuantity),
+      shippingPrice: String(slab.shippingPrice),
+      displayOrder: String(slab.displayOrder ?? 0),
     });
     setIsEditDialogOpen(true);
   };
 
   const handleUpdate = () => {
-    if (!editingRule) return;
-    const data = {
-      ruleName: formData.ruleName,
-      scope: formData.scope,
-      state: formData.scope === 'STATE_WISE' ? formData.state : null,
-      calculationType: formData.calculationType,
-      flatPrice: formData.calculationType === 'FLAT' ? (formData.flatPrice ? parseFloat(formData.flatPrice) : null) : null,
-      freeShippingAbove: formData.freeShippingAbove ? parseFloat(formData.freeShippingAbove) : null,
-      priority: parseInt(formData.priority) || 0,
-      isActive: formData.isActive,
-      ranges: formData.calculationType === 'RANGE_BASED' ? formData.ranges.map(r => ({
-        minCartValue: r.minCartValue ? parseFloat(r.minCartValue) : null,
-        maxCartValue: r.maxCartValue ? parseFloat(r.maxCartValue) : null,
-        shippingPrice: parseFloat(r.shippingPrice) || 0,
-        displayOrder: r.displayOrder || 0,
-      })) : [],
-    };
-    updateMutation.mutate({ id: editingRule.id, data });
-  };
-
-  const addRange = () => {
-    setFormData({
-      ...formData,
-      ranges: [...formData.ranges, { minCartValue: '', maxCartValue: '', shippingPrice: '', displayOrder: formData.ranges.length }],
+    if (!editingSlab) return;
+    const min = parseInt(formData.minQuantity, 10);
+    if (isNaN(min) || min < 0) {
+      toast.error('Min quantity must be 0 or greater');
+      return;
+    }
+    const max = formData.maxQuantity.trim() === '' ? null : parseInt(formData.maxQuantity, 10);
+    if (max !== null && (isNaN(max) || max < min)) {
+      toast.error('Max quantity must be empty or >= min quantity');
+      return;
+    }
+    const price = parseFloat(formData.shippingPrice);
+    if (isNaN(price) || price < 0) {
+      toast.error('Shipping price must be 0 or greater');
+      return;
+    }
+    const displayOrder = parseInt(formData.displayOrder, 10) || 0;
+    updateMutation.mutate({
+      id: editingSlab.id,
+      data: { minQuantity: min, maxQuantity: max, shippingPrice: price, displayOrder },
     });
   };
 
-  const removeRange = (index: number) => {
-    setFormData({
-      ...formData,
-      ranges: formData.ranges.filter((_, i) => i !== index),
-    });
+  const formatRange = (min: number, max: number | null) => {
+    if (max == null) return `${min}+`;
+    return `${min}–${max}`;
   };
 
-  const updateRange = (index: number, field: string, value: string) => {
-    const newRanges = [...formData.ranges];
-    newRanges[index] = { ...newRanges[index], [field]: value };
-    setFormData({ ...formData, ranges: newRanges });
-  };
-
-  const filteredRules = rules.filter((rule: any) =>
-    rule.ruleName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    rule.state?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const slabList = slabs as Slab[];
 
   return (
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Shipping Rules</h1>
-            <p className="text-muted-foreground mt-1">Manage shipping charges and rules</p>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Truck className="w-8 h-8" />
+              Shipping – Quantity slabs
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Set shipping cost by total cart quantity. Example: 1–5 qty → ₹50, 6–10 → ₹100, 11+ → free. Cart total quantity (sum of all item quantities) selects the slab; shipping updates when quantity changes.
+            </p>
           </div>
           <Button onClick={() => { resetForm(); setIsCreateDialogOpen(true); }} className="gap-2">
             <Plus className="w-4 h-4" />
-            Create Rule
+            Add slab
           </Button>
-        </div>
-
-        <div className="flex gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search rules..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
         </div>
 
         {isLoading ? (
@@ -220,406 +169,169 @@ const AdminShipping = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-4">Rule Name</th>
-                    <th className="text-left p-4">Scope</th>
-                    <th className="text-left p-4">Type</th>
-                    <th className="text-left p-4">Price/Ranges</th>
-                    <th className="text-left p-4">Priority</th>
-                    <th className="text-left p-4">Status</th>
+                    <th className="text-left p-4">Min Qty</th>
+                    <th className="text-left p-4">Max Qty</th>
+                    <th className="text-left p-4">Shipping (₹)</th>
+                    <th className="text-left p-4">Range</th>
                     <th className="text-left p-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRules.map((rule: any) => (
-                    <tr key={rule.id} className="border-b hover:bg-secondary/50">
-                      <td className="p-4 font-medium">{rule.ruleName || 'Unnamed Rule'}</td>
-                      <td className="p-4">
-                        <Badge variant={rule.scope === 'ALL_INDIA' ? 'default' : 'secondary'}>
-                          {rule.scope === 'ALL_INDIA' ? 'All India' : rule.state || 'State'}
-                        </Badge>
-                      </td>
-                      <td className="p-4">
-                        <Badge variant="outline">{rule.calculationType}</Badge>
-                      </td>
-                      <td className="p-4">
-                        {rule.calculationType === 'FLAT' ? (
-                          <span>₹{rule.flatPrice}</span>
-                        ) : (
-                          <span>{rule.ranges?.length || 0} range(s)</span>
-                        )}
-                        {rule.freeShippingAbove && (
-                          <span className="text-xs text-muted-foreground block">Free above ₹{rule.freeShippingAbove}</span>
-                        )}
-                      </td>
-                      <td className="p-4">{rule.priority || 0}</td>
-                      <td className="p-4">
-                        <Badge variant={rule.isActive ? 'default' : 'secondary'}>
-                          {rule.isActive ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(rule)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => deleteMutation.mutate(rule.id)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            {deleteMutation.isPending ? (
-                              <Loader2 className="w-4 h-4 animate-spin text-destructive" />
-                            ) : (
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            )}
-                          </Button>
-                        </div>
+                  {slabList.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                        No quantity slabs yet. Add one to set shipping by cart total quantity.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    slabList.map((slab) => (
+                      <tr key={slab.id} className="border-b hover:bg-secondary/50">
+                        <td className="p-4 font-medium">{slab.minQuantity}</td>
+                        <td className="p-4">{slab.maxQuantity == null ? '—' : slab.maxQuantity}</td>
+                        <td className="p-4">₹{slab.shippingPrice}</td>
+                        <td className="p-4 text-muted-foreground">{formatRange(slab.minQuantity, slab.maxQuantity)}</td>
+                        <td className="p-4">
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(slab)}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deleteMutation.mutate(slab.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              {deleteMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-destructive" />
+                              ) : (
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              )}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* Create Dialog */}
+        {/* Create slab dialog */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Create Shipping Rule</DialogTitle>
+              <DialogTitle>Add quantity slab</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Rule Name *</Label>
-                  <Input
-                    value={formData.ruleName}
-                    onChange={(e) => setFormData({ ...formData, ruleName: e.target.value })}
-                    placeholder="e.g., Standard Shipping"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Priority *</Label>
-                  <Input
-                    type="number"
-                    value={formData.priority}
-                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                    placeholder="Higher = checked first"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Scope *</Label>
-                  <Select value={formData.scope} onValueChange={(val) => setFormData({ ...formData, scope: val, state: val === 'ALL_INDIA' ? '' : formData.state })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL_INDIA">All India</SelectItem>
-                      <SelectItem value="STATE_WISE">State Wise</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {formData.scope === 'STATE_WISE' && (
-                  <div className="space-y-2">
-                    <Label>State *</Label>
-                    <Select value={formData.state} onValueChange={(val) => setFormData({ ...formData, state: val })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select State" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {INDIAN_STATES.map((state) => (
-                          <SelectItem key={state} value={state}>{state}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-
               <div className="space-y-2">
-                <Label>Calculation Type *</Label>
-                <Select value={formData.calculationType} onValueChange={(val) => setFormData({ ...formData, calculationType: val })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="FLAT">Flat Price</SelectItem>
-                    <SelectItem value="RANGE_BASED">Range Based</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.calculationType === 'FLAT' && (
-                <div className="space-y-2">
-                  <Label>Flat Price (₹) *</Label>
-                  <Input
-                    type="number"
-                    value={formData.flatPrice}
-                    onChange={(e) => setFormData({ ...formData, flatPrice: e.target.value })}
-                    placeholder="99"
-                  />
-                </div>
-              )}
-
-              {formData.calculationType === 'RANGE_BASED' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Cart Value Ranges</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addRange}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Range
-                    </Button>
-                  </div>
-                  {formData.ranges.map((range, index) => (
-                    <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
-                      <Input
-                        type="number"
-                        placeholder="Min (₹)"
-                        value={range.minCartValue}
-                        onChange={(e) => updateRange(index, 'minCartValue', e.target.value)}
-                      />
-                      <Input
-                        type="number"
-                        placeholder="Max (₹)"
-                        value={range.maxCartValue}
-                        onChange={(e) => updateRange(index, 'maxCartValue', e.target.value)}
-                      />
-                      <Input
-                        type="number"
-                        placeholder="Price (₹) *"
-                        value={range.shippingPrice}
-                        onChange={(e) => updateRange(index, 'shippingPrice', e.target.value)}
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeRange(index)}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  {formData.ranges.length === 0 && (
-                    <p className="text-sm text-muted-foreground">Click "Add Range" to add cart value ranges</p>
-                  )}
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>Free Shipping Above (₹)</Label>
+                <Label>Min quantity *</Label>
                 <Input
                   type="number"
-                  value={formData.freeShippingAbove}
-                  onChange={(e) => setFormData({ ...formData, freeShippingAbove: e.target.value })}
-                  placeholder="Optional - e.g., 1000"
+                  min={0}
+                  value={formData.minQuantity}
+                  onChange={(e) => setFormData({ ...formData, minQuantity: e.target.value })}
+                  placeholder="e.g. 1"
                 />
               </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="w-4 h-4"
+              <div className="space-y-2">
+                <Label>Max quantity (leave empty for &quot;above min&quot;)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={formData.maxQuantity}
+                  onChange={(e) => setFormData({ ...formData, maxQuantity: e.target.value })}
+                  placeholder="e.g. 5 or empty"
                 />
-                <Label htmlFor="isActive">Active</Label>
               </div>
-
+              <div className="space-y-2">
+                <Label>Shipping price (₹) *</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={formData.shippingPrice}
+                  onChange={(e) => setFormData({ ...formData, shippingPrice: e.target.value })}
+                  placeholder="e.g. 50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Display order (optional)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={formData.displayOrder}
+                  onChange={(e) => setFormData({ ...formData, displayOrder: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
               <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleCreate} 
-                  disabled={createMutation.isPending || !formData.ruleName || 
-                    (formData.calculationType === 'FLAT' && !formData.flatPrice) ||
-                    (formData.scope === 'STATE_WISE' && !formData.state) ||
-                    (formData.calculationType === 'RANGE_BASED' && formData.ranges.length === 0)}
-                  className="gap-2"
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={handleCreate}
+                  disabled={createMutation.isPending || formData.minQuantity === '' || formData.shippingPrice === ''}
                 >
-                  {createMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create'
-                  )}
+                  {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Add
                 </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
 
-        {/* Edit Dialog */}
+        {/* Edit slab dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Edit Shipping Rule</DialogTitle>
+              <DialogTitle>Edit quantity slab</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Rule Name *</Label>
-                  <Input
-                    value={formData.ruleName}
-                    onChange={(e) => setFormData({ ...formData, ruleName: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Priority *</Label>
-                  <Input
-                    type="number"
-                    value={formData.priority}
-                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Scope *</Label>
-                  <Select value={formData.scope} onValueChange={(val) => setFormData({ ...formData, scope: val })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL_INDIA">All India</SelectItem>
-                      <SelectItem value="STATE_WISE">State Wise</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {formData.scope === 'STATE_WISE' && (
-                  <div className="space-y-2">
-                    <Label>State *</Label>
-                    <Select value={formData.state} onValueChange={(val) => setFormData({ ...formData, state: val })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select State" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {INDIAN_STATES.map((state) => (
-                          <SelectItem key={state} value={state}>{state}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-
               <div className="space-y-2">
-                <Label>Calculation Type *</Label>
-                <Select value={formData.calculationType} onValueChange={(val) => setFormData({ ...formData, calculationType: val })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="FLAT">Flat Price</SelectItem>
-                    <SelectItem value="RANGE_BASED">Range Based</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.calculationType === 'FLAT' && (
-                <div className="space-y-2">
-                  <Label>Flat Price (₹) *</Label>
-                  <Input
-                    type="number"
-                    value={formData.flatPrice}
-                    onChange={(e) => setFormData({ ...formData, flatPrice: e.target.value })}
-                  />
-                </div>
-              )}
-
-              {formData.calculationType === 'RANGE_BASED' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Cart Value Ranges</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addRange}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Range
-                    </Button>
-                  </div>
-                  {formData.ranges.map((range, index) => (
-                    <div key={index} className="grid grid-cols-4 gap-2 p-3 border rounded-lg">
-                      <Input
-                        type="number"
-                        placeholder="Min (₹)"
-                        value={range.minCartValue}
-                        onChange={(e) => updateRange(index, 'minCartValue', e.target.value)}
-                      />
-                      <Input
-                        type="number"
-                        placeholder="Max (₹)"
-                        value={range.maxCartValue}
-                        onChange={(e) => updateRange(index, 'maxCartValue', e.target.value)}
-                      />
-                      <Input
-                        type="number"
-                        placeholder="Price (₹) *"
-                        value={range.shippingPrice}
-                        onChange={(e) => updateRange(index, 'shippingPrice', e.target.value)}
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeRange(index)}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>Free Shipping Above (₹)</Label>
+                <Label>Min quantity *</Label>
                 <Input
                   type="number"
-                  value={formData.freeShippingAbove}
-                  onChange={(e) => setFormData({ ...formData, freeShippingAbove: e.target.value })}
+                  min={0}
+                  value={formData.minQuantity}
+                  onChange={(e) => setFormData({ ...formData, minQuantity: e.target.value })}
                 />
               </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isActiveEdit"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="w-4 h-4"
+              <div className="space-y-2">
+                <Label>Max quantity (leave empty for &quot;above min&quot;)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={formData.maxQuantity}
+                  onChange={(e) => setFormData({ ...formData, maxQuantity: e.target.value })}
                 />
-                <Label htmlFor="isActiveEdit">Active</Label>
               </div>
-
+              <div className="space-y-2">
+                <Label>Shipping price (₹) *</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={formData.shippingPrice}
+                  onChange={(e) => setFormData({ ...formData, shippingPrice: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Display order (optional)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={formData.displayOrder}
+                  onChange={(e) => setFormData({ ...formData, displayOrder: e.target.value })}
+                />
+              </div>
               <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleUpdate} 
-                  disabled={updateMutation.isPending || !formData.ruleName || 
-                    (formData.calculationType === 'FLAT' && !formData.flatPrice) ||
-                    (formData.scope === 'STATE_WISE' && !formData.state)}
-                  className="gap-2"
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={handleUpdate}
+                  disabled={updateMutation.isPending || formData.minQuantity === '' || formData.shippingPrice === ''}
                 >
-                  {updateMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    'Update'
-                  )}
+                  {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Update
                 </Button>
               </div>
             </div>

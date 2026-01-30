@@ -339,7 +339,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
     pricePerMeter: '' as string | number,
     designPrice: '' as string | number,
     unitExtension: 'per meter' as string,
-    unitExtensionType: 'per meter' as 'per meter' | 'per piece' | 'custom',
+    unitExtensionType: 'per meter' as 'per meter' | 'per piece' | 'per yard' | 'custom',
     unitExtensionCustom: '' as string,
     gstRate: '' as string | number,
     hsnCode: '',
@@ -398,12 +398,12 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
           unitExtension: productData.plainProduct?.unitExtension || productData.unitExtension || 'per meter',
           unitExtensionType: (() => {
             const unit = productData.plainProduct?.unitExtension || productData.unitExtension || 'per meter';
-            if (unit === 'per meter' || unit === 'per piece') return unit;
+            if (unit === 'per meter' || unit === 'per piece' || unit === 'per yard') return unit;
             return 'custom';
-          })() as 'per meter' | 'per piece' | 'custom',
+          })() as 'per meter' | 'per piece' | 'per yard' | 'custom',
           unitExtensionCustom: (() => {
             const unit = productData.plainProduct?.unitExtension || productData.unitExtension || 'per meter';
-            if (unit !== 'per meter' && unit !== 'per piece') return unit;
+            if (unit !== 'per meter' && unit !== 'per piece' && unit !== 'per yard') return unit;
             return '';
           })(),
           gstRate: productData.gstRate ?? 0,
@@ -450,7 +450,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       pricePerMeter: '' as string | number,
       designPrice: '' as string | number,
       unitExtension: 'per meter' as string,
-      unitExtensionType: 'per meter' as 'per meter' | 'per piece' | 'custom',
+      unitExtensionType: 'per meter' as 'per meter' | 'per piece' | 'per yard' | 'custom',
       unitExtensionCustom: '' as string,
       gstRate: '' as string | number,
       hsnCode: '',
@@ -1103,7 +1103,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                   <Label htmlFor="p-unit-extension">Unit Extension *</Label>
                   <Select
                     value={formData.unitExtensionType}
-                    onValueChange={(value: 'per meter' | 'per piece' | 'custom') => {
+                    onValueChange={(value: 'per meter' | 'per piece' | 'per yard' | 'custom') => {
                       setFormData({
                         ...formData,
                         unitExtensionType: value,
@@ -1117,6 +1117,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                     <SelectContent>
                       <SelectItem value="per meter">Per Meter</SelectItem>
                       <SelectItem value="per piece">Per Piece</SelectItem>
+                      <SelectItem value="per yard">Per Yard</SelectItem>
                       <SelectItem value="custom">Custom</SelectItem>
                     </SelectContent>
                   </Select>

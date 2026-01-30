@@ -245,10 +245,10 @@ const Checkout = () => {
   // Don't auto-select default address - let user explicitly choose
   // This ensures the selected address is what user wants, not auto-selected
   
-  // Fetch cart with current state
+  // Fetch cart with state, coupon, and country (India = quantity-based shipping)
   const { data: cartData, isLoading: cartLoading, refetch: refetchCart } = useQuery({
-    queryKey: ['cart-checkout', formData.state, appliedCouponCode],
-    queryFn: () => cartApi.getCart(formData.state || undefined, appliedCouponCode || undefined),
+    queryKey: ['cart-checkout', formData.state, appliedCouponCode, formData.country],
+    queryFn: () => cartApi.getCart(formData.state || undefined, appliedCouponCode || undefined, formData.country || undefined),
     enabled: isLoggedIn,
   });
   
@@ -259,20 +259,12 @@ const Checkout = () => {
     }
   }, [cartData?.appliedCouponCode]);
   
-  // Calculate shipping immediately when state/pincode changes (for both logged in and guest)
+  // When state/country changes, refetch cart so shipping is recalculated (logged-in: backend uses country for India quantity-based)
   useEffect(() => {
-    if (formData.state && (cartData?.subtotal || subtotalFromLocalStorage > 0)) {
-      const cartValue = cartData?.subtotal || subtotalFromLocalStorage;
-      shippingApi.calculate(cartValue, formData.state)
-        .then((result) => {
-          // Shipping will be updated via cart refetch or we can set it directly
-          if (isLoggedIn) {
-            queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
-          }
-        })
-        .catch(() => {});
+    if (isLoggedIn) {
+      queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
     }
-  }, [formData.state, formData.postalCode, cartData?.subtotal, subtotalFromLocalStorage, isLoggedIn, queryClient]);
+  }, [formData.state, formData.country, isLoggedIn, queryClient]);
   
   // Load selected address - this is the single source of truth for logged-in users
   useEffect(() => {
@@ -540,17 +532,28 @@ const Checkout = () => {
     }
   }, [formData.country, isIndia, paymentMethodsData, hasDigitalProducts, paymentConfig, paymentGateway]);
   
-  // Calculate shipping for guest checkout
+  // Calculate shipping for guest checkout: India = quantity-based (calculateForItems), international = 0
   const [guestShipping, setGuestShipping] = useState(0);
   useEffect(() => {
-    if (!isLoggedIn && formData.state && subtotalFromLocalStorage > 0) {
-      shippingApi.calculate(subtotalFromLocalStorage, formData.state)
-        .then((result) => {
-          setGuestShipping(result.shipping || 0);
-        })
+    if (!isLoggedIn) {
+      if (!isIndia) {
+        setGuestShipping(0);
+        return;
+      }
+      if (guestCartItems.length === 0) {
+        setGuestShipping(0);
+        return;
+      }
+      const country = formData.country === 'IN' ? 'IN' : (formData.country || 'IN');
+      shippingApi.calculateForItems(country, guestCartItems.map((item: any) => ({
+        productId: item.productId,
+        productType: item.productType,
+        quantity: item.quantity ?? 1,
+      })))
+        .then((result) => setGuestShipping(Number(result.shipping) || 0))
         .catch(() => setGuestShipping(0));
     }
-  }, [formData.state, subtotalFromLocalStorage, isLoggedIn]);
+  }, [isLoggedIn, isIndia, formData.country, guestCartItems]);
   
   const subtotal = isLoggedIn 
     ? (cartData?.subtotal ? Number(cartData.subtotal) : 0)

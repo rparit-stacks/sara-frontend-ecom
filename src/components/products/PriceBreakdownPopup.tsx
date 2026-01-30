@@ -68,68 +68,56 @@ export const PriceBreakdownPopup = ({
   // Calculate breakdown based on whether it's from cart or product detail
   const calculateBreakdown = () => {
     if (item.productType === 'DESIGNED') {
-      // PRICING LOGIC:
-      // Fabric: (base + fabric variant) × meters = Fabric Total
-      // Print: base + print variant = Print Total (NO meter multiplication)
-      // Unit Price = Fabric Total + Print Total
-      // Final Total = Unit Price × Product Quantity
+      // PRICING LOGIC (1-meter base, quantity = meters):
+      // unitPrice = per-meter total (fabric/m + print/m). totalPrice = unitPrice × quantity (meters).
       
-      // From cart - use stored values
+      // From cart - use stored values (quantity = meters, unitPrice = per meter)
       if (item.designPrice !== undefined && item.fabricPrice !== undefined) {
-        const designPrice = Number(item.designPrice) || 0;  // Print base price
-        const fabricPrice = Number(item.fabricPrice) || 0;  // Fabric total for X meters
-        const quantity = item.quantity || 1;  // Product quantity (units)
+        const designPrice = Number(item.designPrice) || 0;
+        const fabricPrice = Number(item.fabricPrice) || 0;
+        const quantity = item.quantity || 1;  // Meters
         const storedTotalPrice = Number(item.totalPrice) || 0;
         const storedUnitPrice = Number(item.unitPrice) || 0;
-        const fabricMeters = item.customFormData?.fabricMeters;
+        const fabricMeters = item.customFormData?.fabricMeters ?? quantity;
         
-        // Calculate print variant modifier (added ONCE, not per meter)
         let printVariantModifier = 0;
         if (effectiveProductData && effectiveProductData.variants && item.variants) {
           effectiveProductData.variants.forEach((variant: any) => {
             const selectedValue = item.variants[String(variant.id)];
             if (selectedValue && variant.options) {
-              const selectedOption = variant.options.find((opt: any) => 
+              const selectedOption = variant.options.find((opt: any) =>
                 String(opt.id) === selectedValue || opt.value === selectedValue
               );
               if (selectedOption && selectedOption.priceModifier) {
-                // Print variants add ONCE, not multiplied by anything
                 printVariantModifier += Number(selectedOption.priceModifier);
               }
             }
           });
         }
-        
-        // Print total = base + variant
-        const printTotal = designPrice + printVariantModifier;
-        
-        // Use stored values if available
-        const unitPrice = storedUnitPrice || (fabricPrice + printTotal);
-        const totalPrice = storedTotalPrice || (unitPrice * quantity);
+        const printPerMeter = designPrice + printVariantModifier;
+        const unitPrice = storedUnitPrice || (fabricPrice / quantity + printPerMeter);
+        const totalPrice = storedTotalPrice || unitPrice * quantity;
         
         return {
           basePrice: designPrice,
           fabricPrice: fabricPrice,
           printVariantModifier: printVariantModifier,
-          printTotal: printTotal,
+          printTotal: printPerMeter,
           quantity: quantity,
           unitPrice: unitPrice,
           totalPrice: totalPrice,
-          fabricMeters: fabricMeters != null ? Number(fabricMeters) : undefined,
-          fabricBasePricePerMeter: fabricPrice != null && fabricMeters != null && Number(fabricMeters) > 0
-            ? fabricPrice / Number(fabricMeters) : undefined,
+          fabricMeters: fabricMeters != null ? Number(fabricMeters) : quantity,
+          fabricBasePricePerMeter: quantity > 0 ? fabricPrice / quantity : undefined,
         };
       }
       
-      // From product detail page
+      // From product detail page (quantity = meters, unitPrice = per meter)
       if (productData && fabricPricePerMeter !== undefined && fabricQuantity !== undefined) {
-        const designPrice = Number(productData.designPrice) || 0;  // Print base price
-        const beforeSlab = Number(fabricPricePerMeter) || 0;  // Price per meter before slab
+        const designPrice = Number(productData.designPrice) || 0;
+        const beforeSlab = Number(fabricPricePerMeter) || 0;
         const afterSlab = (finalFabricPricePerMeter != null ? Number(finalFabricPricePerMeter) : null) ?? beforeSlab;
-        const productQuantity = item.quantity ?? 1;  // Product quantity (units)
-        const metersPerUnit = fabricQuantity || 1;  // Fabric meters per unit
+        const meters = fabricQuantity ?? item.quantity ?? 1;
         
-        // Calculate print variant modifier (added ONCE, not per meter)
         let printVariantModifier = 0;
         if (productData.variants && selectedVariants) {
           productData.variants.forEach((variant: any) => {
@@ -142,12 +130,10 @@ export const PriceBreakdownPopup = ({
             }
           });
         }
-        
-        // Fabric total = price per meter (after slab) × meters
-        const fabricTotalPrice = afterSlab * metersPerUnit;
-        const printTotal = designPrice + printVariantModifier;
-        const unitPrice = item.unitPrice != null ? Number(item.unitPrice) : (fabricTotalPrice + printTotal);
-        const totalPrice = item.totalPrice != null ? Number(item.totalPrice) : unitPrice * productQuantity;
+        const printPerMeter = designPrice + printVariantModifier;
+        const fabricTotalPrice = afterSlab * meters;
+        const unitPrice = item.unitPrice != null ? Number(item.unitPrice) : (afterSlab + printPerMeter);
+        const totalPrice = item.totalPrice != null ? Number(item.totalPrice) : unitPrice * meters;
         
         return {
           basePrice: designPrice,
@@ -155,11 +141,11 @@ export const PriceBreakdownPopup = ({
           fabricBasePricePerMeter: afterSlab,
           fabricPricePerMeterBeforeSlab: discountAmount != null && discountAmount > 0 ? beforeSlab : undefined,
           printVariantModifier: printVariantModifier,
-          printTotal: printTotal,
-          quantity: productQuantity,
+          printTotal: printPerMeter,
+          quantity: meters,
           unitPrice: unitPrice,
           totalPrice: totalPrice,
-          fabricMeters: metersPerUnit,
+          fabricMeters: meters,
           discountAmount: discountAmount != null && discountAmount > 0 ? discountAmount : undefined,
         };
       }
@@ -256,7 +242,7 @@ export const PriceBreakdownPopup = ({
                 {item.productName}
                 {breakdown.quantity && breakdown.quantity > 1 && (
                   <span className="text-muted-foreground font-normal ml-2">
-                    × {breakdown.quantity} {item.productType === 'DESIGNED' ? 'unit' : item.productType === 'PLAIN' ? getUnitName() : 'item'}{breakdown.quantity !== 1 ? 's' : ''}
+                    × {breakdown.quantity} {item.productType === 'DESIGNED' ? 'meter' : item.productType === 'PLAIN' ? getUnitName() : 'item'}{breakdown.quantity !== 1 ? 's' : ''}
                   </span>
                 )}
               </h4>
@@ -299,12 +285,12 @@ export const PriceBreakdownPopup = ({
                   )}
                 </div>
 
-                {/* PRINT SECTION */}
+                {/* PRINT SECTION (per meter) */}
                 <div className="space-y-2 pt-3 border-t border-border/30">
                   <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Print / Design</div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Base print price</span>
-                    <span>{format(breakdown.basePrice)}</span>
+                    <span className="text-muted-foreground">Print per meter</span>
+                    <span>{format(breakdown.printTotal ?? breakdown.basePrice)}/m</span>
                   </div>
                   {breakdown.printVariantModifier != null && breakdown.printVariantModifier !== 0 && (
                     <div className="flex justify-between">
@@ -312,24 +298,18 @@ export const PriceBreakdownPopup = ({
                       <span>{breakdown.printVariantModifier > 0 ? '+' : ''}{format(breakdown.printVariantModifier)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between font-medium">
-                    <span>Print total</span>
-                    <span className="text-primary">{format(breakdown.printTotal ?? breakdown.basePrice)}</span>
-                  </div>
                 </div>
 
-                {/* COMBINED UNIT PRICE */}
+                {/* PER METER TOTAL & METERS */}
                 <div className="space-y-2 pt-3 border-t border-border/50">
                   <div className="flex justify-between font-semibold">
-                    <span>Per unit total</span>
-                    <span className="text-primary">{format(breakdown.unitPrice)}</span>
+                    <span>Per meter total</span>
+                    <span className="text-primary">{format(breakdown.unitPrice)}/m</span>
                   </div>
-                  {breakdown.quantity > 1 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Quantity (units)</span>
-                      <span>× {breakdown.quantity}</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Meters</span>
+                    <span>× {breakdown.quantity}</span>
+                  </div>
                 </div>
 
                 {/* GRAND TOTAL */}
@@ -337,11 +317,9 @@ export const PriceBreakdownPopup = ({
                   <span>Grand total</span>
                   <span className="text-primary">{format(breakdown.totalPrice)}</span>
                 </div>
-                {breakdown.quantity > 1 && (
-                  <div className="text-xs text-muted-foreground pt-1">
-                    {format(breakdown.unitPrice)} × {breakdown.quantity} = {format(breakdown.totalPrice)}
-                  </div>
-                )}
+                <div className="text-xs text-muted-foreground pt-1">
+                  {format(breakdown.unitPrice)}/m × {breakdown.quantity} m = {format(breakdown.totalPrice)}
+                </div>
               </div>
             )}
             

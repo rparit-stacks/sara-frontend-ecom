@@ -7,6 +7,7 @@ import { CurrencyProvider } from "@/context/CurrencyContext";
 import { LoadingProvider } from "@/context/LoadingContext";
 import ScrollToTop from "./components/ScrollToTop";
 import AuthSessionListener from "./components/AuthSessionListener";
+import VisitTracker from "./components/VisitTracker";
 import Index from "./pages/Index";
 import Categories from "./pages/Categories";
 import CategoryProducts from "./pages/CategoryProducts";
@@ -72,6 +73,7 @@ const App = () => (
       <BrowserRouter>
         <ScrollToTop />
         <AuthSessionListener />
+        <VisitTracker />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/categories" element={<Categories />} />

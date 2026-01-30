@@ -246,6 +246,7 @@ const CustomProductDetail = () => {
   const [showFabricVariant, setShowFabricVariant] = useState(false);
   const [selectedPlainProductId, setSelectedPlainProductId] = useState<string | null>(null);
   const [fabricSelectionData, setFabricSelectionData] = useState<any>(null);
+  const [metersQuantity, setMetersQuantity] = useState(1);
 
   // Config variant selections (variantId -> optionId) from customConfig.variants
   const [selectedConfigVariants, setSelectedConfigVariants] = useState<Record<string, string>>({});
@@ -277,21 +278,20 @@ const CustomProductDetail = () => {
     });
   }, [customFormFields, customFormData]);
 
-  // Calculate combined price (Design Price + Fabric Price + Config variant modifiers)
+  // Combined price per meter (design + fabric per m + config variant per m); total = combinedPrice * metersQuantity
   const combinedPrice = useMemo(() => {
-    const fabricTotal = fabricSelectionData?.totalPrice ?? 0;
-    const qty = fabricSelectionData?.quantity ?? 1;
-    let configVariantModifier = 0;
-    if (effectiveConfigVariants.length > 0 && qty > 0) {
+    const fabricPerMeter = fabricSelectionData?.totalPrice ?? 0;
+    let configVariantPerMeter = 0;
+    if (effectiveConfigVariants.length > 0) {
       effectiveConfigVariants.forEach((variant: any) => {
         const optionId = selectedConfigVariants[String(variant.id)];
         if (optionId && variant.options) {
           const opt = variant.options.find((o: any) => String(o.id) === optionId);
-          if (opt && opt.priceModifier) configVariantModifier += Number(opt.priceModifier) * qty;
+          if (opt && opt.priceModifier) configVariantPerMeter += Number(opt.priceModifier);
         }
       });
     }
-    return DESIGN_PRICE + fabricTotal + configVariantModifier;
+    return DESIGN_PRICE + fabricPerMeter + configVariantPerMeter;
   }, [DESIGN_PRICE, fabricSelectionData, effectiveConfigVariants, selectedConfigVariants]);
 
   const handlePlainProductSelect = (productId: string) => {
@@ -342,13 +342,14 @@ const CustomProductDetail = () => {
     }
   }, [isEditFromCart, resolvedCartItem, effectiveConfigVariants]);
 
-  // Preload fabricSelectionData once fabric is loaded (edit-from-cart)
+  // Preload fabricSelectionData once fabric is loaded (edit-from-cart); quantity = meters
   useEffect(() => {
     if (preloadFabricDoneRef.current) return;
     if (!isEditFromCart || !resolvedCartItem || !selectedFabricProduct || !selectedPlainProductId) return;
     const item = resolvedCartItem as any;
-    const qty = item.quantity ?? 1;
-    const total = item.fabricPrice != null ? Number(item.fabricPrice) : 0;
+    const meters = item.quantity ?? 1;
+    const fabricTotal = item.fabricPrice != null ? Number(item.fabricPrice) : 0;
+    const fabricPerMeter = meters > 0 ? fabricTotal / meters : 0;
 
     const fabricVar: Record<string, string> = {};
     const vs = item.variantSelections || {};
@@ -362,15 +363,16 @@ const CustomProductDetail = () => {
 
     setFabricSelectionData({
       fabricId: selectedPlainProductId,
-      quantity: qty,
-      totalPrice: total,
+      quantity: 1,
+      totalPrice: fabricPerMeter,
       selectedVariants: fabricVar,
     });
+    setMetersQuantity(meters);
     preloadFabricDoneRef.current = true;
   }, [isEditFromCart, resolvedCartItem, selectedFabricProduct, selectedPlainProductId]);
 
   const handleFabricVariantComplete = (data: any) => {
-    setFabricSelectionData(data);
+    setFabricSelectionData({ ...data, quantity: 1, totalPrice: data.totalPrice });
     setShowFabricVariant(false);
   };
 
@@ -401,6 +403,8 @@ const CustomProductDetail = () => {
         }
       }
     });
+    const fabricPerMeter = fabricSelectionData!.totalPrice;
+    const fabricTotal = fabricPerMeter * metersQuantity;
     return {
       productType: 'CUSTOM' as const,
       productId: customProductId || 0,
@@ -408,12 +412,13 @@ const CustomProductDetail = () => {
       productImage: designUrl,
       designPrice: DESIGN_PRICE,
       fabricId: Number(fabricSelectionData!.fabricId),
-      fabricPrice: fabricSelectionData!.totalPrice,
-      quantity: fabricSelectionData!.quantity,
+      fabricPrice: fabricTotal,
+      quantity: metersQuantity,
       unitPrice: combinedPrice,
+      totalPrice: combinedPrice * metersQuantity,
       variants: fabricSelectionData!.selectedVariants,
       variantSelections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
-      customFormData,
+      customFormData: { ...customFormData, fabricMeters: metersQuantity },
       uploadedDesignUrl: designUrl,
       customProductId: customProductId ?? undefined,
     };
@@ -671,24 +676,23 @@ const CustomProductDetail = () => {
                       {customConfig?.pageTitle || 'Your Custom Design'}
                     </h1>
                     
-                    {/* Price Display */}
+                    {/* Price Display: per meter + total */}
                     <div className="space-y-2 mb-6">
                       <div className="flex items-center gap-4">
-                        <span className="font-cursive text-4xl text-primary">{format(combinedPrice)}</span>
+                        <span className="font-cursive text-4xl text-primary">{format(combinedPrice * metersQuantity)}</span>
                       </div>
                       {fabricSelectionData && (
                         <div className="text-sm text-muted-foreground space-y-1">
-                          <p>Design Price: {format(DESIGN_PRICE)}</p>
-                          <p>Fabric Price: {format(fabricSelectionData.totalPrice)}</p>
+                          <p>Per meter: {format(combinedPrice)}/m</p>
+                          <p>Design: {format(DESIGN_PRICE)}/m · Fabric: {format(fabricSelectionData.totalPrice)}/m</p>
                           {(() => {
-                            const qty = fabricSelectionData.quantity ?? 1;
-                            let mod = 0;
+                            let modPerMeter = 0;
                             effectiveConfigVariants.forEach((v: any) => {
                               const oid = selectedConfigVariants[String(v.id)];
                               const opt = oid && v.options ? v.options.find((o: any) => String(o.id) === oid) : null;
-                              if (opt && opt.priceModifier) mod += Number(opt.priceModifier) * qty;
+                              if (opt && opt.priceModifier) modPerMeter += Number(opt.priceModifier);
                             });
-                            return mod > 0 ? <p>Options: {format(mod)}</p> : null;
+                            return modPerMeter > 0 ? <p>Options: {format(modPerMeter)}/m</p> : null;
                           })()}
                         </div>
                       )}
@@ -736,7 +740,7 @@ const CustomProductDetail = () => {
                         <div>
                           <h4 className="font-medium text-lg">Selected Fabric</h4>
                           <p className="text-sm text-muted-foreground">
-                            {customConfig?.quantityLabel || 'Quantity'}: {fabricSelectionData.quantity} meters
+                            {format(fabricSelectionData.totalPrice)}/meter (1-meter base)
                           </p>
                         </div>
                         <Button
@@ -750,6 +754,34 @@ const CustomProductDetail = () => {
                         >
                           Change
                         </Button>
+                      </div>
+                      {/* Quantity (Meters) */}
+                      <div className="pt-3 border-t border-border/50">
+                        <h4 className="font-medium text-sm mb-2">Quantity (Meters)</h4>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center border border-border rounded-full">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="rounded-full w-10 h-10"
+                              onClick={() => setMetersQuantity((q) => Math.max(1, q - 1))}
+                            >
+                              <Minus className="w-4 h-4" />
+                            </Button>
+                            <span className="w-12 text-center font-medium text-sm">{metersQuantity}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="rounded-full w-10 h-10"
+                              onClick={() => setMetersQuantity((q) => q + 1)}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            Total: {format(combinedPrice * metersQuantity)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   )}
