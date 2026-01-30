@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { userApi, orderApi, categoriesApi } from '@/lib/api';
 import { getPaymentStatusDisplay } from '@/lib/orderUtils';
-import { Package, MapPin, User, Edit, Trash2, Plus, Loader2, Check, Gift, ArrowRight, Download, Menu, X, LogOut } from 'lucide-react';
+import { Package, MapPin, User, Edit, Trash2, Plus, Loader2, Check, Gift, ArrowRight, Download, Menu, X, LogOut, Pencil } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { MandatoryProfileDialog } from '@/components/MandatoryProfileDialog';
@@ -45,6 +46,7 @@ const Dashboard = () => {
   const [showMandatoryDialog, setShowMandatoryDialog] = useState(false);
   const [isCheckingMandatory, setIsCheckingMandatory] = useState(true);
 
+  const [isProfileEditMode, setIsProfileEditMode] = useState(false);
   const [profileFormData, setProfileFormData] = useState({
     firstName: '',
     lastName: '',
@@ -227,6 +229,30 @@ const Dashboard = () => {
     localStorage.removeItem('authEmail');
     toast.info('You have been logged out');
     navigate('/login', { replace: true });
+  };
+
+  const handleProfileEditStart = () => {
+    setProfileFormData({
+      firstName: profile?.firstName || '',
+      lastName: profile?.lastName || '',
+      phoneNumber: profile?.phoneNumber || '',
+    });
+    setIsProfileEditMode(true);
+  };
+
+  const handleProfileSave = () => {
+    updateProfileMutation.mutate(profileFormData, {
+      onSuccess: () => setIsProfileEditMode(false),
+    });
+  };
+
+  const handleProfileCancel = () => {
+    setProfileFormData({
+      firstName: profile?.firstName || '',
+      lastName: profile?.lastName || '',
+      phoneNumber: profile?.phoneNumber || '',
+    });
+    setIsProfileEditMode(false);
   };
 
   // Address mutations
@@ -605,24 +631,36 @@ const Dashboard = () => {
                   </TabsTrigger>
                 </TabsList>
 
-                {/* Profile Tab */}
+                {/* Profile Tab: read-only by default, single Edit toggles edit mode */}
                 <TabsContent value="profile" className="space-y-4 md:space-y-6 mt-4 md:mt-6">
                   <Card>
-                    <CardHeader className="p-4 md:p-6">
-                      <CardTitle className="text-lg md:text-xl">Profile Details</CardTitle>
+                    <CardHeader className="p-4 md:p-6 flex flex-row items-center justify-between gap-4">
+                      <CardTitle className="text-lg md:text-xl">Profile</CardTitle>
+                      {!profileLoading && (
+                        isProfileEditMode ? (
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={handleProfileCancel}>
+                              Cancel
+                            </Button>
+                            <Button size="sm" onClick={handleProfileSave} disabled={updateProfileMutation.isPending}>
+                              {updateProfileMutation.isPending ? 'Saving...' : 'Save'}
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button variant="outline" size="sm" onClick={handleProfileEditStart} className="gap-2">
+                            <Pencil className="w-4 h-4" />
+                            Edit
+                          </Button>
+                        )
+                      )}
                     </CardHeader>
                     <CardContent className="p-4 md:p-6">
                       {profileLoading ? (
                         <div className="flex justify-center py-8">
                           <Loader2 className="w-6 h-6 animate-spin" />
                         </div>
-                      ) : (
+                      ) : isProfileEditMode ? (
                         <div className="space-y-4">
-                          <div>
-                            <Label>Email</Label>
-                            <Input value={profile?.email || ''} disabled className="mt-1" />
-                            <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
-                          </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                               <Label>First Name</Label>
@@ -642,6 +680,13 @@ const Dashboard = () => {
                             </div>
                           </div>
                           <div>
+                            <Label>Email</Label>
+                            <p className="mt-1 text-sm text-muted-foreground py-2 px-3 rounded-md bg-muted/50 border border-transparent">
+                              {profile?.email || ''}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
+                          </div>
+                          <div>
                             <Label>Phone Number</Label>
                             <Input
                               value={profileFormData.phoneNumber}
@@ -649,13 +694,41 @@ const Dashboard = () => {
                               className="mt-1"
                             />
                           </div>
-                          <Button
-                            onClick={() => updateProfileMutation.mutate(profileFormData)}
-                            disabled={updateProfileMutation.isPending}
-                            className="w-full sm:w-auto"
-                          >
-                            {updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}
-                          </Button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-4">
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</p>
+                              <p className="text-base font-medium mt-1">
+                                {profile?.firstName || profile?.lastName
+                                  ? `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim() || '—'
+                                  : '—'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email</p>
+                              <p className="text-base mt-1 break-all">{profile?.email || '—'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Phone</p>
+                              <p className="text-base mt-1">{profile?.phoneNumber || '—'}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-3 border-t md:border-t-0 md:border-l pt-4 md:pt-0 md:pl-6">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm text-muted-foreground">Saved addresses</span>
+                              <Button variant="ghost" size="sm" onClick={() => setActiveTab('addresses')} className="text-primary shrink-0">
+                                {addresses.length} saved · View
+                              </Button>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm text-muted-foreground">Order history</span>
+                              <Button variant="ghost" size="sm" onClick={() => setActiveTab('orders')} className="text-primary shrink-0">
+                                {orders.length} orders · View
+                              </Button>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </CardContent>
@@ -911,22 +984,34 @@ const Dashboard = () => {
                 {activeTab === 'profile' && (
                   <div className="space-y-4">
                     <Card>
-                      <CardHeader className="p-4">
-                        <CardTitle className="text-lg">Profile Details</CardTitle>
+                      <CardHeader className="p-4 flex flex-row items-center justify-between gap-4">
+                        <CardTitle className="text-lg">Profile</CardTitle>
+                        {!profileLoading && (
+                          isProfileEditMode ? (
+                            <div className="flex gap-2">
+                              <Button variant="outline" size="sm" onClick={handleProfileCancel}>
+                                Cancel
+                              </Button>
+                              <Button size="sm" onClick={handleProfileSave} disabled={updateProfileMutation.isPending}>
+                                {updateProfileMutation.isPending ? 'Saving...' : 'Save'}
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button variant="outline" size="sm" onClick={handleProfileEditStart} className="gap-2">
+                              <Pencil className="w-4 h-4" />
+                              Edit
+                            </Button>
+                          )
+                        )}
                       </CardHeader>
                       <CardContent className="p-4">
                         {profileLoading ? (
                           <div className="flex justify-center py-8">
                             <Loader2 className="w-6 h-6 animate-spin" />
                           </div>
-                        ) : (
+                        ) : isProfileEditMode ? (
                           <div className="space-y-4">
-                            <div>
-                              <Label>Email</Label>
-                              <Input value={profile?.email || ''} disabled className="mt-1" />
-                              <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                               <div>
                                 <Label>First Name</Label>
                                 <Input
@@ -945,6 +1030,13 @@ const Dashboard = () => {
                               </div>
                             </div>
                             <div>
+                              <Label>Email</Label>
+                              <p className="mt-1 text-sm text-muted-foreground py-2 px-3 rounded-md bg-muted/50">
+                                {profile?.email || ''}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
+                            </div>
+                            <div>
                               <Label>Phone Number</Label>
                               <Input
                                 value={profileFormData.phoneNumber}
@@ -952,14 +1044,53 @@ const Dashboard = () => {
                                 className="mt-1"
                               />
                             </div>
-                            <Button
-                              onClick={() => updateProfileMutation.mutate(profileFormData)}
-                              disabled={updateProfileMutation.isPending}
-                              className="w-full"
-                            >
-                              {updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}
-                            </Button>
                           </div>
+                        ) : (
+                          <Accordion type="single" collapsible defaultValue="personal" className="w-full">
+                            <AccordionItem value="personal" className="border-b border-border">
+                              <AccordionTrigger className="text-sm font-medium py-3 hover:no-underline">
+                                Personal details
+                              </AccordionTrigger>
+                              <AccordionContent className="pb-3 space-y-3">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Name</p>
+                                  <p className="text-base font-medium">
+                                    {profile?.firstName || profile?.lastName
+                                      ? `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim() || '—'
+                                      : '—'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Email</p>
+                                  <p className="text-base break-all">{profile?.email || '—'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Phone</p>
+                                  <p className="text-base">{profile?.phoneNumber || '—'}</p>
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="addresses" className="border-b border-border">
+                              <AccordionTrigger className="text-sm font-medium py-3 hover:no-underline">
+                                Saved addresses ({addresses.length})
+                              </AccordionTrigger>
+                              <AccordionContent className="pb-3">
+                                <Button variant="ghost" size="sm" className="w-full justify-start text-primary" onClick={() => setActiveTab('addresses')}>
+                                  View and manage addresses
+                                </Button>
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="orders" className="border-b border-border">
+                              <AccordionTrigger className="text-sm font-medium py-3 hover:no-underline">
+                                Order history ({orders.length})
+                              </AccordionTrigger>
+                              <AccordionContent className="pb-3">
+                                <Button variant="ghost" size="sm" className="w-full justify-start text-primary" onClick={() => setActiveTab('orders')}>
+                                  View order history
+                                </Button>
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
                         )}
                       </CardContent>
                     </Card>
