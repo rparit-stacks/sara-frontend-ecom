@@ -484,6 +484,7 @@ export const cmsApi = {
   getBanners: () => fetchApi<any[]>('/api/cms/banners'),
   getContactInfo: () => fetchApi<Record<string, string>>('/api/cms/contact'),
   getHomepageBlogs: () => fetchApi<any[]>('/api/cms/homepage-blogs'),
+  getAnnouncement: () => fetchApi<{ text: string }>('/api/cms/announcement'),
   
   // Admin
   setBestSellers: (productIds: number[]) => fetchApi<void>('/api/admin/cms/best-sellers', { method: 'PUT', body: JSON.stringify({ productIds }) }),
@@ -510,6 +511,8 @@ export const cmsApi = {
   deleteBanner: (id: number) => fetchApi<void>(`/api/admin/cms/banners/${id}`, { method: 'DELETE' }),
   
   setContactInfo: (content: Record<string, string>) => fetchApi<void>('/api/admin/cms/contact', { method: 'PUT', body: JSON.stringify({ content }) }),
+  
+  setAnnouncement: (text: string) => fetchApi<void>('/api/admin/cms/announcement', { method: 'PUT', body: JSON.stringify({ text }) }),
 };
 
 // ===============================
@@ -753,6 +756,51 @@ export const orderApi = {
 
   // Admin
   getAllOrders: (status?: string) => fetchApi<any[]>(`/api/admin/orders${status ? `?status=${status}` : ''}`),
+  
+  getAllOrdersPaginated: (params: {
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+    status?: string;
+    paymentStatus?: string;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params.page !== undefined) searchParams.set('page', params.page.toString());
+    if (params.size !== undefined) searchParams.set('size', params.size.toString());
+    if (params.sortBy) searchParams.set('sortBy', params.sortBy);
+    if (params.sortDir) searchParams.set('sortDir', params.sortDir);
+    if (params.status && params.status !== 'all') searchParams.set('status', params.status);
+    if (params.paymentStatus && params.paymentStatus !== 'all') searchParams.set('paymentStatus', params.paymentStatus);
+    if (params.search) searchParams.set('search', params.search);
+    if (params.startDate) searchParams.set('startDate', params.startDate);
+    if (params.endDate) searchParams.set('endDate', params.endDate);
+    return fetchApi<{
+      content: any[];
+      totalElements: number;
+      totalPages: number;
+      number: number;
+      size: number;
+      first: boolean;
+      last: boolean;
+    }>(`/api/admin/orders/paginated?${searchParams}`);
+  },
+  
+  getOrderStats: () => fetchApi<{
+    totalOrders: number;
+    pendingOrders: number;
+    confirmedOrders: number;
+    processingOrders: number;
+    shippedOrders: number;
+    deliveredOrders: number;
+    cancelledOrders: number;
+    paidOrders: number;
+    pendingPayments: number;
+    failedPayments: number;
+  }>('/api/admin/orders/stats'),
   getOrderByIdAdmin: (id: number) => fetchApi<any>(`/api/admin/orders/${id}`),
   updateOrderStatus: (id: number, status: string, customStatus?: string, customMessage?: string, skipWhatsApp?: boolean) =>
     fetchApi<any>(`/api/admin/orders/${id}/status`, { 

@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import SearchPopup from '@/components/search/SearchPopup';
-import { cartApi, wishlistApi } from '@/lib/api';
+import { cartApi, wishlistApi, cmsApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import { CategoryDropdown } from '@/components/categories/CategoryDropdown';
 import { CurrencySelector } from '@/components/currency/CurrencySelector';
@@ -42,6 +42,15 @@ export const Navbar = () => {
       document.body.style.overflow = 'unset';
     };
   }, [isOpen]);
+
+  // Fetch announcement text
+  const { data: announcementData } = useQuery({
+    queryKey: ['announcement'],
+    queryFn: () => cmsApi.getAnnouncement(),
+    staleTime: 60000, // Cache for 1 minute
+  });
+  
+  const announcementText = announcementData?.text || 'Made to order. Dispatch takes 5–6 days (India)';
 
   // Fetch cart count (for logged-in users)
   const { data: cartCountData } = useQuery({
@@ -109,8 +118,8 @@ export const Navbar = () => {
       <div className="bg-foreground text-background text-[10px] xs:text-[11px] sm:text-xs">
         <div className="container-custom overflow-hidden">
           <div className="marquee py-1">
-            <span className="mx-6">Made to order. Dispatch takes 5–6 days (India)</span>
-            <span className="mx-6">Made to order. Dispatch takes 5–6 days (India)</span>
+            <span className="mx-6">{announcementText}</span>
+            <span className="mx-6">{announcementText}</span>
           </div>
         </div>
       </div>

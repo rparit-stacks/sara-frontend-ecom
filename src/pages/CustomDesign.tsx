@@ -130,13 +130,23 @@ const CustomDesign = () => {
       <AnimatedWaveBackground />
       
       {/* Hero Section - Banner Style with Background Image & Flowers */}
-      <section className="relative bg-white/80 backdrop-blur-sm py-6 sm:py-8 lg:py-12 overflow-hidden z-20">
+      <section className="relative bg-white/80 backdrop-blur-sm py-6 sm:py-8 lg:py-12 z-20 overflow-hidden">
+        {/* Section Background Image */}
+        <div 
+          className="absolute inset-0 pointer-events-none opacity-[0.12]"
+          style={{
+            backgroundImage: 'url(/bg_images/watercolor-wallpaper-with-hand-drawn-elements.png)',
+            backgroundPosition: 'center',
+            backgroundSize: 'cover',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
         <div className="relative mx-auto max-w-6xl px-3 xs:px-4 sm:px-6 lg:px-12">
           {/* Banner with custom background image */}
           <div 
-            className="relative w-full py-10 xs:py-12 sm:py-16 md:py-20 lg:py-24 xl:py-28 bg-[#f5b5b5] overflow-hidden"
+            className="relative w-full py-10 xs:py-12 sm:py-16 md:py-20 lg:py-24 xl:py-28 overflow-hidden"
             style={{
-              backgroundImage: 'url(/bg_images/661653d7e241afba33eeb02dc6a09f9e%20copy.png)',
+              backgroundImage: 'url(/bg_images/hand_painted_watercolour_winter_floral_background_1111.jpg)',
               backgroundPosition: 'center',
               backgroundSize: 'cover',
             }}
@@ -158,15 +168,15 @@ const CustomDesign = () => {
                 >
                   Welcome
                 </motion.h1>
-                <p className="text-xs xs:text-sm sm:text-base md:text-lg lg:text-xl text-foreground font-medium mb-1">
+                <p className="text-sm xs:text-base sm:text-lg md:text-xl lg:text-2xl text-foreground font-medium mb-1">
                   Welcome to the world of exquisite
                 </p>
-                <p className="text-xs xs:text-sm sm:text-base md:text-lg lg:text-xl text-foreground font-medium mb-3 xs:mb-4 md:mb-6">
+                <p className="text-sm xs:text-base sm:text-lg md:text-xl lg:text-2xl text-foreground font-medium mb-3 xs:mb-4 md:mb-6">
                   prints and embroideries.
                 </p>
                 <Button 
                   variant="outline"
-                  className="px-3 xs:px-4 sm:px-6 md:px-8 py-2 xs:py-2.5 sm:py-3 md:py-4 lg:py-5 text-[10px] xs:text-xs sm:text-sm md:text-base border-2 border-[#d4a84b] text-[#d4a84b] hover:bg-[#d4a84b] hover:text-white rounded-none uppercase tracking-wider font-medium transition-all w-full sm:w-auto"
+                  className="px-3 xs:px-4 sm:px-6 md:px-8 py-2 xs:py-2.5 sm:py-3 md:py-4 lg:py-5 text-sm xs:text-base sm:text-lg md:text-xl border-2 border-[#d4a84b] text-[#d4a84b] hover:bg-[#d4a84b] hover:text-white rounded-none uppercase tracking-wider font-medium transition-all w-full sm:w-auto"
                   onClick={() => document.getElementById('design-form')?.scrollIntoView({ behavior: 'smooth' })}
                 >
                   <span className="truncate">Begin your custom design</span>
@@ -175,60 +185,63 @@ const CustomDesign = () => {
             </div>
           </div>
 
-          {/* Left Background Image - Desktop - Extending outside pattern */}
+          {/* Left Background Image - Desktop (HIDDEN) */}
           <motion.div 
-            initial={{ opacity: 0, x: -100 }}
+            initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="absolute left-0 top-1/2 -translate-y-1/2 hidden lg:block z-30 pointer-events-none"
-            style={{ left: '-120px' }}
+            className="hidden absolute lg:hidden z-30 pointer-events-none"
+            style={{ left: '-120px', bottom: '-180px' }}
           >
             <img 
               src="/bg_images/6be0f0ce2c11383d352bd0828a354dba%20copy.png" 
               alt="Decorative background left" 
-              className="w-[350px] xl:w-[420px] 2xl:w-[480px] h-auto object-contain max-w-none"
+              className="w-[260px] xl:w-[300px] 2xl:w-[340px] h-auto object-contain max-w-none"
             />
           </motion.div>
 
-          {/* Right Background Image - Desktop - Extending outside pattern */}
+          {/* Right Background Image - Desktop (HIDDEN) */}
           <motion.div 
-            initial={{ opacity: 0, x: 100 }}
+            initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="absolute right-0 top-1/2 -translate-y-1/2 hidden lg:block z-30 pointer-events-none"
-            style={{ right: '-120px' }}
+            className="hidden absolute lg:hidden z-30 pointer-events-none"
+            style={{ right: '-120px', bottom: '-180px' }}
           >
             <img 
               src="/bg_images/c71febdd919ac8f0010cd96003e2ff7d%20copy.png" 
               alt="Decorative background right" 
-              className="w-[350px] xl:w-[420px] 2xl:w-[480px] h-auto object-contain max-w-none"
+              className="w-[260px] xl:w-[300px] 2xl:w-[340px] h-auto object-contain max-w-none"
             />
           </motion.div>
 
-          {/* Mobile Background Images - Right on top, Left on bottom */}
+          {/* Left Background Image - Mobile/Tablet (HIDDEN) */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6 }}
-            className="absolute -top-4 xs:-top-6 -right-2 xs:-right-4 lg:hidden z-30 pointer-events-none"
+            className="hidden absolute z-30 pointer-events-none"
+            style={{ left: '-30px', bottom: '-60px' }}
           >
             <img 
-              src="/bg_images/c71febdd919ac8f0010cd96003e2ff7d%20copy.png" 
-              alt="Decorative background" 
-              className="w-[80px] xs:w-[100px] sm:w-[120px] md:w-[160px] h-auto object-contain"
+              src="/bg_images/6be0f0ce2c11383d352bd0828a354dba%20copy.png" 
+              alt="Decorative background left" 
+              className="w-[100px] xs:w-[120px] sm:w-[150px] md:w-[180px] h-auto object-contain"
             />
           </motion.div>
 
+          {/* Right Background Image - Mobile/Tablet (HIDDEN) */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="absolute -bottom-4 xs:-bottom-6 -left-2 xs:-left-4 lg:hidden z-30 pointer-events-none"
+            className="hidden absolute z-30 pointer-events-none"
+            style={{ right: '-30px', bottom: '-60px' }}
           >
             <img 
-              src="/bg_images/6be0f0ce2c11383d352bd0828a354dba%20copy.png" 
-              alt="Decorative background" 
-              className="w-[80px] xs:w-[100px] sm:w-[120px] md:w-[160px] h-auto object-contain"
+              src="/bg_images/c71febdd919ac8f0010cd96003e2ff7d%20copy.png" 
+              alt="Decorative background right" 
+              className="w-[100px] xs:w-[120px] sm:w-[150px] md:w-[180px] h-auto object-contain"
             />
           </motion.div>
         </div>
@@ -236,23 +249,15 @@ const CustomDesign = () => {
 
       {/* How It Works Section */}
       <section className="py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-white/90 backdrop-blur-sm relative z-0 overflow-hidden">
-        {/* Background Images */}
+        {/* Background Image */}
         <div 
-          className="absolute inset-0 opacity-10 pointer-events-none"
+          className="absolute inset-0 pointer-events-none opacity-[0.15]"
           style={{
-            backgroundImage: 'url(/bg_images/6e22cdcedfa63286bcf4f43754509fe0%20copy.png)',
+            backgroundImage: 'url(/bg_images/powder-pastel-with-hand-drawn-elements-background.png)',
             backgroundPosition: 'center',
             backgroundSize: 'cover',
-            backgroundRepeat: 'no-repeat',
           }}
         />
-        <div className="absolute top-10 right-10 w-32 h-32 xs:w-40 xs:h-40 sm:w-48 sm:h-48 opacity-5 pointer-events-none hidden md:block">
-          <img src="/bg_images/68fccd394db41a54b986a269033bf872 copy.png" alt="" className="w-full h-full object-contain" />
-        </div>
-        <div className="absolute bottom-10 left-10 w-28 h-28 xs:w-36 xs:h-36 sm:w-40 sm:h-40 opacity-5 pointer-events-none hidden md:block">
-          <img src="/bg_images/6eee32992a66df14391a55bb7cd7c3e3 copy.png" alt="" className="w-full h-full object-contain" />
-        </div>
-        
         <div className="container-custom relative z-10">
           <ScrollReveal>
             <div className="text-center mb-8 xs:mb-10 sm:mb-12">
@@ -265,7 +270,7 @@ const CustomDesign = () => {
               >
                 How It Works
               </motion.h2>
-              <p className="text-muted-foreground text-sm xs:text-base sm:text-lg max-w-xl mx-auto px-2">
+              <p className="text-muted-foreground text-base xs:text-lg sm:text-xl max-w-xl mx-auto px-2">
                 Getting your custom design is simple and straightforward
               </p>
             </div>
@@ -286,8 +291,8 @@ const CustomDesign = () => {
                     <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-16 sm:h-16 mx-auto bg-accent/10 rounded-full flex items-center justify-center mb-3 xs:mb-4">
                       <i className={`fa-solid ${step.icon} text-lg xs:text-xl sm:text-2xl text-accent`}></i>
                     </div>
-                    <h3 className="text-base xs:text-lg font-semibold text-foreground mb-1.5 xs:mb-2 px-2">{step.title}</h3>
-                    <p className="text-xs xs:text-sm text-muted-foreground px-2">{step.description}</p>
+                    <h3 className="text-lg xs:text-xl font-semibold text-foreground mb-1.5 xs:mb-2 px-2">{step.title}</h3>
+                    <p className="text-sm xs:text-base text-muted-foreground px-2">{step.description}</p>
                   </div>
                 </motion.div>
               </ScrollReveal>
@@ -298,49 +303,15 @@ const CustomDesign = () => {
 
       {/* Design Request Form Section */}
       <section id="design-form" className="py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-gradient-to-b from-warm to-white/90 backdrop-blur-sm relative overflow-hidden z-10">
-        {/* Background Images */}
+        {/* Background Image */}
         <div 
-          className="absolute inset-0 opacity-8 pointer-events-none"
+          className="absolute inset-0 pointer-events-none opacity-[0.12]"
           style={{
-            backgroundImage: 'url(/bg_images/a603b38fb1ef532479389da84c00a970 copy.png)',
+            backgroundImage: 'url(/bg_images/4014404.jpg)',
             backgroundPosition: 'center',
             backgroundSize: 'cover',
-            backgroundRepeat: 'no-repeat',
           }}
         />
-        <div 
-          className="absolute inset-0 opacity-5 pointer-events-none"
-          style={{
-            backgroundImage: 'url(/bg_images/6e22cdcedfa63286bcf4f43754509fe0%20copy.png)',
-            backgroundPosition: 'top left',
-            backgroundSize: '30%',
-            backgroundRepeat: 'no-repeat',
-          }}
-        />
-        <div 
-          className="absolute inset-0 opacity-5 pointer-events-none"
-          style={{
-            backgroundImage: 'url(/bg_images/e9a22ea4ff03375f5fcfc718eb3f5894 copy.png)',
-            backgroundPosition: 'bottom right',
-            backgroundSize: '25%',
-            backgroundRepeat: 'no-repeat',
-          }}
-        />
-        <div className="absolute top-0 left-0 w-24 h-24 xs:w-32 xs:h-32 bg-primary/5 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
-        <div className="absolute bottom-0 right-0 w-32 h-32 xs:w-48 xs:h-48 bg-accent/5 rounded-full translate-x-1/2 translate-y-1/2 pointer-events-none"></div>
-        <div className="absolute top-20 right-20 w-24 h-24 xs:w-32 xs:h-32 opacity-6 pointer-events-none hidden lg:block">
-          <img src="/bg_images/909a6230d8137dc501ca08257ed328b9 copy.png" alt="" className="w-full h-full object-contain" />
-        </div>
-        <div className="absolute bottom-20 left-20 w-28 h-28 xs:w-36 xs:h-36 opacity-6 pointer-events-none hidden lg:block">
-          <img src="/bg_images/f4fd6c7d6a5ba90fa1bc31d53ee4bacc copy.png" alt="" className="w-full h-full object-contain" />
-        </div>
-        <div className="absolute top-1/2 left-10 w-20 h-20 xs:w-28 xs:h-28 opacity-4 pointer-events-none hidden md:block">
-          <img src="/bg_images/68fccd394db41a54b986a269033bf872 copy.png" alt="" className="w-full h-full object-contain" />
-        </div>
-        <div className="absolute top-1/3 right-10 w-24 h-24 xs:w-32 xs:h-32 opacity-4 pointer-events-none hidden md:block">
-          <img src="/bg_images/c71febdd919ac8f0010cd96003e2ff7d copy.png" alt="" className="w-full h-full object-contain" />
-        </div>
-
         <div className="container-custom relative z-10">
           <ScrollReveal>
             <div className="text-center mb-8 xs:mb-10 sm:mb-12">
@@ -353,7 +324,7 @@ const CustomDesign = () => {
               >
                 Request Your Design
               </motion.h2>
-              <p className="text-muted-foreground text-sm xs:text-base sm:text-lg max-w-xl mx-auto px-2">
+              <p className="text-muted-foreground text-base xs:text-lg sm:text-xl max-w-xl mx-auto px-2">
                 Tell us about your vision and we'll bring it to life
               </p>
             </div>
@@ -371,13 +342,13 @@ const CustomDesign = () => {
                   <div className="w-16 h-16 xs:w-18 xs:h-18 sm:w-20 sm:h-20 mx-auto bg-accent/10 rounded-full flex items-center justify-center mb-4 xs:mb-5 sm:mb-6">
                     <i className="fa-solid fa-check text-2xl xs:text-2.5xl sm:text-3xl text-accent"></i>
                   </div>
-                  <h3 className="text-xl xs:text-2xl font-semibold text-foreground mb-3 xs:mb-4 px-2">Thanks for Your Request!</h3>
-                  <p className="text-muted-foreground text-sm xs:text-base mb-4 xs:mb-5 sm:mb-6 px-2">
+                  <h3 className="text-2xl xs:text-3xl font-semibold text-foreground mb-3 xs:mb-4 px-2">Thanks for Your Request!</h3>
+                  <p className="text-muted-foreground text-base xs:text-lg mb-4 xs:mb-5 sm:mb-6 px-2">
                     Our team will personally connect with you shortly to discuss your design requirements.
                   </p>
                   <Button 
                     variant="outline" 
-                    className="rounded-full h-10 xs:h-11 sm:h-12 text-xs xs:text-sm sm:text-base px-4 xs:px-6 sm:px-8"
+                    className="rounded-full h-10 xs:h-11 sm:h-12 text-sm xs:text-base sm:text-lg px-4 xs:px-6 sm:px-8"
                     onClick={() => {
                       setIsSubmitted(false);
                       setFormData({ fullName: '', email: '', phone: '', designType: '', description: '' });
@@ -401,7 +372,7 @@ const CustomDesign = () => {
                 >
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 xs:gap-5 sm:gap-6 mb-4 xs:mb-5 sm:mb-6">
                     <div>
-                      <Label htmlFor="fullName" className="text-foreground font-medium mb-1.5 xs:mb-2 block text-xs xs:text-sm">
+                      <Label htmlFor="fullName" className="text-foreground font-medium mb-1.5 xs:mb-2 block text-sm xs:text-base">
                         Full Name *
                       </Label>
                       <Input
@@ -410,11 +381,11 @@ const CustomDesign = () => {
                         value={formData.fullName}
                         onChange={(e) => handleInputChange('fullName', e.target.value)}
                         required
-                        className="rounded-lg border-primary/20 focus:border-primary transition-colors h-10 xs:h-11 sm:h-12 text-sm sm:text-base"
+                        className="rounded-lg border-primary/20 focus:border-primary transition-colors h-10 xs:h-11 sm:h-12 text-base"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="email" className="text-foreground font-medium mb-1.5 xs:mb-2 block text-xs xs:text-sm">
+                      <Label htmlFor="email" className="text-foreground font-medium mb-1.5 xs:mb-2 block text-sm xs:text-base">
                         Email Address *
                       </Label>
                       <Input
@@ -424,14 +395,14 @@ const CustomDesign = () => {
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         required
-                        className="rounded-lg border-primary/20 focus:border-primary transition-colors h-10 xs:h-11 sm:h-12 text-sm sm:text-base"
+                        className="rounded-lg border-primary/20 focus:border-primary transition-colors h-10 xs:h-11 sm:h-12 text-base"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 xs:gap-5 sm:gap-6 mb-4 xs:mb-5 sm:mb-6">
                     <div>
-                      <Label htmlFor="phone" className="text-foreground font-medium mb-1.5 xs:mb-2 block text-xs xs:text-sm">
+                      <Label htmlFor="phone" className="text-foreground font-medium mb-1.5 xs:mb-2 block text-sm xs:text-base">
                         Phone Number *
                       </Label>
                       <Input
@@ -441,11 +412,11 @@ const CustomDesign = () => {
                         value={formData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
                         required
-                        className="rounded-lg border-primary/20 focus:border-primary transition-colors h-10 xs:h-11 sm:h-12 text-sm sm:text-base"
+                        className="rounded-lg border-primary/20 focus:border-primary transition-colors h-10 xs:h-11 sm:h-12 text-base"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="designType" className="text-foreground font-medium mb-1.5 xs:mb-2 block text-xs xs:text-sm">
+                      <Label htmlFor="designType" className="text-foreground font-medium mb-1.5 xs:mb-2 block text-sm xs:text-base">
                         Type of Design *
                       </Label>
                       <Select 
@@ -453,7 +424,7 @@ const CustomDesign = () => {
                         onValueChange={(value) => handleInputChange('designType', value)}
                         required
                       >
-                        <SelectTrigger className="rounded-lg border-primary/20 focus:border-primary transition-colors h-10 xs:h-11 sm:h-12 text-sm sm:text-base">
+                        <SelectTrigger className="rounded-lg border-primary/20 focus:border-primary transition-colors h-10 xs:h-11 sm:h-12 text-base">
                           <SelectValue placeholder="Select design type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -465,7 +436,7 @@ const CustomDesign = () => {
                   </div>
 
                   <div className="mb-4 xs:mb-5 sm:mb-6">
-                    <Label htmlFor="description" className="text-foreground font-medium mb-1.5 xs:mb-2 block text-xs xs:text-sm">
+                    <Label htmlFor="description" className="text-foreground font-medium mb-1.5 xs:mb-2 block text-sm xs:text-base">
                       Describe Your Design *
                     </Label>
                     <Textarea
@@ -475,12 +446,12 @@ const CustomDesign = () => {
                       onChange={(e) => handleInputChange('description', e.target.value)}
                       required
                       rows={5}
-                      className="rounded-lg border-primary/20 focus:border-primary resize-none transition-colors text-sm sm:text-base"
+                      className="rounded-lg border-primary/20 focus:border-primary resize-none transition-colors text-base"
                     />
                   </div>
 
                   <div className="mb-4 xs:mb-5 sm:mb-6">
-                    <Label className="text-foreground font-medium mb-1.5 xs:mb-2 block text-xs xs:text-sm">
+                    <Label className="text-foreground font-medium mb-1.5 xs:mb-2 block text-sm xs:text-base">
                       Reference Image (Optional)
                     </Label>
                     <input
@@ -507,15 +478,15 @@ const CustomDesign = () => {
                       onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
                       className="border-2 border-dashed border-primary/20 rounded-lg p-4 xs:p-5 sm:p-6 text-center hover:border-primary hover:bg-primary/5 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50"
                     >
-                      <i className="fa-solid fa-cloud-upload text-2xl xs:text-3xl text-muted-foreground mb-2"></i>
-                      <p className="text-xs xs:text-sm text-muted-foreground">
+                      <i className="fa-solid fa-cloud-upload text-3xl xs:text-4xl text-muted-foreground mb-2"></i>
+                      <p className="text-sm xs:text-base text-muted-foreground">
                         Click to upload or drag and drop
                       </p>
-                      <p className="text-[10px] xs:text-xs text-muted-foreground mt-1">
+                      <p className="text-sm xs:text-base text-muted-foreground mt-1">
                         PNG, JPG up to 10MB
                       </p>
                       {referenceFile && (
-                        <p className="text-xs text-primary font-medium mt-2 truncate max-w-full" title={referenceFile.name}>
+                        <p className="text-sm text-primary font-medium mt-2 truncate max-w-full" title={referenceFile.name}>
                           {referenceFile.name}
                         </p>
                       )}
@@ -548,23 +519,15 @@ const CustomDesign = () => {
 
       {/* Design Specialties Section */}
       <section className="py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-white/90 backdrop-blur-sm relative z-10 overflow-hidden">
-        {/* Background Images */}
+        {/* Background Image */}
         <div 
-          className="absolute inset-0 opacity-10 pointer-events-none"
+          className="absolute inset-0 pointer-events-none opacity-[0.15]"
           style={{
-            backgroundImage: 'url(/bg_images/e9a22ea4ff03375f5fcfc718eb3f5894 copy.png)',
+            backgroundImage: 'url(/bg_images/9598237.jpg)',
             backgroundPosition: 'center',
             backgroundSize: 'cover',
-            backgroundRepeat: 'no-repeat',
           }}
         />
-        <div className="absolute top-10 left-10 w-32 h-32 xs:w-40 xs:h-40 sm:w-48 sm:h-48 opacity-5 pointer-events-none hidden md:block">
-          <img src="/bg_images/6be0f0ce2c11383d352bd0828a354dba copy.png" alt="" className="w-full h-full object-contain" />
-        </div>
-        <div className="absolute bottom-10 right-10 w-28 h-28 xs:w-36 xs:h-36 sm:w-40 sm:h-40 opacity-5 pointer-events-none hidden md:block">
-          <img src="/bg_images/c71febdd919ac8f0010cd96003e2ff7d copy.png" alt="" className="w-full h-full object-contain" />
-        </div>
-        
         <div className="container-custom relative z-10">
           <ScrollReveal>
             <div className="text-center mb-8 xs:mb-10 sm:mb-12">
@@ -577,7 +540,7 @@ const CustomDesign = () => {
               >
                 Our Design Specialties
               </motion.h2>
-              <p className="text-muted-foreground text-sm xs:text-base sm:text-lg max-w-xl mx-auto px-2">
+              <p className="text-muted-foreground text-base xs:text-lg sm:text-xl max-w-xl mx-auto px-2">
                 We specialize in creating beautiful, custom designs across various categories
               </p>
             </div>
@@ -594,8 +557,8 @@ const CustomDesign = () => {
                   <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-16 sm:h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-3 xs:mb-4 group-hover:bg-primary/20 transition-colors">
                     <i className={`fa-solid ${specialty.icon} text-lg xs:text-xl sm:text-2xl text-primary`}></i>
                   </div>
-                  <h3 className="text-base xs:text-lg font-semibold text-foreground mb-1.5 xs:mb-2 px-2">{specialty.title}</h3>
-                  <p className="text-xs xs:text-sm text-muted-foreground px-2">{specialty.description}</p>
+                  <h3 className="text-lg xs:text-xl font-semibold text-foreground mb-1.5 xs:mb-2 px-2">{specialty.title}</h3>
+                  <p className="text-sm xs:text-base text-muted-foreground px-2">{specialty.description}</p>
                 </motion.div>
               </ScrollReveal>
             ))}
@@ -605,23 +568,15 @@ const CustomDesign = () => {
 
       {/* Why Choose Us Section */}
       <section className="py-8 sm:py-12 md:py-16 lg:py-20 xl:py-24 bg-gradient-to-b from-warm to-white/90 backdrop-blur-sm relative z-10 overflow-hidden">
-        {/* Background Images */}
+        {/* Background Image */}
         <div 
-          className="absolute inset-0 opacity-3 pointer-events-none"
+          className="absolute inset-0 pointer-events-none opacity-[0.15]"
           style={{
-            backgroundImage: 'url(/bg_images/661653d7e241afba33eeb02dc6a09f9e%20copy.png)',
+            backgroundImage: 'url(/bg_images/9595043.jpg)',
             backgroundPosition: 'center',
             backgroundSize: 'cover',
-            backgroundRepeat: 'no-repeat',
           }}
         />
-        <div className="absolute top-20 right-20 w-32 h-32 xs:w-40 xs:h-40 sm:w-48 sm:h-48 opacity-3 pointer-events-none hidden lg:block">
-          <img src="/bg_images/6be0f0ce2c11383d352bd0828a354dba copy.png" alt="" className="w-full h-full object-contain" />
-        </div>
-        <div className="absolute bottom-20 left-20 w-28 h-28 xs:w-36 xs:h-36 sm:w-40 sm:h-40 opacity-3 pointer-events-none hidden lg:block">
-          <img src="/bg_images/68fccd394db41a54b986a269033bf872 copy.png" alt="" className="w-full h-full object-contain" />
-        </div>
-        
         <div className="container-custom relative z-10">
           <ScrollReveal>
             <div className="text-center mb-8 xs:mb-10 sm:mb-12">
@@ -634,7 +589,7 @@ const CustomDesign = () => {
               >
                 Why Choose Us
               </motion.h2>
-              <p className="text-muted-foreground text-sm xs:text-base sm:text-lg max-w-xl mx-auto px-2">
+              <p className="text-muted-foreground text-base xs:text-lg sm:text-xl max-w-xl mx-auto px-2">
                 We're committed to delivering exceptional design experiences
               </p>
             </div>
@@ -651,8 +606,8 @@ const CustomDesign = () => {
                   <div className="w-12 h-12 xs:w-14 xs:h-14 mx-auto bg-accent/10 rounded-full flex items-center justify-center mb-3 xs:mb-4 group-hover:bg-accent/20 transition-colors">
                     <i className={`fa-solid ${item.icon} text-lg xs:text-xl text-accent`}></i>
                   </div>
-                  <h3 className="text-base xs:text-lg font-semibold text-foreground mb-1.5 xs:mb-2 px-2">{item.title}</h3>
-                  <p className="text-xs xs:text-sm text-muted-foreground px-2">{item.description}</p>
+                  <h3 className="text-lg xs:text-xl font-semibold text-foreground mb-1.5 xs:mb-2 px-2">{item.title}</h3>
+                  <p className="text-sm xs:text-base text-muted-foreground px-2">{item.description}</p>
                 </motion.div>
               </ScrollReveal>
             ))}
@@ -693,7 +648,7 @@ const CustomDesign = () => {
               Ready to Create Something Beautiful?
             </motion.h2>
             <motion.p 
-              className="text-white/90 text-sm xs:text-base sm:text-lg mb-6 xs:mb-7 sm:mb-8 max-w-xl mx-auto px-2"
+              className="text-white/90 text-base xs:text-lg sm:text-xl mb-6 xs:mb-7 sm:mb-8 max-w-xl mx-auto px-2"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}

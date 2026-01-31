@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
-import { Save, Image as ImageIcon, FileText, Globe, Star, Package, MessageSquare, Tag, Instagram, Link as LinkIcon, Copy, Trash2, Plus, X, Loader2, Upload } from 'lucide-react';
+import { Save, Image as ImageIcon, FileText, Globe, Star, Package, MessageSquare, Tag, Instagram, Link as LinkIcon, Copy, Trash2, Plus, X, Loader2, Upload, Megaphone, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -36,6 +36,34 @@ const AdminCMS = () => {
   const { data: allBanners = [], refetch: refetchBanners } = useQuery({
     queryKey: ['admin-banners'],
     queryFn: () => cmsApi.getAllBanners(),
+  });
+  
+  // Fetch announcement/marquee text
+  const { data: announcementData } = useQuery({
+    queryKey: ['announcement'],
+    queryFn: () => cmsApi.getAnnouncement(),
+  });
+  
+  // Announcement state
+  const [announcementText, setAnnouncementText] = useState('');
+  
+  // Update announcement state when data loads
+  useEffect(() => {
+    if (announcementData?.text) {
+      setAnnouncementText(announcementData.text);
+    }
+  }, [announcementData]);
+  
+  // Announcement mutation
+  const saveAnnouncementMutation = useMutation({
+    mutationFn: (text: string) => cmsApi.setAnnouncement(text),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['announcement'] });
+      toast.success('Announcement saved successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to save announcement');
+    },
   });
   
   // Testimonial mutations
@@ -206,9 +234,9 @@ const AdminCMS = () => {
   
   // Local state for forms
   const [contactPageContent, setContactPageContent] = useState({
-    email: 'contact@studiosara.com',
-    phone: '+91 9876543210',
-    address: '123 Artisan Street, Jaipur, Rajasthan',
+    email: '',
+    phone: '',
+    address: '',
   });
 
   // Best Sellers State
@@ -292,15 +320,12 @@ const AdminCMS = () => {
           }
         }
       }
-      if (cmsData.content) {
-        const content = cmsData.content;
-        if (content.contact) {
-          setContactPageContent({
-            email: content.contact.email || '',
-            phone: content.contact.phone || '',
-            address: content.contact.address || '',
-          });
-        }
+      if (cmsData.contactInfo) {
+        setContactPageContent({
+          email: cmsData.contactInfo.email || '',
+          phone: cmsData.contactInfo.phone || '',
+          address: cmsData.contactInfo.address || '',
+        });
       }
     }
   }, [cmsData]);
@@ -574,8 +599,12 @@ const AdminCMS = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.3 }}
         >
-          <Tabs defaultValue="best-sellers" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-2 overflow-x-auto">
+          <Tabs defaultValue="announcement" className="w-full">
+            <TabsList className="flex w-full gap-2 overflow-x-auto pb-1">
+              <TabsTrigger value="announcement" className="gap-2 whitespace-nowrap">
+                <Megaphone className="w-4 h-4" />
+                <span className="hidden lg:inline">Announcement</span>
+              </TabsTrigger>
               <TabsTrigger value="best-sellers" className="gap-2 whitespace-nowrap">
                 <Star className="w-4 h-4" />
                 <span className="hidden lg:inline">Best Sellers</span>
@@ -609,6 +638,91 @@ const AdminCMS = () => {
                 <span className="hidden lg:inline">Banners</span>
               </TabsTrigger>
             </TabsList>
+
+            {/* Announcement/Marquee */}
+            <TabsContent value="announcement" className="mt-6">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="bg-white rounded-xl border border-border shadow-sm p-6 space-y-6"
+              >
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Manage Announcement Bar</h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Edit the scrolling announcement text displayed at the top of the website. This is shown on every page.
+                  </p>
+                  
+                  {/* Preview */}
+                  <div className="mb-6 p-4 bg-muted rounded-lg">
+                    <label className="text-sm font-medium mb-2 block">Preview</label>
+                    <div className="bg-foreground text-background text-xs py-2 px-4 rounded overflow-hidden">
+                      <div className="whitespace-nowrap">
+                        {announcementText || 'Made to order. Dispatch takes 5–6 days (India)'}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Edit */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Announcement Text</label>
+                      <Input
+                        value={announcementText}
+                        onChange={(e) => setAnnouncementText(e.target.value)}
+                        className="h-11"
+                        placeholder="e.g., Made to order. Dispatch takes 5–6 days (India)"
+                      />
+                      <p className="text-xs text-muted-foreground mt-2">
+                        This text will scroll continuously in the announcement bar at the top of your website.
+                      </p>
+                    </div>
+                    
+                    {/* Suggestions */}
+                    <div className="p-4 border border-border rounded-lg bg-muted/30">
+                      <p className="text-sm font-medium mb-3">Quick suggestions:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          'Free shipping on orders above ₹999',
+                          '20% OFF on your first order - Use code: FIRST20',
+                          'Made to order. Dispatch takes 5–6 days',
+                          'New arrivals just dropped! Shop now',
+                          'Sale live: Up to 50% OFF',
+                        ].map((suggestion) => (
+                          <Button
+                            key={suggestion}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAnnouncementText(suggestion)}
+                            className="text-xs"
+                          >
+                            {suggestion}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button 
+                    className="btn-primary gap-2 mt-6" 
+                    onClick={() => saveAnnouncementMutation.mutate(announcementText)} 
+                    disabled={saveAnnouncementMutation.isPending || !announcementText.trim()}
+                  >
+                    {saveAnnouncementMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Announcement
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </motion.div>
+            </TabsContent>
 
             {/* Best Sellers */}
             <TabsContent value="best-sellers" className="mt-6">
@@ -1550,11 +1664,15 @@ const AdminCMS = () => {
 };
 
 // Media Manager Component
+const IMAGES_PER_PAGE = 50;
+
 const MediaManager = ({ onImageSelect }: { onImageSelect?: (url: string) => void }) => {
   const [selectedFolder, setSelectedFolder] = useState<string>('all');
   const [isUploading, setIsUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(0);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { data: mediaData, isLoading, refetch } = useQuery({
@@ -1585,12 +1703,28 @@ const MediaManager = ({ onImageSelect }: { onImageSelect?: (url: string) => void
         toast.warning(`Deleted ${successCount} image(s), ${failedCount} failed`);
       }
       setSelectedImages(new Set());
+      setDeleteConfirmOpen(false);
       refetch();
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to delete images');
     },
   });
+  
+  const allImages = mediaData?.images || [];
+  const totalImages = allImages.length;
+  const totalPages = Math.ceil(totalImages / IMAGES_PER_PAGE);
+  
+  // Get current page images
+  const startIndex = currentPage * IMAGES_PER_PAGE;
+  const endIndex = startIndex + IMAGES_PER_PAGE;
+  const currentPageImages = allImages.slice(startIndex, endIndex);
+  
+  // Reset page when folder changes
+  useEffect(() => {
+    setCurrentPage(0);
+    setSelectedImages(new Set());
+  }, [selectedFolder]);
   
   const toggleImageSelection = (imageUrl: string) => {
     setSelectedImages(prev => {
@@ -1604,8 +1738,12 @@ const MediaManager = ({ onImageSelect }: { onImageSelect?: (url: string) => void
     });
   };
   
+  const selectAllOnPage = () => {
+    setSelectedImages(new Set(currentPageImages.map((img: any) => img.url)));
+  };
+  
   const selectAllImages = () => {
-    setSelectedImages(new Set(images.map((img: any) => img.url)));
+    setSelectedImages(new Set(allImages.map((img: any) => img.url)));
   };
   
   const deselectAllImages = () => {
@@ -1614,9 +1752,11 @@ const MediaManager = ({ onImageSelect }: { onImageSelect?: (url: string) => void
   
   const handleBulkDelete = () => {
     if (selectedImages.size === 0) return;
-    if (confirm(`Are you sure you want to delete ${selectedImages.size} image(s)?`)) {
-      bulkDeleteMutation.mutate(Array.from(selectedImages));
-    }
+    setDeleteConfirmOpen(true);
+  };
+  
+  const confirmBulkDelete = () => {
+    bulkDeleteMutation.mutate(Array.from(selectedImages));
   };
   
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1626,7 +1766,7 @@ const MediaManager = ({ onImageSelect }: { onImageSelect?: (url: string) => void
     setIsUploading(true);
     try {
       const folder = selectedFolder === 'all' ? 'banners' : selectedFolder;
-      const url = await mediaApi.upload(file, folder);
+      await mediaApi.upload(file, folder);
       toast.success('Image uploaded successfully!');
       refetch();
     } catch (error: any) {
@@ -1644,9 +1784,11 @@ const MediaManager = ({ onImageSelect }: { onImageSelect?: (url: string) => void
     { value: 'banners', label: 'Banners' },
     { value: 'categories', label: 'Categories' },
     { value: 'products/images', label: 'Products' },
+    { value: 'instagram', label: 'Instagram' },
   ];
   
-  const images = mediaData?.images || [];
+  const allOnPageSelected = currentPageImages.length > 0 && 
+    currentPageImages.every((img: any) => selectedImages.has(img.url));
   
   return (
     <motion.div
@@ -1655,191 +1797,342 @@ const MediaManager = ({ onImageSelect }: { onImageSelect?: (url: string) => void
       transition={{ duration: 0.3 }}
       className="bg-white rounded-xl border border-border shadow-sm p-6 space-y-6"
     >
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Media Manager</h3>
-          <p className="text-sm text-muted-foreground">
-            Manage all images from Cloudinary
-            {selectedImages.size > 0 && (
-              <span className="ml-2 text-primary font-medium">{selectedImages.size} selected</span>
-            )}
-          </p>
+      {/* Header */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold mb-1">Media Manager</h3>
+            <p className="text-sm text-muted-foreground">
+              {totalImages} images in Cloudinary
+              {selectedImages.size > 0 && (
+                <span className="ml-2 text-primary font-medium">• {selectedImages.size} selected</span>
+              )}
+            </p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Select value={selectedFolder} onValueChange={setSelectedFolder}>
+              <SelectTrigger className="w-[160px] h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {folders.map((folder) => (
+                  <SelectItem key={folder.value} value={folder.value}>
+                    {folder.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="media-upload"
+            />
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              size="sm"
+              className="gap-2"
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Upload
+                </>
+              )}
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {selectedImages.size > 0 && (
-            <>
+        
+        {/* Selection & Delete Controls */}
+        {currentPageImages.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg">
+            <span className="text-sm text-muted-foreground mr-2">Selection:</span>
+            
+            {!allOnPageSelected ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={selectAllOnPage}
+                className="gap-2 h-8"
+              >
+                Select Page ({currentPageImages.length})
+              </Button>
+            ) : (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={deselectAllImages}
-                className="gap-2"
+                className="gap-2 h-8"
               >
-                <X className="w-4 h-4" />
-                Deselect All
+                <X className="w-3 h-3" />
+                Deselect Page
               </Button>
+            )}
+            
+            {totalImages > IMAGES_PER_PAGE && (
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
-                onClick={handleBulkDelete}
-                disabled={bulkDeleteMutation.isPending}
-                className="gap-2"
+                onClick={selectAllImages}
+                className="gap-2 h-8"
               >
-                {bulkDeleteMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4" />
-                    Delete Selected ({selectedImages.size})
-                  </>
-                )}
+                Select All ({totalImages})
               </Button>
-            </>
-          )}
-          {selectedImages.size === 0 && images.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={selectAllImages}
-              className="gap-2"
-            >
-              Select All
-            </Button>
-          )}
-          <Select value={selectedFolder} onValueChange={setSelectedFolder}>
-            <SelectTrigger className="w-[180px] h-11">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {folders.map((folder) => (
-                <SelectItem key={folder.value} value={folder.value}>
-                  {folder.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileUpload}
-            className="hidden"
-            id="media-upload"
-          />
-          <Button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="gap-2"
-          >
-            {isUploading ? (
+            )}
+            
+            {selectedImages.size > 0 && (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <Upload className="w-4 h-4" />
-                Upload Image
+                <div className="w-px h-6 bg-border mx-2" />
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleteMutation.isPending}
+                  className="gap-2 h-8"
+                >
+                  {bulkDeleteMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Delete {selectedImages.size} Image{selectedImages.size > 1 ? 's' : ''}
+                    </>
+                  )}
+                </Button>
               </>
             )}
-          </Button>
-        </div>
+          </div>
+        )}
       </div>
       
+      {/* Images Grid */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
-      ) : images.length === 0 ? (
+      ) : totalImages === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No images found. Upload your first image!
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {images.map((image: any, index: number) => {
-            const isSelected = selectedImages.has(image.url);
-            return (
-              <motion.div
-                key={image.publicId || index}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.02, duration: 0.3 }}
-                className={`group relative aspect-square rounded-lg overflow-hidden bg-muted border-2 transition-colors ${
-                  isSelected ? 'border-primary ring-2 ring-primary' : 'border-border hover:border-primary'
-                }`}
-              >
-                <div
-                  className="absolute top-2 left-2 z-10"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleImageSelection(image.url);
-                  }}
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {currentPageImages.map((image: any, index: number) => {
+              const isSelected = selectedImages.has(image.url);
+              return (
+                <motion.div
+                  key={image.publicId || startIndex + index}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: index * 0.01, duration: 0.2 }}
+                  className={`group relative aspect-square rounded-lg overflow-hidden bg-muted border-2 transition-all ${
+                    isSelected ? 'border-primary ring-2 ring-primary shadow-lg' : 'border-border hover:border-primary/50'
+                  }`}
                 >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleImageSelection(image.url)}
-                    className="w-5 h-5 rounded border-2 border-white bg-white/90 cursor-pointer"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </div>
-                <div
-                  className="w-full h-full cursor-pointer"
-                  onClick={() => {
-                    if (onImageSelect) {
-                      onImageSelect(image.url);
-                      toast.success('Image selected!');
-                    } else {
-                      setSelectedImage(image.url);
-                      navigator.clipboard.writeText(image.url);
-                      toast.success('Image URL copied to clipboard!');
-                    }
-                  }}
-                >
-                  <img
-                    src={image.url}
-                    alt={image.publicId || `Image ${index}`}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                    <Button
-                      size="icon"
-                      variant="secondary"
-                      className="h-8 w-8"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigator.clipboard.writeText(image.url);
-                        toast.success('URL copied!');
-                      }}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="destructive"
-                      className="h-8 w-8"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm('Are you sure you want to delete this image?')) {
-                          deleteMutation.mutate(image.url);
-                        }
-                      }}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                  {/* Checkbox */}
+                  <div
+                    className="absolute top-2 left-2 z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleImageSelection(image.url);
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleImageSelection(image.url)}
+                      className="w-5 h-5 rounded border-2 border-white bg-white/90 cursor-pointer shadow"
+                      onClick={(e) => e.stopPropagation()}
+                    />
                   </div>
+                  
+                  {/* Image */}
+                  <div
+                    className="w-full h-full cursor-pointer"
+                    onClick={() => {
+                      if (onImageSelect) {
+                        onImageSelect(image.url);
+                        toast.success('Image selected!');
+                      } else {
+                        setSelectedImage(image.url);
+                      }
+                    }}
+                  >
+                    <img
+                      src={image.url}
+                      alt={image.publicId || `Image ${startIndex + index + 1}`}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                  
+                  {/* Hover overlay with actions */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(image.url);
+                          toast.success('URL copied!');
+                        }}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Delete this image?')) {
+                            deleteMutation.mutate(image.url);
+                          }
+                        }}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {startIndex + 1} - {Math.min(endIndex, totalImages)} of {totalImages} images
+              </div>
+              
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(0)}
+                  disabled={currentPage === 0}
+                  className="h-8 px-2"
+                >
+                  First
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                  disabled={currentPage === 0}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                
+                <div className="flex items-center gap-1 mx-2">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i;
+                    } else if (currentPage < 3) {
+                      pageNum = i;
+                    } else if (currentPage > totalPages - 4) {
+                      pageNum = totalPages - 5 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? 'default' : 'outline'}
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setCurrentPage(pageNum)}
+                      >
+                        {pageNum + 1}
+                      </Button>
+                    );
+                  })}
                 </div>
-              </motion.div>
-            );
-          })}
-        </div>
+                
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                  disabled={currentPage >= totalPages - 1}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages - 1)}
+                  disabled={currentPage >= totalPages - 1}
+                  className="h-8 px-2"
+                >
+                  Last
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
       
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Confirm Delete</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              Are you sure you want to delete <strong>{selectedImages.size}</strong> image{selectedImages.size > 1 ? 's' : ''}? 
+              This action cannot be undone.
+            </p>
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+              <p className="text-sm text-destructive font-medium">
+                Warning: Deleted images may still be referenced in products, banners, or other content.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={confirmBulkDelete}
+                disabled={bulkDeleteMutation.isPending}
+              >
+                {bulkDeleteMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete {selectedImages.size} Image{selectedImages.size > 1 ? 's' : ''}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Image Preview Dialog */}
       {selectedImage && (
         <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
           <DialogContent className="max-w-4xl">
@@ -1847,9 +2140,9 @@ const MediaManager = ({ onImageSelect }: { onImageSelect?: (url: string) => void
               <DialogTitle>Image Preview</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <img src={selectedImage} alt="Preview" className="w-full h-auto rounded-lg" />
+              <img src={selectedImage} alt="Preview" className="w-full h-auto rounded-lg max-h-[60vh] object-contain bg-muted" />
               <div className="flex gap-2">
-                <Input value={selectedImage} readOnly className="flex-1" />
+                <Input value={selectedImage} readOnly className="flex-1 text-xs" />
                 <Button
                   onClick={() => {
                     navigator.clipboard.writeText(selectedImage);
@@ -1858,6 +2151,19 @@ const MediaManager = ({ onImageSelect }: { onImageSelect?: (url: string) => void
                 >
                   <Copy className="w-4 h-4 mr-2" />
                   Copy URL
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    if (confirm('Delete this image?')) {
+                      deleteMutation.mutate(selectedImage);
+                      setSelectedImage(null);
+                    }
+                  }}
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
                 </Button>
               </div>
             </div>
