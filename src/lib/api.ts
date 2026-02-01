@@ -76,6 +76,12 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     
     if (!response.ok) {
       const error = await response.text();
+      // #region agent log
+      if (method === 'GET' && endpoint.includes('/api/products') && !endpoint.includes('/api/products/')) {
+        const payload = { location: 'api.ts:fetchApi-products-error', message: 'Products API error', data: { endpoint, status: response.status, errorPreview: error != null && error.length > 100 ? error.slice(0, 100) : error }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1,H2' };
+        fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => {});
+      }
+      // #endregion
       console.error(`[API Error] ${method} ${endpoint}`, {
         status: response.status,
         error,
@@ -118,6 +124,12 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     const text = await response.text();
     const data = text ? JSON.parse(text) : null;
     
+    // #region agent log
+    if (method === 'GET' && endpoint.includes('/api/products') && !endpoint.includes('/api/products/')) {
+      const payload = { location: 'api.ts:fetchApi-products', message: 'Products API response', data: { endpoint, status: response.status, bodyLength: text.length, dataIsNull: data == null, isArray: Array.isArray(data), arrayLength: Array.isArray(data) ? data.length : undefined }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1,H2,H3' };
+      fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => {});
+    }
+    // #endregion
     console.log(`[API Success] ${method} ${endpoint}`, {
       status: response.status,
       duration: `${duration}ms`,
@@ -166,6 +178,15 @@ export const productsApi = {
     if (params?.userEmail) searchParams.set('userEmail', params.userEmail);
     return fetchApi<any[]>(`/api/products?${searchParams}`);
   },
+  /** Admin: get all products including those in personalized categories */
+  getAllAdmin: (params?: { status?: string; type?: string; categoryId?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.type) searchParams.set('type', params.type);
+    if (params?.categoryId) searchParams.set('categoryId', params.categoryId.toString());
+    const query = searchParams.toString();
+    return fetchApi<any[]>(`/api/admin/products${query ? `?${query}` : ''}`);
+  },
   getById: (id: number, userEmail?: string) => {
     const params = new URLSearchParams();
     if (userEmail) params.set('userEmail', userEmail);
@@ -190,6 +211,8 @@ export const productsApi = {
     fetchApi<any>('/api/admin/products/bulk/toggle-status', { method: 'POST', body: JSON.stringify({ ids, action }) }),
   bulkCopy: (ids: number[]) =>
     fetchApi<{ message: string; copied: number; failed: number; errors: string[] }>('/api/admin/products/bulk/copy', { method: 'POST', body: JSON.stringify({ ids }) }),
+  bulkUpdateCategory: (ids: number[], categoryId: number) =>
+    fetchApi<{ message: string; count: number }>('/api/admin/products/bulk/update-category', { method: 'POST', body: JSON.stringify({ ids, categoryId }) }),
   exportToExcel: async () => {
     const response = await fetch(`${API_BASE_URL}/api/admin/products/export`, {
       method: 'GET',
@@ -425,6 +448,8 @@ export const categoriesApi = {
     const queryString = params.toString();
     return fetchApi<any[]>(`/api/categories${queryString ? `?${queryString}` : ''}`);
   },
+  /** Admin panel: get all categories including personalised ones. Uses admin token. */
+  getAllAdmin: () => fetchApi<any[]>('/api/admin/categories'),
   getById: (id: number) => fetchApi<any>(`/api/categories/id/${id}`),
   getBySlugPath: (slugPath: string) => fetchApi<any>(`/api/categories/${slugPath}`),
   getLeafCategories: () => fetchApi<any[]>('/api/categories/leaf'),
@@ -710,8 +735,23 @@ export const cartApi = {
 // ===============================
 export const wishlistApi = {
   getWishlist: () => fetchApi<any[]>('/api/wishlist'),
-  addItem: (productType: string, productId: number) => 
-    fetchApi<any>('/api/wishlist', { method: 'POST', body: JSON.stringify({ productType, productId }) }),
+  addItem: (data: {
+    productType: string;
+    productId: number;
+    productName?: string;
+    productImage?: string;
+    designId?: number;
+    fabricId?: number;
+    fabricPrice?: number;
+    designPrice?: number;
+    uploadedDesignUrl?: string;
+    variants?: Record<string, string>;
+    variantSelections?: Record<string, any>;
+    customFormData?: Record<string, any>;
+    quantity?: number;
+    unitPrice?: number;
+  }) => 
+    fetchApi<any>('/api/wishlist', { method: 'POST', body: JSON.stringify(data) }),
   removeItem: (itemId: number) => fetchApi<void>(`/api/wishlist/${itemId}`, { method: 'DELETE' }),
   removeByProduct: (productType: string, productId: number) => 
     fetchApi<void>(`/api/wishlist/product?productType=${productType}&productId=${productId}`, { method: 'DELETE' }),
@@ -1160,6 +1200,106 @@ export const currencyMultiplierAdminApi = {
     fetchApi<void>(`/api/admin/currency-multipliers/${id}`, { method: 'DELETE' }),
 };
 
+// ===============================
+// API Logs API (Admin)
+// ===============================
+export interface ApiLogDTO {
+  id: number;
+  apiEndpoint: string;
+  httpMethod: string;
+  statusCode: number;
+  errorFlag: 'GREEN' | 'ORANGE' | 'RED';
+  country: string;
+  device: string;
+  ipAddress: string;
+  timestamp: string;
+  userId?: number;
+  userEmail?: string;
+  responseTimeMs?: number;
+  userAgent?: string;
+}
+
+export interface ApiLogDetailDTO extends ApiLogDTO {
+  errorMessage?: string;
+  stackTrace?: string;
+  requestBody?: string;
+  requestParams?: string;
+}
+
+export interface ApiLogStatsDTO {
+  totalLogs: number;
+  greenCount: number;
+  orangeCount: number;
+  redCount: number;
+  todayTotal: number;
+  todayGreen: number;
+  todayOrange: number;
+  todayRed: number;
+}
+
+export interface BulkDeleteRequest {
+  ids?: number[];
+  errorFlag?: string;
+  olderThan?: string;
+  endpoint?: string;
+  deleteAll?: boolean;
+}
+
+export const logsApi = {
+  getLogs: (params: {
+    page?: number;
+    size?: number;
+    errorFlag?: string;
+    endpoint?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params.page !== undefined) searchParams.set('page', params.page.toString());
+    if (params.size !== undefined) searchParams.set('size', params.size.toString());
+    if (params.errorFlag && params.errorFlag !== 'all') searchParams.set('errorFlag', params.errorFlag);
+    if (params.endpoint && params.endpoint !== 'all') searchParams.set('endpoint', params.endpoint);
+    if (params.startDate) searchParams.set('startDate', params.startDate);
+    if (params.endDate) searchParams.set('endDate', params.endDate);
+    if (params.search) searchParams.set('search', params.search);
+    if (params.sortBy) searchParams.set('sortBy', params.sortBy);
+    if (params.sortDir) searchParams.set('sortDir', params.sortDir);
+    return fetchApi<{
+      content: ApiLogDTO[];
+      totalElements: number;
+      totalPages: number;
+      number: number;
+      size: number;
+      first: boolean;
+      last: boolean;
+    }>(`/api/admin/logs?${searchParams}`);
+  },
+  
+  getLogById: (id: number) => fetchApi<ApiLogDetailDTO>(`/api/admin/logs/${id}`),
+  
+  getStats: () => fetchApi<ApiLogStatsDTO>('/api/admin/logs/stats'),
+  
+  getEndpoints: () => fetchApi<string[]>('/api/admin/logs/endpoints'),
+  
+  bulkDelete: (request: BulkDeleteRequest) => 
+    fetchApi<{ success: boolean; deletedCount: number; message: string }>('/api/admin/logs/bulk', {
+      method: 'DELETE',
+      body: JSON.stringify(request),
+    }),
+  
+  cleanup: (daysOld?: number, errorFlag?: string) => {
+    const params = new URLSearchParams();
+    if (daysOld !== undefined) params.set('daysOld', daysOld.toString());
+    if (errorFlag) params.set('errorFlag', errorFlag);
+    return fetchApi<{ success: boolean; deletedCount: number; message: string }>(`/api/admin/logs/cleanup?${params}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 export default {
   products: productsApi,
   plainProducts: plainProductsApi,
@@ -1182,4 +1322,5 @@ export default {
   auth: authApi,
   currency: currencyApi,
   payment: paymentApi,
+  logs: logsApi,
 };

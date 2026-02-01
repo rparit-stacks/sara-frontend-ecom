@@ -41,6 +41,7 @@ import AdminFabrics from "./pages/admin/AdminFabrics";
 import AdminDesigns from "./pages/admin/AdminDesigns";
 import AdminCMS from "./pages/admin/AdminCMS";
 import AdminCategories from "./pages/admin/AdminCategories";
+import AdminCategoryForm from "./pages/admin/AdminCategoryForm";
 import AdminCustomConfig from "./pages/admin/AdminCustomConfig";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminAdmins from "./pages/admin/AdminAdmins";
@@ -59,6 +60,7 @@ import AdminBusinessConfig from "./pages/admin/AdminBusinessConfig";
 import AdminPaymentConfig from "./pages/admin/AdminPaymentConfig";
 import AdminCurrencyMultipliers from "./pages/admin/AdminCurrencyMultipliers";
 import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
+import AdminLogs from "./pages/admin/AdminLogs";
 import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
 
 const queryClient = new QueryClient();
@@ -187,6 +189,30 @@ const App = () => (
             } 
           />
           <Route 
+            path="/admin-sara/categories/new" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminCategoryForm />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/categories/new/:parentId" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminCategoryForm />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin-sara/categories/edit/:id" 
+            element={
+              <ProtectedAdminRoute>
+                <AdminCategoryForm />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
             path="/admin-sara/users" 
             element={
               <ProtectedAdminRoute>
@@ -271,6 +297,14 @@ const App = () => (
             element={
               <ProtectedAdminRoute>
                 <AdminWhatsApp />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/logs"
+            element={
+              <ProtectedAdminRoute>
+                <AdminLogs />
               </ProtectedAdminRoute>
             }
           />

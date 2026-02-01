@@ -277,10 +277,11 @@ const Index = () => {
     return defaultInstagramPosts;
   })();
   
-  // Get categories from API - only parent categories (no parentId)
+  // Get categories from API - only parent categories, sorted by display order (1, 2, 3...)
   const categories = apiCategories.length 
     ? apiCategories
         .filter((c: any) => !c.parentId) // Only parent categories
+        .sort((a: any, b: any) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999))
         .map((c: any) => ({
           id: String(c.id),
           slug: c.slug || '',

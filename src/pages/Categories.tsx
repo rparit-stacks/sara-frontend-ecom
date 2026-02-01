@@ -1,12 +1,16 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { categoriesApi } from '@/lib/api';
 
 const Categories = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Fetch categories from API with user email if logged in
   const { data: apiCategories = [], isLoading } = useQuery({
     queryKey: ['categoriesActive'],
@@ -25,9 +29,10 @@ const Categories = () => {
     },
   });
   
-  // Transform categories - only show parent categories (no parentId)
-  const categories = apiCategories
+  // Transform categories - only parent categories, sorted by display order (1, 2, 3...)
+  const allCategories = apiCategories
     .filter((c: any) => !c.parentId) // Only parent categories
+    .sort((a: any, b: any) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999))
     .map((c: any) => ({
       id: String(c.id),
       slug: c.slug || '',
@@ -36,6 +41,14 @@ const Categories = () => {
       count: c.subcategories?.length || 0, // Count of subcategories
       description: c.description || '',
     }));
+
+  // Filter categories by search (resets on page reload via useState)
+  const categories = searchQuery.trim()
+    ? allCategories.filter((c: any) =>
+        (c.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (c.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : allCategories;
 
   if (isLoading) {
     return (
@@ -66,18 +79,40 @@ const Categories = () => {
         </div>
       </section>
 
+      {/* Search */}
+      <section className="w-full py-4 sm:py-6">
+        <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
+          <div className="relative max-w-md mx-auto">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+            <Input
+              placeholder="Search categories..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 sm:pl-10 pr-4 h-10 sm:h-11 text-sm sm:text-base"
+            />
+          </div>
+        </div>
+      </section>
+
       {/* Categories Grid */}
       <section className="w-full py-8 sm:py-14 lg:py-20">
         <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
           {categories.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              No categories available
+              {searchQuery.trim() ? (
+                <>
+                  <p className="text-lg font-medium text-foreground mb-2">No categories found</p>
+                  <p className="text-sm">Try a different search term or clear the search to see all categories.</p>
+                </>
+              ) : (
+                <p>No categories available</p>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 xs:gap-4 sm:gap-6 lg:gap-8">
               {categories.map((category, index) => (
                 <ScrollReveal key={category.id} delay={index * 0.05}>
-                  <Link to={`/category/${category.slug}`} className="group block">
+                  <Link to={`/category/${(category.slug || '').replace(/\s+/g, '-')}`} className="group block">
                     <motion.div
                       whileHover={{ y: -5 }}
                       className="card-floral overflow-hidden"

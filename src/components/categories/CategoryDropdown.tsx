@@ -55,8 +55,19 @@ export const CategoryDropdown = () => {
     };
   }, [isOpen]);
 
-  // Get parent categories only
-  const parentCategories = categories.filter((cat: Category) => !cat.parentId);
+  // Get parent categories only, sorted by display order (1, 2, 3...); sort each category's subcategories too
+  const parentCategories = categories
+    .filter((cat: Category) => !cat.parentId)
+    .sort((a: Category & { displayOrder?: number }, b: Category & { displayOrder?: number }) =>
+      (a.displayOrder ?? 999) - (b.displayOrder ?? 999)
+    )
+    .map((cat: Category & { subcategories?: Category[]; displayOrder?: number }) => ({
+      ...cat,
+      subcategories: (cat.subcategories ?? []).slice().sort(
+        (x: Category & { displayOrder?: number }, y: Category & { displayOrder?: number }) =>
+          (x.displayOrder ?? 999) - (y.displayOrder ?? 999)
+      ),
+    }));
 
   const handleCategoryClick = (category: Category) => {
     navigate(`/category/${category.slug}`);

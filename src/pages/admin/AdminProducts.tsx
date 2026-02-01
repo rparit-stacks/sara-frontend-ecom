@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, Package, ExternalLink, Loader2, Pause, Play, Download, CheckSquare, Square, Copy } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Package, ExternalLink, Loader2, Pause, Play, Download, CheckSquare, Square, Copy, FolderInput } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +34,8 @@ const AdminProducts = () => {
   const [deleteProductId, setDeleteProductId] = useState<number | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
+  const [isBulkCategoryOpen, setIsBulkCategoryOpen] = useState(false);
+  const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
   const [filterType, setFilterType] = useState<'ALL' | ProductType>(() => {
     const typeParam = searchParams.get('type') as ProductType | null;
     return typeParam || 'ALL';
@@ -41,10 +43,10 @@ const AdminProducts = () => {
   
   const queryClient = useQueryClient();
 
-  // Fetch products from API
+  // Fetch products from API (use admin endpoint to include products in personalized categories)
   const { data: products = [], isLoading: productsLoading, error: productsError } = useQuery({
-    queryKey: ['products', filterType],
-    queryFn: () => productsApi.getAll(filterType !== 'ALL' ? { type: filterType } : undefined),
+    queryKey: ['products', 'admin', filterType],
+    queryFn: () => productsApi.getAllAdmin(filterType !== 'ALL' ? { type: filterType } : undefined),
   });
 
   // Fetch plain products (fabrics) for the form dialog
@@ -203,6 +205,22 @@ const AdminProducts = () => {
     },
   });
 
+  // Bulk update category mutation
+  const bulkUpdateCategoryMutation = useMutation({
+    mutationFn: ({ ids, categoryId }: { ids: number[]; categoryId: number }) =>
+      productsApi.bulkUpdateCategory(ids, categoryId),
+    onSuccess: (data: { count: number }) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success(`${data.count} product(s) category updated successfully!`);
+      setIsBulkCategoryOpen(false);
+      setBulkCategoryId('');
+      setSelectedProducts(new Set());
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || 'Failed to update category');
+    },
+  });
+
   // Export mutation
   const exportMutation = useMutation({
     mutationFn: productsApi.exportToExcel,
@@ -215,7 +233,7 @@ const AdminProducts = () => {
   });
 
   // Loading state for admin operations (must be after all mutations are declared)
-  const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || bulkCopyMutation.isPending || exportMutation.isPending;
+  const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || bulkCopyMutation.isPending || bulkUpdateCategoryMutation.isPending || exportMutation.isPending;
 
   // Update filter when URL param changes
   useEffect(() => {
@@ -341,6 +359,24 @@ const AdminProducts = () => {
     bulkCopyMutation.mutate(ids);
   };
 
+  const handleBulkChangeCategory = () => {
+    const ids = Array.from(selectedProducts);
+    if (ids.length === 0) {
+      toast.error('Please select at least one product');
+      return;
+    }
+    setIsBulkCategoryOpen(true);
+  };
+
+  const confirmBulkChangeCategory = () => {
+    if (!bulkCategoryId) {
+      toast.error('Please select a category');
+      return;
+    }
+    const ids = Array.from(selectedProducts);
+    bulkUpdateCategoryMutation.mutate({ ids, categoryId: Number(bulkCategoryId) });
+  };
+
   const handleExport = () => {
     exportMutation.mutate();
   };
@@ -392,7 +428,7 @@ const AdminProducts = () => {
 
   // Global admin loader overlay
   const AdminLoader = () => {
-    const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || bulkCopyMutation.isPending || exportMutation.isPending;
+    const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || bulkCopyMutation.isPending || bulkUpdateCategoryMutation.isPending || exportMutation.isPending;
     
     if (!isLoading) return null;
     
@@ -402,6 +438,7 @@ const AdminProducts = () => {
       if (deleteMutation.isPending || bulkDeleteMutation.isPending) return 'Deleting products...';
       if (toggleStatusMutation.isPending) return 'Updating product status...';
       if (bulkCopyMutation.isPending) return 'Copying products...';
+      if (bulkUpdateCategoryMutation.isPending) return 'Updating category...';
       if (exportMutation.isPending) return 'Exporting products...';
       return 'Processing...';
     };
@@ -475,6 +512,15 @@ const AdminProducts = () => {
                 >
                   <Copy className="w-4 h-4" />
                   Copy ({selectedProducts.size})
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="gap-2"
+                  onClick={handleBulkChangeCategory}
+                  disabled={bulkUpdateCategoryMutation.isPending}
+                >
+                  <FolderInput className="w-4 h-4" />
+                  Change Category ({selectedProducts.size})
                 </Button>
               </motion.div>
             )}
@@ -747,6 +793,41 @@ const AdminProducts = () => {
               >
                 {bulkDeleteMutation.isPending ? 'Deleting...' : 'Delete All'}
               </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Bulk Change Category Dialog */}
+        <AlertDialog open={isBulkCategoryOpen} onOpenChange={(open) => !open && (setIsBulkCategoryOpen(false), setBulkCategoryId(''))}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Change Category for {selectedProducts.size} Product(s)</AlertDialogTitle>
+              <AlertDialogDescription>
+                Select the new category for the selected products. Products can only be moved to leaf categories (subcategories).
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+              <Select value={bulkCategoryId} onValueChange={setBulkCategoryId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoriesForForm.map((cat: any) => (
+                    <SelectItem key={cat.id} value={String(cat.id)}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={bulkUpdateCategoryMutation.isPending}>Cancel</AlertDialogCancel>
+              <Button 
+                onClick={confirmBulkChangeCategory}
+                disabled={!bulkCategoryId || bulkUpdateCategoryMutation.isPending}
+              >
+                {bulkUpdateCategoryMutation.isPending ? 'Updating...' : 'Update Category'}
+              </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

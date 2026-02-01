@@ -16,7 +16,8 @@ import {
   MessageSquare,
   ShoppingBag,
   CreditCard,
-  Percent
+  Percent,
+  Activity
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
@@ -113,6 +114,11 @@ const adminMenuItems = [
     icon: MessageSquare, 
     label: 'Contact Submissions', 
     path: '/admin-sara/contact-submissions' 
+  },
+  { 
+    icon: Activity, 
+    label: 'Logs', 
+    path: '/admin-sara/logs' 
   },
 ];
 

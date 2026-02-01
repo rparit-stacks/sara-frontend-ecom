@@ -5,7 +5,6 @@ import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRight } from 'lucide-react';
 import { blogApi } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -71,19 +70,6 @@ const BlogDetail = () => {
 
   return (
     <Layout>
-      {/* Breadcrumb */}
-      <section className="w-full bg-secondary/30 py-5">
-        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
-          <nav className="flex items-center text-sm text-muted-foreground flex-wrap">
-            <Link to="/" className="hover:text-primary transition-colors">Home</Link>
-            <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
-            <Link to="/blog" className="hover:text-primary transition-colors">Blog</Link>
-            <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
-            <span className="text-foreground truncate">{blog.title}</span>
-          </nav>
-        </div>
-      </section>
-
       {/* Blog Content */}
       <section className="w-full py-14 lg:py-20">
         <div className="max-w-4xl mx-auto px-6 lg:px-12">

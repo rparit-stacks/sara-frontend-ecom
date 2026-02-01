@@ -1,8 +1,16 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Heart, ShoppingBag, Share2, Minus, Plus, ChevronRight, Download, Palette, Package, FileJson, IndianRupee, Video, Loader2, Calculator, ZoomIn, X } from 'lucide-react';
+import { Heart, ShoppingBag, Share2, Minus, Plus, Download, Palette, Package, FileJson, IndianRupee, Video, Loader2, Calculator, ZoomIn, X } from 'lucide-react';
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
@@ -56,6 +64,24 @@ const ProductDetail = () => {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { format } = usePrice();
+  const navigate = useNavigate();
+  
+  // Get cartItemId from URL params for pre-loading selections
+  const cartItemIdParam = searchParams.get('cartItemId');
+  const isLoggedIn = typeof window !== 'undefined' && !!localStorage.getItem('authToken');
+  
+  // Fetch cart data if cartItemId is provided
+  const { data: cartData } = useQuery({
+    queryKey: ['cart-preload', cartItemIdParam],
+    queryFn: () => cartApi.getCart(),
+    enabled: !!cartItemIdParam && isLoggedIn,
+  });
+  
+  // Find the specific cart item for pre-loading
+  const cartItemForPreload = useMemo(() => {
+    if (!cartData || !cartItemIdParam) return null;
+    return cartData.items?.find((item: any) => item.id === Number(cartItemIdParam));
+  }, [cartData, cartItemIdParam]);
   
   // Fetch product by slug or by id (All Products links use slug || id; id used when slug missing)
   const { data: apiProduct, isLoading: productLoading, error: productError } = useQuery({
@@ -273,6 +299,64 @@ const ProductDetail = () => {
     // For regular DESIGNED products, use ONLY product recommended fabrics (never config)
     return product?.recommendedPlainProductIds || [];
   }, [isCustomProduct, customConfig?.recommendedFabricIds, product?.recommendedPlainProductIds]);
+  
+  // Pre-load selections from cart item if cartItemId is provided
+  useEffect(() => {
+    if (cartItemForPreload && product) {
+      // Pre-load fabric selection for DESIGNED products
+      if (cartItemForPreload.fabricId) {
+        setSelectedFabricId(String(cartItemForPreload.fabricId));
+      }
+      
+      // Pre-load variant selections
+      if (cartItemForPreload.variantSelections) {
+        const variantMap: Record<string, string> = {};
+        Object.entries(cartItemForPreload.variantSelections).forEach(([key, selection]: [string, any]) => {
+          if (selection.optionId) {
+            variantMap[selection.variantId || key] = String(selection.optionId);
+          }
+        });
+        setSelectedVariants(variantMap);
+      } else if (cartItemForPreload.variants) {
+        setSelectedVariants(cartItemForPreload.variants);
+      }
+      
+      // Pre-load custom field values
+      if (cartItemForPreload.customFormData) {
+        const fieldValues: Record<string, string | File | null> = {};
+        Object.entries(cartItemForPreload.customFormData).forEach(([key, value]) => {
+          if (key !== 'fabricMeters' && !key.startsWith('_')) {
+            fieldValues[key] = value as string;
+          }
+        });
+        setCustomFieldValues(fieldValues);
+      }
+      
+      // Pre-load quantity
+      if (cartItemForPreload.quantity) {
+        setQuantity(cartItemForPreload.quantity);
+        setFabricQuantity(cartItemForPreload.quantity);
+      }
+      
+      // Pre-load fabric variants and custom fields if available
+      if (cartItemForPreload.customFormData) {
+        const fabricVariants: Record<string, string> = {};
+        const fabricCustomFields: Record<string, string> = {};
+        
+        Object.entries(cartItemForPreload.customFormData).forEach(([key, value]) => {
+          // This is a simplified approach - in reality, we'd need to distinguish
+          // between fabric variants and fabric custom fields
+          if (key.startsWith('fabric_')) {
+            fabricCustomFields[key] = value as string;
+          }
+        });
+        
+        if (Object.keys(fabricCustomFields).length > 0) {
+          setFabricCustomFieldValues(fabricCustomFields);
+        }
+      }
+    }
+  }, [cartItemForPreload, product]);
   
   // Update custom form fields when config loads - ONLY for custom products
   useEffect(() => {
@@ -529,13 +613,14 @@ const ProductDetail = () => {
     return true;
   };
 
-  // Add to cart mutation (for logged-in users)
+  // Add to cart mutation (for logged-in users) – redirect to Cart page (no popup)
   const addToCartMutation = useMutation({
     mutationFn: (cartData: any) => cartApi.addItem(cartData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cart'] });
       queryClient.invalidateQueries({ queryKey: ['cart-count'] });
       toast.success('Product added to cart!');
+      navigate('/cart');
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to add product to cart');
@@ -576,9 +661,6 @@ const ProductDetail = () => {
     }
   }, [displayImages.length]);
   
-  // Check if user is logged in
-  const isLoggedIn = !!localStorage.getItem('authToken');
-
   // Wishlist mutations
   const addToWishlistMutation = useMutation({
     mutationFn: () => wishlistApi.addItem(productType, productId!),
@@ -732,8 +814,8 @@ const ProductDetail = () => {
     if (!isLoggedIn) {
       guestCart.addItem(cartData);
       toast.success('Product added to cart!');
-      // Trigger a custom event to update cart count in navbar
       window.dispatchEvent(new Event('guestCartUpdated'));
+      navigate('/cart');
     } else {
       addToCartMutation.mutate(cartData);
     }
@@ -807,8 +889,8 @@ const ProductDetail = () => {
     if (!isLoggedIn) {
       guestCart.addItem(cartData);
       toast.success('Product added to cart!');
-      // Trigger a custom event to update cart count in navbar
       window.dispatchEvent(new Event('guestCartUpdated'));
+      navigate('/cart');
     } else {
       addToCartMutation.mutate(cartData);
     }
@@ -840,6 +922,7 @@ const ProductDetail = () => {
       guestCart.addItem(cartData);
       toast.success('Digital product added to cart!');
       window.dispatchEvent(new Event('guestCartUpdated'));
+      navigate('/cart');
     } else {
       addToCartMutation.mutate(cartData);
     }
@@ -937,18 +1020,38 @@ const ProductDetail = () => {
 
   return (
     <Layout>
-      {/* Breadcrumb */}
-      <section className="w-full bg-secondary/30 py-3 sm:py-5">
+      {/* Breadcrumb: Home > Categories > Category > Product */}
+      <section className="w-full bg-secondary/30 py-3 sm:py-4">
         <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
-          <nav className="flex items-center text-xs sm:text-sm text-muted-foreground flex-wrap gap-1 sm:gap-0">
-            <Link to="/" className="hover:text-primary transition-colors">Home</Link>
-            <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
-            <Link to="/products" className="hover:text-primary transition-colors">Products</Link>
-            <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
-            <Link to={`/category/${product.category.toLowerCase()}`} className="hover:text-primary transition-colors">{product.category}</Link>
-            <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
-            <span className="text-foreground truncate">{product.name}</span>
-          </nav>
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link to="/">Home</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link to="/categories">Categories</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              {product?.category && (
+                <>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink asChild>
+                      <Link to="/categories">{product.category}</Link>
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                </>
+              )}
+              <BreadcrumbItem>
+                <BreadcrumbPage className="truncate max-w-[180px] sm:max-w-none">{product?.name || 'Product'}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
         </div>
       </section>
 

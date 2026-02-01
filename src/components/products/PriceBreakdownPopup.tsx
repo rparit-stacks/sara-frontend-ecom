@@ -12,12 +12,14 @@ interface PriceBreakdownPopupProps {
     productType: string;
     productName: string;
     productId?: number;
+    fabricId?: number;
     designPrice?: number;
     fabricPrice?: number;
     unitPrice?: number;
     totalPrice?: number;
     quantity: number;
     variants?: Record<string, string>;
+    variantSelections?: Record<string, { variantId?: number | string; optionId?: number | string; variantName?: string; optionName?: string; optionValue?: string; priceModifier?: number }>;
     pricePerMeter?: number;
     basePrice?: number;
     customFormData?: Record<string, any>;
@@ -56,11 +58,18 @@ export const PriceBreakdownPopup = ({
 }: PriceBreakdownPopupProps) => {
   const { format } = usePrice();
   
-  // Fetch product data for cart items to get variant details
+  // Fetch print product data for cart items to get variant details
   const { data: fetchedProductData } = useQuery({
     queryKey: ['product-for-breakdown', item.productId],
     queryFn: () => productsApi.getById(item.productId!),
     enabled: open && !productData && !!item.productId,
+  });
+
+  // Fetch fabric product for DESIGNED cart items (for fabric variant breakdown)
+  const { data: fabricProductData } = useQuery({
+    queryKey: ['fabric-for-breakdown', item.fabricId],
+    queryFn: () => productsApi.getById(item.fabricId!),
+    enabled: open && item.productType === 'DESIGNED' && !!item.fabricId,
   });
 
   const effectiveProductData = productData || fetchedProductData;
@@ -75,38 +84,84 @@ export const PriceBreakdownPopup = ({
       if (item.designPrice !== undefined && item.fabricPrice !== undefined) {
         const designPrice = Number(item.designPrice) || 0;
         const fabricPrice = Number(item.fabricPrice) || 0;
-        const quantity = item.quantity || 1;  // Meters
+        const quantity = item.quantity || 1;  // Meters - source of truth for display
         const storedTotalPrice = Number(item.totalPrice) || 0;
         const storedUnitPrice = Number(item.unitPrice) || 0;
-        const fabricMeters = item.customFormData?.fabricMeters ?? quantity;
-        
+
+        const printVariantIds = new Set(
+          (effectiveProductData?.variants || []).map((v: any) => String(v.id))
+        );
+        const fabricVariantIds = new Set(
+          (fabricProductData?.variants || []).map((v: any) => String(v.id))
+        );
+
+        const printVariantLines: { variantName: string; optionLabel: string; priceModifier: number }[] = [];
+        const fabricVariantLines: { variantName: string; optionLabel: string; priceModifier: number }[] = [];
         let printVariantModifier = 0;
-        if (effectiveProductData && effectiveProductData.variants && item.variants) {
-          effectiveProductData.variants.forEach((variant: any) => {
-            const selectedValue = item.variants[String(variant.id)];
-            if (selectedValue && variant.options) {
-              const selectedOption = variant.options.find((opt: any) =>
-                String(opt.id) === selectedValue || opt.value === selectedValue
+        let fabricVariantModifier = 0;
+
+        const selections = item.variantSelections ? Object.entries(item.variantSelections) : [];
+        for (const [, selection] of selections) {
+          if (!selection || typeof selection !== 'object') continue;
+          const variantId = selection.variantId != null ? String(selection.variantId) : '';
+          const priceMod = Number(selection.priceModifier) || 0;
+          const variantName = selection.variantName || 'Variant';
+          const optionLabel = selection.optionName || selection.optionValue || '—';
+          if (printVariantIds.has(variantId)) {
+            printVariantModifier += priceMod;
+            printVariantLines.push({ variantName, optionLabel, priceModifier: priceMod });
+          } else if (fabricVariantIds.has(variantId)) {
+            fabricVariantModifier += priceMod;
+            fabricVariantLines.push({ variantName, optionLabel, priceModifier: priceMod });
+          }
+        }
+
+        if (printVariantLines.length === 0 && effectiveProductData?.variants && (item.variants || item.variantSelections)) {
+          const variantMap: Record<string, string> = {};
+          if (item.variants) Object.assign(variantMap, item.variants);
+          else if (item.variantSelections) {
+            effectiveProductData.variants.forEach((v: any) => {
+              const sel = Object.values(item.variantSelections || {}).find(
+                (s: any) => s && String(s.variantId) === String(v.id)
               );
-              if (selectedOption && selectedOption.priceModifier) {
-                printVariantModifier += Number(selectedOption.priceModifier);
-              }
+              if (sel?.optionId != null) variantMap[String(v.id)] = String(sel.optionId);
+              else if (sel?.optionValue != null) variantMap[String(v.id)] = sel.optionValue;
+            });
+          }
+          effectiveProductData.variants.forEach((variant: any) => {
+            const selectedValue = variantMap[String(variant.id)];
+            if (!selectedValue || !variant.options) return;
+            const selectedOption = variant.options.find((opt: any) =>
+              String(opt.id) === selectedValue || opt.value === selectedValue
+            );
+            if (selectedOption) {
+              const mod = Number(selectedOption.priceModifier) || 0;
+              printVariantModifier += mod;
+              printVariantLines.push({
+                variantName: variant.name || 'Variant',
+                optionLabel: selectedOption.value || selectedOption.name || '—',
+                priceModifier: mod,
+              });
             }
           });
         }
+
         const printPerMeter = designPrice + printVariantModifier;
         const unitPrice = storedUnitPrice || (fabricPrice / quantity + printPerMeter);
         const totalPrice = storedTotalPrice || unitPrice * quantity;
-        
+
         return {
           basePrice: designPrice,
           fabricPrice: fabricPrice,
           printVariantModifier: printVariantModifier,
+          printVariantLines,
+          fabricVariantLines,
+          fabricVariantModifier,
           printTotal: printPerMeter,
           quantity: quantity,
           unitPrice: unitPrice,
           totalPrice: totalPrice,
-          fabricMeters: fabricMeters != null ? Number(fabricMeters) : quantity,
+          fabricMeters: quantity, // Always use cart quantity (meters) for display
           fabricBasePricePerMeter: quantity > 0 ? fabricPrice / quantity : undefined,
         };
       }
@@ -117,15 +172,22 @@ export const PriceBreakdownPopup = ({
         const beforeSlab = Number(fabricPricePerMeter) || 0;
         const afterSlab = (finalFabricPricePerMeter != null ? Number(finalFabricPricePerMeter) : null) ?? beforeSlab;
         const meters = fabricQuantity ?? item.quantity ?? 1;
-        
+
+        const printVariantLines: { variantName: string; optionLabel: string; priceModifier: number }[] = [];
         let printVariantModifier = 0;
         if (productData.variants && selectedVariants) {
           productData.variants.forEach((variant: any) => {
             const selectedOptionId = selectedVariants[String(variant.id)];
             if (selectedOptionId && variant.options) {
               const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
-              if (selectedOption && selectedOption.priceModifier) {
-                printVariantModifier += Number(selectedOption.priceModifier);
+              if (selectedOption) {
+                const mod = Number(selectedOption.priceModifier) || 0;
+                printVariantModifier += mod;
+                printVariantLines.push({
+                  variantName: variant.name || 'Variant',
+                  optionLabel: selectedOption.value || selectedOption.name || '—',
+                  priceModifier: mod,
+                });
               }
             }
           });
@@ -134,13 +196,15 @@ export const PriceBreakdownPopup = ({
         const fabricTotalPrice = afterSlab * meters;
         const unitPrice = item.unitPrice != null ? Number(item.unitPrice) : (afterSlab + printPerMeter);
         const totalPrice = item.totalPrice != null ? Number(item.totalPrice) : unitPrice * meters;
-        
+
         return {
           basePrice: designPrice,
           fabricPrice: fabricTotalPrice,
           fabricBasePricePerMeter: afterSlab,
           fabricPricePerMeterBeforeSlab: discountAmount != null && discountAmount > 0 ? beforeSlab : undefined,
           printVariantModifier: printVariantModifier,
+          printVariantLines,
+          fabricVariantLines: [],
           printTotal: printPerMeter,
           quantity: meters,
           unitPrice: unitPrice,
@@ -271,6 +335,14 @@ export const PriceBreakdownPopup = ({
                       <span>{format(breakdown.fabricBasePricePerMeter)}/m</span>
                     </div>
                   )}
+                  {(breakdown as any).fabricVariantLines?.length > 0 && (
+                    (breakdown as any).fabricVariantLines.map((line: { variantName: string; optionLabel: string; priceModifier: number }, idx: number) => (
+                      <div key={idx} className="flex justify-between pl-2 text-muted-foreground">
+                        <span>{line.variantName}: {line.optionLabel}</span>
+                        <span>{line.priceModifier !== 0 ? (line.priceModifier > 0 ? '+' : '') + format(line.priceModifier) : '—'}</span>
+                      </div>
+                    ))
+                  )}
                   {breakdown.fabricMeters != null && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Meters</span>
@@ -289,15 +361,28 @@ export const PriceBreakdownPopup = ({
                 <div className="space-y-2 pt-3 border-t border-border/30">
                   <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Print / Design</div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Print per meter</span>
-                    <span>{format(breakdown.printTotal ?? breakdown.basePrice)}/m</span>
+                    <span className="text-muted-foreground">Print base (per m)</span>
+                    <span>{format(breakdown.basePrice)}/m</span>
                   </div>
-                  {breakdown.printVariantModifier != null && breakdown.printVariantModifier !== 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Print variant</span>
-                      <span>{breakdown.printVariantModifier > 0 ? '+' : ''}{format(breakdown.printVariantModifier)}</span>
-                    </div>
+                  {(breakdown as any).printVariantLines?.length > 0 ? (
+                    (breakdown as any).printVariantLines.map((line: { variantName: string; optionLabel: string; priceModifier: number }, idx: number) => (
+                      <div key={idx} className="flex justify-between pl-2">
+                        <span className="text-muted-foreground">{line.variantName}: {line.optionLabel}</span>
+                        <span>{line.priceModifier !== 0 ? (line.priceModifier > 0 ? '+' : '') + format(line.priceModifier) : '—'}</span>
+                      </div>
+                    ))
+                  ) : (
+                    breakdown.printVariantModifier != null && breakdown.printVariantModifier !== 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Variant modifier</span>
+                        <span>{breakdown.printVariantModifier > 0 ? '+' : ''}{format(breakdown.printVariantModifier)}</span>
+                      </div>
+                    )
                   )}
+                  <div className="flex justify-between font-medium pt-0.5">
+                    <span className="text-muted-foreground">Print total (per m)</span>
+                    <span className="text-primary">{format(breakdown.printTotal ?? breakdown.basePrice)}/m</span>
+                  </div>
                 </div>
 
                 {/* PER METER TOTAL & METERS */}

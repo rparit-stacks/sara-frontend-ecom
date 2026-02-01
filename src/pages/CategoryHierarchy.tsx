@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Grid, List, Search, Loader2, ArrowLeft } from 'lucide-react';
@@ -8,6 +8,14 @@ import ProductCard, { Product } from '@/components/products/ProductCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { categoriesApi, productsApi } from '@/lib/api';
 
 const CategoryHierarchy = () => {
@@ -16,6 +24,7 @@ const CategoryHierarchy = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState('featured');
   const [searchQuery, setSearchQuery] = useState('');
+  const [subcategorySearchQuery, setSubcategorySearchQuery] = useState('');
   
   // Parse slug path: "men/shirts/formal-shirts"
   const slugPath = params['*'] || '';
@@ -45,6 +54,11 @@ const CategoryHierarchy = () => {
           'Content-Type': 'application/json',
         },
       });
+      // #region agent log
+      if (!response.ok) {
+        fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'CategoryHierarchy.tsx:fetch-fail', message: 'Category fetch failed', data: { slugPath, status: response.status }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1,H4' }) }).catch(() => {});
+      }
+      // #endregion
       if (!response.ok) throw new Error('Failed to fetch category');
       return response.json();
     },
@@ -70,17 +84,42 @@ const CategoryHierarchy = () => {
     isNew: p.isNew,
     isSale: p.isSale,
     rating: p.rating || 4,
+    createdAt: p.createdAt,
   }));
   
   // Filter products by search query
-  const filteredProducts = products.filter(product =>
+  let filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchQuery.toLowerCase())
+    (product.category || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Apply sorting
+  filteredProducts = [...filteredProducts].sort((a, b) => {
+    switch (sortBy) {
+      case 'newest':
+        const aDate = (a as any).createdAt ? new Date((a as any).createdAt).getTime() : 0;
+        const bDate = (b as any).createdAt ? new Date((b as any).createdAt).getTime() : 0;
+        return bDate - aDate;
+      case 'price-low':
+        return a.price - b.price;
+      case 'price-high':
+        return b.price - a.price;
+      default:
+        return 0;
+    }
+  });
+
+  // Check if category has subcategories; sort by display order (1, 2, 3...)
+  const subcategories = [...(category?.subcategories || [])].sort(
+    (a: any, b: any) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999)
+  );
+  const hasSubcategories = subcategories.length > 0;
   
-  // Check if category has subcategories
-  const hasSubcategories = category?.subcategories && category.subcategories.length > 0;
-  const subcategories = category?.subcategories || [];
+  // Filter subcategories by search query
+  const filteredSubcategories = subcategories.filter((sub: any) =>
+    sub.name?.toLowerCase().includes(subcategorySearchQuery.toLowerCase()) ||
+    sub.description?.toLowerCase().includes(subcategorySearchQuery.toLowerCase())
+  );
   
   // Build breadcrumb path from slugs
   const getBreadcrumbPath = (upToIndex: number): string => {
@@ -88,6 +127,13 @@ const CategoryHierarchy = () => {
     const pathSlugs = slugParts.slice(0, upToIndex + 1);
     return '/category/' + pathSlugs.join('/');
   };
+
+  // Breadcrumb items: Home > Categories > [each level] > current
+  const breadcrumbItems = slugParts.map((slug, idx) => {
+    const path = getBreadcrumbPath(idx);
+    const name = idx === slugParts.length - 1 && category?.name ? category.name : slug.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+    return { name, path, isLast: idx === slugParts.length - 1 };
+  });
 
   if (categoryLoading) {
     return (
@@ -100,6 +146,9 @@ const CategoryHierarchy = () => {
   }
 
   if (!category) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'CategoryHierarchy.tsx:not-found', message: 'Category not found', data: { slugPath, userEmail: !!userEmail }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H4' }) }).catch(() => {});
+    // #endregion
     return (
       <Layout>
         <div className="text-center py-12">
@@ -119,29 +168,35 @@ const CategoryHierarchy = () => {
       <section className="w-full bg-secondary/30 py-8 sm:py-12 lg:py-16 xl:py-20">
         <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
           <ScrollReveal>
-            <nav className="text-xs xs:text-sm text-muted-foreground mb-3 xs:mb-4 flex flex-wrap gap-1 sm:gap-0 items-center">
-              <Link to="/" className="hover:text-primary">Home</Link>
-              <span className="mx-1 sm:mx-2">/</span>
-              <Link to="/categories" className="hover:text-primary">Categories</Link>
-              {slugParts.map((slug, idx) => {
-                // Find category name for this slug
-                let categoryName = slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                if (idx === slugParts.length - 1 && category?.name) {
-                  categoryName = category.name;
-                }
-                return (
-                  <span key={idx}>
-                    <span className="mx-1 sm:mx-2">/</span>
-                    <Link 
-                      to={getBreadcrumbPath(idx)}
-                      className={idx === slugParts.length - 1 ? 'text-foreground' : 'hover:text-primary'}
-                    >
-                      {categoryName}
-                    </Link>
-                  </span>
-                );
-              })}
-            </nav>
+            <Breadcrumb className="mb-3 xs:mb-4">
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link to="/">Home</Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link to="/categories">Categories</Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                {breadcrumbItems.map((item, idx) => (
+                  <React.Fragment key={idx}>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      {item.isLast ? (
+                        <BreadcrumbPage>{item.name}</BreadcrumbPage>
+                      ) : (
+                        <BreadcrumbLink asChild>
+                          <Link to={item.path}>{item.name}</Link>
+                        </BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                  </React.Fragment>
+                ))}
+              </BreadcrumbList>
+            </Breadcrumb>
             <div className="flex items-center gap-4 mb-4">
               {category.image && (
                 <img 
@@ -198,8 +253,35 @@ const CategoryHierarchy = () => {
                   </Button>
                 </div>
               )}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-                {subcategories.map((sub: any, index: number) => (
+              
+              {/* Subcategory Search */}
+              <div className="mb-6">
+                <div className="relative max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    type="text"
+                    placeholder="Search subcategories..."
+                    value={subcategorySearchQuery}
+                    onChange={(e) => setSubcategorySearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {filteredSubcategories.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No subcategories found matching "{subcategorySearchQuery}"</p>
+                  <Button 
+                    variant="link" 
+                    onClick={() => setSubcategorySearchQuery('')}
+                    className="mt-2"
+                  >
+                    Clear search
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                  {filteredSubcategories.map((sub: any, index: number) => (
                   <ScrollReveal key={sub.id} delay={index * 0.05}>
                     <Link 
                       to={`/category/${slugPath ? slugPath + '/' : ''}${sub.slug}`} 
@@ -224,7 +306,8 @@ const CategoryHierarchy = () => {
                     </Link>
                   </ScrollReveal>
                 ))}
-              </div>
+                </div>
+              )}
             </div>
           ) : filteredProducts.length === 0 && !hasSubcategories ? (
             // Empty category - no products and no subcategories
@@ -295,11 +378,23 @@ const CategoryHierarchy = () => {
               ) : filteredProducts.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="max-w-md mx-auto">
-                    <p className="text-lg font-semibold text-foreground mb-2">No products available in this category.</p>
-                    <p className="text-muted-foreground mb-4">This category currently has no products.</p>
-                    <Link to="/categories">
-                      <Button variant="outline">Browse Other Categories</Button>
-                    </Link>
+                    <p className="text-lg font-semibold text-foreground mb-2">
+                      {searchQuery.trim() ? 'No products found' : 'No products available in this category.'}
+                    </p>
+                    <p className="text-muted-foreground mb-4">
+                      {searchQuery.trim()
+                        ? 'Try a different search term or clear the search to see all products.'
+                        : 'This category currently has no products.'}
+                    </p>
+                    {searchQuery.trim() ? (
+                      <Button variant="outline" onClick={() => setSearchQuery('')}>
+                        Clear search
+                      </Button>
+                    ) : (
+                      <Link to="/categories">
+                        <Button variant="outline">Browse Other Categories</Button>
+                      </Link>
+                    )}
                   </div>
                 </div>
               ) : (

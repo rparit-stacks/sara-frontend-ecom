@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Calendar, User, ArrowRight, ChevronRight, Loader2 } from 'lucide-react';
+import { Calendar, User, ArrowRight, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
@@ -37,17 +37,6 @@ const Blog = () => {
 
   return (
     <Layout>
-      {/* Breadcrumb */}
-      <section className="w-full bg-secondary/30 py-5">
-        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
-          <nav className="flex items-center text-sm text-muted-foreground flex-wrap">
-            <Link to="/" className="hover:text-primary transition-colors">Home</Link>
-            <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
-            <span className="text-foreground">Blog</span>
-          </nav>
-        </div>
-      </section>
-
       {/* Header */}
       <section className="w-full py-14 lg:py-20">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-12">

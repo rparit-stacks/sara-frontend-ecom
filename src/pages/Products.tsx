@@ -118,29 +118,33 @@ const Products = () => {
     },
   });
 
-  // Transform categories to include subcategories
+  // Transform categories: parents and subcategories sorted by display order (1, 2, 3...)
   const categories: Category[] = useMemo(() => {
     const cats = apiCategories.map((c: any) => ({
       id: c.id,
       name: c.name,
       slug: c.slug,
       parentId: c.parentId,
-      subcategories: c.subcategories?.map((sub: any) => ({
+      displayOrder: c.displayOrder,
+      subcategories: (c.subcategories?.map((sub: any) => ({
         id: sub.id,
         name: sub.name,
         slug: sub.slug,
         parentId: sub.parentId,
-      })) || [],
+        displayOrder: sub.displayOrder,
+      })) ?? []).sort((a: any, b: any) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999)),
     }));
 
-    // Separate parent and child categories
-    const parentCategories = cats.filter(c => !c.parentId);
+    // Separate parent and child categories; sort parents by display order
+    const parentCategories = cats.filter(c => !c.parentId).sort((a: any, b: any) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999));
     const childCategories = cats.filter(c => c.parentId);
 
-    // Attach subcategories to parents
+    // Attach subcategories to parents (each parent's subcategories already sorted above when from API; when rebuilt from children, sort by displayOrder)
     return parentCategories.map(parent => ({
       ...parent,
-      subcategories: childCategories.filter(sub => sub.parentId === parent.id),
+      subcategories: childCategories
+        .filter((sub: any) => sub.parentId === parent.id)
+        .sort((a: any, b: any) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999)),
     }));
   }, [apiCategories]);
   
@@ -157,6 +161,7 @@ const Products = () => {
     isNew: p.isNew,
     isSale: p.isSale,
     rating: p.rating || 4,
+    createdAt: p.createdAt,
   }));
   
   // IDs explicitly marked in CMS (admin selection)
@@ -253,18 +258,22 @@ const Products = () => {
         if (selectedPriceRange.max === null) {
           return price >= selectedPriceRange.min;
         }
-        // Handle ₹401-₹500 range correctly (inclusive on both ends)
-        if (selectedPriceRange.min === 401 && selectedPriceRange.max === 500) {
-          return price >= 401 && price <= 500;
+        // "Under ₹300" uses strict less-than; other ranges are inclusive
+        if (selectedPriceRange.min === 0 && selectedPriceRange.max === 300) {
+          return price < 300;
         }
-        return price >= selectedPriceRange.min && price < selectedPriceRange.max;
+        return price >= selectedPriceRange.min && price <= selectedPriceRange.max;
       });
     }
 
     // Sort products
     switch (sortBy) {
       case 'newest':
-        filtered = [...filtered].sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+        filtered = [...filtered].sort((a, b) => {
+          const aDate = (a as any).createdAt ? new Date((a as any).createdAt).getTime() : 0;
+          const bDate = (b as any).createdAt ? new Date((b as any).createdAt).getTime() : 0;
+          return bDate - aDate;
+        });
         break;
       case 'price-low':
         filtered = [...filtered].sort((a, b) => a.price - b.price);

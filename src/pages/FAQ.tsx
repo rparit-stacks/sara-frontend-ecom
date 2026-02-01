@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Search, ChevronRight } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
@@ -59,17 +59,6 @@ const FAQ = () => {
 
   return (
     <Layout>
-      {/* Breadcrumb */}
-      <section className="w-full bg-secondary/30 py-5">
-        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
-          <nav className="flex items-center text-sm text-muted-foreground flex-wrap">
-            <Link to="/" className="hover:text-primary transition-colors">Home</Link>
-            <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
-            <span className="text-foreground">FAQ</span>
-          </nav>
-        </div>
-      </section>
-
       <section className="bg-secondary/30 py-16 md:py-24">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-12 text-center">
           <ScrollReveal>

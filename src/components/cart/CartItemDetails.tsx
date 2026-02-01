@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { productsApi } from '@/lib/api';
 import { usePrice } from '@/lib/currency';
-import { Loader2 } from 'lucide-react';
+import { Loader2, FileText, ExternalLink } from 'lucide-react';
 
 interface CartItemDetailsProps {
   item: {
@@ -10,7 +10,7 @@ interface CartItemDetailsProps {
     fabricId?: number;
     quantity: number;
     variants?: Record<string, string>;
-    variantSelections?: Record<string, { variantName?: string; optionValue?: string }>;
+    variantSelections?: Record<string, { variantName?: string; optionValue?: string; optionName?: string }>;
     customFormData?: Record<string, any>;
     designPrice?: number;
     fabricPrice?: number;
@@ -18,25 +18,62 @@ interface CartItemDetailsProps {
   };
 }
 
+// Helper function to format field names
+const formatFieldName = (key: string): string => {
+  // Remove 'field-' prefix if present
+  const cleaned = key.replace(/^field-/, '');
+  // Convert camelCase or snake_case to Title Case
+  return cleaned
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, l => l.toUpperCase())
+    .trim();
+};
+
+// Helper function to format field values
+const formatFieldValue = (value: any): string => {
+  if (value === null || value === undefined) return 'N/A';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+};
+
+// Helper function to check if value is a URL
+const isUrl = (value: any): boolean => {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+// Helper function to map field IDs to labels
+const getFieldLabel = (fieldId: string, fields: any[]): string => {
+  const field = fields.find((f: any) => String(f.id) === fieldId);
+  return field?.label || field?.name || formatFieldName(fieldId);
+};
+
 export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
   const isCustom = item.productType === 'CUSTOM';
   const { format } = usePrice();
 
-  // Fetch product details (skip for CUSTOM - catalog product not used)
-  const { data: productData, isLoading: productLoading } = useQuery({
-    queryKey: ['product-details', item.productId],
+  // Fetch print product details (DESIGNED products)
+  const { data: printProductData, isLoading: printProductLoading } = useQuery({
+    queryKey: ['print-product-details', item.productId],
     queryFn: () => productsApi.getById(item.productId),
-    enabled: !!item.productId && !isCustom,
+    enabled: item.productType === 'DESIGNED' && !!item.productId,
   });
 
-  // Fetch fabric details for DESIGNED or CUSTOM with fabricId
+  // Fetch fabric details for print products (DESIGNED or CUSTOM with fabric)
   const { data: fabricData, isLoading: fabricLoading } = useQuery({
     queryKey: ['fabric-details', item.fabricId],
     queryFn: () => productsApi.getById(item.fabricId!),
     enabled: !!item.fabricId && (item.productType === 'DESIGNED' || isCustom),
   });
 
-  if (productLoading || fabricLoading) {
+  if ((fabricLoading || printProductLoading) && (item.productType === 'DESIGNED' || isCustom)) {
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Loader2 className="w-3 h-3 animate-spin" />
@@ -45,180 +82,310 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
     );
   }
 
-  // Get product variant display names
-  const getProductVariantDisplay = () => {
-    if (!item.variants || !productData?.variants) return null;
+  const isPrintProduct = item.productType === 'DESIGNED' || isCustom;
+  const totalMeters = item.quantity; // Always use cart item quantity as source of truth
 
-    const variantDisplays: string[] = [];
+  // Get fabric custom field IDs
+  const fabricFieldIds = new Set(
+    (fabricData?.customFields || []).map((f: any) => String(f.id))
+  );
+
+  // Get print custom field IDs
+  const printFieldIds = new Set(
+    (printProductData?.customFields || []).map((f: any) => String(f.id))
+  );
+
+  // Separate custom form data into fabric and print
+  const fabricCustomFields: Record<string, any> = {};
+  const printCustomFields: Record<string, any> = {};
+
+  Object.entries(item.customFormData || {}).forEach(([key, value]) => {
+    // Skip internal fields
+    if (key === 'fabricMeters' || key.startsWith('_')) return;
+    // Skip null/undefined/empty values
+    if (value === null || value === undefined) return;
+    if (typeof value === 'string' && value.trim() === '') return;
     
-    productData.variants.forEach((variant: any) => {
-      const selectedValue = item.variants[String(variant.id)];
-      if (selectedValue && variant.options) {
-        // Try to find option by ID or value
-        const selectedOption = variant.options.find((opt: any) => 
-          String(opt.id) === selectedValue || opt.value === selectedValue
-        );
-        if (selectedOption) {
-          variantDisplays.push(`${variant.name}: ${selectedOption.value}`);
-        } else {
-          // Fallback to just show the value
-          variantDisplays.push(`${variant.name}: ${selectedValue}`);
-        }
-      }
-    });
+    if (fabricFieldIds.has(key)) {
+      fabricCustomFields[key] = value;
+    } else if (printFieldIds.has(key)) {
+      printCustomFields[key] = value;
+    } else {
+      // Fallback: if can't determine, assume print
+      printCustomFields[key] = value;
+    }
+  });
 
-    return variantDisplays.length > 0 ? variantDisplays : null;
-  };
+  // Get fabric variant IDs
+  const fabricVariantIds = new Set(
+    (fabricData?.variants || []).map((v: any) => String(v.id))
+  );
 
-  // Get fabric variant display names (DESIGNED or CUSTOM with fabric)
-  const getFabricVariantDisplay = () => {
-    if (!fabricData?.variants || (item.productType !== 'DESIGNED' && !isCustom)) return null;
-    const v = item.variants;
-    if (!v || !Object.keys(v).length) return null;
+  // Get print variant IDs  
+  const printVariantIds = new Set(
+    (printProductData?.variants || []).map((v: any) => String(v.id))
+  );
 
-    const variantDisplays: string[] = [];
-    fabricData.variants.forEach((variant: any) => {
-      const selectedValue = v[String(variant.id)];
-      if (selectedValue && variant.options) {
-        const selectedOption = variant.options.find((opt: any) =>
-          String(opt.id) === selectedValue || opt.value === selectedValue
-        );
-        if (selectedOption) {
-          variantDisplays.push(`${variant.name}: ${selectedOption.value}`);
-        } else {
-          variantDisplays.push(`${variant.name}: ${selectedValue}`);
-        }
-      }
-    });
+  // Separate variant selections into fabric and print
+  const fabricVariants: any[] = [];
+  const printVariants: any[] = [];
 
-    return variantDisplays.length > 0 ? variantDisplays : null;
-  };
+  Object.entries(item.variantSelections || {}).forEach(([key, selection]: [string, any]) => {
+    const variantId = selection.variantId || key;
+    
+    if (fabricVariantIds.has(String(variantId))) {
+      fabricVariants.push([key, selection]);
+    } else if (printVariantIds.has(String(variantId))) {
+      printVariants.push([key, selection]);
+    } else {
+      // Fallback: assume print
+      printVariants.push([key, selection]);
+    }
+  });
 
-  // Variant display from structured variantSelections (CUSTOM and DESIGNED)
-  const variantSelectionsDisplays = (() => {
-    const vs = item.variantSelections;
-    if (!vs || !Object.keys(vs).length) return null;
-    const arr = Object.values(vs)
-      .filter((s): s is { variantName?: string; optionValue?: string } => s != null && (s.variantName != null || s.optionValue != null))
-      .map((s) => `${s.variantName ?? 'Option'}: ${s.optionValue ?? ''}`)
-      .filter(Boolean);
-    return arr.length > 0 ? arr : null;
-  })();
+  // For non-print products, get all variants and custom fields
+  const allVariantEntries = item.variantSelections 
+    ? Object.entries(item.variantSelections)
+    : item.variants 
+    ? Object.entries(item.variants).map(([key, value]) => [key, { optionValue: value }])
+    : [];
 
-  const productVariantDisplays = getProductVariantDisplay();
-  const fabricVariantDisplays = getFabricVariantDisplay();
-  const showVariantSelections = !!variantSelectionsDisplays?.length;
+  const allCustomFormEntries = item.customFormData 
+    ? Object.entries(item.customFormData).filter(([key, value]) => {
+        if (key === 'fabricMeters' || key.startsWith('_')) return false;
+        if (value === null || value === undefined) return false;
+        if (typeof value === 'string' && value.trim() === '') return false;
+        return true;
+      })
+    : [];
 
   return (
-    <div className="space-y-1.5 mt-2">
-      {/* Fabric Name for DESIGNED / CUSTOM */}
-      {(item.productType === 'DESIGNED' || isCustom) && fabricData && (
-        <div className="text-xs sm:text-sm">
-          <span className="text-muted-foreground">Fabric: </span>
-          <span className="font-medium text-foreground">{fabricData.name}</span>
-        </div>
-      )}
-
-      {/* Quantity/Meters */}
-      {item.productType === 'PLAIN' && (
-        <div className="text-xs sm:text-sm">
-          <span className="text-muted-foreground">Quantity: </span>
-          <span className="font-medium text-foreground">{item.quantity} meter{item.quantity !== 1 ? 's' : ''}</span>
-        </div>
-      )}
-
-      {(item.productType === 'DESIGNED' || isCustom) && (() => {
-        const fabricMeters = (item as any).customFormData?.fabricMeters;
-        return (
-          <>
-            {typeof fabricMeters === 'number' && fabricMeters > 0 && (
-              <div className="text-xs sm:text-sm">
-                <span className="text-muted-foreground">Fabric: </span>
-                <span className="font-medium text-foreground">{fabricMeters} meter{fabricMeters !== 1 ? 's' : ''}</span>
-              </div>
-            )}
-            <div className="text-xs sm:text-sm">
-              <span className="text-muted-foreground">Quantity: </span>
-              <span className="font-medium text-foreground">{item.quantity} unit{item.quantity !== 1 ? 's' : ''}</span>
+    <div className="space-y-3 mt-2">
+      {/* FABRIC SECTION - For print products (DESIGNED/CUSTOM) */}
+      {isPrintProduct && fabricData && (
+        <div className="space-y-1.5">
+          <div className="text-xs font-semibold text-foreground border-b border-border pb-1">
+            Fabric Details
+          </div>
+          
+          {/* Fabric Name */}
+          <div className="text-xs sm:text-sm pl-2">
+            <span className="text-muted-foreground">Name: </span>
+            <span className="font-medium text-foreground">{fabricData.name}</span>
+          </div>
+          
+          {/* Fabric Variants */}
+          {fabricVariants.length > 0 && (
+            <div className="pl-2 space-y-0.5">
+              <div className="text-xs text-muted-foreground">Variants:</div>
+              {fabricVariants.map(([key, selection]: [string, any]) => (
+                <div key={key} className="text-xs sm:text-sm pl-2">
+                  <span className="text-muted-foreground">
+                    {selection.variantName || 'Variant'}:{' '}
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {selection.optionName || selection.optionValue || 'N/A'}
+                  </span>
+                </div>
+              ))}
             </div>
-          </>
-        );
-      })()}
+          )}
+          
+          {/* Fabric Custom Fields */}
+          {Object.keys(fabricCustomFields).length > 0 && (
+            <div className="pl-2 space-y-0.5">
+              <div className="text-xs text-muted-foreground">Custom Details:</div>
+              {Object.entries(fabricCustomFields).map(([fieldId, value]) => {
+                const isUrlValue = isUrl(value);
+                return (
+                  <div key={fieldId} className="text-xs sm:text-sm pl-2">
+                    <span className="text-muted-foreground">
+                      {getFieldLabel(fieldId, fabricData.customFields || [])}:{' '}
+                    </span>
+                    {isUrlValue ? (
+                      <a 
+                        href={value as string} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="font-medium text-primary hover:underline inline-flex items-center gap-1"
+                      >
+                        <FileText className="w-3 h-3" />
+                        View File
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    ) : (
+                      <span className="font-medium text-foreground">
+                        {formatFieldValue(value)}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
+          {/* Meters */}
+          <div className="text-xs sm:text-sm pl-2">
+            <span className="text-muted-foreground">Meters: </span>
+            <span className="font-medium text-foreground">{totalMeters} m</span>
+          </div>
+        </div>
+      )}
+      
+      {/* PRINT SECTION - For print products (DESIGNED) */}
+      {isPrintProduct && printProductData && (
+        <div className="space-y-1.5">
+          <div className="text-xs font-semibold text-foreground border-b border-border pb-1">
+            Print Details
+          </div>
+          
+          {/* Print Variants */}
+          {printVariants.length > 0 && (
+            <div className="pl-2 space-y-0.5">
+              <div className="text-xs text-muted-foreground">Variants:</div>
+              {printVariants.map(([key, selection]: [string, any]) => (
+                <div key={key} className="text-xs sm:text-sm pl-2">
+                  <span className="text-muted-foreground">
+                    {selection.variantName || 'Variant'}:{' '}
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {selection.optionName || selection.optionValue || 'N/A'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Print Custom Fields */}
+          {Object.keys(printCustomFields).length > 0 && (
+            <div className="pl-2 space-y-0.5">
+              <div className="text-xs text-muted-foreground">Custom Details:</div>
+              {Object.entries(printCustomFields).map(([fieldId, value]) => {
+                const isUrlValue = isUrl(value);
+                return (
+                  <div key={fieldId} className="text-xs sm:text-sm pl-2">
+                    <span className="text-muted-foreground">
+                      {getFieldLabel(fieldId, printProductData?.customFields || [])}:{' '}
+                    </span>
+                    {isUrlValue ? (
+                      <a 
+                        href={value as string} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="font-medium text-primary hover:underline inline-flex items-center gap-1"
+                      >
+                        <FileText className="w-3 h-3" />
+                        View File
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    ) : (
+                      <span className="font-medium text-foreground">
+                        {formatFieldValue(value)}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CUSTOM PRODUCT - Uploaded Design */}
+      {isCustom && item.uploadedDesignUrl && (
+        <div className="space-y-1.5">
+          <div className="text-xs font-semibold text-foreground border-b border-border pb-1">
+            Design Details
+          </div>
+          <div className="text-xs sm:text-sm pl-2">
+            <span className="text-muted-foreground">Uploaded Design: </span>
+            <a 
+              href={item.uploadedDesignUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="font-medium text-primary hover:underline inline-flex items-center gap-1"
+            >
+              <FileText className="w-3 h-3" />
+              View Design
+              <ExternalLink className="w-2.5 h-2.5" />
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* NON-PRINT PRODUCTS (PLAIN, DIGITAL) - Show variants and custom fields */}
+      {!isPrintProduct && (
+        <>
+          {/* Variants */}
+          {allVariantEntries.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-xs font-semibold text-foreground border-b border-border pb-1">
+                Variants
+              </div>
+              {allVariantEntries.map(([key, selection]: [string, any]) => (
+                <div key={key} className="text-xs sm:text-sm pl-2">
+                  <span className="text-muted-foreground">
+                    {selection.variantName || formatFieldName(key)}:{' '}
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {selection.optionName || selection.optionValue || 'N/A'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Custom Form Fields */}
+          {allCustomFormEntries.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-xs font-semibold text-foreground border-b border-border pb-1">
+                Custom Details
+              </div>
+              {allCustomFormEntries.map(([key, value]) => {
+                const isUrlValue = isUrl(value);
+                return (
+                  <div key={key} className="text-xs sm:text-sm pl-2">
+                    <span className="text-muted-foreground">{formatFieldName(key)}: </span>
+                    {isUrlValue ? (
+                      <a 
+                        href={value as string} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="font-medium text-primary hover:underline inline-flex items-center gap-1"
+                      >
+                        <FileText className="w-3 h-3" />
+                        View File
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    ) : (
+                      <span className="font-medium text-foreground">{formatFieldValue(value)}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
 
       {/* Pricing for CUSTOM: design + fabric */}
       {isCustom && (item.designPrice != null || item.fabricPrice != null) && (
-        <div className="space-y-0.5 text-xs sm:text-sm">
+        <div className="space-y-1.5">
+          <div className="text-xs font-semibold text-foreground border-b border-border pb-1">
+            Pricing Breakdown
+          </div>
           {item.designPrice != null && (
-            <div>
+            <div className="text-xs sm:text-sm pl-2">
               <span className="text-muted-foreground">Design: </span>
               <span className="font-medium text-foreground">{format(Number(item.designPrice))}</span>
             </div>
           )}
           {item.fabricPrice != null && (
-            <div>
+            <div className="text-xs sm:text-sm pl-2">
               <span className="text-muted-foreground">Fabric: </span>
               <span className="font-medium text-foreground">{format(Number(item.fabricPrice))}</span>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Selected Variant – Fabric (DESIGNED/CUSTOM) and/or Product variants, or variantSelections */}
-      {((fabricVariantDisplays?.length ?? 0) > 0 || (productVariantDisplays?.length ?? 0) > 0 || showVariantSelections) ? (
-        <div className="space-y-1">
-          <div className="text-[10px] sm:text-xs text-muted-foreground/70 uppercase tracking-wide font-medium mt-1">
-            Selected Variant
-          </div>
-          {fabricVariantDisplays && fabricVariantDisplays.length > 0 && (
-            <div className="space-y-0.5 pl-2 border-l-2 border-primary/20">
-              {fabricVariantDisplays.map((display, index) => (
-                <div key={index} className="text-xs sm:text-sm">
-                  <span className="text-muted-foreground">{display}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {productVariantDisplays && productVariantDisplays.length > 0 && (
-            <div className="space-y-0.5">
-              {productVariantDisplays.map((display, index) => (
-                <div key={index} className="text-xs sm:text-sm">
-                  <span className="text-muted-foreground">{display}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {showVariantSelections && variantSelectionsDisplays?.map((display, index) => (
-            <div key={index} className="text-xs sm:text-sm">
-              <span className="text-muted-foreground">{display}</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      {/* Selected Custom Field */}
-      {item.customFormData && Object.keys(item.customFormData).length > 0 && (
-        <div className="space-y-0.5 mt-1.5">
-          <div className="text-[10px] sm:text-xs text-muted-foreground/70 uppercase tracking-wide font-medium">
-            Selected Custom Field
-          </div>
-          {Object.entries(item.customFormData).map(([key, value]) => {
-            if (value == null || value === '') return null;
-            const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim();
-            return (
-              <div key={key} className="text-xs sm:text-sm">
-                <span className="text-muted-foreground">{label}: </span>
-                <span className="font-medium text-foreground">{String(value)}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* If no variants but quantity exists for DIGITAL products */}
-      {!productVariantDisplays && !fabricVariantDisplays && item.quantity > 1 && item.productType === 'DIGITAL' && (
-        <div className="text-xs sm:text-sm">
-          <span className="text-muted-foreground">Quantity: </span>
-          <span className="font-medium text-foreground">{item.quantity}</span>
         </div>
       )}
     </div>

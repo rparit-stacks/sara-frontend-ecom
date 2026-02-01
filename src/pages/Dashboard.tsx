@@ -13,11 +13,73 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { userApi, orderApi, categoriesApi } from '@/lib/api';
 import { getPaymentStatusDisplay } from '@/lib/orderUtils';
-import { Package, MapPin, User, Edit, Trash2, Plus, Loader2, Check, Gift, ArrowRight, Download, Menu, X, LogOut, Pencil } from 'lucide-react';
+import { Package, MapPin, User, Edit, Trash2, Plus, Loader2, Check, Gift, ArrowRight, Download, Menu, X, LogOut, Pencil, ChevronRight, LayoutGrid } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { MandatoryProfileDialog } from '@/components/MandatoryProfileDialog';
+
+/** Recursive component for personalized category tree with expandable subcategories */
+const PersonalizedCategoryItem = ({
+  category,
+  parentPath,
+  navigate,
+}: {
+  category: any;
+  parentPath: string;
+  navigate: (path: string) => void;
+}) => {
+  const slugPath = parentPath ? `${parentPath}/${category.slug || category.id}` : (category.slug || String(category.id));
+  const hasSubs = category.subcategories && category.subcategories.length > 0;
+
+  return (
+    <AccordionItem value={String(category.id)} className="border rounded-lg px-3 [&>div]:border-none">
+      <div className="flex items-center gap-2 py-2 min-h-[44px]">
+        {hasSubs ? (
+          <>
+            <AccordionTrigger className="flex-1 py-2 hover:no-underline">
+              <span className="font-medium text-left">{category.name}</span>
+            </AccordionTrigger>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/category/${slugPath}`);
+              }}
+            >
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </>
+        ) : (
+          <>
+            <span
+              className="flex-1 font-medium hover:text-primary cursor-pointer py-2"
+              onClick={() => navigate(`/category/${slugPath}`)}
+            >
+              {category.name}
+            </span>
+            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => navigate(`/category/${slugPath}`)}>
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </>
+        )}
+      </div>
+      {hasSubs && (
+        <AccordionContent>
+          <div className="pl-4 mt-1 space-y-1 border-l-2 border-muted ml-2 pb-2">
+            {(category.subcategories || [])
+              .sort((a: any, b: any) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999))
+              .map((sub: any) => (
+                <PersonalizedCategoryItem key={sub.id} category={sub} parentPath={slugPath} navigate={navigate} />
+              ))}
+          </div>
+        </AccordionContent>
+      )}
+    </AccordionItem>
+  );
+};
 
 const INDIAN_STATES = [
   'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
@@ -188,10 +250,44 @@ const Dashboard = () => {
   // Fetch dashboard notification - allow to fetch if token exists and not showing mandatory dialog
   const { data: dashboardNotification } = useQuery({
     queryKey: ['dashboardNotification'],
-    queryFn: () => categoriesApi.getDashboardNotification(),
+    queryFn: async () => {
+      const result = await categoriesApi.getDashboardNotification();
+      console.log('[Dashboard] Dashboard notification:', result);
+      return result;
+    },
     enabled: !!token && !showMandatoryDialog && !isCheckingMandatory,
     retry: 1,
   });
+
+  // Fetch user's categories for Personalized Portal (only when they have restricted categories)
+  const { data: myCategories = [] } = useQuery({
+    queryKey: ['myCategories'],
+    queryFn: () => categoriesApi.getMyCategories(),
+    enabled: !!token && !showMandatoryDialog && !isCheckingMandatory && !!dashboardNotification?.hasRestrictedCategories,
+    retry: 1,
+  });
+
+  // Derived state for personalized categories
+  const hasRestrictedCategories = dashboardNotification?.hasRestrictedCategories === true;
+  const effectiveTab = activeTab === 'personalized' && !hasRestrictedCategories ? 'profile' : activeTab;
+  
+  // Debug logging
+  console.log('[Dashboard] hasRestrictedCategories:', hasRestrictedCategories);
+  console.log('[Dashboard] dashboardNotification:', dashboardNotification);
+  
+  // Helper function to recursively check if category or subcategories have allowedEmails
+  const hasRestrictedCategoriesInTree = (cat: any): boolean => {
+    if (cat.allowedEmails != null && String(cat.allowedEmails).trim() !== '') {
+      return true;
+    }
+    if (cat.subcategories && cat.subcategories.length > 0) {
+      return cat.subcategories.some((sub: any) => hasRestrictedCategoriesInTree(sub));
+    }
+    return false;
+  };
+
+  // Filter to only personalized (admin-assigned) categories - includes roots that have restricted subcategories
+  const personalizedCategories = (myCategories as any[]).filter(hasRestrictedCategoriesInTree);
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
@@ -501,36 +597,25 @@ const Dashboard = () => {
             </Button>
           </div>
 
-          {/* Dashboard Notification for Restricted Categories */}
-          {dashboardNotification?.hasRestrictedCategories && (
-            <Card className="mb-4 md:mb-6 bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20">
+          {/* Dashboard Notification for Restricted Categories - CTA to Personalized Portal */}
+          {hasRestrictedCategories && (
+            <Card
+              className="mb-4 md:mb-6 bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20 cursor-pointer hover:from-primary/15 hover:to-secondary/15 transition-colors"
+              onClick={() => {
+                setActiveTab('personalized');
+                setIsMobileMenuOpen(false);
+              }}
+            >
               <CardContent className="pt-4 md:pt-6 p-4 md:p-6">
-                <div className="flex flex-col sm:flex-row items-start gap-4">
+                <div className="flex items-center gap-4">
                   <div className="rounded-full bg-primary/20 p-2 md:p-3 flex-shrink-0">
                     <Gift className="w-5 h-5 md:w-6 md:h-6 text-primary" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-base md:text-lg mb-2">Special Products Available!</h3>
-                    <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4">
-                      {dashboardNotification.message || 'The store has loaded special products for you.'}
-                    </p>
-                    {dashboardNotification.categories && dashboardNotification.categories.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {dashboardNotification.categories.map((cat: any) => (
-                          <Button
-                            key={cat.id}
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/category/${cat.id}`)}
-                            className="gap-2 text-xs md:text-sm"
-                          >
-                            {cat.name}
-                            <ArrowRight className="w-3 h-3 md:w-4 md:h-4" />
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <p className="flex-1 text-sm md:text-base text-foreground">
+                    You have a personalized category allotted by the admin.{' '}
+                    <span className="font-semibold text-primary underline underline-offset-2">Click here to view.</span>
+                  </p>
+                  <ChevronRight className="w-5 h-5 text-primary flex-shrink-0" />
                 </div>
               </CardContent>
             </Card>
@@ -603,6 +688,19 @@ const Dashboard = () => {
                       <MapPin className="w-4 h-4" />
                       Addresses ({addresses.length})
                     </Button>
+                    {hasRestrictedCategories && (
+                      <Button
+                        variant={activeTab === 'personalized' ? 'default' : 'ghost'}
+                        className="w-full justify-start gap-2"
+                        onClick={() => {
+                          setActiveTab('personalized');
+                          setIsMobileMenuOpen(false);
+                        }}
+                      >
+                        <LayoutGrid className="w-4 h-4" />
+                        Personalized
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -611,8 +709,8 @@ const Dashboard = () => {
             {/* Main content */}
             <div className="flex-1 min-w-0">
               {/* Desktop Tabs */}
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full hidden lg:block">
-                <TabsList className="grid w-full grid-cols-4 mb-6">
+              <Tabs value={effectiveTab} onValueChange={setActiveTab} className="w-full hidden lg:block">
+                <TabsList className={`grid w-full mb-6 ${hasRestrictedCategories ? 'grid-cols-5' : 'grid-cols-4'}`}>
                   <TabsTrigger value="profile" className="gap-2">
                     <User className="w-4 h-4" />
                     <span className="hidden xl:inline">Profile</span>
@@ -629,6 +727,12 @@ const Dashboard = () => {
                     <MapPin className="w-4 h-4" />
                     Addresses ({addresses.length})
                   </TabsTrigger>
+                  {hasRestrictedCategories && (
+                    <TabsTrigger value="personalized" className="gap-2">
+                      <LayoutGrid className="w-4 h-4" />
+                      <span className="hidden xl:inline">Personalized</span>
+                    </TabsTrigger>
+                  )}
                 </TabsList>
 
                 {/* Profile Tab: read-only by default, single Edit toggles edit mode */}
@@ -898,6 +1002,36 @@ const Dashboard = () => {
                     </CardContent>
                   </Card>
                 </TabsContent>
+
+                {/* Personalized Portal Tab */}
+                {hasRestrictedCategories && (
+                  <TabsContent value="personalized" className="space-y-4 md:space-y-6 mt-4 md:mt-6">
+                    <Card>
+                      <CardHeader className="p-4 md:p-6">
+                        <CardTitle className="text-lg md:text-xl">Your Personalized Categories</CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Categories assigned to you by the admin. Click to browse products.
+                        </p>
+                      </CardHeader>
+                      <CardContent className="p-4 md:p-6">
+                        {personalizedCategories.length === 0 ? (
+                          <div className="text-center py-8">
+                            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mx-auto mb-4" />
+                            <p className="text-muted-foreground">Loading your personalized categories...</p>
+                          </div>
+                        ) : (
+                          <Accordion type="multiple" className="w-full space-y-2">
+                            {personalizedCategories
+                              .sort((a: any, b: any) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999))
+                              .map((cat: any) => (
+                                <PersonalizedCategoryItem key={cat.id} category={cat} parentPath="" navigate={navigate} />
+                              ))}
+                          </Accordion>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                )}
 
                 {/* Addresses Tab */}
                 <TabsContent value="addresses" className="space-y-4 md:space-y-6 mt-4 md:mt-6">
@@ -1244,6 +1378,33 @@ const Dashboard = () => {
                             </Card>
                           ))}
                         </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {activeTab === 'personalized' && hasRestrictedCategories && (
+                  <Card>
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-lg">Your Personalized Categories</CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Categories assigned to you by the admin. Click to browse products.
+                      </p>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                      {personalizedCategories.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mx-auto mb-4" />
+                          <p className="text-muted-foreground text-sm">Loading your personalized categories...</p>
+                        </div>
+                      ) : (
+                        <Accordion type="multiple" className="w-full space-y-2">
+                          {personalizedCategories
+                            .sort((a: any, b: any) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999))
+                            .map((cat: any) => (
+                              <PersonalizedCategoryItem key={cat.id} category={cat} parentPath="" navigate={navigate} />
+                            ))}
+                        </Accordion>
                       )}
                     </CardContent>
                   </Card>

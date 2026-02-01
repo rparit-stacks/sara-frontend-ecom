@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Heart, ShoppingBag, Share2, Truck, RotateCcw, Shield, Minus, Plus, ChevronRight, Palette, CheckCircle2, Info, ZoomIn, X } from 'lucide-react';
+import { Heart, ShoppingBag, Share2, Truck, RotateCcw, Shield, Minus, Plus, Palette, CheckCircle2, Info, ZoomIn, X } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Button } from '@/components/ui/button';
@@ -432,14 +432,17 @@ const CustomProductDetail = () => {
     },
   });
 
-  // Add to cart mutation
+  // Add to cart mutation – redirect to Cart page (no popup)
   const addToCartMutation = useMutation({
     mutationFn: (cartData: any) => cartApi.addItem(cartData),
     onSuccess: () => {
       if (customProductId) {
         saveCustomProductMutation.mutate();
       }
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+      queryClient.invalidateQueries({ queryKey: ['cart-count'] });
       toast.success('Custom product added to cart and saved!');
+      navigate('/cart');
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to add to cart');
@@ -586,19 +589,6 @@ const CustomProductDetail = () => {
           </div>
         </section>
       )}
-
-      {/* Breadcrumb */}
-      <section className="w-full bg-secondary/30 py-5">
-        <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
-          <nav className="flex items-center text-sm text-muted-foreground flex-wrap">
-            <Link to="/" className="hover:text-primary transition-colors">Home</Link>
-            <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
-            <Link to="/make-your-own" className="hover:text-primary transition-colors">Upload Your Design</Link>
-            <ChevronRight className="w-4 h-4 mx-2 flex-shrink-0" />
-            <span className="text-foreground truncate">Custom Product</span>
-          </nav>
-        </div>
-      </section>
 
       {/* Product Section - Same as Design Product */}
       <section className="w-full py-14 lg:py-20">
