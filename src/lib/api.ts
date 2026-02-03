@@ -318,6 +318,48 @@ export const productsApi = {
     console.log('[Product Media Upload] Success:', data);
     return data.files || [];
   },
+  
+  // New function for digital file upload (local storage)
+  uploadDigitalFile: async (file: File, productId: string): Promise<any> => {
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB for local storage
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error('Upload failed: File size exceeds 50MB limit for local storage.');
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('productId', productId);
+    
+    const token = localStorage.getItem('adminToken');
+    console.log('[Digital File Upload] Uploading', file.name, 'for product:', productId);
+    
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}/api/admin/products/upload-digital-file`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData,
+      });
+    } catch (e) {
+      throw new Error('Upload failed. Please check your connection and try again.');
+    }
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Digital File Upload] Error:', errorText);
+      try {
+        const errorData = JSON.parse(errorText);
+        throw new Error(errorData.error || 'Upload failed');
+      } catch (err: any) {
+        if (err instanceof SyntaxError) throw new Error(errorText || 'Upload failed');
+        throw err;
+      }
+    }
+    
+    const data = await response.json();
+    console.log('[Digital File Upload] Success:', data);
+    return data;
+  },
 };
 
 // ===============================

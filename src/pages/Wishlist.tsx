@@ -96,7 +96,20 @@ const Wishlist = () => {
   // Fetch wishlist from API (only when logged in)
   const { data: wishlistItems = [], isLoading } = useQuery({
     queryKey: ['wishlist'],
-    queryFn: () => wishlistApi.getWishlist(),
+    queryFn: async () => {
+      const data = await wishlistApi.getWishlist();
+      console.log('Wishlist data received:', data);
+      console.log('Wishlist data type:', typeof data);
+      console.log('Is array:', Array.isArray(data));
+      
+      // Handle case where data might be double-stringified
+      if (typeof data === 'string') {
+        console.warn('Wishlist data is a string, parsing...');
+        return JSON.parse(data);
+      }
+      
+      return data;
+    },
     enabled: isLoggedIn,
   });
 

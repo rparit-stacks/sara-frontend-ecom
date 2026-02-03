@@ -110,10 +110,14 @@ const ProductDetail = () => {
   // Check if product is in wishlist
   const productType = apiProduct?.type || 'PLAIN';
   const productId = apiProduct?.id;
+  // For PLAIN products, backend expects plainProductId; for DESIGNED/DIGITAL, product id
+  const wishlistProductId = (productType === 'PLAIN' && apiProduct?.plainProductId) 
+    ? apiProduct.plainProductId 
+    : productId;
   const { data: wishlistCheck } = useQuery({
-    queryKey: ['wishlist-check', productType, productId],
-    queryFn: () => wishlistApi.checkItem(productType, productId!),
-    enabled: !!productId && !!localStorage.getItem('authToken'),
+    queryKey: ['wishlist-check', productType, wishlistProductId],
+    queryFn: () => wishlistApi.checkItem(productType, wishlistProductId!),
+    enabled: !!wishlistProductId && !!localStorage.getItem('authToken'),
   });
   
   const isInWishlist = wishlistCheck?.inWishlist || false;
@@ -321,12 +325,19 @@ const ProductDetail = () => {
         setSelectedVariants(cartItemForPreload.variants);
       }
       
-      // Pre-load custom field values
+      // Pre-load custom field values (backend may send label keys; map to id for form)
       if (cartItemForPreload.customFormData) {
+        const raw = cartItemForPreload.customFormData as Record<string, any>;
         const fieldValues: Record<string, string | File | null> = {};
-        Object.entries(cartItemForPreload.customFormData).forEach(([key, value]) => {
-          if (key !== 'fabricMeters' && !key.startsWith('_')) {
+        const productFields = product?.customFields || [];
+        Object.entries(raw).forEach(([key, value]) => {
+          if (key === 'fabricMeters' || key.startsWith('_')) return;
+          if (/^\d+$/.test(key)) {
             fieldValues[key] = value as string;
+          } else {
+            const field = productFields.find((f: any) => f.label === key || f.name === key);
+            if (field) fieldValues[String(field.id)] = value as string;
+            else fieldValues[key] = value as string;
           }
         });
         setCustomFieldValues(fieldValues);
@@ -338,26 +349,9 @@ const ProductDetail = () => {
         setFabricQuantity(cartItemForPreload.quantity);
       }
       
-      // Pre-load fabric variants and custom fields if available
-      if (cartItemForPreload.customFormData) {
-        const fabricVariants: Record<string, string> = {};
-        const fabricCustomFields: Record<string, string> = {};
-        
-        Object.entries(cartItemForPreload.customFormData).forEach(([key, value]) => {
-          // This is a simplified approach - in reality, we'd need to distinguish
-          // between fabric variants and fabric custom fields
-          if (key.startsWith('fabric_')) {
-            fabricCustomFields[key] = value as string;
-          }
-        });
-        
-        if (Object.keys(fabricCustomFields).length > 0) {
-          setFabricCustomFieldValues(fabricCustomFields);
-        }
-      }
     }
   }, [cartItemForPreload, product]);
-  
+
   // Update custom form fields when config loads - ONLY for custom products
   useEffect(() => {
     // Only load customConfig.formFields for custom products (user-uploaded)
@@ -387,6 +381,18 @@ const ProductDetail = () => {
     queryFn: () => productsApi.getById(Number(selectedFabricId!)),
     enabled: !!selectedFabricId && product?.type === 'DESIGNED',
   });
+
+  // Pre-load fabric custom fields when fabric product loads (backend sends label keys)
+  useEffect(() => {
+    if (!cartItemForPreload?.customFormData || !fabricProduct?.customFields?.length) return;
+    const raw = cartItemForPreload.customFormData as Record<string, any>;
+    const fabricValues: Record<string, string> = {};
+    fabricProduct.customFields.forEach((f: any) => {
+      const val = raw[f.label] ?? raw[f.name] ?? raw[String(f.id)];
+      if (val != null) fabricValues[String(f.id)] = String(val);
+    });
+    if (Object.keys(fabricValues).length > 0) setFabricCustomFieldValues(fabricValues);
+  }, [cartItemForPreload, fabricProduct]);
 
   // Calculate price per meter based on quantity and pricing slabs
   // Discount-based slab system: Slabs define discount rules, not absolute prices
@@ -663,10 +669,15 @@ const ProductDetail = () => {
   
   // Wishlist mutations
   const addToWishlistMutation = useMutation({
-    mutationFn: () => wishlistApi.addItem(productType, productId!),
+    mutationFn: () => wishlistApi.addItem({
+      productType,
+      productId: wishlistProductId!,
+      productName: product?.name,
+      productImage: product?.images?.[0],
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wishlist'] });
-      queryClient.invalidateQueries({ queryKey: ['wishlist-check', productType, productId] });
+      queryClient.invalidateQueries({ queryKey: ['wishlist-check', productType, wishlistProductId] });
       toast.success('Added to wishlist!');
     },
     onError: (error: Error) => {
@@ -675,10 +686,10 @@ const ProductDetail = () => {
   });
 
   const removeFromWishlistMutation = useMutation({
-    mutationFn: () => wishlistApi.removeByProduct(productType, productId!),
+    mutationFn: () => wishlistApi.removeByProduct(productType, wishlistProductId!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wishlist'] });
-      queryClient.invalidateQueries({ queryKey: ['wishlist-check', productType, productId] });
+      queryClient.invalidateQueries({ queryKey: ['wishlist-check', productType, wishlistProductId] });
       toast.success('Removed from wishlist!');
     },
     onError: (error: Error) => {
@@ -696,6 +707,30 @@ const ProductDetail = () => {
       removeFromWishlistMutation.mutate();
     } else {
       addToWishlistMutation.mutate();
+    }
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const title = product?.name || 'Product';
+    const text = `Check out ${title}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text, url });
+        toast.success('Link shared!');
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link copied to clipboard!');
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        try {
+          await navigator.clipboard.writeText(url);
+          toast.success('Link copied to clipboard!');
+        } catch {
+          toast.error('Failed to share');
+        }
+      }
     }
   };
 
@@ -1561,6 +1596,24 @@ const ProductDetail = () => {
                         <span className="text-muted-foreground">{getDigitalFileFormat(product.fileUrl)} · Instant</span>
                       </div>
                       
+                      {/* Digital Product Price */}
+                      <div className="flex items-center justify-between p-4 bg-muted/30 border border-border rounded-xl">
+                        <div>
+                          <h4 className="font-semibold">Price</h4>
+                          <p className="text-sm text-muted-foreground">One-time purchase</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-bold text-lg text-primary">
+                            {format(finalPrice)}
+                          </span>
+                          {product.originalPrice && product.originalPrice > product.price && (
+                            <div className="text-sm text-muted-foreground line-through">
+                              {format(product.originalPrice)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
                       {product.description && (
                         <div className="p-4 bg-muted/30 border border-border rounded-xl">
                           <h4 className="font-semibold mb-2">What's Included</h4>
@@ -1735,11 +1788,16 @@ const ProductDetail = () => {
                           isInWishlist && "bg-primary/10 border-primary text-primary"
                         )}
                         onClick={handleWishlistToggle}
-                        disabled={addToWishlistMutation.isPending || removeFromWishlistMutation.isPending || !productId}
+                        disabled={addToWishlistMutation.isPending || removeFromWishlistMutation.isPending || !wishlistProductId}
                       >
                         <Heart className={cn("w-4 h-4 sm:w-5 sm:h-5", isInWishlist && "fill-current")} />
                       </Button>
-                      <Button size="lg" variant="outline" className="rounded-full w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0 border-border hover:border-primary hover:bg-primary/5">
+                      <Button 
+                        size="lg" 
+                        variant="outline" 
+                        className="rounded-full w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0 border-border hover:border-primary hover:bg-primary/5"
+                        onClick={handleShare}
+                      >
                         <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
                       </Button>
                     </div>

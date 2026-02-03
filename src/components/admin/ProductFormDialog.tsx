@@ -371,6 +371,12 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
   // Error state for real-time validation
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  
+  // Upload state for digital files
+  const [isUploadingDigitalFile, setIsUploadingDigitalFile] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadedDigitalFileUrl, setUploadedDigitalFileUrl] = useState<string>('');
+  const [uploadError, setUploadError] = useState<string>('');
 
   // Fetch full product details when editing
   const { data: fullProductData, isLoading: isLoadingProduct } = useQuery({
@@ -434,6 +440,11 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
           })),
           status: productData.status?.toLowerCase() === 'active' ? 'active' : 'inactive',
         });
+        
+        // Set uploaded file URL if editing digital product
+        if (productData.type === 'DIGITAL' && productData.fileUrl) {
+          setUploadedDigitalFileUrl(productData.fileUrl);
+        }
       }
     } else if (mode === 'create' || !open) {
       handleResetForm();
@@ -466,6 +477,74 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       status: 'active',
     });
     setActiveType('PLAIN');
+    setUploadedDigitalFileUrl('');
+    setUploadError('');
+    setIsUploadingDigitalFile(false);
+    setUploadProgress(0);
+  };
+
+  // Automatic upload handler for digital files
+  const handleDigitalFileChange = async (file: File | null) => {
+    if (!file) {
+      setFormData({ ...formData, digitalFile: null });
+      setUploadedDigitalFileUrl('');
+      setUploadError('');
+      return;
+    }
+
+    // Validate file size (50MB for local storage)
+    const MAX_FILE_SIZE = 50 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      setUploadError('File size exceeds 50MB limit for local storage.');
+      toast.error('File size exceeds 50MB limit for local storage.');
+      return;
+    }
+
+    // Start automatic upload
+    setFormData({ ...formData, digitalFile: file });
+    setIsUploadingDigitalFile(true);
+    setUploadProgress(0);
+    setUploadError('');
+
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => Math.min(prev + 10, 90));
+    }, 200);
+
+    toast.loading('Uploading digital file to local storage...', { id: 'digital-upload' });
+
+    try {
+      // For new products, we need to create a temporary product ID first
+      // For now, we'll use a timestamp as temporary ID
+      const tempProductId = 'temp_' + Date.now();
+      
+      // Upload file to local storage
+      const uploadResult = await productsApi.uploadDigitalFile(file, tempProductId);
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      if (uploadResult && uploadResult.success) {
+        // Store the upload result for later use when creating the product
+        setUploadedDigitalFileUrl(JSON.stringify(uploadResult));
+        toast.success('Digital file uploaded successfully to local storage!', { id: 'digital-upload' });
+      } else {
+        throw new Error('Upload failed: No success response from server');
+      }
+    } catch (error: any) {
+      clearInterval(progressInterval);
+      setUploadProgress(0);
+      
+      console.error('Digital file upload error:', error);
+      const errorMessage = error.message || 'Failed to upload digital file';
+      
+      setUploadError(errorMessage);
+      toast.error(errorMessage, { id: 'digital-upload', duration: 5000 });
+      setUploadedDigitalFileUrl('');
+    } finally {
+      setIsUploadingDigitalFile(false);
+      setUploadProgress(0);
+    }
   };
 
   // Real-time validation function
@@ -506,14 +585,8 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
         }
         return '';
       case 'digitalFile':
-        if (activeType === 'DIGITAL' && mode === 'create' && !value) {
-          return 'Digital file is required';
-        }
-        if (activeType === 'DIGITAL' && value && value instanceof File) {
-          const MAX_MB = 10;
-          if (value.size > MAX_MB * 1024 * 1024) {
-            return 'Upload failed: Cloudinary supports max 10MB. Please adjust file size or upgrade Cloudinary limits.';
-          }
+        if (activeType === 'DIGITAL' && mode === 'create' && !uploadedDigitalFileUrl) {
+          return 'Digital file is required. Please upload a file.';
         }
         return '';
       default:
@@ -626,38 +699,29 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       return;
     }
 
-    // Upload digital file if it's a new file and product type is DIGITAL
-    let uploadedFileUrl = initialData?.fileUrl || '';
-    if (activeType === 'DIGITAL' && formData.digitalFile && mode === 'create') {
-      try {
-        // Upload file to Cloudinary
-        const uploadedFiles = await productsApi.uploadMedia([formData.digitalFile], 'products/digital');
-        if (uploadedFiles && uploadedFiles.length > 0) {
-          uploadedFileUrl = uploadedFiles[0].url;
-        } else {
-          toast.error('Failed to upload digital file');
-          return;
+    // For digital products, handle local storage upload results
+    let fileUrl = '';
+    if (activeType === 'DIGITAL') {
+      if (uploadedDigitalFileUrl) {
+        try {
+          // Try to parse as JSON (for local storage results)
+          const uploadResult = JSON.parse(uploadedDigitalFileUrl);
+          if (uploadResult.success && uploadResult.filePath && uploadResult.zipPath) {
+            // This is a local storage upload result
+            fileUrl = JSON.stringify({
+              localFilePath: uploadResult.filePath,
+              zipFilePath: uploadResult.zipPath,
+              originalFilename: uploadResult.originalFilename,
+              storedFilename: uploadResult.storedFilename
+            });
+          } else {
+            // Fallback to treating as regular URL
+            fileUrl = uploadedDigitalFileUrl;
+          }
+        } catch (e) {
+          // Not JSON, treat as regular URL (Cloudinary)
+          fileUrl = uploadedDigitalFileUrl;
         }
-      } catch (error: any) {
-        const msg = error?.message || '';
-        const cloudinaryMsg = 'Upload failed: Cloudinary supports max 10MB. Please adjust file size or upgrade Cloudinary limits.';
-        const show = /10MB|Cloudinary|File size|exceeds/i.test(msg) ? cloudinaryMsg : (msg || 'Upload failed. Please check your connection and try again.');
-        toast.error(show);
-        return;
-      }
-    } else if (activeType === 'DIGITAL' && formData.digitalFile && mode === 'edit') {
-      // For edit mode, upload new file if changed
-      try {
-        const uploadedFiles = await productsApi.uploadMedia([formData.digitalFile], 'products/digital');
-        if (uploadedFiles && uploadedFiles.length > 0) {
-          uploadedFileUrl = uploadedFiles[0].url;
-        }
-      } catch (error: any) {
-        const msg = error?.message || '';
-        const cloudinaryMsg = 'Upload failed: Cloudinary supports max 10MB. Please adjust file size or upgrade Cloudinary limits.';
-        const show = /10MB|Cloudinary|File size|exceeds/i.test(msg) ? cloudinaryMsg : (msg || 'Upload failed. Please check your connection and try again.');
-        toast.error(show);
-        return;
       }
     }
 
@@ -732,7 +796,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       const sellingPrice = formData.basePrice;
       payload.price = sellingPrice;
       payload.originalPrice = sellingPrice;
-      payload.fileUrl = uploadedFileUrl;
+      payload.fileUrl = uploadedDigitalFileUrl;
     }
 
     // Add GST rate
@@ -1423,23 +1487,59 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                   <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-[10px]">3</span>
                   Digital Asset
                 </div>
-                <div className={`border-2 border-dashed rounded-xl p-8 text-center space-y-4 hover:bg-muted/30 transition-colors group cursor-pointer ${touched.digitalFile && errors.digitalFile ? 'border-red-500 bg-red-50/30' : 'border-border'}`}>
+                <div className={`border-2 border-dashed rounded-xl p-8 text-center space-y-4 hover:bg-muted/30 transition-colors group cursor-pointer ${touched.digitalFile && errors.digitalFile ? 'border-red-500 bg-red-50/30' : uploadedDigitalFileUrl ? 'border-green-500 bg-green-50/30' : 'border-border'} ${isUploadingDigitalFile ? 'pointer-events-none opacity-60' : ''}`}>
                   <div className="w-16 h-16 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
-                    <Upload className="w-8 h-8" />
+                    {isUploadingDigitalFile ? (
+                      <Loader2 className="w-8 h-8 animate-spin" />
+                    ) : uploadedDigitalFileUrl ? (
+                      <Badge className="w-16 h-16 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-2xl">✓</Badge>
+                    ) : (
+                      <Upload className="w-8 h-8" />
+                    )}
                   </div>
                   <div className="space-y-1">
-                    <p className="font-semibold">Upload Digital File *</p>
+                    <p className="font-semibold">
+                      {isUploadingDigitalFile 
+                        ? 'Uploading to local storage...' 
+                        : uploadedDigitalFileUrl 
+                          ? 'File Uploaded Successfully!' 
+                          : 'Upload Digital File *'}
+                    </p>
                     <p className="text-xs text-muted-foreground text-center max-w-[200px] mx-auto">
-                      Any file type supported. Max 10MB (Cloudinary limit).
+                      {isUploadingDigitalFile 
+                        ? `Upload progress: ${uploadProgress}%` 
+                        : uploadedDigitalFileUrl
+                          ? 'File ready. You can now create the product.'
+                          : 'Any file type supported. Max 50MB (local storage).'}
                     </p>
                   </div>
+                  
+                  {/* Progress bar */}
+                  {isUploadingDigitalFile && (
+                    <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                      <div 
+                        className="bg-purple-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Error message */}
+                  {uploadError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-700 font-medium">Upload Failed</p>
+                      <p className="text-xs text-red-600 mt-1">{uploadError}</p>
+                    </div>
+                  )}
+                  
                   <input 
                     type="file" 
                     className="hidden" 
                     id="digital-upload" 
+                    disabled={isUploadingDigitalFile}
                     onChange={(e) => {
                       const file = e.target.files?.[0] || null;
-                      setFormData({ ...formData, digitalFile: file });
+                      handleDigitalFileChange(file);
                       if (touched.digitalFile) {
                         const error = validateField('digitalFile', file);
                         setErrors({ ...errors, digitalFile: error });
@@ -1447,13 +1547,44 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                     }}
                     onBlur={() => handleBlur('digitalFile', formData.digitalFile)}
                   />
-                  <Button type="button" variant="outline" onClick={() => document.getElementById('digital-upload')?.click()}>
-                    {formData.digitalFile ? formData.digitalFile.name : initialData?.fileUrl ? 'File Uploaded' : 'Choose File'}
-                  </Button>
+                  <div className="flex gap-2 justify-center">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => document.getElementById('digital-upload')?.click()}
+                      disabled={isUploadingDigitalFile}
+                    >
+                      {isUploadingDigitalFile ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : uploadedDigitalFileUrl ? (
+                        'Change File'
+                      ) : (
+                        'Choose File'
+                      )}
+                    </Button>
+                    {uploadedDigitalFileUrl && !isUploadingDigitalFile && (
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          setUploadedDigitalFileUrl('');
+                          setFormData({ ...formData, digitalFile: null });
+                          setUploadError('');
+                        }}
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
                   {touched.digitalFile && errors.digitalFile && (
                     <p className="text-sm text-red-500">{errors.digitalFile}</p>
                   )}
-                  {!touched.digitalFile && mode === 'create' && (
+                  {!touched.digitalFile && mode === 'create' && !isUploadingDigitalFile && !uploadedDigitalFileUrl && (
                     <p className="text-xs text-muted-foreground">Digital file is required for digital products</p>
                   )}
                 </div>
@@ -1857,9 +1988,17 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
             >
               Save as Draft
             </Button>
-            <Button className="btn-primary gap-2 h-11 px-8" onClick={handleSubmit}>
+            <Button 
+              className="btn-primary gap-2 h-11 px-8" 
+              onClick={handleSubmit}
+              disabled={isUploadingDigitalFile || (activeType === 'DIGITAL' && !uploadedDigitalFileUrl && mode === 'create')}
+            >
               <Save className="w-4 h-4" />
-              {mode === 'edit' ? 'Update Product' : 'Create Product'}
+              {isUploadingDigitalFile 
+                ? 'Uploading...' 
+                : mode === 'edit' 
+                  ? 'Update Product' 
+                  : 'Create Product'}
             </Button>
           </div>
         </div>

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, Save, X, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Save, X, ChevronDown, ChevronUp, Loader2, GripVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dialog,
@@ -28,8 +28,125 @@ import { Switch } from '@/components/ui/switch';
 import RichTextEditor from '@/components/admin/RichTextEditor';
 import { toast } from 'sonner';
 import { faqApi } from '@/lib/api';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const categories = ['All', 'Shipping', 'Returns', 'Payment', 'Customization', 'Products', 'General'];
+
+// Sortable FAQ Item Component
+const SortableFAQItem = ({ faq, index, onEdit, onDelete, onMoveUp, onMoveDown, totalItems }: any) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: faq.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ delay: index * 0.05, duration: 0.4 }}
+        className={`bg-white rounded-xl border border-border shadow-sm overflow-hidden hover:shadow-md transition-shadow ${isDragging ? 'shadow-lg' : ''}`}
+      >
+        <div className="p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Badge variant="secondary" className="text-xs">
+                  {faq.category}
+                </Badge>
+                <Badge 
+                  className={faq.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}
+                >
+                  {faq.status}
+                </Badge>
+                <span className="text-xs text-muted-foreground">Order: {faq.displayOrder || index}</span>
+              </div>
+              <h3 className="font-semibold text-lg">{faq.question}</h3>
+              <p className="text-muted-foreground line-clamp-2">{faq.answer}</p>
+            </div>
+            
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex flex-col gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => onMoveUp(faq)}
+                  disabled={index === 0}
+                >
+                  <ChevronUp className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => onMoveDown(faq)}
+                  disabled={index === totalItems - 1}
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => onEdit(faq)}
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => onDelete(faq)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Drag Handle */}
+        <div 
+          className="absolute left-0 top-0 bottom-0 flex items-center cursor-grab active:cursor-grabbing z-10 p-2 text-muted-foreground hover:text-foreground"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-5 h-5" />
+        </div>
+      </motion.div>
+    </div>
+  );
+};
 
 const AdminFAQ = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -89,11 +206,71 @@ const AdminFAQ = () => {
     },
   });
   
+  // Reorder mutation
+  const reorderMutation = useMutation({
+    mutationFn: faqApi.reorder,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['faqs'] });
+      toast.success('FAQ order updated successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to reorder FAQs');
+    },
+  });
+  
+  // Setup drag-and-drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      sortableKeyboardCoordinates,
+    })
+  );
+  
+  // Handle drag end for reordering
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    if (active.id !== over?.id) {
+      const oldIndex = filteredFAQs.findIndex((faq) => faq.id === active.id);
+      const newIndex = filteredFAQs.findIndex((faq) => faq.id === over?.id);
+      
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reorderedFiltered = arrayMove(filteredFAQs, oldIndex, newIndex);
+        const filteredIdSet = new Set(filteredFAQs.map((faq) => faq.id));
+        const baseOrder = [...faqs].sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0));
+
+        let filteredIndex = 0;
+        const nextOrder = baseOrder.map((faq: any) => {
+          if (!filteredIdSet.has(faq.id)) {
+            return faq;
+          }
+          const replacement = reorderedFiltered[filteredIndex++];
+          return replacement ?? faq;
+        }).map((faq: any, index: number) => ({
+          ...faq,
+          displayOrder: index,
+        }));
+
+        const orderedIds = nextOrder.map((faq: any) => faq.id);
+
+        // Update local state immediately for better UX
+        queryClient.setQueryData(['faqs'], nextOrder);
+
+        // Call API to update order
+        reorderMutation.mutate(orderedIds);
+      }
+    }
+  };
+  
   const [formData, setFormData] = useState({
     question: '',
     answer: '',
     category: 'General',
-    order: 0,
+    displayOrder: 0,
     status: 'active' as 'active' | 'inactive',
   });
 
@@ -102,7 +279,7 @@ const AdminFAQ = () => {
       question: '',
       answer: '',
       category: 'General',
-      order: 0,
+      displayOrder: 0,
       status: 'active',
     });
   };
@@ -113,7 +290,7 @@ const AdminFAQ = () => {
       question: faq.question,
       answer: faq.answer,
       category: faq.category,
-      order: faq.order,
+      displayOrder: faq.displayOrder,
       status: faq.status,
     });
     setIsEditDialogOpen(true);
@@ -153,16 +330,16 @@ const AdminFAQ = () => {
 
   const handleMoveUp = (faq: any) => {
     // Reorder mutation
-    const newOrder = (faq.order || 0) - 1;
+    const newOrder = (faq.displayOrder || 0) - 1;
     if (newOrder >= 0) {
-      updateMutation.mutate({ id: faq.id, data: { ...faq, order: newOrder } });
+      updateMutation.mutate({ id: faq.id, data: { ...faq, displayOrder: newOrder } });
     }
   };
 
   const handleMoveDown = (faq: any) => {
     // Reorder mutation
-    const newOrder = (faq.order || 0) + 1;
-    updateMutation.mutate({ id: faq.id, data: { ...faq, order: newOrder } });
+    const newOrder = (faq.displayOrder || 0) + 1;
+    updateMutation.mutate({ id: faq.id, data: { ...faq, displayOrder: newOrder } });
   };
 
   const filteredFAQs = faqs.filter((faq: any) => {
@@ -170,7 +347,7 @@ const AdminFAQ = () => {
     const matchesSearch = faq.question?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          faq.answer?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
-  }).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+  }).sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0));
   
   if (isLoading) {
     return (
@@ -251,85 +428,24 @@ const AdminFAQ = () => {
         </motion.div>
 
         {/* FAQs List */}
-        <div className="space-y-4">
-          {filteredFAQs.map((faq, index) => (
-            <motion.div
-              key={faq.id}
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ delay: index * 0.05, duration: 0.4 }}
-              className="bg-white rounded-xl border border-border shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-            >
-              <div className="p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <Badge variant="secondary" className="text-xs">
-                        {faq.category}
-                      </Badge>
-                      <Badge 
-                        className={faq.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}
-                      >
-                        {faq.status}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">Order: {faq.order}</span>
-                    </div>
-                    <h3 className="font-semibold text-lg">{faq.question}</h3>
-                    <p className="text-muted-foreground line-clamp-2">{faq.answer}</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <div className="flex flex-col gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleMoveUp(faq)}
-                        disabled={index === 0}
-                      >
-                        <ChevronUp className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleMoveDown(faq)}
-                        disabled={index === filteredFAQs.length - 1}
-                      >
-                        <ChevronDown className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => handleEdit(faq)}
-                        className="h-9 w-9"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => handleDelete(faq.id)}
-                        className="h-9 w-9 text-destructive hover:text-destructive"
-                        disabled={deleteMutation.isPending}
-                      >
-                        {deleteMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </motion.div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={filteredFAQs.map((faq) => faq.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-4">
+              {filteredFAQs.map((faq, index) => (
+                <SortableFAQItem
+                  key={faq.id}
+                  faq={faq}
+                  index={index}
+                  totalItems={filteredFAQs.length}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onMoveUp={handleMoveUp}
+                  onMoveDown={handleMoveDown}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
 
         {filteredFAQs.length === 0 && (
           <div className="text-center py-20 bg-white rounded-xl border border-border">
@@ -397,8 +513,8 @@ const AdminFAQ = () => {
                   <Input
                     type="number"
                     placeholder="0"
-                    value={formData.order}
-                    onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
+                    value={formData.displayOrder}
+                    onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
                     className="h-11"
                   />
                 </div>

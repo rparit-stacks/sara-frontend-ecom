@@ -338,9 +338,21 @@ const CustomProductDetail = () => {
     if (Object.keys(configVar).length) setSelectedConfigVariants(configVar);
 
     if (item.customFormData && typeof item.customFormData === 'object' && Object.keys(item.customFormData).length) {
-      setCustomFormData(item.customFormData);
+      // Backend may send label keys; transform to id keys for form
+      const raw = item.customFormData as Record<string, any>;
+      const byId: Record<string, any> = {};
+      const configFields = customFormFields || [];
+      const fabricFields = (selectedFabricProduct as any)?.customFields || [];
+      [...configFields, ...fabricFields].forEach((f: any) => {
+        const id = String(f.id ?? f.displayOrder ?? '');
+        if (!id) return;
+        const val = raw[f.label] ?? raw[f.name] ?? raw[id];
+        if (val != null) byId[id] = val;
+      });
+      if (raw.fabricMeters != null) byId.fabricMeters = raw.fabricMeters;
+      setCustomFormData(Object.keys(byId).length ? byId : raw);
     }
-  }, [isEditFromCart, resolvedCartItem, effectiveConfigVariants]);
+  }, [isEditFromCart, resolvedCartItem, effectiveConfigVariants, customFormFields, selectedFabricProduct]);
 
   // Preload fabricSelectionData once fabric is loaded (edit-from-cart); quantity = meters
   useEffect(() => {
@@ -418,7 +430,11 @@ const CustomProductDetail = () => {
       totalPrice: combinedPrice * metersQuantity,
       variants: fabricSelectionData!.selectedVariants,
       variantSelections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
-      customFormData: { ...customFormData, fabricMeters: metersQuantity },
+      customFormData: {
+        ...customFormData,
+        ...(fabricSelectionData?.customFieldValues || {}),
+        fabricMeters: metersQuantity,
+      },
       uploadedDesignUrl: designUrl,
       customProductId: customProductId ?? undefined,
     };
@@ -519,9 +535,14 @@ const CustomProductDetail = () => {
     }
   };
 
-  // Add to wishlist mutation (wishlist API takes productType + productId)
+  // Add to wishlist mutation (wishlist API takes object with productType, productId, etc.)
   const addToWishlistMutation = useMutation({
-    mutationFn: () => wishlistApi.addItem('CUSTOM', Number(customProductId!)),
+    mutationFn: () => wishlistApi.addItem({
+      productType: 'CUSTOM',
+      productId: Number(customProductId!),
+      productName: customProduct?.productName || 'Custom Design',
+      productImage: designUrl || displayImages?.[0],
+    }),
     onSuccess: () => {
       if (customProductId) {
         // Save custom product when added to wishlist
@@ -550,6 +571,30 @@ const CustomProductDetail = () => {
     }
 
     addToWishlistMutation.mutate();
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const title = customProduct?.productName || 'Custom Design';
+    const text = `Check out ${title}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text, url });
+        toast.success('Link shared!');
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link copied to clipboard!');
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        try {
+          await navigator.clipboard.writeText(url);
+          toast.success('Link copied to clipboard!');
+        } catch {
+          toast.error('Failed to share');
+        }
+      }
+    }
   };
 
   if (!designUrl || displayImages.length === 0) return null;
@@ -877,7 +922,7 @@ const CustomProductDetail = () => {
                     >
                       <Heart className={`w-5 h-5 ${isSaved ? 'fill-primary text-primary' : ''}`} />
                     </Button>
-                    <Button size="lg" variant="outline" className="rounded-full w-14 h-14">
+                    <Button size="lg" variant="outline" className="rounded-full w-14 h-14" onClick={handleShare}>
                       <Share2 className="w-5 h-5" />
                     </Button>
                   </div>

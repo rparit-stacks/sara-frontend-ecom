@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Grid, List, SlidersHorizontal, X, Loader2 } from 'lucide-react';
+import { Grid, List, SlidersHorizontal, X, ChevronRight } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
@@ -9,7 +9,6 @@ import ListViewProductCard from '@/components/products/ListViewProductCard';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
@@ -21,13 +20,14 @@ interface Category {
   name: string;
   slug: string;
   parentId: number | null;
+  displayOrder?: number;
   subcategories?: Category[];
 }
 
 interface PriceRange {
   label: string;
   min: number;
-  max: number | null; // null means "over"
+  max: number | null;
 }
 
 const priceRanges: PriceRange[] = [
@@ -45,36 +45,30 @@ const Products = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(16);
   
-  // Filter states
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
-  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<number | null>(null);
+  // Cascading category filter - array of selected category IDs at each level
+  // [level0CategoryId, level1CategoryId, level2CategoryId, ...]
+  const [categoryPath, setCategoryPath] = useState<number[]>([]);
   const [selectedPriceRange, setSelectedPriceRange] = useState<PriceRange | null>(null);
 
-  // Responsive page size
   const getPageSize = () => {
-    if (window.innerWidth < 640) return 8;  // Mobile: 2 cols × 4 rows
-    if (window.innerWidth < 1024) return 12; // Tablet: 3 cols × 4 rows
-    return 16; // Desktop: 4 cols × 4 rows
+    if (window.innerWidth < 640) return 8;
+    if (window.innerWidth < 1024) return 12;
+    return 16;
   };
 
   useEffect(() => {
     const handleResize = () => {
       const newPageSize = getPageSize();
       setPageSize(newPageSize);
-      // Reset to page 1 when page size changes
       setCurrentPage(1);
     };
-
-    // Set initial page size
     setPageSize(getPageSize());
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const filter = searchParams.get('filter');
   
-  // Fetch products from API with user email if logged in
   const { data: apiProducts = [], isLoading } = useQuery({
     queryKey: ['products'],
     queryFn: () => {
@@ -92,7 +86,6 @@ const Products = () => {
     },
   });
   
-  // Fetch homepage CMS data to get explicit New Arrivals selection
   const { data: cmsData } = useQuery({
     queryKey: ['cmsHomepage'],
     queryFn: () => cmsApi.getHomepage(),
@@ -100,7 +93,6 @@ const Products = () => {
     retry: 2,
   });
   
-  // Fetch categories with subcategories and user email if logged in
   const { data: apiCategories = [] } = useQuery({
     queryKey: ['categoriesActive'],
     queryFn: () => {
@@ -118,37 +110,44 @@ const Products = () => {
     },
   });
 
-  // Transform categories: parents and subcategories sorted by display order (1, 2, 3...)
-  const categories: Category[] = useMemo(() => {
-    const cats = apiCategories.map((c: any) => ({
-      id: c.id,
-      name: c.name,
-      slug: c.slug,
-      parentId: c.parentId,
-      displayOrder: c.displayOrder,
-      subcategories: (c.subcategories?.map((sub: any) => ({
-        id: sub.id,
-        name: sub.name,
-        slug: sub.slug,
-        parentId: sub.parentId,
-        displayOrder: sub.displayOrder,
-      })) ?? []).sort((a: any, b: any) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999)),
-    }));
+  // Build a flat map of all categories for easy lookup
+  const allCategoriesMap = useMemo(() => {
+    const map = new Map<number, Category>();
+    const buildMap = (cats: any[]) => {
+      cats.forEach((c: any) => {
+        const cat: Category = {
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+          parentId: c.parentId,
+          displayOrder: c.displayOrder,
+          subcategories: c.subcategories || [],
+        };
+        map.set(c.id, cat);
+        if (c.subcategories && c.subcategories.length > 0) {
+          buildMap(c.subcategories);
+        }
+      });
+    };
+    buildMap(apiCategories);
+    return map;
+  }, [apiCategories]);
 
-    // Separate parent and child categories; sort parents by display order
-    const parentCategories = cats.filter(c => !c.parentId).sort((a: any, b: any) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999));
-    const childCategories = cats.filter(c => c.parentId);
-
-    // Attach subcategories to parents (each parent's subcategories already sorted above when from API; when rebuilt from children, sort by displayOrder)
-    return parentCategories.map(parent => ({
-      ...parent,
-      subcategories: childCategories
-        .filter((sub: any) => sub.parentId === parent.id)
-        .sort((a: any, b: any) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999)),
-    }));
+  // Get root level categories (no parent)
+  const rootCategories = useMemo(() => {
+    return apiCategories
+      .filter((c: any) => !c.parentId)
+      .map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        parentId: c.parentId,
+        displayOrder: c.displayOrder,
+        subcategories: c.subcategories || [],
+      }))
+      .sort((a: Category, b: Category) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999));
   }, [apiCategories]);
   
-  // Transform products (slug || id for links; ProductDetail supports both)
   const allProducts: Product[] = apiProducts.map((p: any) => ({
     id: String(p.id),
     slug: p.slug || String(p.id),
@@ -164,7 +163,6 @@ const Products = () => {
     createdAt: p.createdAt,
   }));
   
-  // IDs explicitly marked in CMS (admin selection)
   const bestSellerIds: Array<number | string> = cmsData?.bestSellerIds || cmsData?.bestSellers || [];
   const newArrivalIds: Array<number | string> = cmsData?.newArrivalIds || cmsData?.newArrivals || [];
   
@@ -177,51 +175,97 @@ const Products = () => {
     }
   };
 
-  // Get available subcategories based on selected category
-  const availableSubCategories = useMemo(() => {
-    if (!selectedCategoryId) return [];
-    const category = categories.find(c => c.id === selectedCategoryId);
-    return category?.subcategories || [];
-  }, [selectedCategoryId, categories]);
-
-  // Handle category selection
-  const handleCategoryChange = (categoryId: number | null) => {
-    setSelectedCategoryId(categoryId);
-    // Clear subcategory if it doesn't belong to new category
-    if (categoryId && selectedSubCategoryId) {
-      const category = categories.find(c => c.id === categoryId);
-      const subExists = category?.subcategories?.some(sub => sub.id === selectedSubCategoryId);
-      if (!subExists) {
-        setSelectedSubCategoryId(null);
+  // Get all descendant category IDs for a given category
+  const getAllDescendantIds = (categoryId: number): number[] => {
+    const category = allCategoriesMap.get(categoryId);
+    if (!category) return [categoryId];
+    
+    const descendants = [categoryId];
+    const getChildren = (cat: Category) => {
+      if (cat.subcategories && cat.subcategories.length > 0) {
+        cat.subcategories.forEach((sub: Category) => {
+          descendants.push(sub.id);
+          const fullSub = allCategoriesMap.get(sub.id);
+          if (fullSub) getChildren(fullSub);
+        });
       }
+    };
+    getChildren(category);
+    return descendants;
+  };
+
+  // Get categories to show at each level based on current path
+  const getCategoriesForLevel = (level: number): Category[] => {
+    if (level === 0) {
+      // Root level - show all root categories
+      return rootCategories;
+    }
+    
+    // Get parent category from previous level
+    const parentId = categoryPath[level - 1];
+    if (!parentId) return [];
+    
+    const parent = allCategoriesMap.get(parentId);
+    if (!parent || !parent.subcategories) return [];
+    
+    return parent.subcategories.sort((a, b) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999));
+  };
+
+  // Handle category selection at a specific level
+  const handleCategorySelect = (level: number, categoryId: number | null) => {
+    if (categoryId === null) {
+      // "All Category" clicked - clear from this level onwards
+      setCategoryPath(prev => prev.slice(0, level));
+    } else {
+      // Category selected - update path up to this level
+      setCategoryPath(prev => {
+        const newPath = prev.slice(0, level);
+        newPath[level] = categoryId;
+        return newPath;
+      });
     }
   };
 
-  // Handle subcategory selection
-  const handleSubCategoryChange = (subCategoryId: number | null) => {
-    setSelectedSubCategoryId(subCategoryId);
-    // Auto-select parent category
-    if (subCategoryId) {
-      const subCategory = categories
-        .flatMap(c => c.subcategories?.map(sub => ({ ...sub, parentId: c.id })) || [])
-        .find(sub => sub.id === subCategoryId);
-      if (subCategory?.parentId) {
-        setSelectedCategoryId(subCategory.parentId);
-      }
+  // Get products that match the current category filter
+  const getFilteredByCategory = (products: Product[]): Product[] => {
+    if (categoryPath.length === 0) {
+      // No category selected - show all
+      return products;
     }
+    
+    // Get the deepest selected category
+    const selectedCategoryId = categoryPath[categoryPath.length - 1];
+    const allowedCategoryIds = getAllDescendantIds(selectedCategoryId);
+    
+    return products.filter(p => allowedCategoryIds.includes(p.categoryId));
   };
+
+  // Get categories that have products (for filtering empty categories)
+  const categoriesWithProducts = useMemo(() => {
+    const productCategoryIds = new Set(allProducts.map(p => p.categoryId));
+    const hasProducts = new Set<number>();
+    
+    // Mark all categories that have products or have descendants with products
+    allCategoriesMap.forEach((cat, id) => {
+      const descendants = getAllDescendantIds(id);
+      if (descendants.some(descId => productCategoryIds.has(descId))) {
+        hasProducts.add(id);
+      }
+    });
+    
+    return hasProducts;
+  }, [allProducts, allCategoriesMap]);
 
   // Filter products by all criteria
   const filteredProducts = useMemo(() => {
     let filtered = allProducts;
 
-    // Filter by URL filter param (e.g. ?filter=new, ?filter=best)
+    // Filter by URL filter param
     if (filter === 'new') {
       if (newArrivalIds && newArrivalIds.length > 0) {
         const idSet = new Set(newArrivalIds.map((id) => String(id)));
         filtered = filtered.filter((product) => idSet.has(product.id));
       } else {
-        // Fallback: use isNew flag when no explicit selection in CMS
         filtered = filtered.filter((product) => product.isNew);
       }
     } else if (filter === 'best') {
@@ -229,7 +273,6 @@ const Products = () => {
         const idSet = new Set(bestSellerIds.map((id) => String(id)));
         filtered = filtered.filter((product) => idSet.has(product.id));
       } else {
-        // Fallback: use rating to approximate best sellers when no explicit selection in CMS
         filtered = filtered.filter((product) => (product.rating || 0) >= 4.5);
       }
     }
@@ -241,24 +284,16 @@ const Products = () => {
       );
     }
 
-    // Filter by category
-    if (selectedCategoryId) {
-      filtered = filtered.filter(product => product.categoryId === selectedCategoryId);
-    }
+    // Filter by category path
+    filtered = getFilteredByCategory(filtered);
 
-    // Filter by subcategory (if selected, it overrides category filter)
-    if (selectedSubCategoryId) {
-      filtered = filtered.filter(product => product.categoryId === selectedSubCategoryId);
-    }
-
-    // Filter by price range (applied last)
+    // Filter by price range
     if (selectedPriceRange) {
       filtered = filtered.filter(product => {
         const price = product.price;
         if (selectedPriceRange.max === null) {
           return price >= selectedPriceRange.min;
         }
-        // "Under ₹300" uses strict less-than; other ranges are inclusive
         if (selectedPriceRange.min === 0 && selectedPriceRange.max === 300) {
           return price < 300;
         }
@@ -281,18 +316,13 @@ const Products = () => {
       case 'price-high':
         filtered = [...filtered].sort((a, b) => b.price - a.price);
         break;
-      case 'rating':
-        filtered = [...filtered].sort((a, b) => (b.rating || 0) - (a.rating || 0));
-        break;
-      default: // featured
-        // Keep original order
+      default:
         break;
     }
 
     return filtered;
-  }, [allProducts, searchQuery, selectedCategoryId, selectedSubCategoryId, selectedPriceRange, sortBy, filter, newArrivalIds, bestSellerIds]);
+  }, [allProducts, searchQuery, categoryPath, selectedPriceRange, sortBy, filter, newArrivalIds, bestSellerIds]);
 
-  // Pagination calculations
   const totalPages = Math.ceil(filteredProducts.length / pageSize);
   const paginatedProducts = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
@@ -300,18 +330,83 @@ const Products = () => {
     return filteredProducts.slice(startIndex, endIndex);
   }, [filteredProducts, currentPage, pageSize]);
 
-  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCategoryId, selectedSubCategoryId, selectedPriceRange, searchQuery, filter]);
+  }, [categoryPath, selectedPriceRange, searchQuery, filter]);
 
   const clearAllFilters = () => {
-    setSelectedCategoryId(null);
-    setSelectedSubCategoryId(null);
+    setCategoryPath([]);
     setSelectedPriceRange(null);
   };
 
-  const hasActiveFilters = selectedCategoryId !== null || selectedSubCategoryId !== null || selectedPriceRange !== null;
+  const hasActiveFilters = categoryPath.length > 0 || selectedPriceRange !== null;
+
+  // Render cascading category filters
+  const renderCategoryFilters = (isMobile: boolean = false) => {
+    const levels: JSX.Element[] = [];
+    
+    // Determine how many levels to show (current path + 1 for next level)
+    const maxLevel = categoryPath.length + 1;
+    
+    for (let level = 0; level < maxLevel; level++) {
+      const categories = getCategoriesForLevel(level);
+      
+      // Only show categories that have products
+      const availableCategories = categories.filter(cat => categoriesWithProducts.has(cat.id));
+      
+      if (availableCategories.length === 0 && level > 0) continue;
+      
+      const selectedId = categoryPath[level];
+      const selectedCategory = selectedId ? allCategoriesMap.get(selectedId) : null;
+      
+      const levelTitle = level === 0 ? 'Categories' : 
+                        level === 1 ? 'Sub-Categories' :
+                        `Level ${level + 1}`;
+      
+      levels.push(
+        <div key={level} className={level > 0 ? 'border-t border-border pt-6' : ''}>
+          <div className="flex items-center gap-2 mb-4">
+            {level > 0 && <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+            <h4 className={isMobile ? 'font-medium text-sm' : 'font-cursive text-2xl'}>
+              {levelTitle}
+            </h4>
+          </div>
+          <div className="space-y-3">
+            {/* "All Category" option for each level */}
+            <button
+              onClick={() => handleCategorySelect(level, null)}
+              className={`w-full text-left px-3 py-2 rounded-md transition-colors text-sm ${
+                !selectedId
+                  ? 'bg-primary text-primary-foreground font-medium'
+                  : 'hover:bg-secondary text-muted-foreground'
+              }`}
+            >
+              All {level === 0 ? 'Categories' : 'Items'}
+            </button>
+            
+            {availableCategories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => handleCategorySelect(level, cat.id)}
+                className={`w-full text-left px-3 py-2 rounded-md transition-colors text-sm flex items-center justify-between ${
+                  selectedId === cat.id
+                    ? 'bg-primary text-primary-foreground font-medium'
+                    : 'hover:bg-secondary text-muted-foreground'
+                }`}
+              >
+                <span>{cat.name}</span>
+                {cat.subcategories && cat.subcategories.length > 0 && (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    
+    return levels;
+  };
 
   return (
     <Layout>
@@ -348,27 +443,21 @@ const Products = () => {
       {/* Products Section */}
       <section className="w-full py-14 lg:py-20">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
-          {/* Active Filters */}
+          {/* Active Filters Breadcrumb */}
           {hasActiveFilters && (
             <div className="flex flex-wrap items-center gap-2 mb-8">
               <span className="text-sm text-muted-foreground">Active filters:</span>
-              {selectedCategoryId && (
-                <Badge key="category" variant="secondary" className="gap-1 text-sm py-1 px-3">
-                  {categories.find(c => c.id === selectedCategoryId)?.name}
-                  <button onClick={() => handleCategoryChange(null)}>
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
-              )}
-              {selectedSubCategoryId && (
-                <Badge key="subcategory" variant="secondary" className="gap-1 text-sm py-1 px-3">
-                  {availableSubCategories.find(sub => sub.id === selectedSubCategoryId)?.name || 
-                   categories.flatMap(c => c.subcategories || []).find(sub => sub.id === selectedSubCategoryId)?.name}
-                  <button onClick={() => handleSubCategoryChange(null)}>
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
-              )}
+              {categoryPath.map((catId, index) => {
+                const cat = allCategoriesMap.get(catId);
+                return (
+                  <Badge key={`cat-${index}-${catId}`} variant="secondary" className="gap-1 text-sm py-1 px-3">
+                    {cat?.name}
+                    <button onClick={() => handleCategorySelect(index, null)}>
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                );
+              })}
               {selectedPriceRange && (
                 <Badge key="price" variant="secondary" className="gap-1 text-sm py-1 px-3">
                   {selectedPriceRange.label}
@@ -399,79 +488,34 @@ const Products = () => {
                     <SheetTitle>Filters</SheetTitle>
                   </SheetHeader>
                   <div className="mt-6 space-y-6">
-                    {/* Category Filter */}
-                    <div>
-                      <h4 className="font-medium mb-3">Category</h4>
-                      <div className="space-y-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <Checkbox 
-                            checked={selectedCategoryId === null}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                handleCategoryChange(null);
-                                setSelectedSubCategoryId(null);
-                              }
-                            }}
-                          />
-                          <span className="text-sm">All Categories</span>
-                        </label>
-                        {categories.map((cat) => (
-                          <label key={cat.id} className="flex items-center gap-2 cursor-pointer">
-                            <Checkbox 
-                              checked={selectedCategoryId === cat.id}
-                              onCheckedChange={(checked) => {
-                                handleCategoryChange(checked ? cat.id : null);
-                              }}
-                            />
-                            <span className="text-sm">{cat.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Sub-Category Filter */}
-                    {selectedCategoryId && availableSubCategories.length > 0 && (
-                      <div>
-                        <h4 className="font-medium mb-3">Sub-Category</h4>
-                        <div className="space-y-2">
-                          {availableSubCategories.map((sub) => (
-                            <label key={sub.id} className="flex items-center gap-2 cursor-pointer">
-                              <Checkbox 
-                                checked={selectedSubCategoryId === sub.id}
-                                onCheckedChange={(checked) => {
-                                  handleSubCategoryChange(checked ? sub.id : null);
-                                }}
-                              />
-                              <span className="text-sm">{sub.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    {renderCategoryFilters(true)}
 
                     {/* Price Filter */}
-                    <div>
-                      <h4 className="font-medium mb-3">Price</h4>
+                    <div className="border-t border-border pt-6">
+                      <h4 className="font-medium mb-3 text-sm">Price Range</h4>
                       <div className="space-y-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <Checkbox 
-                            checked={selectedPriceRange === null}
-                            onCheckedChange={(checked) => {
-                              if (checked) setSelectedPriceRange(null);
-                            }}
-                          />
-                          <span className="text-sm">All Prices</span>
-                        </label>
+                        <button
+                          onClick={() => setSelectedPriceRange(null)}
+                          className={`w-full text-left px-3 py-2 rounded-md transition-colors text-sm ${
+                            !selectedPriceRange
+                              ? 'bg-primary text-primary-foreground font-medium'
+                              : 'hover:bg-secondary text-muted-foreground'
+                          }`}
+                        >
+                          All Prices
+                        </button>
                         {priceRanges.map((range) => (
-                          <label key={range.label} className="flex items-center gap-2 cursor-pointer">
-                            <Checkbox 
-                              checked={selectedPriceRange?.label === range.label}
-                              onCheckedChange={(checked) => {
-                                setSelectedPriceRange(checked ? range : null);
-                              }}
-                            />
-                            <span className="text-sm">{range.label}</span>
-                          </label>
+                          <button
+                            key={range.label}
+                            onClick={() => setSelectedPriceRange(range)}
+                            className={`w-full text-left px-3 py-2 rounded-md transition-colors text-sm ${
+                              selectedPriceRange?.label === range.label
+                                ? 'bg-primary text-primary-foreground font-medium'
+                                : 'hover:bg-secondary text-muted-foreground'
+                            }`}
+                          >
+                            {range.label}
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -510,7 +554,6 @@ const Products = () => {
                 <SelectItem value="newest">Newest</SelectItem>
                 <SelectItem value="price-low">Price: Low to High</SelectItem>
                 <SelectItem value="price-high">Price: High to Low</SelectItem>
-                <SelectItem value="rating">Best Rating</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -519,79 +562,34 @@ const Products = () => {
             {/* Desktop Sidebar Filters */}
             <aside className="hidden lg:block w-64 flex-shrink-0">
               <div className="sticky top-24 space-y-8">
-                {/* Category Filter */}
-                <div>
-                  <h4 className="font-cursive text-2xl mb-5">Category</h4>
-                  <div className="space-y-4">
-                    <label className="flex items-center gap-3 cursor-pointer group">
-                      <Checkbox 
-                        checked={selectedCategoryId === null}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            handleCategoryChange(null);
-                            setSelectedSubCategoryId(null);
-                          }
-                        }}
-                      />
-                      <span className="text-muted-foreground group-hover:text-foreground transition-colors text-base">All Categories</span>
-                    </label>
-                    {categories.map((cat) => (
-                      <label key={cat.id} className="flex items-center gap-3 cursor-pointer group">
-                        <Checkbox 
-                          checked={selectedCategoryId === cat.id}
-                          onCheckedChange={(checked) => {
-                            handleCategoryChange(checked ? cat.id : null);
-                          }}
-                        />
-                        <span className="text-muted-foreground group-hover:text-foreground transition-colors text-base">{cat.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Sub-Category Filter */}
-                {selectedCategoryId && availableSubCategories.length > 0 && (
-                  <div className="border-t border-border pt-8">
-                    <h4 className="font-cursive text-2xl mb-5">Sub-Category</h4>
-                    <div className="space-y-4">
-                      {availableSubCategories.map((sub) => (
-                        <label key={sub.id} className="flex items-center gap-3 cursor-pointer group">
-                          <Checkbox 
-                            checked={selectedSubCategoryId === sub.id}
-                            onCheckedChange={(checked) => {
-                              handleSubCategoryChange(checked ? sub.id : null);
-                            }}
-                          />
-                          <span className="text-muted-foreground group-hover:text-foreground transition-colors text-base">{sub.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {renderCategoryFilters(false)}
 
                 {/* Price Filter */}
                 <div className="border-t border-border pt-8">
                   <h4 className="font-cursive text-2xl mb-5">Price Range</h4>
-                  <div className="space-y-4">
-                    <label className="flex items-center gap-3 cursor-pointer group">
-                      <Checkbox 
-                        checked={selectedPriceRange === null}
-                        onCheckedChange={(checked) => {
-                          if (checked) setSelectedPriceRange(null);
-                        }}
-                      />
-                      <span className="text-muted-foreground group-hover:text-foreground transition-colors text-base">All Prices</span>
-                    </label>
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => setSelectedPriceRange(null)}
+                      className={`w-full text-left px-3 py-2 rounded-md transition-colors text-base ${
+                        !selectedPriceRange
+                          ? 'bg-primary text-primary-foreground font-medium'
+                          : 'hover:bg-secondary text-muted-foreground'
+                      }`}
+                    >
+                      All Prices
+                    </button>
                     {priceRanges.map((range) => (
-                      <label key={range.label} className="flex items-center gap-3 cursor-pointer group">
-                        <Checkbox 
-                          checked={selectedPriceRange?.label === range.label}
-                          onCheckedChange={(checked) => {
-                            setSelectedPriceRange(checked ? range : null);
-                          }}
-                        />
-                        <span className="text-muted-foreground group-hover:text-foreground transition-colors text-base">{range.label}</span>
-                      </label>
+                      <button
+                        key={range.label}
+                        onClick={() => setSelectedPriceRange(range)}
+                        className={`w-full text-left px-3 py-2 rounded-md transition-colors text-base ${
+                          selectedPriceRange?.label === range.label
+                            ? 'bg-primary text-primary-foreground font-medium'
+                            : 'hover:bg-secondary text-muted-foreground'
+                        }`}
+                      >
+                        {range.label}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -656,7 +654,6 @@ const Products = () => {
                     </PaginationItem>
                     
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                      // Show first page, last page, current page, and pages around current
                       if (
                         page === 1 ||
                         page === totalPages ||

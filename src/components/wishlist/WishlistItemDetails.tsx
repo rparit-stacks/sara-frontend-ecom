@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { productsApi } from '@/lib/api';
+import { productsApi, customConfigApi } from '@/lib/api';
 import { usePrice } from '@/lib/currency';
 import { Loader2, FileText, ExternalLink } from 'lucide-react';
 
@@ -47,6 +47,12 @@ const isUrl = (value: any): boolean => {
   }
 };
 
+// Helper function to map field IDs to labels
+const getFieldLabel = (fieldId: string, fields: any[]): string => {
+  const field = fields.find((f: any) => String(f.id) === fieldId);
+  return field?.label || field?.name || formatFieldName(fieldId);
+};
+
 export const WishlistItemDetails = ({ item }: WishlistItemDetailsProps) => {
   const isCustom = item.productType === 'CUSTOM';
   const { format } = usePrice();
@@ -57,6 +63,32 @@ export const WishlistItemDetails = ({ item }: WishlistItemDetailsProps) => {
     queryFn: () => productsApi.getById(item.fabricId!),
     enabled: !!item.fabricId && (item.productType === 'DESIGNED' || isCustom),
   });
+
+  // Fetch custom config for CUSTOM products (has form field labels)
+  const { data: customConfig } = useQuery({
+    queryKey: ['customConfig'],
+    queryFn: () => customConfigApi.getPublicConfig(),
+    enabled: isCustom,
+  });
+
+  const configFormFields = (customConfig?.formFields || []).map((f: any) => ({
+    id: String(f.id ?? f.frontendId ?? ''),
+    label: f.label || f.name,
+    name: f.name || f.label,
+  })).filter((f: any) => f.id);
+
+  // Deduplicate entries with same URL (1 image added, avoid showing 2)
+  const dedupeByUrl = (entries: [string, any][]): [string, any][] => {
+    const seenUrls = new Set<string>();
+    return entries.filter(([key, value]) => {
+      if (typeof value === 'string' && (value.startsWith('http') || value.startsWith('data:'))) {
+        const url = String(value).trim();
+        if (seenUrls.has(url)) return false;
+        seenUrls.add(url);
+      }
+      return true;
+    });
+  };
 
   if (fabricLoading && (item.productType === 'DESIGNED' || isCustom) && item.fabricId) {
     return (
@@ -130,11 +162,12 @@ export const WishlistItemDetails = ({ item }: WishlistItemDetailsProps) => {
       {customFormEntries.length > 0 && (
         <div className="space-y-0.5 pt-1">
           <div className="text-xs font-medium text-muted-foreground">Custom Details:</div>
-          {customFormEntries.map(([key, value]) => {
+          {dedupeByUrl(customFormEntries).map(([key, value]) => {
             const isUrlValue = isUrl(value);
+            const fieldsForLabel = isCustom ? [...configFormFields, ...(fabricData?.customFields || [])] : (fabricData?.customFields || []);
             return (
               <div key={key} className="text-xs sm:text-sm pl-2">
-                <span className="text-muted-foreground">{formatFieldName(key)}: </span>
+                <span className="text-muted-foreground">{getFieldLabel(key, fieldsForLabel)}: </span>
                 {isUrlValue ? (
                   <a 
                     href={value as string} 

@@ -26,6 +26,7 @@ interface ProductCardProps {
 
 export const ProductCard = ({ product, className }: ProductCardProps) => {
   const { format } = usePrice();
+  
   const discount = product.originalPrice 
     ? Math.round((1 - product.price / product.originalPrice) * 100) 
     : 0;
@@ -52,44 +53,6 @@ export const ProductCard = ({ product, className }: ProductCardProps) => {
             {product.isSale && discount > 0 && (
               <Badge className="bg-[#2b9d8f] text-white text-[10px] xs:text-xs px-2 xs:px-2.5 py-0.5 xs:py-1">-{discount}%</Badge>
             )}
-          </div>
-
-          {/* Quick Actions */}
-          <div className="absolute top-2 xs:top-3 right-2 xs:right-3 flex flex-col gap-1.5 xs:gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <Button
-              size="icon"
-              className="w-8 h-8 xs:w-9 xs:h-9 rounded-full bg-white hover:bg-[#2b9d8f] text-foreground hover:text-white shadow-sm"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-            >
-              <i className="fa-regular fa-heart text-xs xs:text-sm"></i>
-            </Button>
-            <Button
-              size="icon"
-              className="w-8 h-8 xs:w-9 xs:h-9 rounded-full bg-white hover:bg-[#2b9d8f] text-foreground hover:text-white shadow-sm"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-            >
-              <i className="fa-regular fa-eye text-xs xs:text-sm"></i>
-            </Button>
-          </div>
-
-          {/* Add to Cart */}
-          <div className="absolute inset-x-0 bottom-0 p-2 xs:p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-            <Button 
-              className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white rounded-full text-xs xs:text-sm h-9 xs:h-10"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-            >
-              <i className="fa-solid fa-bag-shopping mr-1.5 xs:mr-2 text-xs xs:text-sm"></i>
-              <span className="truncate">Add to Cart</span>
-            </Button>
           </div>
         </div>
 

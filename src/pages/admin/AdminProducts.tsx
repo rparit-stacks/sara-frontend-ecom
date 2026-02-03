@@ -400,11 +400,18 @@ const AdminProducts = () => {
     subcategories: [], // Leaf categories have no subcategories
   }));
 
-  // Filter products by search
-  const filteredProducts = products.filter((product: any) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
+  // Filter and sort products by search (newest first)
+  const filteredProducts = products
+    .filter((product: any) => {
+      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesSearch;
+    })
+    .sort((a: any, b: any) => {
+      // Sort by createdAt descending (newest first)
+      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bDate - aDate;
+    });
 
   if (productsLoading) {
     return (

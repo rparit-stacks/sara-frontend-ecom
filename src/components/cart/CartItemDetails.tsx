@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { productsApi } from '@/lib/api';
+import { productsApi, customConfigApi } from '@/lib/api';
 import { usePrice } from '@/lib/currency';
 import { Loader2, FileText, ExternalLink } from 'lucide-react';
 
@@ -73,6 +73,13 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
     enabled: !!item.fabricId && (item.productType === 'DESIGNED' || isCustom),
   });
 
+  // Fetch custom config for CUSTOM products (has form field labels)
+  const { data: customConfig } = useQuery({
+    queryKey: ['customConfig'],
+    queryFn: () => customConfigApi.getPublicConfig(),
+    enabled: isCustom,
+  });
+
   if ((fabricLoading || printProductLoading) && (item.productType === 'DESIGNED' || isCustom)) {
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -84,6 +91,27 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
 
   const isPrintProduct = item.productType === 'DESIGNED' || isCustom;
   const totalMeters = item.quantity; // Always use cart item quantity as source of truth
+
+  // For CUSTOM: combine config form fields + fabric custom fields for label lookup
+  const configFormFields = (customConfig?.formFields || []).map((f: any) => ({
+    id: String(f.id ?? f.frontendId ?? ''),
+    label: f.label || f.name,
+    name: f.name || f.label,
+  })).filter((f: any) => f.id);
+
+  // Deduplicate entries with same URL value (user added 1 image, avoid showing 2)
+  const dedupeByUrl = (entries: [string, any][]): [string, any][] => {
+    const seenUrls = new Set<string>();
+    return entries.filter(([key, value]) => {
+      const isFileUrl = isUrl(value) || (typeof value === 'string' && value.startsWith('data:'));
+      if (isFileUrl) {
+        const url = String(value).trim();
+        if (seenUrls.has(url)) return false;
+        seenUrls.add(url);
+      }
+      return true;
+    });
+  };
 
   // Get fabric custom field IDs
   const fabricFieldIds = new Set(
@@ -195,12 +223,16 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
           {Object.keys(fabricCustomFields).length > 0 && (
             <div className="pl-2 space-y-0.5">
               <div className="text-xs text-muted-foreground">Custom Details:</div>
-              {Object.entries(fabricCustomFields).map(([fieldId, value]) => {
+              {dedupeByUrl(Object.entries(fabricCustomFields)).map(([fieldKey, value]) => {
                 const isUrlValue = isUrl(value);
+                // Backend sends labels as keys; fallback to getFieldLabel for legacy ID keys
+                const displayLabel = /^\d+$/.test(fieldKey)
+                  ? getFieldLabel(fieldKey, isCustom ? [...configFormFields, ...(fabricData?.customFields || [])] : (fabricData?.customFields || []))
+                  : fieldKey;
                 return (
-                  <div key={fieldId} className="text-xs sm:text-sm pl-2">
+                  <div key={fieldKey} className="text-xs sm:text-sm pl-2">
                     <span className="text-muted-foreground">
-                      {getFieldLabel(fieldId, fabricData.customFields || [])}:{' '}
+                      {displayLabel}:{' '}
                     </span>
                     {isUrlValue ? (
                       <a 
@@ -260,12 +292,15 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
           {Object.keys(printCustomFields).length > 0 && (
             <div className="pl-2 space-y-0.5">
               <div className="text-xs text-muted-foreground">Custom Details:</div>
-              {Object.entries(printCustomFields).map(([fieldId, value]) => {
+              {dedupeByUrl(Object.entries(printCustomFields)).map(([fieldKey, value]) => {
                 const isUrlValue = isUrl(value);
+                // Backend sends labels as keys; fallback to getFieldLabel for legacy ID keys
+                const fieldsForLabel = isCustom ? [...configFormFields, ...(fabricData?.customFields || [])] : (printProductData?.customFields || []);
+                const displayLabel = /^\d+$/.test(fieldKey) ? getFieldLabel(fieldKey, fieldsForLabel) : fieldKey;
                 return (
-                  <div key={fieldId} className="text-xs sm:text-sm pl-2">
+                  <div key={fieldKey} className="text-xs sm:text-sm pl-2">
                     <span className="text-muted-foreground">
-                      {getFieldLabel(fieldId, printProductData?.customFields || [])}:{' '}
+                      {displayLabel}:{' '}
                     </span>
                     {isUrlValue ? (
                       <a 
@@ -335,13 +370,13 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
             </div>
           )}
 
-          {/* Custom Form Fields */}
+          {/* Custom Form Fields (PLAIN, DIGITAL) */}
           {allCustomFormEntries.length > 0 && (
             <div className="space-y-1.5">
               <div className="text-xs font-semibold text-foreground border-b border-border pb-1">
                 Custom Details
               </div>
-              {allCustomFormEntries.map(([key, value]) => {
+              {dedupeByUrl(allCustomFormEntries).map(([key, value]) => {
                 const isUrlValue = isUrl(value);
                 return (
                   <div key={key} className="text-xs sm:text-sm pl-2">
