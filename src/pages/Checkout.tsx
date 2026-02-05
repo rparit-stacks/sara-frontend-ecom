@@ -242,8 +242,12 @@ const Checkout = () => {
     }
   }, [userProfile, isLoggedIn]);
   
-  // Don't auto-select default address - let user explicitly choose
-  // This ensures the selected address is what user wants, not auto-selected
+  // Auto-select default address if available and no address is selected yet
+  useEffect(() => {
+    if (isLoggedIn && defaultAddress && selectedAddressId === null && addresses.length > 0) {
+      setSelectedAddressId(defaultAddress.id);
+    }
+  }, [isLoggedIn, defaultAddress, selectedAddressId, addresses.length]);
   
   // Fetch cart with state, coupon, and country (India = quantity-based shipping)
   const { data: cartData, isLoading: cartLoading, refetch: refetchCart } = useQuery({
@@ -271,27 +275,58 @@ const Checkout = () => {
     if (isLoggedIn && selectedAddressId && addresses.length > 0) {
       const address = addresses.find((a: any) => a.id === selectedAddressId);
       if (address) {
+        // Split address field from backend (newline separated) into addressLine1 and addressLine2
+        const addressParts = address.address 
+          ? address.address.split('\n').filter(Boolean)
+          : [];
+        const addressLine1 = addressParts[0] || address.addressLine1 || '';
+        const addressLine2 = addressParts[1] || address.addressLine2 || '';
+        
         // Use selected address data - this ensures order uses the exact address user selected
+        // Convert country name to code if needed
+        const countryCode = address.country ? getCountryCode(address.country) : 'IN';
+        
         setFormData(prev => ({
           ...prev,
           firstName: address.firstName || prev.firstName,
           lastName: address.lastName || prev.lastName,
           email: address.email || prev.email || (userProfile as any)?.email || prev.email, // Use address email, fallback to profile
           phone: address.phoneNumber || address.phone || prev.phone, // Use address phone (important for WhatsApp)
-          address: address.address || address.addressLine1 || prev.address,
-          addressLine2: address.addressLine2 || prev.addressLine2 || '',
-          country: address.country || prev.country || 'IN',
+          address: addressLine1,
+          addressLine2: addressLine2,
+          country: countryCode,
           city: address.city || prev.city,
           postalCode: address.zipCode || address.postalCode || prev.postalCode,
           state: address.state || prev.state,
           gstin: address.gstin || prev.gstin || '',
         }));
         setHasGstin(!!address.gstin);
+        
+        // Validate selected address - check if any required fields are missing
+        const addressDataToValidate = {
+          firstName: address.firstName,
+          lastName: address.lastName,
+          email: address.email || (userProfile as any)?.email,
+          phone: address.phoneNumber || address.phone,
+          address: addressLine1,
+          city: address.city,
+          state: address.state,
+          postalCode: address.zipCode || address.postalCode,
+          country: countryCode,
+        };
+        const skipEmailRequired = isLoggedIn && !!(userProfile as any)?.email;
+        const validationErrors = getAddressValidationErrors(addressDataToValidate, false, { skipEmailRequired });
+        // Set validation errors if any fields are missing
+        setFieldErrors(validationErrors);
+        
         // Trigger shipping recalculation
         queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
       }
+    } else if (isLoggedIn && selectedAddressId === null) {
+      // Clear errors when no address is selected (user will fill form manually)
+      setFieldErrors({});
     }
-  }, [selectedAddressId, addresses, isLoggedIn, userProfile]);
+  }, [selectedAddressId, addresses, isLoggedIn, userProfile, queryClient]);
 
   // Auto-fill state and city from pincode (Zippopotam) when postal code + country are entered
   useEffect(() => {
@@ -416,6 +451,19 @@ const Checkout = () => {
   const getCountryName = () => {
     const country = COUNTRIES.find(c => c.code === formData.country);
     return country?.name || 'India';
+  };
+
+  // Convert country name to code (for mapping backend country names to frontend codes)
+  const getCountryCode = (countryName: string): string => {
+    if (!countryName) return 'IN';
+    // First try exact match by name
+    const exactMatch = COUNTRIES.find(c => c.name.toLowerCase() === countryName.toLowerCase());
+    if (exactMatch) return exactMatch.code;
+    // Then try by code (in case backend already sends code)
+    const codeMatch = COUNTRIES.find(c => c.code === countryName.toUpperCase());
+    if (codeMatch) return codeMatch.code;
+    // Default to India
+    return 'IN';
   };
   
   // Get available cities for selected country
@@ -608,6 +656,7 @@ const Checkout = () => {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error for this field when user starts typing
     if (fieldErrors[field]) {
       setFieldErrors(prev => {
         const next = { ...prev };
@@ -616,6 +665,82 @@ const Checkout = () => {
       });
     }
   };
+
+  // Real-time validation on blur
+  const handleFieldBlur = (field: string) => {
+    // Build data to validate
+    let dataToValidate: any = {
+      ...formData,
+      email: formData.email || (userProfile as any)?.email,
+    };
+    if (isLoggedIn && selectedAddressId && addresses.length > 0) {
+      const selectedAddress = addresses.find((a: any) => a.id === selectedAddressId);
+      if (selectedAddress) {
+        const addressParts = selectedAddress.address 
+          ? selectedAddress.address.split('\n').filter(Boolean)
+          : [];
+        const countryCode = selectedAddress.country ? getCountryCode(selectedAddress.country) : (formData.country || 'IN');
+        dataToValidate = {
+          firstName: selectedAddress.firstName || formData.firstName,
+          lastName: selectedAddress.lastName || formData.lastName,
+          email: selectedAddress.email || formData.email || (userProfile as any)?.email,
+          phone: selectedAddress.phoneNumber || selectedAddress.phone || formData.phone,
+          address: addressParts[0] || selectedAddress.addressLine1 || formData.address,
+          city: selectedAddress.city || formData.city,
+          state: selectedAddress.state || formData.state,
+          postalCode: selectedAddress.zipCode || selectedAddress.postalCode || formData.postalCode,
+          country: countryCode,
+        };
+      }
+    }
+    const formFilled = !!(dataToValidate.firstName?.trim() && dataToValidate.lastName?.trim() && 
+      dataToValidate.phone?.trim() && dataToValidate.address?.trim() && 
+      dataToValidate.city?.trim() && dataToValidate.state?.trim() && 
+      dataToValidate.postalCode?.trim() && dataToValidate.country?.trim());
+    const requireAddressSelection = isLoggedIn && addresses.length > 0 && !selectedAddressId && !formFilled;
+    const skipEmailRequired = isLoggedIn && !!(userProfile as any)?.email;
+    const validationErrors = getAddressValidationErrors(dataToValidate, requireAddressSelection, { skipEmailRequired });
+    // Only set error for the field that was blurred
+    if (validationErrors[field]) {
+      setFieldErrors(prev => ({ ...prev, [field]: validationErrors[field] }));
+    }
+  };
+
+  // Check if form is valid for Place Order button
+  const isFormValid = useMemo(() => {
+    let dataToValidate: any = {
+      ...formData,
+      email: formData.email || (userProfile as any)?.email,
+    };
+    if (isLoggedIn && selectedAddressId && addresses.length > 0) {
+      const selectedAddress = addresses.find((a: any) => a.id === selectedAddressId);
+      if (selectedAddress) {
+        const addressParts = selectedAddress.address 
+          ? selectedAddress.address.split('\n').filter(Boolean)
+          : [];
+        const countryCode = selectedAddress.country ? getCountryCode(selectedAddress.country) : (formData.country || 'IN');
+        dataToValidate = {
+          firstName: selectedAddress.firstName || formData.firstName,
+          lastName: selectedAddress.lastName || formData.lastName,
+          email: selectedAddress.email || formData.email || (userProfile as any)?.email,
+          phone: selectedAddress.phoneNumber || selectedAddress.phone || formData.phone,
+          address: addressParts[0] || selectedAddress.addressLine1 || formData.address,
+          city: selectedAddress.city || formData.city,
+          state: selectedAddress.state || formData.state,
+          postalCode: selectedAddress.zipCode || selectedAddress.postalCode || formData.postalCode,
+          country: countryCode,
+        };
+      }
+    }
+    const formFilled = !!(dataToValidate.firstName?.trim() && dataToValidate.lastName?.trim() && 
+      dataToValidate.phone?.trim() && dataToValidate.address?.trim() && 
+      dataToValidate.city?.trim() && dataToValidate.state?.trim() && 
+      dataToValidate.postalCode?.trim() && dataToValidate.country?.trim());
+    const requireAddressSelection = isLoggedIn && addresses.length > 0 && !selectedAddressId && !formFilled;
+    const skipEmailRequired = isLoggedIn && !!(userProfile as any)?.email;
+    const validationErrors = getAddressValidationErrors(dataToValidate, requireAddressSelection, { skipEmailRequired });
+    return Object.keys(validationErrors).length === 0;
+  }, [formData, selectedAddressId, addresses, isLoggedIn, userProfile]);
   
   // Helper function to build shipping address object - ensures single source of truth
   const buildShippingAddress = () => {
@@ -674,7 +799,7 @@ const Checkout = () => {
           city: selectedAddress.city || formData.city,
           state: selectedAddress.state || formData.state,
           postalCode: selectedAddress.zipCode || selectedAddress.postalCode || formData.postalCode,
-          country: selectedAddress.country || formData.country || 'IN',
+          country: selectedAddress.country ? getCountryCode(selectedAddress.country) : (formData.country || 'IN'),
         };
       }
     }
@@ -1161,6 +1286,7 @@ const Checkout = () => {
                           className={`h-12 ${fieldErrors.firstName ? 'border-destructive' : ''}`}
                           value={formData.firstName}
                           onChange={(e) => handleInputChange('firstName', e.target.value)}
+                          onBlur={() => handleFieldBlur('firstName')}
                           disabled={isLoggedIn && selectedAddressId !== null}
                           required
                         />
@@ -1172,6 +1298,7 @@ const Checkout = () => {
                           className={`h-12 ${fieldErrors.lastName ? 'border-destructive' : ''}`}
                           value={formData.lastName}
                           onChange={(e) => handleInputChange('lastName', e.target.value)}
+                          onBlur={() => handleFieldBlur('lastName')}
                           disabled={isLoggedIn && selectedAddressId !== null}
                           required
                         />
@@ -1186,6 +1313,7 @@ const Checkout = () => {
                           type="email"
                           value={formData.email}
                           onChange={(e) => handleInputChange('email', e.target.value)}
+                          onBlur={() => handleFieldBlur('email')}
                           required
                         />
                         {fieldErrors.email && <p className="text-destructive text-xs">{fieldErrors.email}</p>}
@@ -1206,6 +1334,7 @@ const Checkout = () => {
                           className={`h-12 ${fieldErrors.phone ? 'border-destructive' : ''}`}
                           value={formData.phone}
                           onChange={(e) => handleInputChange('phone', e.target.value)}
+                          onBlur={() => handleFieldBlur('phone')}
                           disabled={isLoggedIn && selectedAddressId !== null}
                           required
                         />
@@ -1217,6 +1346,7 @@ const Checkout = () => {
                           className={`h-12 ${fieldErrors.address ? 'border-destructive' : ''}`}
                           value={formData.address}
                           onChange={(e) => handleInputChange('address', e.target.value)}
+                          onBlur={() => handleFieldBlur('address')}
                           disabled={isLoggedIn && selectedAddressId !== null}
                           required
                         />
@@ -1236,6 +1366,7 @@ const Checkout = () => {
                             handleInputChange('country', val);
                             handleInputChange('city', '');
                             if (val !== 'IN') handleInputChange('state', '');
+                            setTimeout(() => handleFieldBlur('country'), 0);
                           }}
                         >
                           <SelectTrigger className={`h-12 ${fieldErrors.country ? 'border-destructive' : ''}`}>
@@ -1258,6 +1389,7 @@ const Checkout = () => {
                             onValueChange={(val) => {
                               handleInputChange('state', val);
                               queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
+                              setTimeout(() => handleFieldBlur('state'), 0);
                             }}
                           >
                             <SelectTrigger className={`h-12 ${fieldErrors.state ? 'border-destructive' : ''}`}>
@@ -1278,6 +1410,7 @@ const Checkout = () => {
                             className={`h-12 ${fieldErrors.state ? 'border-destructive' : ''}`}
                             value={formData.state}
                             onChange={(e) => handleInputChange('state', e.target.value)}
+                            onBlur={() => handleFieldBlur('state')}
                             required
                           />
                           {fieldErrors.state && <p className="text-destructive text-xs">{fieldErrors.state}</p>}
@@ -1287,7 +1420,10 @@ const Checkout = () => {
                         {availableCities.length > 0 && !(formData.city && !availableCities.includes(formData.city)) ? (
                           <Select
                             value={formData.city}
-                            onValueChange={(val) => handleInputChange('city', val)}
+                            onValueChange={(val) => {
+                              handleInputChange('city', val);
+                              setTimeout(() => handleFieldBlur('city'), 0);
+                            }}
                             disabled={!formData.country}
                           >
                             <SelectTrigger className={`h-12 ${fieldErrors.city ? 'border-destructive' : ''}`}>
@@ -1305,6 +1441,7 @@ const Checkout = () => {
                             className={`h-12 ${fieldErrors.city ? 'border-destructive' : ''}`}
                             value={formData.city}
                             onChange={(e) => handleInputChange('city', e.target.value)}
+                            onBlur={() => handleFieldBlur('city')}
                             disabled={isLoggedIn && selectedAddressId !== null}
                             required
                           />
@@ -1317,6 +1454,7 @@ const Checkout = () => {
                           className={`h-12 ${fieldErrors.postalCode ? 'border-destructive' : ''}`}
                           value={formData.postalCode}
                           onChange={(e) => handleInputChange('postalCode', e.target.value)}
+                          onBlur={() => handleFieldBlur('postalCode')}
                           required
                         />
                         {fieldErrors.postalCode && <p className="text-destructive text-xs">{fieldErrors.postalCode}</p>}
@@ -1721,9 +1859,9 @@ const Checkout = () => {
                 </Collapsible>
 
                 <Button 
-                  className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white mt-2 h-12 sm:h-14 text-base font-semibold"
+                  className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white mt-2 h-12 sm:h-14 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handlePlaceOrder}
-                  disabled={createOrderMutation.isPending || isProcessingPayment}
+                  disabled={createOrderMutation.isPending || isProcessingPayment || !isFormValid}
                 >
                   {(createOrderMutation.isPending || isProcessingPayment) ? (
                     <>
