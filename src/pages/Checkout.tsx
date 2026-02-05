@@ -242,12 +242,8 @@ const Checkout = () => {
     }
   }, [userProfile, isLoggedIn]);
   
-  // Auto-select default address if available and no address is selected yet
-  useEffect(() => {
-    if (isLoggedIn && defaultAddress && selectedAddressId === null && addresses.length > 0) {
-      setSelectedAddressId(defaultAddress.id);
-    }
-  }, [isLoggedIn, defaultAddress, selectedAddressId, addresses.length]);
+  // Don't auto-select - let user manually choose address
+  // Auto-fill will happen only when user selects an address
   
   // Fetch cart with state, coupon, and country (India = quantity-based shipping)
   const { data: cartData, isLoading: cartLoading, refetch: refetchCart } = useQuery({
@@ -1200,14 +1196,22 @@ const Checkout = () => {
                             size="sm"
                             onClick={() => {
                               setSelectedAddressId(null);
-                              // Reset form to allow manual entry
+                              // Clear form and reset to allow manual entry
                               setFormData(prev => ({
-                                ...prev,
-                                firstName: (userProfile as any)?.firstName || prev.firstName,
-                                lastName: (userProfile as any)?.lastName || prev.lastName,
-                                email: (userProfile as any)?.email || prev.email,
-                                phone: (userProfile as any)?.phoneNumber || prev.phone,
+                                firstName: (userProfile as any)?.firstName || '',
+                                lastName: (userProfile as any)?.lastName || '',
+                                email: (userProfile as any)?.email || '',
+                                phone: (userProfile as any)?.phoneNumber || '',
+                                address: '',
+                                addressLine2: '',
+                                country: 'IN',
+                                city: '',
+                                postalCode: '',
+                                state: '',
+                                gstin: '',
                               }));
+                              // Clear validation errors
+                              setFieldErrors({});
                             }}
                             className="h-8 text-xs"
                           >
@@ -1244,13 +1248,22 @@ const Checkout = () => {
                             type="button"
                             onClick={() => {
                               setSelectedAddressId(null);
+                              // Clear form and reset to allow manual entry
                               setFormData(prev => ({
-                                ...prev,
-                                firstName: (userProfile as any)?.firstName || prev.firstName,
-                                lastName: (userProfile as any)?.lastName || prev.lastName,
-                                email: (userProfile as any)?.email || prev.email,
-                                phone: (userProfile as any)?.phoneNumber || prev.phone,
+                                firstName: (userProfile as any)?.firstName || '',
+                                lastName: (userProfile as any)?.lastName || '',
+                                email: (userProfile as any)?.email || '',
+                                phone: (userProfile as any)?.phoneNumber || '',
+                                address: '',
+                                addressLine2: '',
+                                country: 'IN',
+                                city: '',
+                                postalCode: '',
+                                state: '',
+                                gstin: '',
                               }));
+                              // Clear validation errors
+                              setFieldErrors({});
                               shippingFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                             }}
                             className="p-3 rounded-lg border border-dashed border-border hover:bg-muted/50 text-muted-foreground text-sm flex items-center justify-center gap-1.5 min-h-[72px]"
