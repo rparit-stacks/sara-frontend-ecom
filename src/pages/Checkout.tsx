@@ -602,9 +602,10 @@ const Checkout = () => {
   const subtotal = isLoggedIn 
     ? (cartData?.subtotal ? Number(cartData.subtotal) : 0)
     : subtotalFromLocalStorage;
+  // GST: For logged-in users, get from backend. For guest users, backend calculates it when order is created
   const gst = isLoggedIn 
     ? (cartData?.gst ? Number(cartData.gst) : 0)
-    : 0;
+    : 0; // Guest GST calculated by backend on order creation
   const shipping = isLoggedIn 
     ? (cartData?.shipping ? Number(cartData.shipping) : 0)
     : guestShipping;
@@ -1644,12 +1645,10 @@ const Checkout = () => {
                     <span>Subtotal</span>
                     <span>{format(subtotal)}</span>
                   </div>
-                  {gst > 0 && (
-                    <div className="flex justify-between">
-                      <span>GST</span>
-                      <span>{format(gst)}</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between">
+                    <span>GST</span>
+                    <span>{format(gst)}</span>
+                  </div>
                   <div className="flex justify-between">
                     <span>Shipping</span>
                     <span>

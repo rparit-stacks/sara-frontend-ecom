@@ -1360,6 +1360,22 @@ const AdminOrderDetail = () => {
                     <span>-{formatPrice(Number(order.couponDiscount), 'INR')}</span>
                   </div>
                 )}
+                {(() => {
+                  // Calculate COD charge: Total - (Subtotal + GST + Shipping - Discount)
+                  const baseTotal = Number(order.subtotal || 0) + Number(order.gst || 0) + Number(order.shipping || 0) - Number(order.couponDiscount || 0);
+                  const codCharge = Number(order.total || 0) - baseTotal;
+                  const isCod = order.paymentMethod === 'COD' || order.paymentMethod === 'cod' || order.paymentMethod === 'CASH_ON_DELIVERY';
+                  
+                  if (isCod && codCharge > 0) {
+                    return (
+                      <div className="flex justify-between text-primary">
+                        <span>COD charge</span>
+                        <span>+{formatPrice(codCharge, 'INR')}</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 <div className="flex justify-between font-semibold pt-2 border-t border-border">
                   <span>Total</span>
                   <span>{formatPrice(Number(order.total || 0), 'INR')}</span>

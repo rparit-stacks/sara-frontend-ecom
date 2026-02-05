@@ -447,6 +447,12 @@ const OrderDetail = () => {
                         <span>Subtotal</span>
                         <span>{formatPrice(Number(order.subtotal ?? 0), currency)}</span>
                       </div>
+                      {order.gst != null && Number(order.gst) !== 0 && (
+                        <div className="flex justify-between">
+                          <span>GST</span>
+                          <span>{formatPrice(Number(order.gst), currency)}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span>Shipping</span>
                         <span>
@@ -459,6 +465,22 @@ const OrderDetail = () => {
                           <span>-{formatPrice(Number(order.couponDiscount), currency)}</span>
                         </div>
                       )}
+                      {(() => {
+                        // Calculate COD charge: Total - (Subtotal + GST + Shipping - Discount)
+                        const baseTotal = Number(order.subtotal ?? 0) + Number(order.gst ?? 0) + Number(order.shipping ?? 0) - Number(order.couponDiscount ?? 0);
+                        const codCharge = Number(order.total ?? 0) - baseTotal;
+                        const isCod = order.paymentMethod === 'COD' || order.paymentMethod === 'cod' || order.paymentMethod === 'CASH_ON_DELIVERY';
+                        
+                        if (isCod && codCharge > 0) {
+                          return (
+                            <div className="flex justify-between text-primary">
+                              <span>COD charge</span>
+                              <span>+{formatPrice(codCharge, currency)}</span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       <div className="flex justify-between font-semibold text-lg pt-2 border-t">
                         <span>Total</span>
                         <span>{formatPrice(Number(order.total ?? 0), currency)}</span>
@@ -614,6 +636,22 @@ const OrderDetail = () => {
                 <span>-{formatPrice(Number(order.couponDiscount), currency)}</span>
               </div>
             )}
+            {(() => {
+              // Calculate COD charge: Total - (Subtotal + GST + Shipping - Discount)
+              const baseTotal = Number(order.subtotal ?? 0) + Number(order.gst ?? 0) + Number(order.shipping ?? 0) - Number(order.couponDiscount ?? 0);
+              const codCharge = Number(order.total ?? 0) - baseTotal;
+              const isCod = order.paymentMethod === 'COD' || order.paymentMethod === 'cod' || order.paymentMethod === 'CASH_ON_DELIVERY';
+              
+              if (isCod && codCharge > 0) {
+                return (
+                  <div className="flex justify-between text-primary">
+                    <span>COD charge</span>
+                    <span>+{formatPrice(codCharge, currency)}</span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
             <div className="flex justify-between font-semibold text-lg pt-2 border-t">
               <span>Total (incl. GST)</span>
               <span>{formatPrice(Number(order.total ?? 0), currency)}</span>
