@@ -9,10 +9,12 @@ import ScrollReveal from '@/components/animations/ScrollReveal';
 import { toast } from 'sonner';
 import { wishlistApi, cartApi } from '@/lib/api';
 import WishlistItemDetails from '@/components/wishlist/WishlistItemDetails';
+import { usePrice } from '@/lib/currency';
 
 // Separate component for wishlist item card
 const WishlistItemCard = ({ item, index, hasCustomizations, removeMutation, addToCartMutation }: any) => {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const { format } = usePrice();
   
   // Build navigation URL
   const productUrl = item.productType === 'CUSTOM' 
@@ -44,7 +46,21 @@ const WishlistItemCard = ({ item, index, hasCustomizations, removeMutation, addT
           >
             {item.productName || 'Product'}
           </Link>
-          <p className="font-semibold text-[#2b9d8f] text-base xs:text-lg sm:text-xl mt-2 xs:mt-3">{item.productPrice || '₹0'}</p>
+          <p className="font-semibold text-[#2b9d8f] text-base xs:text-lg sm:text-xl mt-2 xs:mt-3">
+            {(() => {
+              // Prefer numeric unitPrice from backend (already includes variants/customizations)
+              if (item.unitPrice != null) {
+                return format(Number(item.unitPrice));
+              }
+              // Fallback: parse from productPrice string like "₹1234"
+              if (typeof item.productPrice === 'string') {
+                const cleaned = item.productPrice.replace(/[^\d.]/g, '').trim();
+                const num = cleaned ? Number(cleaned) : 0;
+                return format(num);
+              }
+              return format(0);
+            })()}
+          </p>
           
           {/* View Details Collapsible */}
           {hasCustomizations && (

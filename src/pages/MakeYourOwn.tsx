@@ -187,8 +187,43 @@ const MakeYourOwn = () => {
     });
   };
 
+  const isGlobalLoading =
+    isGeneratingMockups || isUploading || createProductMutation.isPending;
+
   return (
     <Layout>
+      {/* Full-screen loading overlay during upload/mockup generation/product creation */}
+      <AnimatePresence>
+        {isGlobalLoading && (
+          <motion.div
+            key="full-screen-loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="flex flex-col items-center gap-4 px-6 py-5 sm:px-8 sm:py-6 rounded-2xl bg-background/95 shadow-2xl border border-white/10 max-w-sm text-center"
+            >
+              <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 text-primary animate-spin" />
+              <div className="space-y-1">
+                <p className="text-base sm:text-lg font-semibold text-foreground">
+                  {isGeneratingMockups
+                    ? 'Generating mockups for your design...'
+                    : 'Creating your custom product...'}
+                </p>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Please do not close this tab. This may take a few seconds.
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <section className="w-full py-8 sm:py-12 lg:py-20 xl:py-24 relative overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute top-0 right-0 w-1/2 sm:w-1/3 h-1/3 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 sm:translate-x-1/2 pointer-events-none" />

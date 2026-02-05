@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Heart, ShoppingBag, Share2, Truck, RotateCcw, Shield, Minus, Plus, Palette, CheckCircle2, Info, ZoomIn, X } from 'lucide-react';
+import { Heart, ShoppingBag, Share2, Truck, RotateCcw, Shield, Minus, Plus, Palette, CheckCircle2, Info, ZoomIn, X, Calculator } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { IndianRupee } from 'lucide-react';
 import { customProductsApi, cartApi, wishlistApi, customConfigApi, productsApi } from '@/lib/api';
+import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import { guestCart } from '@/lib/guestCart';
 import { usePrice } from '@/lib/currency';
 
@@ -234,6 +235,9 @@ const CustomProductDetail = () => {
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [zoomScale, setZoomScale] = useState(1);
 
+  // Price breakdown popup state
+  const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
+
   // Reset zoom scale when image changes
   useEffect(() => {
     if (zoomImage) {
@@ -248,6 +252,23 @@ const CustomProductDetail = () => {
   const [fabricSelectionData, setFabricSelectionData] = useState<any>(null);
   const [metersQuantity, setMetersQuantity] = useState(1);
 
+  // Apply min/max quantity constraints from custom config (meters)
+  const minMeters = customConfig?.minQuantity ?? 1;
+  const maxMeters = customConfig?.maxQuantity ?? null;
+
+  useEffect(() => {
+    if (customConfig) {
+      setMetersQuantity((prev) => {
+        let next = prev;
+        const min = customConfig.minQuantity ?? 1;
+        const max = customConfig.maxQuantity;
+        if (next < min) next = min;
+        if (max != null && next > max) next = max;
+        return next;
+      });
+    }
+  }, [customConfig]);
+
   // Config variant selections (variantId -> optionId) from customConfig.variants
   const [selectedConfigVariants, setSelectedConfigVariants] = useState<Record<string, string>>({});
 
@@ -260,6 +281,7 @@ const CustomProductDetail = () => {
 
   // Custom Form State (only used when customConfig.formFields has items)
   const [customFormData, setCustomFormData] = useState<Record<string, any>>({});
+  const [isFormUploading, setIsFormUploading] = useState(false);
 
   // Normalized field id for form data keys (align with DynamicForm / ProductDetail)
   const getFieldId = (f: { id?: string | number; displayOrder?: number }, index: number) =>
@@ -477,6 +499,54 @@ const CustomProductDetail = () => {
       toast.error(error.message || 'Failed to update cart');
     },
   });
+
+  const currentCartLikeItem = useMemo(() => {
+    if (!fabricSelectionData) return null;
+    const fabricPerMeter = fabricSelectionData.totalPrice;
+    const fabricTotal = fabricPerMeter * metersQuantity;
+    // Build variantSelections from config variants (same logic as buildCartPayload)
+    const variantSelections: Record<string, any> = {};
+    effectiveConfigVariants.forEach((variant: any) => {
+      const selectedOptionId = selectedConfigVariants[String(variant.id)];
+      if (selectedOptionId && variant.options) {
+        const selectedOption = variant.options.find((o: any) => String(o.id) === selectedOptionId);
+        if (selectedOption) {
+          const variantKey = variant.frontendId || String(variant.id);
+          variantSelections[variantKey] = {
+            variantId: variant.id,
+            variantFrontendId: variant.frontendId || null,
+            variantName: variant.name,
+            variantType: variant.type,
+            variantUnit: variant.unit || null,
+            optionId: selectedOption.id,
+            optionFrontendId: selectedOption.frontendId || null,
+            optionValue: selectedOption.value,
+            priceModifier: selectedOption.priceModifier || 0,
+          };
+        }
+      }
+    });
+    return {
+      productType: 'CUSTOM',
+      productName: customConfig?.pageTitle || 'Custom Design',
+      productId: customProductId ? Number(customProductId) : undefined,
+      fabricId: fabricSelectionData.fabricId ? Number(fabricSelectionData.fabricId) : undefined,
+      designPrice: DESIGN_PRICE,
+      fabricPrice: fabricTotal,
+      unitPrice: combinedPrice,
+      totalPrice: combinedPrice * metersQuantity,
+      quantity: metersQuantity,
+      variants: fabricSelectionData.selectedVariants,
+      variantSelections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
+      pricePerMeter: combinedPrice,
+      basePrice: DESIGN_PRICE,
+      customFormData: {
+        ...(customFormData || {}),
+        ...(fabricSelectionData.customFieldValues || {}),
+        fabricMeters: metersQuantity,
+      },
+    };
+  }, [fabricSelectionData, metersQuantity, combinedPrice, DESIGN_PRICE, customConfig?.pageTitle, customProductId, customFormData, effectiveConfigVariants, selectedConfigVariants]);
 
   const [showAddAsNewConfirm, setShowAddAsNewConfirm] = useState(false);
 
@@ -774,7 +844,10 @@ const CustomProductDetail = () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <h4 className="font-medium text-lg">Selected Fabric</h4>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm font-medium text-foreground">
+                            {selectedFabricProduct?.name || 'Fabric selected'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
                             {format(fabricSelectionData.totalPrice)}/meter (1-meter base)
                           </p>
                         </div>
@@ -799,7 +872,10 @@ const CustomProductDetail = () => {
                               variant="ghost"
                               size="icon"
                               className="rounded-full w-10 h-10"
-                              onClick={() => setMetersQuantity((q) => Math.max(1, q - 1))}
+                              onClick={() =>
+                                setMetersQuantity((q) => Math.max(minMeters, q - 1))
+                              }
+                              disabled={metersQuantity <= minMeters}
                             >
                               <Minus className="w-4 h-4" />
                             </Button>
@@ -808,7 +884,16 @@ const CustomProductDetail = () => {
                               variant="ghost"
                               size="icon"
                               className="rounded-full w-10 h-10"
-                              onClick={() => setMetersQuantity((q) => q + 1)}
+                              onClick={() =>
+                                setMetersQuantity((q) => {
+                                  const next = q + 1;
+                                  if (maxMeters != null) {
+                                    return Math.min(next, maxMeters);
+                                  }
+                                  return next;
+                                })
+                              }
+                              disabled={maxMeters != null && metersQuantity >= maxMeters}
                             >
                               <Plus className="w-4 h-4" />
                             </Button>
@@ -872,6 +957,7 @@ const CustomProductDetail = () => {
                         fields={customFormFields}
                         onSubmit={handleCustomFormSubmit}
                         initialData={customFormData}
+                        onUploadingChange={setIsFormUploading}
                       />
                       {Object.keys(customFormData).length > 0 && (
                         <p className="text-sm font-medium text-green-700">Details saved ✓</p>
@@ -880,13 +966,37 @@ const CustomProductDetail = () => {
                   )}
 
                   {/* Actions */}
-                  <div className="flex gap-4 flex-wrap pt-4">
+                  <div className="flex flex-col gap-3 sm:gap-4 pt-4">
+                    {/* View Price Breakdown – same style as print product page */}
+                    {fabricSelectionData && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full sm:w-auto gap-2"
+                        onClick={() => {
+                          // #region agent log
+                          fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CustomProductDetail.tsx:952',message:'Breakdown button clicked',data:{effectiveConfigVariantsCount:effectiveConfigVariants?.length,effectiveConfigVariants:effectiveConfigVariants?.map((v:any)=>({id:v.id,name:v.name,options:v.options?.map((o:any)=>({id:o.id,value:o.value,priceModifier:o.priceModifier}))})),selectedConfigVariants,fabricPricePerMeter:fabricSelectionData?.totalPrice,metersQuantity,DESIGN_PRICE,combinedPrice},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,C'})}).catch(()=>{});
+                          // #endregion
+                          setShowPriceBreakdown(true);
+                        }}
+                      >
+                        <Calculator className="w-4 h-4" />
+                        View Price Breakdown
+                      </Button>
+                    )}
+                    
+                    <div className="flex gap-4 flex-wrap">
                     {isEditFromCart ? (
                       <>
                         <Button
                           size="lg"
                           onClick={handleUpdateCartItem}
-                          disabled={!fabricSelectionData || !requiredFieldsFilled || updateCartItemMutation.isPending}
+                          disabled={
+                            !fabricSelectionData ||
+                            !requiredFieldsFilled ||
+                            updateCartItemMutation.isPending ||
+                            isFormUploading
+                          }
                           className="flex-1 min-w-[180px] btn-primary gap-3 h-14 text-base"
                         >
                           {updateCartItemMutation.isPending ? 'Updating…' : 'Update cart item'}
@@ -895,7 +1005,7 @@ const CustomProductDetail = () => {
                           size="lg"
                           variant="outline"
                           onClick={() => setShowAddAsNewConfirm(true)}
-                          disabled={!fabricSelectionData || !requiredFieldsFilled}
+                          disabled={!fabricSelectionData || !requiredFieldsFilled || isFormUploading}
                           className="flex-1 min-w-[180px] gap-3 h-14 text-base"
                         >
                           <ShoppingBag className="w-5 h-5" />
@@ -906,25 +1016,32 @@ const CustomProductDetail = () => {
                       <Button
                         size="lg"
                         onClick={handleAddToCart}
-                        disabled={!fabricSelectionData || !requiredFieldsFilled}
+                        disabled={!fabricSelectionData || !requiredFieldsFilled || isFormUploading}
                         className="flex-1 min-w-[220px] btn-primary gap-3 h-14 text-base"
                       >
                         <ShoppingBag className="w-5 h-5" />
                         {customConfig?.addToCartButtonText || 'Add to Cart'}
                       </Button>
                     )}
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      className="rounded-full w-14 h-14"
-                      onClick={handleAddToWishlist}
-                      disabled={!isLoggedIn || isSaved || !fabricSelectionData || !requiredFieldsFilled}
-                    >
-                      <Heart className={`w-5 h-5 ${isSaved ? 'fill-primary text-primary' : ''}`} />
-                    </Button>
-                    <Button size="lg" variant="outline" className="rounded-full w-14 h-14" onClick={handleShare}>
-                      <Share2 className="w-5 h-5" />
-                    </Button>
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        className="rounded-full w-14 h-14"
+                        onClick={handleAddToWishlist}
+                        disabled={
+                          !isLoggedIn ||
+                          isSaved ||
+                          !fabricSelectionData ||
+                          !requiredFieldsFilled ||
+                          isFormUploading
+                        }
+                      >
+                        <Heart className={`w-5 h-5 ${isSaved ? 'fill-primary text-primary' : ''}`} />
+                      </Button>
+                      <Button size="lg" variant="outline" className="rounded-full w-14 h-14" onClick={handleShare}>
+                        <Share2 className="w-5 h-5" />
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Terms and Conditions */}
@@ -945,21 +1062,7 @@ const CustomProductDetail = () => {
                     </div>
                   )}
 
-                  {/* Trust Features */}
-                  <div className="grid grid-cols-3 gap-6 pt-8 border-t border-border">
-                    <div className="text-center">
-                      <Truck className="w-7 h-7 mx-auto text-primary mb-3" />
-                      <span className="text-base text-muted-foreground font-cursive">Free Shipping</span>
-                    </div>
-                    <div className="text-center">
-                      <RotateCcw className="w-7 h-7 mx-auto text-primary mb-3" />
-                      <span className="text-base text-muted-foreground font-cursive">Easy Returns</span>
-                    </div>
-                    <div className="text-center">
-                      <Shield className="w-7 h-7 mx-auto text-primary mb-3" />
-                      <span className="text-base text-muted-foreground font-cursive">Secure Payment</span>
-                    </div>
-                  </div>
+                  {/* Trust Features (removed as per request) */}
                 </div>
               </ScrollReveal>
             </div>
@@ -1009,6 +1112,24 @@ const CustomProductDetail = () => {
             />
           )}
         </>
+      )}
+
+      {/* Price Breakdown Popup */}
+      {currentCartLikeItem && (
+        <PriceBreakdownPopup
+          open={showPriceBreakdown}
+          onOpenChange={setShowPriceBreakdown}
+          item={currentCartLikeItem}
+          productData={{
+            type: 'DESIGNED',
+            designPrice: DESIGN_PRICE,
+            pricePerMeter: fabricSelectionData?.totalPrice,
+            variants: effectiveConfigVariants,
+          }}
+          selectedVariants={selectedConfigVariants}
+          fabricQuantity={metersQuantity}
+          fabricPricePerMeter={fabricSelectionData?.totalPrice}
+        />
       )}
 
       {/* Image Zoom Modal */}

@@ -2,19 +2,27 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Upload, X, Link as LinkIcon } from 'lucide-react';
+import { Upload, X, Link as LinkIcon, Loader2 } from 'lucide-react';
 import { FormField } from '@/components/admin/FormBuilder';
 import { toast } from 'sonner';
+import { customProductsApi } from '@/lib/api';
 
 interface DynamicFormProps {
   fields: FormField[];
   onSubmit: (data: Record<string, any>) => void;
   initialData?: Record<string, any>;
+  onUploadingChange?: (uploading: boolean) => void;
 }
 
-const DynamicForm: React.FC<DynamicFormProps> = ({ fields, onSubmit, initialData = {} }) => {
+const DynamicForm: React.FC<DynamicFormProps> = ({
+  fields,
+  onSubmit,
+  initialData = {},
+  onUploadingChange,
+}) => {
   const [formData, setFormData] = useState<Record<string, any>>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
 
   const validateField = (field: FormField, value: any): string | null => {
     if (field.required && (!value || (typeof value === 'string' && value.trim() === ''))) {
@@ -48,21 +56,57 @@ const DynamicForm: React.FC<DynamicFormProps> = ({ fields, onSubmit, initialData
     }
   };
 
-  const handleImageUpload = (fieldId: string, file: File) => {
+  const setFieldUploading = (fieldId: string, uploading: boolean) => {
+    setUploadingFields((prev) => {
+      const next = { ...prev, [fieldId]: uploading };
+      const anyUploading = Object.values(next).some(Boolean);
+      onUploadingChange?.(anyUploading);
+      return next;
+    });
+  };
+
+  const handleImageUpload = async (fieldId: string, file: File) => {
     if (!file.type.startsWith('image/')) {
       toast.error('Please upload a valid image file');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      handleChange(fieldId, e.target?.result);
-    };
-    reader.readAsDataURL(file);
+    
+    // Check file size (10MB limit for Cloudinary)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('File size exceeds 10MB limit');
+      return;
+    }
+    
+    setFieldUploading(fieldId, true);
+    
+    try {
+      // Upload to Cloudinary via API
+      const uploadedFiles = await customProductsApi.uploadMedia([file], 'custom-form-uploads');
+      if (uploadedFiles && uploadedFiles.length > 0) {
+        const cloudinaryUrl = uploadedFiles[0].url || uploadedFiles[0];
+        handleChange(fieldId, cloudinaryUrl);
+        toast.success('File uploaded successfully');
+      } else {
+        throw new Error('No URL returned from upload');
+      }
+    } catch (error: any) {
+      console.error('Image upload error:', error);
+      toast.error(error.message || 'Failed to upload image');
+    } finally {
+      setFieldUploading(fieldId, false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
+
+    // Block submit while any image is still uploading
+    if (Object.values(uploadingFields).some(Boolean)) {
+      toast.error('Please wait for uploads to finish');
+      return;
+    }
 
     fields.forEach((field) => {
       const value = formData[field.id];
@@ -145,6 +189,7 @@ const DynamicForm: React.FC<DynamicFormProps> = ({ fields, onSubmit, initialData
         );
 
       case 'image':
+        const isUploading = uploadingFields[field.id];
         return (
           <div key={field.id} className="space-y-2">
             <Label>
@@ -158,27 +203,38 @@ const DynamicForm: React.FC<DynamicFormProps> = ({ fields, onSubmit, initialData
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute top-2 right-2"
+                  className="absolute top-2 right-2 bg-background/80"
                   onClick={() => handleChange(field.id, '')}
+                  disabled={isUploading}
                 >
                   <X className="w-4 h-4" />
                 </Button>
               </div>
             ) : (
-              <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+              <div className={`border-2 border-dashed rounded-lg p-8 text-center ${isUploading ? 'border-primary bg-primary/5' : 'border-border'}`}>
                 <input
                   type="file"
                   accept="image/*"
                   className="hidden"
                   id={`image-${field.id}`}
+                  disabled={isUploading}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) handleImageUpload(field.id, file);
                   }}
                 />
-                <label htmlFor={`image-${field.id}`} className="cursor-pointer">
-                  <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Click to upload image</p>
+                <label htmlFor={`image-${field.id}`} className={isUploading ? 'cursor-wait' : 'cursor-pointer'}>
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-8 h-8 mx-auto mb-2 text-primary animate-spin" />
+                      <p className="text-sm text-primary">Uploading to cloud...</p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Click to upload image</p>
+                    </>
+                  )}
                 </label>
               </div>
             )}
@@ -212,13 +268,22 @@ const DynamicForm: React.FC<DynamicFormProps> = ({ fields, onSubmit, initialData
     }
   };
 
+  const isAnyUploading = Object.values(uploadingFields).some(Boolean);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
         {fields.map(renderField)}
       </div>
-      <Button type="submit" className="w-full">
-        Continue
+      <Button type="submit" className="w-full" disabled={isAnyUploading}>
+        {isAnyUploading ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Saving…
+          </>
+        ) : (
+          'Continue'
+        )}
       </Button>
     </form>
   );

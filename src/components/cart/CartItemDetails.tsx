@@ -38,9 +38,11 @@ const formatFieldValue = (value: any): string => {
   return String(value);
 };
 
-// Helper function to check if value is a URL
+// Helper function to check if value is a URL or data URI (base64)
 const isUrl = (value: any): boolean => {
   if (typeof value !== 'string') return false;
+  // Check for data URLs (base64 images/files)
+  if (value.startsWith('data:')) return true;
   try {
     const url = new URL(value);
     return url.protocol === 'http:' || url.protocol === 'https:';
@@ -154,9 +156,15 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
     (printProductData?.variants || []).map((v: any) => String(v.id))
   );
 
-  // Separate variant selections into fabric and print
+  // Get config variant IDs for CUSTOM products
+  const configVariantIds = new Set(
+    (customConfig?.variants || []).map((v: any) => String(v.id))
+  );
+
+  // Separate variant selections into fabric, print, and config variants
   const fabricVariants: any[] = [];
   const printVariants: any[] = [];
+  const configVariants: any[] = [];
 
   Object.entries(item.variantSelections || {}).forEach(([key, selection]: [string, any]) => {
     const variantId = selection.variantId || key;
@@ -165,9 +173,12 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
       fabricVariants.push([key, selection]);
     } else if (printVariantIds.has(String(variantId))) {
       printVariants.push([key, selection]);
+    } else if (configVariantIds.has(String(variantId))) {
+      // Config variants for CUSTOM products
+      configVariants.push([key, selection]);
     } else {
-      // Fallback: assume print
-      printVariants.push([key, selection]);
+      // Fallback: assume config/print
+      configVariants.push([key, selection]);
     }
   });
 
@@ -323,6 +334,72 @@ export const CartItemDetails = ({ item }: CartItemDetailsProps) => {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* CONFIG OPTIONS SECTION - For CUSTOM products (config variants like Size) */}
+      {isCustom && configVariants.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="text-xs font-semibold text-foreground border-b border-border pb-1">
+            Selected Options
+          </div>
+          <div className="pl-2 space-y-0.5">
+            {configVariants.map(([key, selection]: [string, any]) => (
+              <div key={key} className="text-xs sm:text-sm">
+                <span className="text-muted-foreground">
+                  {selection.variantName || 'Option'}:{' '}
+                </span>
+                <span className="font-medium text-foreground">
+                  {selection.optionName || selection.optionValue || 'N/A'}
+                  {selection.priceModifier != null && selection.priceModifier !== 0 && (
+                    <span className="text-muted-foreground ml-1">
+                      ({selection.priceModifier > 0 ? '+' : ''}{format(selection.priceModifier)})
+                    </span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM PRODUCT - Custom Form Data */}
+      {isCustom && Object.keys(printCustomFields).length > 0 && (
+        <div className="space-y-1.5">
+          <div className="text-xs font-semibold text-foreground border-b border-border pb-1">
+            Additional Information
+          </div>
+          <div className="pl-2 space-y-0.5">
+            {dedupeByUrl(Object.entries(printCustomFields)).map(([fieldKey, value]) => {
+              const isUrlValue = isUrl(value);
+              // Use config form fields for label lookup
+              const fieldsForLabel = [...configFormFields, ...(fabricData?.customFields || [])];
+              const displayLabel = /^\d+$/.test(fieldKey) ? getFieldLabel(fieldKey, fieldsForLabel) : fieldKey;
+              return (
+                <div key={fieldKey} className="text-xs sm:text-sm">
+                  <span className="text-muted-foreground">
+                    {displayLabel}:{' '}
+                  </span>
+                  {isUrlValue ? (
+                    <a 
+                      href={value as string} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="font-medium text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      <FileText className="w-3 h-3" />
+                      View File
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  ) : (
+                    <span className="font-medium text-foreground">
+                      {formatFieldValue(value)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

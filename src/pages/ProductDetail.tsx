@@ -669,12 +669,24 @@ const ProductDetail = () => {
   
   // Wishlist mutations
   const addToWishlistMutation = useMutation({
-    mutationFn: () => wishlistApi.addItem({
-      productType,
-      productId: wishlistProductId!,
-      productName: product?.name,
-      productImage: product?.images?.[0],
-    }),
+    mutationFn: () => {
+      if (!product || !wishlistProductId) {
+        throw new Error('Product not loaded');
+      }
+
+      // Use the same pricing logic as finalPrice: finalPrice = unitPrice * quantity
+      const qty = quantity > 0 ? quantity : 1;
+      const unitPriceForWishlist = finalPrice && qty > 0 ? finalPrice / qty : 0;
+
+      return wishlistApi.addItem({
+        productType,
+        productId: wishlistProductId,
+        productName: product.name,
+        productImage: product.images?.[0],
+        quantity: qty,
+        unitPrice: unitPriceForWishlist,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wishlist'] });
       queryClient.invalidateQueries({ queryKey: ['wishlist-check', productType, wishlistProductId] });
@@ -1244,35 +1256,27 @@ const ProductDetail = () => {
                           const unitDisplay = unitExtension;
                           
                           return (
-                            <>
-                              <div className="flex items-baseline gap-3">
-                                <span className="font-bold font-normal text-xl sm:text-2xl text-primary not-italic">
-                                  {format((() => {
-                                    const basePrice = product.pricePerMeter || product.price || 0;
-                                    let variantModifier = 0;
-                                    if (product.variants && product.variants.length > 0) {
-                                      product.variants.forEach((variant: any) => {
-                                        const selectedOptionId = selectedVariants[String(variant.id)];
-                                        if (selectedOptionId && variant.options) {
-                                          const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
-                                          if (selectedOption && selectedOption.priceModifier) {
-                                            variantModifier += selectedOption.priceModifier;
-                                          }
+                            <div className="flex items-baseline gap-3">
+                              <span className="font-bold font-normal text-xl sm:text-2xl text-primary not-italic">
+                                {format((() => {
+                                  const basePrice = product.pricePerMeter || product.price || 0;
+                                  let variantModifier = 0;
+                                  if (product.variants && product.variants.length > 0) {
+                                    product.variants.forEach((variant: any) => {
+                                      const selectedOptionId = selectedVariants[String(variant.id)];
+                                      if (selectedOptionId && variant.options) {
+                                        const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+                                        if (selectedOption && selectedOption.priceModifier) {
+                                          variantModifier += selectedOption.priceModifier;
                                         }
-                                      });
-                                    }
-                                    return basePrice + variantModifier;
-                                  })())}
-                                </span>
-                                <span className="text-sm text-muted-foreground">{unitDisplay}</span>
-                              </div>
-                              {finalPrice > 0 && (
-                                <div className="mt-2 pt-2 border-t border-border/50">
-                                  <p className="text-xs text-muted-foreground mb-1">Total for {quantity} {unitName}{quantity !== 1 ? 's' : ''}</p>
-                                  <span className="font-bold font-normal text-lg text-primary not-italic">{format(finalPrice)}</span>
-                                </div>
-                              )}
-                            </>
+                                      }
+                                    });
+                                  }
+                                  return basePrice + variantModifier;
+                                })())}
+                              </span>
+                              <span className="text-sm text-muted-foreground">{unitDisplay}</span>
+                            </div>
                           );
                         })()}
                       </div>
