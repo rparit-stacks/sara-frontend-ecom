@@ -1085,14 +1085,26 @@ const Dashboard = () => {
                                     <p className="font-semibold text-sm md:text-base">
                                       {address.firstName} {address.lastName}
                                     </p>
-                                    <p className="text-xs md:text-sm text-muted-foreground">{address.addressLine1}</p>
-                                    {address.addressLine2 && (
-                                      <p className="text-xs md:text-sm text-muted-foreground">{address.addressLine2}</p>
-                                    )}
+                                    {(() => {
+                                      // Split address field from backend (newline separated) or use addressLine1/addressLine2 if present
+                                      const addressLines = address.address 
+                                        ? address.address.split('\n').filter(Boolean)
+                                        : [address.addressLine1, address.addressLine2].filter(Boolean);
+                                      return addressLines.map((line: string, idx: number) => (
+                                        <p key={idx} className="text-xs md:text-sm text-muted-foreground">
+                                          {line}
+                                        </p>
+                                      ));
+                                    })()}
                                     <p className="text-xs md:text-sm text-muted-foreground">
-                                      {address.city}, {address.state} {address.postalCode}
+                                      {address.city}, {address.state} {address.zipCode || address.postalCode}
+                                      {address.country && `, ${address.country}`}
                                     </p>
-                                    <p className="text-xs md:text-sm text-muted-foreground mt-1">Phone: {address.phone}</p>
+                                    {(address.phoneNumber || address.phone) && (
+                                      <p className="text-xs md:text-sm text-muted-foreground mt-1">
+                                        Phone: {address.phoneNumber || address.phone}
+                                      </p>
+                                    )}
                                   </div>
                                   <div className="flex gap-2 w-full sm:w-auto">
                                     {!address.isDefault && (
@@ -1459,14 +1471,26 @@ const Dashboard = () => {
                                     <p className="font-semibold text-sm">
                                       {address.firstName} {address.lastName}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">{address.addressLine1}</p>
-                                    {address.addressLine2 && (
-                                      <p className="text-xs text-muted-foreground">{address.addressLine2}</p>
-                                    )}
+                                    {(() => {
+                                      // Split address field from backend (newline separated) or use addressLine1/addressLine2 if present
+                                      const addressLines = address.address 
+                                        ? address.address.split('\n').filter(Boolean)
+                                        : [address.addressLine1, address.addressLine2].filter(Boolean);
+                                      return addressLines.map((line: string, idx: number) => (
+                                        <p key={idx} className="text-xs text-muted-foreground">
+                                          {line}
+                                        </p>
+                                      ));
+                                    })()}
                                     <p className="text-xs text-muted-foreground">
-                                      {address.city}, {address.state} {address.postalCode}
+                                      {address.city}, {address.state} {address.zipCode || address.postalCode}
+                                      {address.country && `, ${address.country}`}
                                     </p>
-                                    <p className="text-xs text-muted-foreground mt-1">Phone: {address.phone}</p>
+                                    {(address.phoneNumber || address.phone) && (
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        Phone: {address.phoneNumber || address.phone}
+                                      </p>
+                                    )}
                                   </div>
                                   <div className="flex gap-2">
                                     {!address.isDefault && (
