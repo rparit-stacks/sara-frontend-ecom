@@ -53,11 +53,6 @@ export const ListViewProductCard = ({ product, className }: ListViewProductCardP
               <span className="font-bold text-sm sm:text-base text-[#2b9d8f]">
                 {format(product.price)}
               </span>
-              {product.originalPrice && (
-                <span className="text-[10px] sm:text-xs text-muted-foreground line-through">
-                  {format(product.originalPrice)}
-                </span>
-              )}
             </div>
           </div>
         </div>

@@ -66,11 +66,6 @@ export const ProductCard = ({ product, className }: ProductCardProps) => {
             <span className="font-bold text-xs xs:text-sm sm:text-base text-[#2b9d8f]">
               {format(product.price)}
             </span>
-            {product.originalPrice && (
-              <span className="text-[9px] xs:text-[10px] sm:text-xs text-muted-foreground line-through">
-                {format(product.originalPrice)}
-              </span>
-            )}
           </div>
         </div>
       </motion.div>
