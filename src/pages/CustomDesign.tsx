@@ -88,7 +88,7 @@ const CustomDesign = () => {
     description: '',
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [referenceFile, setReferenceFile] = useState<File | null>(null);
+  const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Submit design request mutation
@@ -106,12 +106,21 @@ const CustomDesign = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let payload: Record<string, unknown> = { ...formData };
-    if (referenceFile) {
+    if (referenceFiles.length > 0) {
       try {
-        const { url } = await customConfigApi.uploadReferenceImage(referenceFile);
-        payload = { ...payload, referenceImage: url };
+        const uploadPromises = referenceFiles.map((file) =>
+          customConfigApi.uploadReferenceImage(file)
+        );
+        const results = await Promise.all(uploadPromises);
+        const urls = results
+          .map((res) => res.url)
+          .filter((url) => typeof url === 'string' && url.length > 0);
+        if (urls.length > 0) {
+          // Store as comma-separated URLs so backend can keep using a single string field
+          payload = { ...payload, referenceImage: urls.join(',') };
+        }
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to upload reference file');
+        toast.error(err instanceof Error ? err.message : 'Failed to upload reference files');
         return;
       }
     }
@@ -352,7 +361,7 @@ const CustomDesign = () => {
                     onClick={() => {
                       setIsSubmitted(false);
                       setFormData({ fullName: '', email: '', phone: '', designType: '', description: '' });
-                      setReferenceFile(null);
+                      setReferenceFiles([]);
                       fileInputRef.current && (fileInputRef.current.value = '');
                     }}
                   >
@@ -452,23 +461,34 @@ const CustomDesign = () => {
 
                   <div className="mb-4 xs:mb-5 sm:mb-6">
                     <Label className="text-foreground font-medium mb-1.5 xs:mb-2 block text-sm xs:text-base">
-                      Reference Image (Optional)
+                      Reference Images (Optional)
                     </Label>
                     <input
                       ref={fileInputRef}
                       type="file"
+                      multiple
                       className="hidden"
                       accept="image/png,image/jpeg,image/jpg,image/webp"
                       onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          if (file.size > 10 * 1024 * 1024) {
-                            toast.error('File must be under 10MB');
-                            e.target.value = '';
-                            return;
-                          }
-                          setReferenceFile(file);
+                        const files = Array.from(e.target.files || []);
+                        if (!files.length) {
+                          setReferenceFiles([]);
+                          return;
                         }
+                        const validFiles: File[] = [];
+                        for (const file of files) {
+                          if (file.size > 10 * 1024 * 1024) {
+                            toast.error(`"${file.name}" must be under 10MB`);
+                          } else {
+                            validFiles.push(file);
+                          }
+                        }
+                        if (!validFiles.length) {
+                          e.target.value = '';
+                          setReferenceFiles([]);
+                          return;
+                        }
+                        setReferenceFiles(validFiles);
                       }}
                     />
                     <div
@@ -483,12 +503,20 @@ const CustomDesign = () => {
                         Click to upload or drag and drop
                       </p>
                       <p className="text-sm xs:text-base text-muted-foreground mt-1">
-                        PNG, JPG up to 10MB
+                        PNG, JPG up to 10MB each
                       </p>
-                      {referenceFile && (
-                        <p className="text-sm text-primary font-medium mt-2 truncate max-w-full" title={referenceFile.name}>
-                          {referenceFile.name}
-                        </p>
+                      {referenceFiles.length > 0 && (
+                        <div className="mt-2 space-y-1 max-h-24 overflow-y-auto text-left">
+                          {referenceFiles.map((file) => (
+                            <p
+                              key={file.name}
+                              className="text-sm text-primary font-medium truncate"
+                              title={file.name}
+                            >
+                              {file.name}
+                            </p>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
