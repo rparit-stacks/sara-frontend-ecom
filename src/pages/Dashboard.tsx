@@ -119,12 +119,13 @@ const Dashboard = () => {
     firstName: '',
     lastName: '',
     email: '',
-    phone: '',
+    phoneNumber: '',
     addressLine1: '',
     addressLine2: '',
     city: '',
     state: '',
-    postalCode: '',
+    zipCode: '',
+    country: '',
     isDefault: false,
   });
 
@@ -406,12 +407,13 @@ const Dashboard = () => {
       firstName: '',
       lastName: '',
       email: profile?.email || '',
-      phone: profile?.phoneNumber || '',
+      phoneNumber: profile?.phoneNumber || '',
       addressLine1: '',
       addressLine2: '',
       city: '',
       state: '',
-      postalCode: '',
+      zipCode: '',
+      country: 'India',
       isDefault: false,
     });
     setEditingAddress(null);
@@ -419,26 +421,42 @@ const Dashboard = () => {
 
   const handleEditAddress = (address: any) => {
     setEditingAddress(address);
+    // Split address into addressLine1 and addressLine2 for display
+    const addressParts = (address.address || '').split('\n');
     setAddressFormData({
       firstName: address.firstName || '',
       lastName: address.lastName || '',
       email: address.email || profile?.email || '',
-      phone: address.phone || profile?.phoneNumber || '',
-      addressLine1: address.addressLine1 || '',
-      addressLine2: address.addressLine2 || '',
+      phoneNumber: address.phoneNumber || profile?.phoneNumber || '',
+      addressLine1: addressParts[0] || '',
+      addressLine2: addressParts[1] || '',
       city: address.city || '',
       state: address.state || '',
-      postalCode: address.postalCode || '',
+      zipCode: address.zipCode || '',
+      country: address.country || 'India',
       isDefault: address.isDefault || false,
     });
     setIsAddressDialogOpen(true);
   };
 
   const handleSaveAddress = () => {
+    // Transform form data to match backend expectations
+    const addressData = {
+      firstName: addressFormData.firstName,
+      lastName: addressFormData.lastName,
+      phoneNumber: addressFormData.phoneNumber,
+      address: [addressFormData.addressLine1, addressFormData.addressLine2].filter(Boolean).join('\n'),
+      city: addressFormData.city,
+      state: addressFormData.state,
+      zipCode: addressFormData.zipCode,
+      country: addressFormData.country || 'India',
+      isDefault: addressFormData.isDefault,
+    };
+
     if (editingAddress) {
-      updateAddressMutation.mutate({ id: editingAddress.id, data: addressFormData });
+      updateAddressMutation.mutate({ id: editingAddress.id, data: addressData });
     } else {
-      createAddressMutation.mutate(addressFormData);
+      createAddressMutation.mutate(addressData);
     }
   };
 
@@ -1523,10 +1541,11 @@ const Dashboard = () => {
               />
             </div>
             <div>
-              <Label>Phone *</Label>
+              <Label>Phone Number *</Label>
               <Input
-                value={addressFormData.phone}
-                onChange={(e) => setAddressFormData({ ...addressFormData, phone: e.target.value })}
+                value={addressFormData.phoneNumber}
+                onChange={(e) => setAddressFormData({ ...addressFormData, phoneNumber: e.target.value })}
+                placeholder="Enter phone number"
               />
             </div>
             <div>
@@ -1568,12 +1587,23 @@ const Dashboard = () => {
                 </Select>
               </div>
             </div>
-            <div>
-              <Label>Postal Code *</Label>
-              <Input
-                value={addressFormData.postalCode}
-                onChange={(e) => setAddressFormData({ ...addressFormData, postalCode: e.target.value })}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>ZIP Code *</Label>
+                <Input
+                  value={addressFormData.zipCode}
+                  onChange={(e) => setAddressFormData({ ...addressFormData, zipCode: e.target.value })}
+                  placeholder="Enter ZIP code"
+                />
+              </div>
+              <div>
+                <Label>Country *</Label>
+                <Input
+                  value={addressFormData.country}
+                  onChange={(e) => setAddressFormData({ ...addressFormData, country: e.target.value })}
+                  placeholder="Enter country"
+                />
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <input

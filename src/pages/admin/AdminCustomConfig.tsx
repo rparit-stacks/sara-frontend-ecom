@@ -843,18 +843,30 @@ const AdminCustomConfig = () => {
                               {request.description}
                             </p>
                           </div>
-                          {request.referenceImage && (
-                            <a
-                              href={request.referenceImage}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
-                            >
-                              <ImageIcon className="w-4 h-4" />
-                              <span>View uploaded file</span>
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
-                          )}
+                          {request.referenceImage && (() => {
+                            const urls = String(request.referenceImage)
+                              .split(',')
+                              .map((u) => u.trim())
+                              .filter(Boolean);
+                            if (!urls.length) return null;
+                            return (
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                {urls.map((url: string, idx: number) => (
+                                  <a
+                                    key={`${request.id}-img-${idx}`}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-primary hover:underline"
+                                  >
+                                    <ImageIcon className="w-4 h-4" />
+                                    <span>{`View file ${idx + 1}`}</span>
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className="flex gap-2 lg:flex-col">
                           <Button
@@ -919,28 +931,47 @@ const AdminCustomConfig = () => {
                   <p className="text-base whitespace-pre-wrap">{selectedRequest.description}</p>
                 </div>
                 
-                {selectedRequest.referenceImage && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Reference Image / Uploaded File</label>
-                    <a
-                      href={selectedRequest.referenceImage}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm text-primary hover:underline mb-2"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      Open uploaded file in new tab
-                    </a>
-                    <img 
-                      src={selectedRequest.referenceImage} 
-                      alt="Reference" 
-                      className="max-w-full max-h-[280px] object-contain rounded-lg border border-border mt-1"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
-                )}
+                {selectedRequest.referenceImage && (() => {
+                  const urls = String(selectedRequest.referenceImage)
+                    .split(',')
+                    .map((u) => u.trim())
+                    .filter(Boolean);
+                  if (!urls.length) return null;
+                  return (
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                        Reference Image{urls.length > 1 ? 's' : ''} / Uploaded File{urls.length > 1 ? 's' : ''}
+                      </label>
+                      <div className="flex flex-wrap gap-3 mb-2">
+                        {urls.map((url, idx) => (
+                          <a
+                            key={`detail-img-link-${idx}`}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            <span>{`Open file ${idx + 1}`}</span>
+                          </a>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {urls.map((url, idx) => (
+                          <img
+                            key={`detail-img-${idx}`}
+                            src={url}
+                            alt={`Reference ${idx + 1}`}
+                            className="max-h-[180px] w-full object-contain rounded-lg border border-border bg-muted"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
                 
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Submitted On</label>
