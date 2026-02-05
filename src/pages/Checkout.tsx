@@ -156,6 +156,17 @@ const Checkout = () => {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const shippingFormRef = useRef<HTMLDivElement>(null);
 
+  /** Validate GSTIN: must be exactly 15 characters, alphanumeric (Indian format). */
+  const validateGstin = (value: string): string | null => {
+    if (!value || !value.trim()) return null;
+    const trimmed = value.trim().toUpperCase();
+    if (trimmed.length !== 15) return 'GSTIN must be exactly 15 characters';
+    // Indian GSTIN: 2 digits (state) + 10 alphanumeric (PAN) + 1 digit + 1 alphanumeric + 1 digit
+    const gstinRegex = /^[0-9]{2}[A-Z0-9]{10}[0-9][A-Z0-9][0-9]$/;
+    if (!gstinRegex.test(trimmed)) return 'Enter a valid 15-character GSTIN (e.g., 27ABCDE1234F1Z5)';
+    return null;
+  };
+
   /** Returns validation errors for address data. Used on submit and for inline display. */
   const getAddressValidationErrors = (
     data: { firstName?: string; lastName?: string; email?: string; phone?: string; address?: string; city?: string; state?: string; postalCode?: string; country?: string },
@@ -736,8 +747,10 @@ const Checkout = () => {
     const requireAddressSelection = isLoggedIn && addresses.length > 0 && !selectedAddressId && !formFilled;
     const skipEmailRequired = isLoggedIn && !!(userProfile as any)?.email;
     const validationErrors = getAddressValidationErrors(dataToValidate, requireAddressSelection, { skipEmailRequired });
-    return Object.keys(validationErrors).length === 0;
-  }, [formData, selectedAddressId, addresses, isLoggedIn, userProfile]);
+    // GSTIN: if provided, must be valid 15 characters
+    const gstinErr = hasGstin && formData.gstin?.trim() ? validateGstin(formData.gstin) : null;
+    return Object.keys(validationErrors).length === 0 && !gstinErr;
+  }, [formData, selectedAddressId, addresses, isLoggedIn, userProfile, hasGstin]);
   
   // Helper function to build shipping address object - ensures single source of truth
   const buildShippingAddress = () => {
@@ -804,6 +817,16 @@ const Checkout = () => {
     const requireAddressSelection = isLoggedIn && addresses.length > 0 && !selectedAddressId && !formFilled;
     const skipEmailRequired = isLoggedIn && !!(userProfile as any)?.email;
     const validationErrors = getAddressValidationErrors(dataToValidate, requireAddressSelection, { skipEmailRequired });
+    // GSTIN validation: if "I have GSTIN" is checked and value entered, must be valid 15-char GSTIN
+    if (hasGstin && formData.gstin?.trim()) {
+      const gstinErr = validateGstin(formData.gstin);
+      if (gstinErr) {
+        setFieldErrors(prev => ({ ...prev, ...validationErrors, gstin: gstinErr }));
+        toast.error('Please enter a valid 15-character GSTIN');
+        shippingFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+    }
     setFieldErrors(validationErrors);
     if (Object.keys(validationErrors).length > 0) {
       toast.error('Please fix the highlighted fields');
@@ -1486,6 +1509,11 @@ const Checkout = () => {
                             setHasGstin(e.target.checked);
                             if (!e.target.checked) {
                               setFormData(prev => ({ ...prev, gstin: '' }));
+                              setFieldErrors(prev => {
+                                const next = { ...prev };
+                                delete next.gstin;
+                                return next;
+                              });
                             }
                           }}
                           className="w-4 h-4 rounded border-border"
@@ -1495,13 +1523,25 @@ const Checkout = () => {
                         </label>
                       </div>
                       {hasGstin && (
-                        <Input
-                          placeholder="Enter 15-digit GSTIN (e.g., 27ABCDE1234F1Z5)"
-                          value={formData.gstin}
-                          onChange={(e) => handleInputChange('gstin', e.target.value.toUpperCase())}
-                          maxLength={15}
-                          className="h-11"
-                        />
+                        <div className="space-y-1">
+                          <Input
+                            placeholder="Enter 15-character GSTIN (e.g., 27ABCDE1234F1Z5)"
+                            value={formData.gstin}
+                            onChange={(e) => {
+                              handleInputChange('gstin', e.target.value.toUpperCase().replace(/[^A-Z0-9]/gi, '').slice(0, 15));
+                              if (fieldErrors.gstin) setFieldErrors(prev => ({ ...prev, gstin: '' }));
+                            }}
+                            onBlur={() => {
+                              if (hasGstin && formData.gstin) {
+                                const err = validateGstin(formData.gstin);
+                                if (err) setFieldErrors(prev => ({ ...prev, gstin: err }));
+                              }
+                            }}
+                            maxLength={15}
+                            className={`h-11 ${fieldErrors.gstin ? 'border-destructive' : ''}`}
+                          />
+                          {fieldErrors.gstin && <p className="text-destructive text-xs">{fieldErrors.gstin}</p>}
+                        </div>
                       )}
                     </div>
                     
