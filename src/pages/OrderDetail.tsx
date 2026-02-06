@@ -9,6 +9,7 @@ import { Loader2, ArrowLeft, Download, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { orderApi, paymentApi } from '@/lib/api';
 import { getPaymentStatusDisplay } from '@/lib/orderUtils';
+import { OrderTrackingStepper } from '@/components/OrderTrackingStepper';
 import { toast } from 'sonner';
 import { formatPrice } from '@/lib/currency';
 import { renderCustomValue } from '@/lib/renderCustomValue';
@@ -358,6 +359,9 @@ const OrderDetail = () => {
                 </div>
               </CardHeader>
             </Card>
+
+            {/* Order Tracking Stepper */}
+            <OrderTrackingStepper status={order.status || 'PENDING'} />
 
             {/* Swipe Invoice Section */}
             {order.swipeInvoiceNumber && (

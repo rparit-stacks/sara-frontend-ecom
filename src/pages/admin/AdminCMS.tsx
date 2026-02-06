@@ -215,8 +215,6 @@ const AdminCMS = () => {
   
   // Banner state
   const [banners, setBanners] = useState<any[]>([]);
-  const [showMediaManager, setShowMediaManager] = useState(false);
-  const [mediaManagerForBanner, setMediaManagerForBanner] = useState<{ bannerId: any; setImage: (url: string) => void } | null>(null);
   
   useEffect(() => {
     if (allBanners.length > 0) {
@@ -224,14 +222,7 @@ const AdminCMS = () => {
     }
   }, [allBanners]);
   
-  const handleSelectImageFromMedia = (url: string) => {
-    if (mediaManagerForBanner) {
-      mediaManagerForBanner.setImage(url);
-      setShowMediaManager(false);
-      setMediaManagerForBanner(null);
-    }
-  };
-  
+
   // Local state for forms
   const [contactPageContent, setContactPageContent] = useState({
     email: '',
@@ -628,10 +619,6 @@ const AdminCMS = () => {
               <TabsTrigger value="contact" className="gap-2 whitespace-nowrap">
                 <FileText className="w-4 h-4" />
                 <span className="hidden lg:inline">Contact</span>
-              </TabsTrigger>
-              <TabsTrigger value="media" className="gap-2 whitespace-nowrap">
-                <ImageIcon className="w-4 h-4" />
-                <span className="hidden lg:inline">Media</span>
               </TabsTrigger>
               <TabsTrigger value="banners" className="gap-2 whitespace-nowrap">
                 <ImageIcon className="w-4 h-4" />
@@ -1429,25 +1416,6 @@ const AdminCMS = () => {
               </motion.div>
             </TabsContent>
 
-            {/* Media Library - Cloudinary Images */}
-            <TabsContent value="media" className="mt-6">
-              <MediaManager />
-            </TabsContent>
-            
-            {/* Media Manager Dialog for Banner Selection */}
-            {showMediaManager && (
-              <Dialog open={showMediaManager} onOpenChange={setShowMediaManager}>
-                <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-                  <DialogHeader>
-                    <DialogTitle>Select Image from Media Library</DialogTitle>
-                  </DialogHeader>
-                  <div className="flex-1 overflow-y-auto">
-                    <MediaManager onImageSelect={handleSelectImageFromMedia} />
-                  </div>
-                </DialogContent>
-              </Dialog>
-            )}
-
             {/* Banner Management (Landing Page Slider) */}
             <TabsContent value="banners" className="mt-6">
               <motion.div
@@ -1492,34 +1460,15 @@ const AdminCMS = () => {
                                     }
                                   }}
                                 />
-                                <div className="flex gap-2">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => document.getElementById(`banner-upload-${banner.id}`)?.click()}
-                                    className="gap-2"
-                                  >
-                                    <Upload className="w-4 h-4" />
-                                    Upload
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setMediaManagerForBanner({
-                                        bannerId: banner.id,
-                                        setImage: (url: string) => {
-                                          setBanners(banners.map(b => b.id === banner.id ? { ...b, image: url } : b));
-                                        }
-                                      });
-                                      setShowMediaManager(true);
-                                    }}
-                                    className="gap-2"
-                                  >
-                                    <ImageIcon className="w-4 h-4" />
-                                    Choose
-                                  </Button>
-                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => document.getElementById(`banner-upload-${banner.id}`)?.click()}
+                                  className="gap-2"
+                                >
+                                  <Upload className="w-4 h-4" />
+                                  Upload
+                                </Button>
                               </div>
                               {banner.image && (
                                 <img src={banner.image} alt="Banner preview" className="w-full h-32 object-cover rounded" />

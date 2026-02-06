@@ -69,7 +69,7 @@ const AdminCoupons = () => {
     mutationFn: couponApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-coupons'] });
-      toast.success('Coupon deleted successfully');
+      toast.success('Coupon deactivated and hidden');
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to delete coupon');
