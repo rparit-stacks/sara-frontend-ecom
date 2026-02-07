@@ -88,21 +88,12 @@ const OrderConfirmation = () => {
     }
 
     setDownloadingIds(prev => new Set(prev).add(item.productId));
-    
     try {
-      const blob = await orderApi.downloadDigitalForOrder(Number(orderId), item.productId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `product_${item.productId}_files.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      toast.success('Download started!');
+      const downloadUrl = await orderApi.getDigitalDownloadUrl(Number(orderId), item.productId);
+      window.open(downloadUrl, '_blank');
     } catch (error: any) {
       console.error('Download error:', error);
-      toast.error(error.message || 'Failed to download files');
+      toast.error(error.message || 'Failed to get download link');
     } finally {
       setDownloadingIds(prev => {
         const next = new Set(prev);

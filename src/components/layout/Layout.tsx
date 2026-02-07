@@ -38,11 +38,11 @@ export const Layout = ({ children, showFooter = true }: LayoutProps) => {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen flex flex-col w-full overflow-x-hidden max-w-[100vw] relative">
+    <div className="min-h-screen flex flex-col w-full max-w-[100vw] relative">
       <AnimatedWaveBackground />
       <FloatingCurlyLines />
       <Navbar />
-      <main className="flex-1 pb-16 lg:pb-0 w-full overflow-x-hidden max-w-full relative z-10">
+      <main className="flex-1 pb-16 lg:pb-0 w-full max-w-full relative z-10 min-w-0">
         {children}
       </main>
       {showFooter && <Footer />}

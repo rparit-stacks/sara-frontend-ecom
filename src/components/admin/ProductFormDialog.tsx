@@ -511,25 +511,21 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       setUploadProgress(prev => Math.min(prev + 10, 90));
     }, 200);
 
-    toast.loading('Uploading digital file to local storage...', { id: 'digital-upload' });
+    toast.loading('Uploading digital file to S3...', { id: 'digital-upload' });
 
     try {
-      // For new products, we need to create a temporary product ID first
-      // For now, we'll use a timestamp as temporary ID
-      const tempProductId = 'temp_' + Date.now();
-      
-      // Upload file to local storage
-      const uploadResult = await productsApi.uploadDigitalFile(file, tempProductId);
+      const productName = formData.name?.trim() || '';
+      const uploadResult = await productsApi.uploadDigitalFile(file, productName);
 
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      if (uploadResult && uploadResult.success) {
-        // Store the upload result for later use when creating the product
-        setUploadedDigitalFileUrl(JSON.stringify(uploadResult));
-        toast.success('Digital file uploaded successfully to local storage!', { id: 'digital-upload' });
+      if (uploadResult && uploadResult.success && uploadResult.downloadUrl) {
+        // Store just the S3 URL — that's all we need
+        setUploadedDigitalFileUrl(uploadResult.downloadUrl);
+        toast.success('Digital file uploaded to S3!', { id: 'digital-upload' });
       } else {
-        throw new Error('Upload failed: No success response from server');
+        throw new Error('Upload failed: No download URL returned');
       }
     } catch (error: any) {
       clearInterval(progressInterval);
@@ -699,31 +695,8 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       return;
     }
 
-    // For digital products, handle local storage upload results
-    let fileUrl = '';
-    if (activeType === 'DIGITAL') {
-      if (uploadedDigitalFileUrl) {
-        try {
-          // Try to parse as JSON (for local storage results)
-          const uploadResult = JSON.parse(uploadedDigitalFileUrl);
-          if (uploadResult.success && uploadResult.filePath && uploadResult.zipPath) {
-            // This is a local storage upload result
-            fileUrl = JSON.stringify({
-              localFilePath: uploadResult.filePath,
-              zipFilePath: uploadResult.zipPath,
-              originalFilename: uploadResult.originalFilename,
-              storedFilename: uploadResult.storedFilename
-            });
-          } else {
-            // Fallback to treating as regular URL
-            fileUrl = uploadedDigitalFileUrl;
-          }
-        } catch (e) {
-          // Not JSON, treat as regular URL (Cloudinary)
-          fileUrl = uploadedDigitalFileUrl;
-        }
-      }
-    }
+    // For digital products, uploadedDigitalFileUrl is already the S3 URL
+    const fileUrl = (activeType === 'DIGITAL') ? uploadedDigitalFileUrl : '';
 
     const payload: any = {
       name: formData.name,
@@ -796,7 +769,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       const sellingPrice = formData.basePrice;
       payload.price = sellingPrice;
       payload.originalPrice = sellingPrice;
-      payload.fileUrl = uploadedDigitalFileUrl;
+      payload.fileUrl = fileUrl; // S3 download URL
     }
 
     // Add GST rate

@@ -198,7 +198,7 @@ function AdminOrderItemDetailBlock({
               label="Download"
               value={
                 <a href={item.digitalDownloadUrl} target="_blank" rel="noreferrer" className="text-primary underline text-sm">
-                  [ Download ZIP ]
+                  Open download (S3)
                 </a>
               }
             />

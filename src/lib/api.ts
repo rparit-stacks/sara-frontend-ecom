@@ -319,34 +319,29 @@ export const productsApi = {
     return data.files || [];
   },
   
-  // New function for digital file upload (local storage)
-  uploadDigitalFile: async (file: File, productId: string): Promise<any> => {
-    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB for local storage
+  // Upload digital file to S3. Returns { success: true, downloadUrl: "https://..." }
+  uploadDigitalFile: async (file: File, productName?: string): Promise<{ success: boolean; downloadUrl: string }> => {
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
     if (file.size > MAX_FILE_SIZE) {
-      throw new Error('Upload failed: File size exceeds 50MB limit for local storage.');
+      throw new Error('Upload failed: File size exceeds 50MB limit.');
     }
-    
+
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('productId', productId);
-    
-    const token = localStorage.getItem('adminToken');
-    console.log('[Digital File Upload] Uploading', file.name, 'for product:', productId);
-    
-    let response: Response;
-    try {
-      response = await fetch(`${API_BASE_URL}/api/admin/products/upload-digital-file`, {
-        method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        body: formData,
-      });
-    } catch (e) {
-      throw new Error('Upload failed. Please check your connection and try again.');
+    if (productName && productName.trim() !== '') {
+      formData.append('productName', productName.trim());
     }
-    
+
+    const token = localStorage.getItem('adminToken');
+
+    const response = await fetch(`${API_BASE_URL}/api/admin/products/upload-digital-file`, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      body: formData,
+    });
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[Digital File Upload] Error:', errorText);
       try {
         const errorData = JSON.parse(errorText);
         throw new Error(errorData.error || 'Upload failed');
@@ -355,10 +350,8 @@ export const productsApi = {
         throw err;
       }
     }
-    
-    const data = await response.json();
-    console.log('[Digital File Upload] Success:', data);
-    return data;
+
+    return await response.json();
   },
 };
 
@@ -822,8 +815,8 @@ export const orderApi = {
   },
   getUserOrders: () => fetchApi<any[]>('/api/orders'),
   getOrderById: (id: number) => fetchApi<any>(`/api/orders/${id}`),
-  /** Download digital files for an order item. Backend validates order is PAID and contains the product. */
-  downloadDigitalForOrder: async (orderId: number, productId: number): Promise<Blob> => {
+  /** Get S3 download URL for a digital order item. Backend validates order is PAID. Returns URL — open in browser to download from S3 (no ZIP). */
+  getDigitalDownloadUrl: async (orderId: number, productId: number): Promise<string> => {
     const token = localStorage.getItem('authToken');
     const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/digital-download/${productId}`, {
       method: 'GET',
@@ -831,9 +824,10 @@ export const orderApi = {
     });
     if (!response.ok) {
       if (response.status === 403) throw new Error('Download available only after payment is confirmed.');
-      throw new Error('Failed to download files');
+      throw new Error('Failed to get download link');
     }
-    return response.blob();
+    const data = await response.json();
+    return data.downloadUrl;
   },
 
   // Admin

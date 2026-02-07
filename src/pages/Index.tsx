@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import useEmblaCarousel from 'embla-carousel-react';
 import Autoplay from 'embla-carousel-autoplay';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
 import { cmsApi, productsApi, categoriesApi, subscribeEmail } from '@/lib/api';
 import { toast } from 'sonner';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   ProductCardSkeleton,
   CategoryCardSkeleton,
@@ -88,6 +89,7 @@ const defaultTestimonials = [
 const Index = () => {
   const [heroRef, heroApi] = useEmblaCarousel({ loop: true }, [Autoplay({ delay: 5000 })]);
   const [productsRef] = useEmblaCarousel({ loop: true, align: 'start' }, [Autoplay({ delay: 4000 })]);
+  const signatureScrollRef = useRef<HTMLDivElement>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [email, setEmail] = useState('');
 
@@ -407,33 +409,61 @@ const Index = () => {
               </h2>
             </ScrollReveal>
           </div>
-          <div className="overflow-x-auto -mx-3 xs:-mx-4 sm:-mx-6 lg:-mx-12 px-3 xs:px-4 sm:px-6 lg:px-12 scrollbar-hide">
-            <div className="flex gap-3 xs:gap-4 sm:gap-6 lg:gap-8 min-w-max pb-4">
-              {isLoadingCategories ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <CategoryCardSkeleton key={i} className="w-[180px] xs:w-[220px] sm:w-[280px] md:w-[320px] lg:w-[360px]" />
-                ))
-              ) : (
-                categories.map((category, index) => (
-                  <ScrollReveal key={category.id} delay={index * 0.1}>
-                    <Link to={`/category/${category.slug}`} className="group block flex-shrink-0">
-                      <div className="relative w-[180px] xs:w-[220px] sm:w-[280px] md:w-[320px] lg:w-[360px] aspect-[3/4] rounded-xl xs:rounded-2xl overflow-hidden shadow-lg">
-                        <img
-                          src={category.image}
-                          alt={category.name}
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/20 to-transparent" />
-                        <div className="absolute inset-0 flex flex-col items-center justify-end text-white pb-4 xs:pb-6 sm:pb-8 lg:pb-10">
-                          <h3 className="font-cursive text-2xl xs:text-3xl sm:text-4xl lg:text-5xl mb-1 xs:mb-2">{category.name}</h3>
-                          <p className="text-xs xs:text-sm lg:text-base text-white/80">{category.count} {category.count === 1 ? 'Category' : 'Categories'}</p>
+          <div className="relative -mx-3 xs:-mx-4 sm:-mx-6 lg:-mx-12">
+            <div
+              ref={signatureScrollRef}
+              className="overflow-x-auto overflow-y-hidden min-w-0 px-3 xs:px-4 sm:px-6 lg:px-12 scrollbar-hide scroll-smooth"
+              style={{ scrollBehavior: 'smooth' }}
+            >
+              <div className="flex gap-3 xs:gap-4 sm:gap-6 lg:gap-8 min-w-max pb-4">
+                {isLoadingCategories ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <CategoryCardSkeleton key={i} className="w-[180px] xs:w-[220px] sm:w-[280px] md:w-[320px] lg:w-[360px]" />
+                  ))
+                ) : (
+                  categories.map((category, index) => (
+                    <ScrollReveal key={category.id} delay={index * 0.1}>
+                      <Link to={`/category/${category.slug}`} className="group block flex-shrink-0">
+                        <div className="relative w-[180px] xs:w-[220px] sm:w-[280px] md:w-[320px] lg:w-[360px] aspect-[3/4] rounded-xl xs:rounded-2xl overflow-hidden shadow-lg">
+                          <img
+                            src={category.image}
+                            alt={category.name}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/20 to-transparent" />
+                          <div className="absolute inset-0 flex flex-col items-center justify-end text-white pb-4 xs:pb-6 sm:pb-8 lg:pb-10">
+                            <h3 className="font-cursive text-2xl xs:text-3xl sm:text-4xl lg:text-5xl mb-1 xs:mb-2">{category.name}</h3>
+                            <p className="text-xs xs:text-sm lg:text-base text-white/80">{category.count} {category.count === 1 ? 'Category' : 'Categories'}</p>
+                          </div>
                         </div>
-                      </div>
-                    </Link>
-                  </ScrollReveal>
-                ))
-              )}
+                      </Link>
+                    </ScrollReveal>
+                  ))
+                )}
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                const el = signatureScrollRef.current;
+                if (el) el.scrollLeft -= el.clientWidth * 0.8;
+              }}
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 xs:w-12 xs:h-12 rounded-full bg-background/90 shadow-md border border-border flex items-center justify-center text-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+              aria-label="Scroll left"
+            >
+              <ChevronLeft className="w-5 h-5 xs:w-6 xs:h-6" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const el = signatureScrollRef.current;
+                if (el) el.scrollLeft += el.clientWidth * 0.8;
+              }}
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 xs:w-12 xs:h-12 rounded-full bg-background/90 shadow-md border border-border flex items-center justify-center text-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+              aria-label="Scroll right"
+            >
+              <ChevronRight className="w-5 h-5 xs:w-6 xs:h-6" />
+            </button>
           </div>
         </div>
       </section>

@@ -110,14 +110,9 @@ function OrderItemDetailBlock({
             )}
           </div>
         )}
-        {item.productType === 'DIGITAL' && (item.zipPassword || item.digitalDownloadUrl) && (
+        {item.productType === 'DIGITAL' && (
           <div className="pt-2 border-t border-border space-y-1">
             <div className="font-medium text-muted-foreground">Digital product</div>
-            {item.zipPassword && (
-              <div className="text-muted-foreground">
-                ZIP Password: <span className="font-mono">{item.zipPassword}</span>
-              </div>
-            )}
             {showDigitalActions && order && onDownload && (
               <div className="pt-2">
                 {(() => {
@@ -196,18 +191,11 @@ const OrderDetail = () => {
     if (!order?.id || !item?.productId) return;
     setDownloadingIds((prev) => new Set(prev).add(item.productId));
     try {
-      const blob = await orderApi.downloadDigitalForOrder(order.id, item.productId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `product_${item.productId}_files.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      const downloadUrl = await orderApi.getDigitalDownloadUrl(order.id, item.productId);
+      window.open(downloadUrl, '_blank');
     } catch (err: any) {
       console.error('Download error:', err);
-      alert(err?.message || 'Failed to download files');
+      alert(err?.message || 'Failed to get download link');
     } finally {
       setDownloadingIds((prev) => {
         const next = new Set(prev);
@@ -540,40 +528,61 @@ const OrderDetail = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {order.items?.map((item: any, index: number) => (
-                      <div
-                        key={item.id ?? index}
-                        className="flex items-center justify-between gap-4 py-3 border-b last:border-0"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium">{item.name}</p>
-                            {item.productType === 'DIGITAL' && (
-                              <Badge variant="secondary" className="text-xs">
-                                Digital
-                              </Badge>
-                            )}
+                    {order.items?.map((item: any, index: number) => {
+                      const isPaid = (order.paymentStatus || '').toUpperCase() === 'PAID';
+                      const isDigital = item.productType === 'DIGITAL';
+                      const canDownload = isDigital && isPaid;
+                      return (
+                        <div
+                          key={item.id ?? index}
+                          className="flex items-center justify-between gap-4 py-3 border-b last:border-0"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium">{item.name}</p>
+                              {isDigital && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Digital
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {item.quantity} × {formatPrice(Number(item.price ?? item.unitPrice ?? 0), currency)}
+                            </p>
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            {item.quantity} × {formatPrice(Number(item.price ?? item.unitPrice ?? 0), currency)}
-                          </p>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <p className="font-semibold">
+                              {formatPrice(Number(item.totalPrice ?? 0), currency)}
+                            </p>
+                            {canDownload && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="gap-1.5"
+                                onClick={() => handleDigitalDownload(item)}
+                                disabled={downloadingIds.has(item.productId)}
+                              >
+                                {downloadingIds.has(item.productId) ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Download className="w-4 h-4" />
+                                )}
+                                {downloadingIds.has(item.productId) ? 'Downloading...' : 'Download'}
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={() => setProductDetailItem(item)}
+                            >
+                              <FileText className="w-4 h-4" />
+                              Detail
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <p className="font-semibold">
-                            {formatPrice(Number(item.totalPrice ?? 0), currency)}
-                          </p>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5"
-                            onClick={() => setProductDetailItem(item)}
-                          >
-                            <FileText className="w-4 h-4" />
-                            View in Detail
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
