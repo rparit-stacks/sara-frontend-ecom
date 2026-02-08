@@ -34,7 +34,7 @@ const Customize = () => {
     const formData = new FormData();
     formData.append('design', selectedFile);
 
-    const MOCKUP_API_URL = import.meta.env.VITE_MOCKUP_API_URL ?? 'https://mockup-sara.vercel.app';
+    const MOCKUP_API_URL = import.meta.env.VITE_MOCKUP_API_URL ?? 'http://72.62.241.163:3001';
 
     try {
       const response = await fetch(`${MOCKUP_API_URL}/api/mockup/generate`, {

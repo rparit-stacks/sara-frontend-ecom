@@ -1157,7 +1157,7 @@ export const mockupApi = {
     const formData = new FormData();
     formData.append('design', file);
     
-    const MOCKUP_API_URL = import.meta.env.VITE_MOCKUP_API_URL ?? 'https://mockup-sara.vercel.app';
+    const MOCKUP_API_URL = import.meta.env.VITE_MOCKUP_API_URL ?? 'http://72.62.241.163:3001';
     
     console.log('[Mockup API] Generating mockups for design:', file.name);
     
