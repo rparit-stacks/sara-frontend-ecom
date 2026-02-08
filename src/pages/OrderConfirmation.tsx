@@ -12,6 +12,8 @@ import { getPaymentStatusDisplay } from '@/lib/orderUtils';
 import { format } from 'date-fns';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { toast } from 'sonner';
+import { formatPrice } from '@/lib/currency';
+import { useCurrency } from '@/context/CurrencyContext';
 
 const OrderConfirmation = () => {
   const { id } = useParams<{ id: string }>();
@@ -69,6 +71,21 @@ const OrderConfirmation = () => {
       })
       .catch(() => {});
   }, [order, orderId, state.paymentIntentId, refetch, queryClient]);
+
+  const { exchangeRates, multipliers, ratesToInr } = useCurrency();
+  const currency = order?.paymentCurrency || 'INR';
+  const exchangeRate =
+    order?.exchangeRate != null && order.exchangeRate > 0
+      ? Number(order.exchangeRate)
+      : (currency !== 'INR' && ratesToInr?.[currency] && ratesToInr[currency] > 0
+          ? 1 / ratesToInr[currency]
+          : (currency !== 'INR' && (multipliers?.[currency] ?? exchangeRates?.[currency]) ? (multipliers?.[currency] ?? exchangeRates?.[currency]) : 1));
+  const toDisplayAmount = (inr: number) => (currency !== 'INR' ? inr * exchangeRate : inr);
+  const shippingCountry = order?.shippingAddress && typeof order.shippingAddress === 'object'
+    ? (order.shippingAddress as { country?: string }).country
+    : undefined;
+  const isIndia = shippingCountry === 'India' || shippingCountry === 'IN' || !shippingCountry;
+  const isNonIndiaOrNonINR = !isIndia || (currency !== 'INR');
 
   const paymentDisplay = order ? getPaymentStatusDisplay(order) : null;
   const paymentStatus = (order?.paymentStatus || '').toUpperCase();
@@ -191,7 +208,7 @@ const OrderConfirmation = () => {
                             <div className="flex-1">
                               <p className="font-medium">{item.name || item.productName}</p>
                               <p className="text-sm text-muted-foreground">
-                                Quantity: {item.quantity} × ₹{(item.price || item.unitPrice)?.toLocaleString('en-IN')}
+                                Quantity: {item.quantity} × {formatPrice(toDisplayAmount(Number(item.price ?? item.unitPrice ?? 0)), currency)}
                               </p>
                               {item.productType === 'DIGITAL' && (
                                 <div className="mt-2 space-y-2">
@@ -266,7 +283,7 @@ const OrderConfirmation = () => {
                                 </div>
                               )}
                             </div>
-                            <p className="font-semibold">₹{item.totalPrice?.toLocaleString('en-IN')}</p>
+                            <p className="font-semibold">{formatPrice(toDisplayAmount(Number(item.totalPrice ?? 0)), currency)}</p>
                           </div>
                         ))}
                       </div>
@@ -274,23 +291,28 @@ const OrderConfirmation = () => {
 
                     {/* Order Summary */}
                     <div className="border-t pt-4 space-y-2">
+                      <p className="text-xs text-muted-foreground pb-1">Amounts in {currency}</p>
                       <div className="flex justify-between">
                         <span>Subtotal</span>
-                        <span>₹{order.subtotal?.toLocaleString('en-IN')}</span>
+                        <span>{formatPrice(toDisplayAmount(Number(order.subtotal ?? 0)), currency)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Shipping</span>
-                        <span>{order.shipping === 0 ? 'Free' : `₹${order.shipping?.toLocaleString('en-IN')}`}</span>
+                        <span>
+                          {order.shipping === 0
+                            ? (isNonIndiaOrNonINR ? 'Our executive will contact you soon for shipping rates' : 'Free')
+                            : formatPrice(toDisplayAmount(Number(order.shipping ?? 0)), currency)}
+                        </span>
                       </div>
                       {order.couponDiscount && order.couponDiscount > 0 && (
                         <div className="flex justify-between text-primary">
                           <span>Coupon Discount</span>
-                          <span>-₹{order.couponDiscount?.toLocaleString('en-IN')}</span>
+                          <span>-{formatPrice(toDisplayAmount(Number(order.couponDiscount)), currency)}</span>
                         </div>
                       )}
                       <div className="flex justify-between font-semibold text-lg pt-2 border-t">
                         <span>Total</span>
-                        <span>₹{order.total?.toLocaleString('en-IN')}</span>
+                        <span>{formatPrice(toDisplayAmount(Number(order.total ?? 0)), currency)}</span>
                       </div>
                     </div>
                   </div>

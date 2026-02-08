@@ -252,8 +252,8 @@ const AdminOrderDetail = () => {
 
   const paymentCurrency: string = order?.paymentCurrency || 'INR';
   const paymentAmount: number = useMemo(
-    () => Number(order?.paymentAmount ?? order?.total ?? 0),
-    [order?.paymentAmount, order?.total]
+    () => Number(order?.paymentAmountInINR ?? order?.paymentAmount ?? order?.total ?? 0),
+    [order?.paymentAmountInINR, order?.paymentAmount, order?.total]
   );
 
   const [statusUpdateForm, setStatusUpdateForm] = useState({
@@ -699,7 +699,7 @@ const AdminOrderDetail = () => {
             </div>
             <div className="text-sm">
               <div className="text-muted-foreground text-xs">Gateway Amount</div>
-              <div className="font-semibold">{formatPrice(paymentAmount, paymentCurrency)}</div>
+              <div className="font-semibold">{formatPrice(paymentAmount, 'INR')}</div>
             </div>
           </div>
         </motion.div>
@@ -1135,7 +1135,7 @@ const AdminOrderDetail = () => {
                       <AdminOrderItemDetailBlock
                         key={item.id || index}
                         item={item}
-                        currency={paymentCurrency}
+                        currency="INR"
                       />
                     ))}
                   </div>
@@ -1145,22 +1145,22 @@ const AdminOrderDetail = () => {
                   >
                     <div className="flex justify-between" style={{ color: LEDGER.value }}>
                       <span style={{ color: LEDGER.label }}>Subtotal</span>
-                      <span>{formatPrice(Number(order.subtotal ?? 0), paymentCurrency)}</span>
+                      <span>{formatPrice(Number(order.subtotal ?? 0), 'INR')}</span>
                     </div>
                     {order.gst != null && Number(order.gst) !== 0 && (
                       <div className="flex justify-between" style={{ color: LEDGER.value }}>
                         <span style={{ color: LEDGER.label }}>GST</span>
-                        <span>{formatPrice(Number(order.gst), paymentCurrency)}</span>
+                        <span>{formatPrice(Number(order.gst), 'INR')}</span>
                       </div>
                     )}
                     <div className="flex justify-between" style={{ color: LEDGER.value }}>
                       <span style={{ color: LEDGER.label }}>Shipping</span>
-                      <span>{formatPrice(Number(order.shipping ?? 0), paymentCurrency)}</span>
+                      <span>{formatPrice(Number(order.shipping ?? 0), 'INR')}</span>
                     </div>
                     {order.couponCode && order.couponDiscount && Number(order.couponDiscount) > 0 && (
                       <div className="flex justify-between text-primary">
                         <span style={{ color: LEDGER.label }}>Coupon ({order.couponCode})</span>
-                        <span>-{formatPrice(Number(order.couponDiscount), paymentCurrency)}</span>
+                        <span>-{formatPrice(Number(order.couponDiscount), 'INR')}</span>
                       </div>
                     )}
                     <div
@@ -1169,8 +1169,7 @@ const AdminOrderDetail = () => {
                     >
                       <span style={{ color: LEDGER.label }}>Total (incl. GST)</span>
                       <span style={{ color: LEDGER.totalAmount }}>
-                        {formatPrice(Number(order.total ?? 0), paymentCurrency)}
-                      </span>
+                        {formatPrice(Number(order.paymentAmountInINR ?? order.total ?? 0), 'INR')}</span>
                     </div>
                   </div>
                 </DialogContent>
@@ -1183,7 +1182,7 @@ const AdminOrderDetail = () => {
                   {productDetailItem && (
                     <AdminOrderItemDetailBlock
                       item={productDetailItem}
-                      currency={paymentCurrency}
+                      currency="INR"
                     />
                   )}
                 </DialogContent>
@@ -1296,12 +1295,12 @@ const AdminOrderDetail = () => {
                       <div className="min-w-0 flex-1">
                         <p className="font-medium">{item.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          {item.quantity} × {formatPrice(Number(item.price || 0), paymentCurrency)}
+                          {item.quantity} × {formatPrice(Number(item.price || 0), 'INR')}
                         </p>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
                         <p className="font-semibold">
-                          {formatPrice(Number(item.totalPrice ?? (Number(item.price || 0) * (item.quantity || 1))), paymentCurrency)}
+                          {formatPrice(Number(item.totalPrice ?? (Number(item.price || 0) * (item.quantity || 1))), 'INR')}
                         </p>
                         <Button
                           variant="outline"
@@ -1378,7 +1377,7 @@ const AdminOrderDetail = () => {
                 })()}
                 <div className="flex justify-between font-semibold pt-2 border-t border-border">
                   <span>Total</span>
-                  <span>{formatPrice(Number(order.total || 0), 'INR')}</span>
+                  <span>{formatPrice(Number(order.paymentAmountInINR ?? order.total ?? 0), 'INR')}</span>
                 </div>
               </div>
             </section>
@@ -1483,7 +1482,7 @@ const AdminOrderDetail = () => {
                 <div className="flex justify-between pt-2 border-t">
                   <span>Current Gateway Amount</span>
                   <span className="font-semibold">
-                    {formatPrice(paymentAmount, paymentCurrency)}
+                    {formatPrice(paymentAmount, 'INR')}
                   </span>
                 </div>
                 {order.paymentMethod === 'PARTIAL_COD' && (
@@ -1494,13 +1493,13 @@ const AdminOrderDetail = () => {
                     <div className="flex justify-between text-xs">
                       <span>Paid amount</span>
                       <span className="font-medium text-green-600">
-                        {formatPrice(paymentAmount, paymentCurrency)}
+                        {formatPrice(paymentAmount, 'INR')}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span>Pending amount</span>
                       <span className="font-medium text-orange-600">
-                        {formatPrice(Number(order.total || 0) - paymentAmount, paymentCurrency)}
+                        {formatPrice(Number(order.total || 0) - paymentAmount, 'INR')}
                       </span>
                     </div>
                     {Number(order.total || 0) > 0 && (

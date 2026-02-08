@@ -8,6 +8,9 @@ interface CurrencyContextType {
   setExchangeRates: (rates: Record<string, number>) => void;
   multipliers: Record<string, number>;
   setMultipliers: (multipliers: Record<string, number>) => void;
+  /** From DB: 1 unit of currency = ratesToInr INR (e.g. USD: 85). Used for display and order exchangeRate. */
+  ratesToInr: Record<string, number>;
+  setRatesToInr: (rates: Record<string, number>) => void;
   baseCurrency: string;
 }
 
@@ -27,6 +30,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
 
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
   const [multipliers, setMultipliers] = useState<Record<string, number>>({});
+  const [ratesToInr, setRatesToInr] = useState<Record<string, number>>({});
 
   // Fetch exchange rates & multipliers on mount
   useEffect(() => {
@@ -53,13 +57,17 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (multipliersData.status === 'fulfilled') {
-          const data = multipliersData.value;
+          const data = multipliersData.value as { multipliers?: Record<string, number>; ratesToInr?: Record<string, number> };
           console.log('[CurrencyContext] Received multipliers:', data);
           if (data?.multipliers) {
             setMultipliers(data.multipliers);
             console.log('[CurrencyContext] Multipliers set for', Object.keys(data.multipliers).length, 'currencies');
           } else {
             console.warn('[CurrencyContext] No multipliers in response');
+          }
+          if (data?.ratesToInr) {
+            setRatesToInr(data.ratesToInr);
+            console.log('[CurrencyContext] ratesToInr set for', Object.keys(data.ratesToInr).length, 'currencies');
           }
         } else {
           console.error('[CurrencyContext] Failed to fetch currency multipliers:', multipliersData.reason);
@@ -95,6 +103,8 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
         setExchangeRates,
         multipliers,
         setMultipliers,
+        ratesToInr,
+        setRatesToInr,
         baseCurrency: BASE_CURRENCY,
       }}
     >

@@ -178,7 +178,7 @@ export const getCurrencyName = (currency: string): string => {
  * Hook to convert and format price using current currency
  */
 export const usePrice = () => {
-  const { currency, exchangeRates, baseCurrency, multipliers } = useCurrency();
+  const { currency, exchangeRates, baseCurrency, multipliers, ratesToInr } = useCurrency();
 
   const getMultiplierForCurrency = (targetCurrency: string): number => {
     const normalized = (targetCurrency || '').toUpperCase();
@@ -201,23 +201,25 @@ export const usePrice = () => {
   };
 
   const convert = (amount: number, fromCurrency: string = baseCurrency): number => {
-    // If no exchange rates available, return original amount
-    if (!exchangeRates || Object.keys(exchangeRates).length === 0) {
-      console.warn('Exchange rates not available, returning original amount');
-      return amount;
-    }
-
     let effectiveAmount = amount;
     let effectiveFromCurrency = fromCurrency;
 
-    // If we are converting from base INR, first apply the currency-wise multiplier
+    // From base INR: apply multiplier from DB (e.g. 300 × 4 = 1200 INR)
     if (effectiveFromCurrency === 'INR') {
       const multiplier = getMultiplierForCurrency(currency);
       effectiveAmount = amount * multiplier;
     }
 
-    const converted = convertPrice(effectiveAmount, effectiveFromCurrency, currency, exchangeRates);
-    return converted;
+    // If target is non-INR and we have rate from DB (1 USD = 85 INR): display = effectiveAmount / 85 (e.g. 1200/85 = 14.12 USD)
+    if (currency !== 'INR' && ratesToInr?.[currency] && ratesToInr[currency] > 0) {
+      return effectiveAmount / ratesToInr[currency];
+    }
+
+    // Fallback: use exchange rates API
+    if (!exchangeRates || Object.keys(exchangeRates).length === 0) {
+      return effectiveAmount;
+    }
+    return convertPrice(effectiveAmount, effectiveFromCurrency, currency, exchangeRates);
   };
 
   const format = (amount: number, fromCurrency: string = baseCurrency): string => {

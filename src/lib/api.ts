@@ -1211,7 +1211,11 @@ export const currencyApi = {
 // Payment API
 // ===============================
 export const paymentApi = {
-  getMethods: (country: string) => fetchApi<{ country: string; gateways: string[]; methods: Record<string, string[]> }>(`/api/payment/methods?country=${encodeURIComponent(country)}`),
+  getMethods: (country: string, currency?: string) => {
+    const params = new URLSearchParams({ country });
+    if (currency != null && currency.trim() !== '') params.set('currency', currency.trim());
+    return fetchApi<{ country: string; gateways: string[]; methods: Record<string, string[]> }>(`/api/payment/methods?${params.toString()}`);
+  },
   createOrder: (data: any) => fetchApi<any>('/api/payment/create-order', { method: 'POST', body: JSON.stringify(data) }),
   payRemaining: (orderId: number, paymentGateway?: string) =>
     fetchApi<any>('/api/payment/pay-remaining', {
@@ -1228,9 +1232,9 @@ export const paymentApi = {
 // ===============================
 export const currencyMultiplierAdminApi = {
   getAll: () => fetchApi<any[]>('/api/admin/currency-multipliers'),
-  create: (data: { currencyCode: string; multiplier: number }) =>
+  create: (data: { currencyCode: string; multiplier: number; rateToInr?: number }) =>
     fetchApi<any>('/api/admin/currency-multipliers', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: number, data: { currencyCode?: string; multiplier?: number }) =>
+  update: (id: number, data: { currencyCode?: string; multiplier?: number; rateToInr?: number | null }) =>
     fetchApi<any>(`/api/admin/currency-multipliers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) =>
     fetchApi<void>(`/api/admin/currency-multipliers/${id}`, { method: 'DELETE' }),

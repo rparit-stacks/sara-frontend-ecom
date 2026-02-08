@@ -13,6 +13,7 @@ type Multiplier = {
   id: number;
   currencyCode: string;
   multiplier: number;
+  rateToInr?: number | null;
 };
 
 const AdminCurrencyMultipliers = () => {
@@ -20,9 +21,10 @@ const AdminCurrencyMultipliers = () => {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Multiplier | null>(null);
-  const [formData, setFormData] = useState<{ currencyCode: string; multiplier: string }>({
+  const [formData, setFormData] = useState<{ currencyCode: string; multiplier: string; rateToInr: string }>({
     currencyCode: '',
     multiplier: '',
+    rateToInr: '',
   });
 
   const { data: multipliers = [], isLoading } = useQuery({
@@ -31,14 +33,14 @@ const AdminCurrencyMultipliers = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: { currencyCode: string; multiplier: number }) =>
+    mutationFn: (data: { currencyCode: string; multiplier: number; rateToInr?: number }) =>
       currencyMultiplierAdminApi.create(data),
     onSuccess: () => {
       toast.success('Multiplier saved successfully');
       queryClient.invalidateQueries({ queryKey: ['admin-currency-multipliers'] });
       setIsDialogOpen(false);
       setEditing(null);
-      setFormData({ currencyCode: '', multiplier: '' });
+      setFormData({ currencyCode: '', multiplier: '', rateToInr: '' });
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to save multiplier');
@@ -46,14 +48,14 @@ const AdminCurrencyMultipliers = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { currencyCode?: string; multiplier?: number } }) =>
+    mutationFn: ({ id, data }: { id: number; data: { currencyCode?: string; multiplier?: number; rateToInr?: number | null } }) =>
       currencyMultiplierAdminApi.update(id, data),
     onSuccess: () => {
       toast.success('Multiplier updated successfully');
       queryClient.invalidateQueries({ queryKey: ['admin-currency-multipliers'] });
       setIsDialogOpen(false);
       setEditing(null);
-      setFormData({ currencyCode: '', multiplier: '' });
+      setFormData({ currencyCode: '', multiplier: '', rateToInr: '' });
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to update multiplier');
@@ -73,7 +75,7 @@ const AdminCurrencyMultipliers = () => {
 
   const openCreate = () => {
     setEditing(null);
-    setFormData({ currencyCode: '', multiplier: '' });
+    setFormData({ currencyCode: '', multiplier: '', rateToInr: '' });
     setIsDialogOpen(true);
   };
 
@@ -82,6 +84,7 @@ const AdminCurrencyMultipliers = () => {
     setFormData({
       currencyCode: item.currencyCode || '',
       multiplier: item.multiplier?.toString() || '',
+      rateToInr: item.rateToInr != null ? String(item.rateToInr) : '',
     });
     setIsDialogOpen(true);
   };
@@ -90,6 +93,7 @@ const AdminCurrencyMultipliers = () => {
     e.preventDefault();
     const code = formData.currencyCode.trim().toUpperCase();
     const multiplierValue = parseFloat(formData.multiplier);
+    const rateToInrValue = formData.rateToInr.trim() ? parseFloat(formData.rateToInr) : undefined;
 
     if (!code) {
       toast.error('Currency code is required');
@@ -99,15 +103,20 @@ const AdminCurrencyMultipliers = () => {
       toast.error('Multiplier must be a positive number');
       return;
     }
+    if (rateToInrValue !== undefined && (Number.isNaN(rateToInrValue) || rateToInrValue <= 0)) {
+      toast.error('Rate to INR must be a positive number (e.g. 85 for 1 USD = 85 INR)');
+      return;
+    }
 
-    // INR is always treated as 1 in backend logic, but allow explicit 1 if admin wants
+    const payload = {
+      currencyCode: code,
+      multiplier: multiplierValue,
+      ...(rateToInrValue != null && rateToInrValue > 0 ? { rateToInr: rateToInrValue } : editing ? { rateToInr: null } : {}),
+    };
     if (editing) {
-      updateMutation.mutate({
-        id: editing.id,
-        data: { currencyCode: code, multiplier: multiplierValue },
-      });
+      updateMutation.mutate({ id: editing.id, data: payload });
     } else {
-      createMutation.mutate({ currencyCode: code, multiplier: multiplierValue });
+      createMutation.mutate(payload as { currencyCode: string; multiplier: number; rateToInr?: number });
     }
   };
 
@@ -146,13 +155,14 @@ const AdminCurrencyMultipliers = () => {
                   <tr className="border-b bg-muted/40">
                     <th className="text-left p-4">Currency Code</th>
                     <th className="text-left p-4">Multiplier</th>
+                    <th className="text-left p-4">Rate to INR (1 unit =)</th>
                     <th className="text-left p-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {multipliers.length === 0 ? (
                     <tr>
-                      <td className="p-4 text-sm text-muted-foreground" colSpan={3}>
+                      <td className="p-4 text-sm text-muted-foreground" colSpan={4}>
                         No multipliers configured yet. Click &quot;Add Multiplier&quot; to create one.
                       </td>
                     </tr>
@@ -170,6 +180,9 @@ const AdminCurrencyMultipliers = () => {
                         <td className="p-4 flex items-center gap-2">
                           <Percent className="w-4 h-4 text-muted-foreground" />
                           <span>{item.multiplier}</span>
+                        </td>
+                        <td className="p-4 text-muted-foreground">
+                          {item.rateToInr != null ? `1 ${item.currencyCode} = ${item.rateToInr} INR` : '—'}
                         </td>
                         <td className="p-4">
                           <div className="flex gap-2">
@@ -234,8 +247,22 @@ const AdminCurrencyMultipliers = () => {
                   placeholder="1.00"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Final price = (INR base × multiplier) × exchange rate. Leave INR at 1x to keep
-                  India pricing unchanged.
+                  Base price × multiplier = stored order value in INR. Admin sees this INR; user sees it converted using Rate to INR.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Rate to INR (e.g. 85 for 1 USD = 85 INR)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formData.rateToInr}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, rateToInr: e.target.value }))
+                  }
+                  placeholder="85"
+                />
+                <p className="text-xs text-muted-foreground">
+                  User sees: (order total in INR) ÷ this rate = amount in their currency. Required for non-INR display.
                 </p>
               </div>
 

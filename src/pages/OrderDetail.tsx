@@ -12,6 +12,7 @@ import { getPaymentStatusDisplay } from '@/lib/orderUtils';
 import { OrderTrackingStepper } from '@/components/OrderTrackingStepper';
 import { toast } from 'sonner';
 import { formatPrice } from '@/lib/currency';
+import { useCurrency } from '@/context/CurrencyContext';
 import { renderCustomValue } from '@/lib/renderCustomValue';
 import { format } from 'date-fns';
 
@@ -19,6 +20,7 @@ import { format } from 'date-fns';
 function OrderItemDetailBlock({
   item,
   currency = 'INR',
+  exchangeRate = 1,
   showDigitalActions,
   order,
   onDownload,
@@ -27,14 +29,16 @@ function OrderItemDetailBlock({
 }: {
   item: any;
   currency?: string;
+  exchangeRate?: number;
   showDigitalActions?: boolean;
   order?: any;
   onDownload?: (item: any) => void;
   onPayAgain?: () => void;
   isDownloading?: boolean;
 }) {
+  const toDisplay = (inr: number) => (currency !== 'INR' ? inr * exchangeRate : inr);
   const price = (n: number | undefined) =>
-    n != null ? formatPrice(Number(n), currency) : '—';
+    n != null ? formatPrice(toDisplay(Number(n)), currency) : '—';
   return (
     <div className="flex gap-6 border border-border rounded-lg p-4">
       <div className="flex-1 min-w-0 space-y-2 text-sm">
@@ -185,7 +189,20 @@ const OrderDetail = () => {
     enabled: !!id,
   });
 
+  const { exchangeRates, multipliers, ratesToInr } = useCurrency();
   const currency = order?.paymentCurrency || 'INR';
+  const exchangeRate =
+    order?.exchangeRate != null && order.exchangeRate > 0
+      ? Number(order.exchangeRate)
+      : (currency !== 'INR' && ratesToInr?.[currency] && ratesToInr[currency] > 0
+          ? 1 / ratesToInr[currency]
+          : (currency !== 'INR' && (multipliers?.[currency] ?? exchangeRates?.[currency]) ? (multipliers?.[currency] ?? exchangeRates?.[currency]) : 1));
+  const toDisplayAmount = (inr: number) => (currency !== 'INR' ? inr * exchangeRate : inr);
+  const shippingCountry = order?.shippingAddress && typeof order.shippingAddress === 'object'
+    ? (order.shippingAddress as { country?: string }).country
+    : undefined;
+  const isIndia = shippingCountry === 'India' || shippingCountry === 'IN' || !shippingCountry;
+  const isNonIndiaOrNonINR = !isIndia || (currency !== 'INR');
 
   const handleDigitalDownload = async (item: any) => {
     if (!order?.id || !item?.productId) return;
@@ -431,30 +448,35 @@ const OrderDetail = () => {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Order Summary</CardTitle>
+                    <CardTitle className="flex items-center justify-between gap-2 flex-wrap">
+                      Order Summary
+                      <span className="text-xs font-normal text-muted-foreground">Amounts in {currency}</span>
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span>Subtotal</span>
-                        <span>{formatPrice(Number(order.subtotal ?? 0), currency)}</span>
+                        <span>{formatPrice(toDisplayAmount(Number(order.subtotal ?? 0)), currency)}</span>
                       </div>
                       {order.gst != null && Number(order.gst) !== 0 && (
                         <div className="flex justify-between">
                           <span>GST</span>
-                          <span>{formatPrice(Number(order.gst), currency)}</span>
+                          <span>{formatPrice(toDisplayAmount(Number(order.gst)), currency)}</span>
                         </div>
                       )}
                       <div className="flex justify-between">
                         <span>Shipping</span>
                         <span>
-                          {order.shipping === 0 ? 'Free' : formatPrice(Number(order.shipping ?? 0), currency)}
+                          {order.shipping === 0
+                            ? (isNonIndiaOrNonINR ? 'Our executive will contact you soon for shipping rates' : 'Free')
+                            : formatPrice(toDisplayAmount(Number(order.shipping ?? 0)), currency)}
                         </span>
                       </div>
                       {order.couponCode && order.couponDiscount && order.couponDiscount > 0 && (
                         <div className="flex justify-between text-primary">
                           <span>Coupon ({order.couponCode})</span>
-                          <span>-{formatPrice(Number(order.couponDiscount), currency)}</span>
+                          <span>-{formatPrice(toDisplayAmount(Number(order.couponDiscount)), currency)}</span>
                         </div>
                       )}
                       {(() => {
@@ -467,7 +489,7 @@ const OrderDetail = () => {
                           return (
                             <div className="flex justify-between text-primary">
                               <span>COD charge</span>
-                              <span>+{formatPrice(codCharge, currency)}</span>
+                              <span>+{formatPrice(toDisplayAmount(codCharge), currency)}</span>
                             </div>
                           );
                         }
@@ -475,7 +497,7 @@ const OrderDetail = () => {
                       })()}
                       <div className="flex justify-between font-semibold text-lg pt-2 border-t">
                         <span>Total</span>
-                        <span>{formatPrice(Number(order.total ?? 0), currency)}</span>
+                        <span>{formatPrice(toDisplayAmount(Number(order.total ?? 0)), currency)}</span>
                       </div>
                     </div>
                     <div className="mt-4 pt-4 border-t">
@@ -491,7 +513,7 @@ const OrderDetail = () => {
                             {isPartialCodWithPending && pendingAmount > 0 && (
                               <div className="mt-3 p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20">
                                 <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                                  Pending amount: {formatPrice(pendingAmount, currency)}
+                                  Pending amount: {formatPrice(toDisplayAmount(pendingAmount), currency)}
                                 </p>
                                 <Button
                                   size="sm"
@@ -547,12 +569,12 @@ const OrderDetail = () => {
                               )}
                             </div>
                             <p className="text-sm text-muted-foreground">
-                              {item.quantity} × {formatPrice(Number(item.price ?? item.unitPrice ?? 0), currency)}
+                              {item.quantity} × {formatPrice(toDisplayAmount(Number(item.price ?? item.unitPrice ?? 0)), currency)}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <p className="font-semibold">
-                              {formatPrice(Number(item.totalPrice ?? 0), currency)}
+                              {formatPrice(toDisplayAmount(Number(item.totalPrice ?? 0)), currency)}
                             </p>
                             {canDownload && (
                               <Button
@@ -601,6 +623,7 @@ const OrderDetail = () => {
             <OrderItemDetailBlock
               item={productDetailItem}
               currency={currency}
+              exchangeRate={exchangeRate}
               showDigitalActions
               order={order}
               onDownload={handleDigitalDownload}
@@ -623,30 +646,33 @@ const OrderDetail = () => {
                 key={item.id ?? index}
                 item={item}
                 currency={currency}
+                exchangeRate={exchangeRate}
               />
             ))}
           </div>
           <div className="border-t pt-4 mt-4 space-y-2 text-sm shrink-0">
             <div className="flex justify-between">
               <span>Subtotal</span>
-              <span>{formatPrice(Number(order.subtotal ?? 0), currency)}</span>
+              <span>{formatPrice(toDisplayAmount(Number(order.subtotal ?? 0)), currency)}</span>
             </div>
             {order.gst != null && Number(order.gst) !== 0 && (
               <div className="flex justify-between">
                 <span>GST</span>
-                <span>{formatPrice(Number(order.gst), currency)}</span>
+                <span>{formatPrice(toDisplayAmount(Number(order.gst)), currency)}</span>
               </div>
             )}
             <div className="flex justify-between">
               <span>Shipping</span>
               <span>
-                {order.shipping === 0 ? 'Free' : formatPrice(Number(order.shipping ?? 0), currency)}
+                {order.shipping === 0
+                  ? (isNonIndiaOrNonINR ? 'Our executive will contact you soon for shipping rates' : 'Free')
+                  : formatPrice(toDisplayAmount(Number(order.shipping ?? 0)), currency)}
               </span>
             </div>
             {order.couponCode && order.couponDiscount && order.couponDiscount > 0 && (
               <div className="flex justify-between text-primary">
                 <span>Coupon ({order.couponCode})</span>
-                <span>-{formatPrice(Number(order.couponDiscount), currency)}</span>
+                <span>-{formatPrice(toDisplayAmount(Number(order.couponDiscount)), currency)}</span>
               </div>
             )}
             {(() => {
@@ -659,7 +685,7 @@ const OrderDetail = () => {
                 return (
                   <div className="flex justify-between text-primary">
                     <span>COD charge</span>
-                    <span>+{formatPrice(codCharge, currency)}</span>
+                    <span>+{formatPrice(toDisplayAmount(codCharge), currency)}</span>
                   </div>
                 );
               }
@@ -667,7 +693,7 @@ const OrderDetail = () => {
             })()}
             <div className="flex justify-between font-semibold text-lg pt-2 border-t">
               <span>Total (incl. GST)</span>
-              <span>{formatPrice(Number(order.total ?? 0), currency)}</span>
+              <span>{formatPrice(toDisplayAmount(Number(order.total ?? 0)), currency)}</span>
             </div>
           </div>
         </DialogContent>

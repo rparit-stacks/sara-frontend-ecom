@@ -373,11 +373,10 @@ const AdminOrders = () => {
                           </td>
                           <td className="px-6 py-4">
                             {(() => {
-                              const currency = order.paymentCurrency || 'INR';
-                              const amount = Number(order.paymentAmount ?? order.total ?? 0);
+                              const amount = Number(order.paymentAmountInINR ?? order.paymentAmount ?? order.total ?? 0);
                               return (
                                 <span className="font-semibold whitespace-nowrap">
-                                  {formatPrice(amount, currency)}
+                                  {formatPrice(amount, 'INR')}
                                 </span>
                               );
                             })()}

@@ -850,20 +850,47 @@ const AdminCustomConfig = () => {
                               .filter(Boolean);
                             if (!urls.length) return null;
                             return (
-                              <div className="flex flex-wrap gap-2 mt-1">
-                                {urls.map((url: string, idx: number) => (
-                                  <a
-                                    key={`${request.id}-img-${idx}`}
-                                    href={url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-primary hover:underline"
-                                  >
-                                    <ImageIcon className="w-4 h-4" />
-                                    <span>{`View file ${idx + 1}`}</span>
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                  </a>
-                                ))}
+                              <div className="mt-2 space-y-1.5">
+                                <span className="text-xs font-medium text-muted-foreground">
+                                  Reference Image{urls.length > 1 ? 's' : ''} ({urls.length})
+                                </span>
+                                <div className="flex flex-wrap gap-2 items-center">
+                                  {urls.map((url: string, idx: number) => (
+                                    <a
+                                      key={`${request.id}-img-${idx}`}
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex flex-col items-center gap-0.5 group"
+                                    >
+                                      <img
+                                        src={url}
+                                        alt={`Reference ${idx + 1}`}
+                                        className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded border border-border bg-muted group-hover:ring-2 group-hover:ring-primary/50 transition-all"
+                                        onError={(e) => {
+                                          (e.target as HTMLImageElement).style.display = 'none';
+                                        }}
+                                      />
+                                      <span className="text-[10px] xs:text-xs text-primary group-hover:underline">
+                                        File {idx + 1}
+                                      </span>
+                                    </a>
+                                  ))}
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {urls.map((url: string, idx: number) => (
+                                    <a
+                                      key={`${request.id}-link-${idx}`}
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      Open {idx + 1}
+                                    </a>
+                                  ))}
+                                </div>
                               </div>
                             );
                           })()}

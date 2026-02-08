@@ -12,6 +12,8 @@ import { toast } from 'sonner';
 import { cartApi, orderApi, userApi, shippingApi, paymentApi, paymentConfigApi, couponApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import { usePrice } from '@/lib/currency';
+import { useCurrency } from '@/context/CurrencyContext';
+import { CurrencySelector } from '@/components/currency/CurrencySelector';
 import { lookupPincode } from '@/lib/pincodeLookup';
 
 // Countries list
@@ -129,6 +131,7 @@ const Checkout = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { format, convert, currency } = usePrice();
+  const { exchangeRates, multipliers, ratesToInr } = useCurrency();
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -371,8 +374,11 @@ const Checkout = () => {
         paymentMethod,
         notes,
         couponCode: appliedCouponCode || null,
+        currency,
+        country: getCountryName(),
+        exchangeRate: currency === 'INR' ? 1 : (ratesToInr?.[currency] && ratesToInr[currency] > 0 ? 1 / ratesToInr[currency] : (exchangeRates?.[currency] && exchangeRates[currency] > 0 ? exchangeRates[currency] : undefined)),
       };
-      
+
       // Add guest checkout fields if not logged in
       if (!isLoggedIn) {
         orderData.guestEmail = formData.email;
@@ -481,10 +487,10 @@ const Checkout = () => {
   // Check if currently selected currency is INR
   const isINRCurrency = currency === 'INR';
 
-  // Fetch payment methods from API to check which are enabled
+  // Fetch payment methods from API (backend filters by country + currency)
   const { data: paymentMethodsData } = useQuery({
-    queryKey: ['payment-methods', getCountryName()],
-    queryFn: () => paymentApi.getMethods(getCountryName()),
+    queryKey: ['payment-methods', getCountryName(), currency],
+    queryFn: () => paymentApi.getMethods(getCountryName(), currency),
     enabled: !!formData.country,
   });
   
@@ -502,60 +508,13 @@ const Checkout = () => {
     return items.some((item: any) => item.productType === 'DIGITAL');
   }, [items]);
   
-  // Determine available payment gateways based on country and BusinessConfig
-  // Rules:
-  // - India: Razorpay (if enabled) + Stripe (if enabled) + COD (if enabled) + Partial COD (if enabled and at least one gateway)
-  // - Non-India: Only Stripe (if enabled) + COD (if enabled); no Razorpay, no Partial COD
-  // - Digital products: Never allow COD/Partial COD, only online payment
+  // Use backend gateways as source of truth (already filtered by country + currency).
+  // Only filter out COD/PARTIAL_COD when cart has digital products.
   useEffect(() => {
-    const apiGateways = paymentMethodsData?.gateways || [];
-    const codEnabled = paymentConfig?.codEnabled ?? false;
-    const partialCodEnabled = paymentConfig?.partialCodEnabled ?? false;
-    const razorpayEnabled = paymentConfig?.razorpayEnabled ?? false;
-    const stripeEnabled = paymentConfig?.stripeEnabled ?? false;
-    
-    const gateways: string[] = [];
-    
-    // If cart contains Digital products, COD is NOT available
+    let gateways: string[] = paymentMethodsData?.gateways ?? [];
     if (hasDigitalProducts) {
-      // Digital products: Only online payment gateways
-      if (isIndia) {
-        if (apiGateways.includes('RAZORPAY') && razorpayEnabled) {
-          gateways.push('RAZORPAY');
-        }
-        if (apiGateways.includes('STRIPE') && stripeEnabled) {
-          gateways.push('STRIPE');
-        }
-      } else {
-        if (apiGateways.includes('STRIPE') && stripeEnabled) {
-          gateways.push('STRIPE');
-        }
-      }
-    } else {
-      if (isIndia) {
-        if (apiGateways.includes('RAZORPAY') && razorpayEnabled) {
-          gateways.push('RAZORPAY');
-        }
-        if (apiGateways.includes('STRIPE') && stripeEnabled) {
-          gateways.push('STRIPE');
-        }
-        if (codEnabled) {
-          gateways.push('COD');
-        }
-        if (partialCodEnabled && (razorpayEnabled || stripeEnabled)) {
-          gateways.push('PARTIAL_COD');
-        }
-      } else {
-        // Non-India: Only Stripe (if enabled) and COD (if enabled); no Razorpay, no Partial COD
-        if (apiGateways.includes('STRIPE') && stripeEnabled) {
-          gateways.push('STRIPE');
-        }
-        if (codEnabled) {
-          gateways.push('COD');
-        }
-      }
+      gateways = gateways.filter((g: string) => g === 'RAZORPAY' || g === 'STRIPE');
     }
-    
     setAvailableGateways(gateways);
     
     // Set default gateway
@@ -585,7 +544,7 @@ const Checkout = () => {
         }
       }
     }
-  }, [formData.country, isIndia, paymentMethodsData, hasDigitalProducts, paymentConfig, paymentGateway]);
+  }, [formData.country, paymentMethodsData, hasDigitalProducts, paymentGateway]);
   
   // Calculate shipping for guest checkout: India = quantity-based (calculateForItems), international = 0
   const [guestShipping, setGuestShipping] = useState(0);
@@ -864,6 +823,9 @@ const Checkout = () => {
           paymentMethod: 'PARTIAL_COD',
           notes,
           couponCode: appliedCouponCode || null,
+          currency,
+          country: getCountryName(),
+          exchangeRate: currency === 'INR' ? 1 : (ratesToInr?.[currency] && ratesToInr[currency] > 0 ? 1 / ratesToInr[currency] : (exchangeRates?.[currency] && exchangeRates[currency] > 0 ? exchangeRates[currency] : undefined)),
         };
 
         if (!isLoggedIn) {
@@ -933,6 +895,9 @@ const Checkout = () => {
         paymentMethod: paymentGateway.toLowerCase(),
         notes,
         couponCode: appliedCouponCode || null,
+        currency,
+        country: getCountryName(),
+        exchangeRate: currency === 'INR' ? 1 : (ratesToInr?.[currency] && ratesToInr[currency] > 0 ? 1 / ratesToInr[currency] : (exchangeRates?.[currency] && exchangeRates[currency] > 0 ? exchangeRates[currency] : undefined)),
       };
 
       if (!isLoggedIn) {
@@ -1638,10 +1603,14 @@ const Checkout = () => {
               </div>
 
               <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border h-fit lg:sticky lg:top-24 space-y-6">
-                <h3 className="font-serif text-lg sm:text-xl mb-6 font-semibold flex items-center gap-2">
+                <h3 className="font-serif text-lg sm:text-xl mb-2 font-semibold flex items-center gap-2">
                   <ShoppingBag className="w-5 h-5 text-muted-foreground" />
                   Order Summary
                 </h3>
+                <div className="flex items-center justify-between gap-2 mb-4 pb-4 border-b text-sm text-muted-foreground">
+                  <span>Pay in:</span>
+                  <CurrencySelector />
+                </div>
                 <div className="space-y-2 text-sm sm:text-base border-b pb-4 mb-4">
                   {items.map((item: any) => {
                     const hasBreakdown = item.productType === 'DESIGNED' && (item.designPrice != null || item.fabricPrice != null) || (item.unitPrice != null && (item.quantity || 1) > 0);
