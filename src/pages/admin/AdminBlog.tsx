@@ -50,6 +50,11 @@ const AdminBlog = () => {
     category: '',
     status: 'ACTIVE',
   });
+  const [errors, setErrors] = useState({
+    title: false,
+    excerpt: false,
+    content: false,
+  });
   
   // Fetch blogs from API
   const { data: blogs = [], isLoading, error } = useQuery({
@@ -133,6 +138,11 @@ const AdminBlog = () => {
       category: '',
       status: 'ACTIVE',
     });
+    setErrors({
+      title: false,
+      excerpt: false,
+      content: false,
+    });
   };
 
   const handleEdit = (blog: any) => {
@@ -165,16 +175,22 @@ const AdminBlog = () => {
   }, [fullBlogData, isEditDialogOpen, editingBlog]);
 
   const handleSave = () => {
-    if (!formData.title.trim()) {
-      toast.error('Blog title is required');
-      return;
-    }
-    if (!formData.excerpt.trim()) {
-      toast.error('Blog excerpt is required');
-      return;
-    }
-    if (!formData.content.trim()) {
-      toast.error('Blog content is required');
+    const newErrors = {
+      title: !formData.title.trim(),
+      excerpt: !formData.excerpt.trim(),
+      content: !formData.content.trim(),
+    };
+
+    setErrors(newErrors);
+
+    if (newErrors.title || newErrors.excerpt || newErrors.content) {
+      if (newErrors.title) {
+        toast.error('Blog title is required');
+      } else if (newErrors.excerpt) {
+        toast.error('Blog excerpt is required');
+      } else if (newErrors.content) {
+        toast.error('Blog content is required');
+      }
       return;
     }
 
@@ -394,22 +410,34 @@ const AdminBlog = () => {
             ) : (
             <div className="space-y-6 mt-4 overflow-y-auto flex-1">
               <div className="space-y-2">
-                <Label>Blog Title</Label>
+                <Label className={errors.title ? 'text-destructive' : ''}>Blog Title *</Label>
                 <Input
                   placeholder="Enter blog title"
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="h-11"
+                  onChange={(e) => {
+                    setFormData({ ...formData, title: e.target.value });
+                    if (errors.title) {
+                      setErrors((prev) => ({ ...prev, title: false }));
+                    }
+                  }}
+                  className={`h-11 ${errors.title ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Excerpt (Short Description)</Label>
+                <Label className={errors.excerpt ? 'text-destructive' : ''}>
+                  Excerpt (Short Description) *
+                </Label>
                 <Textarea
                   placeholder="Enter a short excerpt that will appear in blog listings"
                   value={formData.excerpt}
-                  onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
-                  className="min-h-[100px]"
+                  onChange={(e) => {
+                    setFormData({ ...formData, excerpt: e.target.value });
+                    if (errors.excerpt) {
+                      setErrors((prev) => ({ ...prev, excerpt: false }));
+                    }
+                  }}
+                  className={`min-h-[100px] ${errors.excerpt ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                 />
               </div>
 
@@ -552,12 +580,25 @@ const AdminBlog = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Blog Content</Label>
-                <RichTextEditor 
-                  value={formData.content} 
-                  onChange={(content) => setFormData({ ...formData, content })}
-                  placeholder="Write your blog post content here..."
-                />
+                <Label className={errors.content ? 'text-destructive' : ''}>Blog Content *</Label>
+                <div
+                  className={
+                    errors.content
+                      ? 'rounded-md border border-destructive'
+                      : ''
+                  }
+                >
+                  <RichTextEditor
+                    value={formData.content}
+                    onChange={(content) => {
+                      setFormData({ ...formData, content });
+                      if (errors.content) {
+                        setErrors((prev) => ({ ...prev, content: false }));
+                      }
+                    }}
+                    placeholder="Write your blog post content here..."
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
