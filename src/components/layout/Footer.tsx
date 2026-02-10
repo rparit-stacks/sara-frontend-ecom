@@ -13,6 +13,7 @@ const footerLinks = {
     { name: 'About Us', path: '/about' },
     { name: 'Contact', path: '/contact' },
     { name: 'FAQ', path: '/faq' },
+    { name: 'Blog', path: '/blog' },
   ],
   support: [
     { name: 'Terms & Conditions', path: '/terms' },

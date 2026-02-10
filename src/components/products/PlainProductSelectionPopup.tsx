@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -95,9 +95,9 @@ const PlainProductSelectionPopup: React.FC<PlainProductSelectionPopupProps> = ({
             <Package className="w-5 h-5 sm:w-6 sm:h-6 text-[#2b9d8f] flex-shrink-0" />
             <span className="break-words">Select Fabric</span>
           </DialogTitle>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2">
+          <DialogDescription className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2">
             Choose a fabric to combine with this design
-          </p>
+          </DialogDescription>
         </DialogHeader>
 
         {/* Search Input */}

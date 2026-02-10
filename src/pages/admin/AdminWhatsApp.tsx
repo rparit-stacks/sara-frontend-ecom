@@ -771,14 +771,19 @@ const AdminWhatsApp = () => {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Template ID (Optional)</label>
                 <Select
-                  value={customStatusForm.templateId?.toString() || ''}
-                  onValueChange={(value) => setCustomStatusForm({ ...customStatusForm, templateId: value ? parseInt(value) : null })}
+                  value={customStatusForm.templateId != null ? customStatusForm.templateId.toString() : 'none'}
+                  onValueChange={(value) =>
+                    setCustomStatusForm({
+                      ...customStatusForm,
+                      templateId: value === 'none' ? null : parseInt(value),
+                    })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select template (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {templates.map((template: any) => (
                       <SelectItem key={template.id} value={template.id.toString()}>
                         {template.statusType} - {template.templateName || 'No name'}
