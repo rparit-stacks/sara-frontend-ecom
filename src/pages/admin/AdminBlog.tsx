@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -363,19 +364,27 @@ const AdminBlog = () => {
         </div>
 
         {/* Add/Edit Dialog */}
-        <Dialog open={isAddDialogOpen || isEditDialogOpen} onOpenChange={(open) => {
-          if (!open) {
-            setIsAddDialogOpen(false);
-            setIsEditDialogOpen(false);
-            handleResetForm();
-            setEditingBlog(null);
-          }
-        }}>
+        <Dialog
+          open={isAddDialogOpen || isEditDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsAddDialogOpen(false);
+              setIsEditDialogOpen(false);
+              handleResetForm();
+              setEditingBlog(null);
+            }
+          }}
+        >
           <DialogContent className="max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
             <DialogHeader className="flex-shrink-0">
               <DialogTitle className="font-semibold text-2xl">
                 {editingBlog ? 'Edit Blog Post' : 'Create Blog Post'}
               </DialogTitle>
+              <DialogDescription>
+                {editingBlog
+                  ? 'Update the content and details of your existing blog post.'
+                  : 'Fill in the details below to create a new blog post.'}
+              </DialogDescription>
             </DialogHeader>
             
             {isLoadingBlog && isEditDialogOpen ? (
@@ -562,9 +571,13 @@ const AdminBlog = () => {
                       <SelectValue placeholder="Select or enter category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((cat: string) => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
+                      {categories
+                        .filter((cat: string) => !!cat && cat.trim().length > 0)
+                        .map((cat: string) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   <Input
