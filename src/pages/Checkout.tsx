@@ -159,14 +159,19 @@ const Checkout = () => {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const shippingFormRef = useRef<HTMLDivElement>(null);
 
-  /** Validate GSTIN: must be exactly 15 characters, alphanumeric (Indian format). */
+  /** Validate GSTIN: must be exactly 15 characters and match official Indian GSTIN format. */
   const validateGstin = (value: string): string | null => {
     if (!value || !value.trim()) return null;
     const trimmed = value.trim().toUpperCase();
     if (trimmed.length !== 15) return 'GSTIN must be exactly 15 characters';
-    // Indian GSTIN: 2 digits (state) + 10 alphanumeric (PAN) + 1 digit + 1 alphanumeric + 1 digit
-    const gstinRegex = /^[0-9]{2}[A-Z0-9]{10}[0-9][A-Z0-9][0-9]$/;
-    if (!gstinRegex.test(trimmed)) return 'Enter a valid 15-character GSTIN (e.g., 27ABCDE1234F1Z5)';
+    // Official Indian GSTIN format:
+    //  - 01–99 (state code) = 2 digits
+    //  - PAN: 5 letters + 4 digits + 1 letter
+    //  - Entity code: 1–9 or A–Z
+    //  - Constant "Z"
+    //  - Checksum: 0–9 or A–Z
+    const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+    if (!gstinRegex.test(trimmed)) return 'Enter a valid GSTIN (e.g., 27ABCDE1234F1Z5)';
     return null;
   };
 

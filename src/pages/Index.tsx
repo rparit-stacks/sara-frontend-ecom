@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import useEmblaCarousel from 'embla-carousel-react';
 import Autoplay from 'embla-carousel-autoplay';
@@ -92,6 +92,8 @@ const Index = () => {
   const signatureScrollRef = useRef<HTMLDivElement>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [email, setEmail] = useState('');
+  const location = useLocation();
+  const hasScrolledToSignatureRef = useRef(false);
 
   const scrollTo = useCallback((index: number) => heroApi?.scrollTo(index), [heroApi]);
 
@@ -99,6 +101,21 @@ const Index = () => {
     if (!heroApi) return;
     heroApi.on('select', () => setCurrentSlide(heroApi.selectedScrollSnap()));
   }, [heroApi]);
+  
+  // Handle deep-link scroll to Signature Collections / Prints & Embroideries section
+  useEffect(() => {
+    const state = location.state as any;
+    if (!state?.scrollToSection || hasScrolledToSignatureRef.current) return;
+    const targetId = state.scrollToSection as string;
+    const el = document.getElementById(targetId);
+    if (el) {
+      hasScrolledToSignatureRef.current = true;
+      // Slight delay to ensure layout is ready
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+    }
+  }, [location.state]);
   
   // Fetch CMS homepage data
   const { data: cmsData, isLoading: isLoadingCms } = useQuery({
@@ -389,6 +406,7 @@ const Index = () => {
 
       {/* Categories - Signature Prints & Embroideries */}
       <section 
+        id="signature-print-embroideries"
         className="w-full py-12 xs:py-16 sm:py-20 lg:py-28 relative"
         style={{
           backgroundImage: 'url(/bg_images/thumbnail.png)',

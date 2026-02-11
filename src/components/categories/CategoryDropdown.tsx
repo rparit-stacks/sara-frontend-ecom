@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ export const CategoryDropdown = () => {
   const [hoveredCategory, setHoveredCategory] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Fetch active categories with user email if logged in
   const { data: categories = [] } = useQuery({
@@ -81,10 +82,36 @@ export const CategoryDropdown = () => {
     setHoveredCategory(null);
   };
 
+  const scrollToSignatureSection = () => {
+    const targetId = 'signature-print-embroideries';
+    const el = document.getElementById(targetId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleMainClick = () => {
+    // On mobile/tablet (below lg), keep current behavior and just toggle dropdown
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsOpen((prev) => !prev);
+      return;
+    }
+
+    // Desktop: act as shortcut to Signature Collections / Prints & Embroideries section
+    setIsOpen(false);
+    setHoveredCategory(null);
+
+    if (location.pathname === '/') {
+      scrollToSignatureSection();
+    } else {
+      navigate('/', { state: { scrollToSection: 'signature-print-embroideries' } });
+    }
+  };
+
   return (
     <div ref={dropdownRef} className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleMainClick}
         onMouseEnter={() => setIsOpen(true)}
         className={cn(
           'text-sm font-medium transition-colors duration-200 link-underline py-1 flex items-center gap-1',

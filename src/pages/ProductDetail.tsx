@@ -673,18 +673,13 @@ const ProductDetail = () => {
       if (!product || !wishlistProductId) {
         throw new Error('Product not loaded');
       }
-
-      // Use the same pricing logic as finalPrice: finalPrice = unitPrice * quantity
-      const qty = quantity > 0 ? quantity : 1;
-      const unitPriceForWishlist = finalPrice && qty > 0 ? finalPrice / qty : 0;
-
       return wishlistApi.addItem({
         productType,
         productId: wishlistProductId,
         productName: product.name,
         productImage: product.images?.[0],
-        quantity: qty,
-        unitPrice: unitPriceForWishlist,
+        // Store only product-level reference in wishlist; pricing comes from product itself
+        quantity: 1,
       });
     },
     onSuccess: () => {
@@ -693,7 +688,12 @@ const ProductDetail = () => {
       toast.success('Added to wishlist!');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to add to wishlist');
+      const msg = error.message || '';
+      if (msg.toLowerCase().includes('already') && msg.toLowerCase().includes('wishlist')) {
+        toast.info('This product is already in your wishlist');
+      } else {
+        toast.error(msg || 'Failed to add to wishlist');
+      }
     },
   });
 

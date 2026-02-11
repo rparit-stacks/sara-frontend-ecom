@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { cartApi, productsApi, wishlistApi } from '@/lib/api';
+import { cartApi, productsApi, wishlistApi, saveForLaterApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import CartItemDetails from '@/components/cart/CartItemDetails';
@@ -23,7 +23,9 @@ const CartItem = ({
   handleQuantityChange,
   handleRemoveItem,
   onAddToWishlist,
+  onSaveForLater,
   addToWishlistPending,
+  saveForLaterPending,
   setSelectedItemForBreakdown,
   setShowPriceBreakdown,
 }: any) => {
@@ -132,6 +134,22 @@ const CartItem = ({
               >
                 {addToWishlistPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Heart className="w-3.5 h-3.5" />}
                 Add to Wishlist
+              </Button>
+            )}
+            {onSaveForLater && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs xs:text-sm"
+                onClick={() => onSaveForLater(item)}
+                disabled={saveForLaterPending}
+              >
+                {saveForLaterPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <span className="w-3.5 h-3.5" />
+                )}
+                Save for Later
               </Button>
             )}
             {customEditUrl && (
@@ -269,7 +287,7 @@ const Cart = () => {
     }
   };
 
-  const handleAddToWishlist = (item: any) => {
+  const handleAddToWishlist = async (item: any) => {
     if (!isLoggedIn) {
       toast.error('Please log in to add items to your wishlist');
       return;
@@ -280,28 +298,84 @@ const Cart = () => {
       toast.error('Cannot add this item to wishlist');
       return;
     }
-    
-    // Send full item data including all customizations
+
+    // First, check if product already exists in wishlist
+    try {
+      const check = await wishlistApi.checkItem(productType, productId);
+      if (check?.inWishlist) {
+        toast.info('This product is already in your wishlist');
+        return;
+      }
+    } catch {
+      // If check fails, continue and let the add call handle any errors
+    }
+
+    // Send only minimal product reference to wishlist (no detailed configuration)
     const wishlistData: any = {
       productType,
       productId,
       productName: item.productName,
       productImage: item.productImage,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
+      quantity: 1,
     };
-    
-    // Add customization fields if present
-    if (item.designId) wishlistData.designId = item.designId;
-    if (item.fabricId) wishlistData.fabricId = item.fabricId;
-    if (item.fabricPrice) wishlistData.fabricPrice = item.fabricPrice;
-    if (item.designPrice) wishlistData.designPrice = item.designPrice;
-    if (item.uploadedDesignUrl) wishlistData.uploadedDesignUrl = item.uploadedDesignUrl;
-    if (item.variants) wishlistData.variants = item.variants;
-    if (item.variantSelections) wishlistData.variantSelections = item.variantSelections;
-    if (item.customFormData) wishlistData.customFormData = item.customFormData;
-    
+
     addToWishlistMutation.mutate(wishlistData);
+  };
+
+  // Save for later mutations (logged-in only)
+  const { data: saveForLaterItems } = useQuery({
+    queryKey: ['save-for-later'],
+    queryFn: () => saveForLaterApi.getList(),
+    enabled: isLoggedIn,
+  });
+
+  const moveToSaveForLaterMutation = useMutation({
+    mutationFn: (cartItemId: number) => saveForLaterApi.moveToSaveForLater(cartItemId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+      queryClient.invalidateQueries({ queryKey: ['cart-count'] });
+      queryClient.invalidateQueries({ queryKey: ['save-for-later'] });
+      toast.success('Item moved to Save for Later');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to save item for later');
+    },
+  });
+
+  const moveToCartFromSaveForLaterMutation = useMutation({
+    mutationFn: (id: number) => saveForLaterApi.moveToCart(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+      queryClient.invalidateQueries({ queryKey: ['cart-count'] });
+      queryClient.invalidateQueries({ queryKey: ['save-for-later'] });
+      toast.success('Item moved back to cart');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to move item to cart');
+    },
+  });
+
+  const removeSaveForLaterMutation = useMutation({
+    mutationFn: (id: number) => saveForLaterApi.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['save-for-later'] });
+      toast.success('Item removed from Save for Later');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to remove item');
+    },
+  });
+
+  const handleSaveForLater = (item: any) => {
+    if (!isLoggedIn) {
+      toast.error('Please log in to save items for later');
+      return;
+    }
+    if (!item.id) {
+      toast.error('Cannot save this item for later');
+      return;
+    }
+    moveToSaveForLaterMutation.mutate(item.id as number);
   };
 
   return (
@@ -336,10 +410,75 @@ const Cart = () => {
                     handleRemoveItem={handleRemoveItem}
                     onAddToWishlist={handleAddToWishlist}
                     addToWishlistPending={addToWishlistMutation.isPending}
+                    onSaveForLater={isLoggedIn ? handleSaveForLater : undefined}
+                    saveForLaterPending={moveToSaveForLaterMutation.isPending}
                     setSelectedItemForBreakdown={setSelectedItemForBreakdown}
                     setShowPriceBreakdown={setShowPriceBreakdown}
                   />
                 ))}
+
+                {/* Save for Later section */}
+                {isLoggedIn && saveForLaterItems && saveForLaterItems.length > 0 && (
+                  <div className="mt-6 border-t border-border pt-4 sm:pt-6">
+                    <h3 className="font-cursive text-xl xs:text-2xl mb-3 xs:mb-4">
+                      Save for Later
+                    </h3>
+                    <div className="space-y-3 xs:space-y-4">
+                      {saveForLaterItems.map((item: any) => (
+                        <div
+                          key={item.id}
+                          className="flex gap-3 xs:gap-4 sm:gap-6 p-3 xs:p-4 sm:p-5 bg-card rounded-xl border border-border"
+                        >
+                          <img
+                            src={item.productImage || ''}
+                            alt={item.productName}
+                            className="w-16 h-20 xs:w-20 xs:h-24 sm:w-24 sm:h-28 object-cover rounded-lg flex-shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-cursive text-base xs:text-lg sm:text-xl line-clamp-2">
+                              {item.productName}
+                            </p>
+                            <p className="text-xs xs:text-sm text-muted-foreground mt-1">
+                              {item.productType}
+                            </p>
+                            <div className="flex items-center justify-between mt-2 xs:mt-3">
+                              <p className="font-semibold text-[#2b9d8f] text-sm xs:text-base sm:text-lg">
+                                {format(item.totalPrice || item.unitPrice || 0)}
+                              </p>
+                              <p className="text-xs xs:text-sm text-muted-foreground">
+                                Qty: {item.quantity || 1}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 xs:gap-3 sm:gap-4 mt-3 xs:mt-4">
+                              <Button
+                                size="sm"
+                                className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white text-xs xs:text-sm"
+                                onClick={() =>
+                                  moveToCartFromSaveForLaterMutation.mutate(item.id as number)
+                                }
+                                disabled={moveToCartFromSaveForLaterMutation.isPending}
+                              >
+                                Move to Cart
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10 text-xs xs:text-sm"
+                                onClick={() =>
+                                  removeSaveForLaterMutation.mutate(item.id as number)
+                                }
+                                disabled={removeSaveForLaterMutation.isPending}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="bg-card p-4 xs:p-6 sm:p-8 rounded-xl sm:rounded-2xl border border-border h-fit lg:sticky lg:top-24">

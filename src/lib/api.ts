@@ -766,6 +766,22 @@ export const cartApi = {
 };
 
 // ===============================
+// Save For Later API
+// ===============================
+export const saveForLaterApi = {
+  getList: () => fetchApi<any[]>('/api/save-for-later'),
+  moveToSaveForLater: (cartItemId: number) =>
+    fetchApi<any>('/api/save-for-later', {
+      method: 'POST',
+      body: JSON.stringify({ cartItemId }),
+    }),
+  moveToCart: (id: number) =>
+    fetchApi<void>(`/api/save-for-later/${id}/move-to-cart`, { method: 'POST' }),
+  remove: (id: number) =>
+    fetchApi<void>(`/api/save-for-later/${id}`, { method: 'DELETE' }),
+};
+
+// ===============================
 // Wishlist API
 // ===============================
 export const wishlistApi = {
@@ -1157,7 +1173,7 @@ export const mockupApi = {
     const formData = new FormData();
     formData.append('design', file);
     
-    const MOCKUP_API_URL = import.meta.env.VITE_MOCKUP_API_URL ?? 'http://72.62.241.163:3001';
+    const MOCKUP_API_URL = import.meta.env.VITE_MOCKUP_API_URL ?? 'https://mock-api.studiosara.cloud';
     
     console.log('[Mockup API] Generating mockups for design:', file.name);
     

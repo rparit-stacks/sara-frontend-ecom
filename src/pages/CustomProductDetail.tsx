@@ -607,12 +607,19 @@ const CustomProductDetail = () => {
 
   // Add to wishlist mutation (wishlist API takes object with productType, productId, etc.)
   const addToWishlistMutation = useMutation({
-    mutationFn: () => wishlistApi.addItem({
-      productType: 'CUSTOM',
-      productId: Number(customProductId!),
-      productName: customProduct?.productName || 'Custom Design',
-      productImage: designUrl || displayImages?.[0],
-    }),
+    mutationFn: () => {
+      if (!customProductId) {
+        throw new Error('Custom product not loaded');
+      }
+      return wishlistApi.addItem({
+        productType: 'CUSTOM',
+        productId: Number(customProductId),
+        productName: customProduct?.productName || 'Custom Design',
+        productImage: designUrl || displayImages?.[0],
+        // For wishlist, we only need a reference to the custom product itself
+        quantity: 1,
+      });
+    },
     onSuccess: () => {
       if (customProductId) {
         // Save custom product when added to wishlist
@@ -621,7 +628,12 @@ const CustomProductDetail = () => {
       toast.success('Custom product added to wishlist and saved!');
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Failed to add to wishlist');
+      const msg = error?.message || '';
+      if (typeof msg === 'string' && msg.toLowerCase().includes('already') && msg.toLowerCase().includes('wishlist')) {
+        toast.info('This product is already in your wishlist');
+      } else {
+        toast.error(msg || 'Failed to add to wishlist');
+      }
     },
   });
 
