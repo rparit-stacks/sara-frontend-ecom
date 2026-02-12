@@ -396,87 +396,109 @@ const Cart = () => {
             <div className="flex justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
-          ) : items.length > 0 ? (
+          ) : (
             <div className="grid lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 xl:gap-14">
               <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-                {items.map((item: any) => (
-                  <CartItem
-                    key={item.id}
-                    item={item}
-                    isLoggedIn={isLoggedIn}
-                    updateMutation={updateMutation}
-                    removeMutation={removeMutation}
-                    handleQuantityChange={handleQuantityChange}
-                    handleRemoveItem={handleRemoveItem}
-                    onAddToWishlist={handleAddToWishlist}
-                    addToWishlistPending={addToWishlistMutation.isPending}
-                    onSaveForLater={isLoggedIn ? handleSaveForLater : undefined}
-                    saveForLaterPending={moveToSaveForLaterMutation.isPending}
-                    setSelectedItemForBreakdown={setSelectedItemForBreakdown}
-                    setShowPriceBreakdown={setShowPriceBreakdown}
-                  />
-                ))}
+                {/* Cart items or empty state */}
+                {items.length > 0 ? (
+                  items.map((item: any) => (
+                    <CartItem
+                      key={item.id}
+                      item={item}
+                      isLoggedIn={isLoggedIn}
+                      updateMutation={updateMutation}
+                      removeMutation={removeMutation}
+                      handleQuantityChange={handleQuantityChange}
+                      handleRemoveItem={handleRemoveItem}
+                      onAddToWishlist={handleAddToWishlist}
+                      addToWishlistPending={addToWishlistMutation.isPending}
+                      onSaveForLater={isLoggedIn ? handleSaveForLater : undefined}
+                      saveForLaterPending={moveToSaveForLaterMutation.isPending}
+                      setSelectedItemForBreakdown={setSelectedItemForBreakdown}
+                      setShowPriceBreakdown={setShowPriceBreakdown}
+                    />
+                  ))
+                ) : (
+                  <div className="text-center py-10 border border-dashed border-border rounded-xl sm:rounded-2xl bg-card/40">
+                    <ShoppingBag className="w-12 h-12 xs:w-14 xs:h-14 mx-auto text-muted-foreground mb-3 xs:mb-4" />
+                    <h2 className="font-cursive text-xl xs:text-2xl mb-1 xs:mb-2">Your cart is empty</h2>
+                    <p className="text-muted-foreground text-xs xs:text-sm sm:text-base mb-4 xs:mb-5">
+                      Looks like you haven't added anything yet.
+                    </p>
+                    <Link to="/products">
+                      <Button className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white px-4 sm:px-6 py-2 text-xs sm:text-sm">
+                        Continue Shopping
+                      </Button>
+                    </Link>
+                  </div>
+                )}
 
-                {/* Save for Later section */}
-                {isLoggedIn && saveForLaterItems && saveForLaterItems.length > 0 && (
+                {/* Save for Later section – always visible for logged-in users */}
+                {isLoggedIn && (
                   <div className="mt-6 border-t border-border pt-4 sm:pt-6">
                     <h3 className="font-cursive text-xl xs:text-2xl mb-3 xs:mb-4">
                       Save for Later
                     </h3>
-                    <div className="space-y-3 xs:space-y-4">
-                      {saveForLaterItems.map((item: any) => (
-                        <div
-                          key={item.id}
-                          className="flex gap-3 xs:gap-4 sm:gap-6 p-3 xs:p-4 sm:p-5 bg-card rounded-xl border border-border"
-                        >
-                          <img
-                            src={item.productImage || ''}
-                            alt={item.productName}
-                            className="w-16 h-20 xs:w-20 xs:h-24 sm:w-24 sm:h-28 object-cover rounded-lg flex-shrink-0"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-cursive text-base xs:text-lg sm:text-xl line-clamp-2">
-                              {item.productName}
-                            </p>
-                            <p className="text-xs xs:text-sm text-muted-foreground mt-1">
-                              {item.productType}
-                            </p>
-                            <div className="flex items-center justify-between mt-2 xs:mt-3">
-                              <p className="font-semibold text-[#2b9d8f] text-sm xs:text-base sm:text-lg">
-                                {format(item.totalPrice || item.unitPrice || 0)}
+                    {saveForLaterItems && saveForLaterItems.length > 0 ? (
+                      <div className="space-y-3 xs:space-y-4">
+                        {saveForLaterItems.map((item: any) => (
+                          <div
+                            key={item.id}
+                            className="flex gap-3 xs:gap-4 sm:gap-6 p-3 xs:p-4 sm:p-5 bg-card rounded-xl border border-border"
+                          >
+                            <img
+                              src={item.productImage || ''}
+                              alt={item.productName}
+                              className="w-16 h-20 xs:w-20 xs:h-24 sm:w-24 sm:h-28 object-cover rounded-lg flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-cursive text-base xs:text-lg sm:text-xl line-clamp-2">
+                                {item.productName}
                               </p>
-                              <p className="text-xs xs:text-sm text-muted-foreground">
-                                Qty: {item.quantity || 1}
+                              <p className="text-xs xs:text-sm text-muted-foreground mt-1">
+                                {item.productType}
                               </p>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 xs:gap-3 sm:gap-4 mt-3 xs:mt-4">
-                              <Button
-                                size="sm"
-                                className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white text-xs xs:text-sm"
-                                onClick={() =>
-                                  moveToCartFromSaveForLaterMutation.mutate(item.id as number)
-                                }
-                                disabled={moveToCartFromSaveForLaterMutation.isPending}
-                              >
-                                Move to Cart
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10 text-xs xs:text-sm"
-                                onClick={() =>
-                                  removeSaveForLaterMutation.mutate(item.id as number)
-                                }
-                                disabled={removeSaveForLaterMutation.isPending}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                Remove
-                              </Button>
+                              <div className="flex items-center justify-between mt-2 xs:mt-3">
+                                <p className="font-semibold text-[#2b9d8f] text-sm xs:text-base sm:text-lg">
+                                  {format(item.totalPrice || item.unitPrice || 0)}
+                                </p>
+                                <p className="text-xs xs:text-sm text-muted-foreground">
+                                  Qty: {item.quantity || 1}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 xs:gap-3 sm:gap-4 mt-3 xs:mt-4">
+                                <Button
+                                  size="sm"
+                                  className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white text-xs xs:text-sm"
+                                  onClick={() =>
+                                    moveToCartFromSaveForLaterMutation.mutate(item.id as number)
+                                  }
+                                  disabled={moveToCartFromSaveForLaterMutation.isPending}
+                                >
+                                  Move to Cart
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10 text-xs xs:text-sm"
+                                  onClick={() =>
+                                    removeSaveForLaterMutation.mutate(item.id as number)
+                                  }
+                                  disabled={removeSaveForLaterMutation.isPending}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  Remove
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 xs:p-5 sm:p-6 rounded-xl sm:rounded-2xl border border-dashed border-border bg-muted/40 text-xs xs:text-sm text-muted-foreground">
+                        No items saved for later.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -484,13 +506,28 @@ const Cart = () => {
               <div className="bg-card p-4 xs:p-6 sm:p-8 rounded-xl sm:rounded-2xl border border-border h-fit lg:sticky lg:top-24">
                 <h3 className="font-cursive text-xl xs:text-2xl mb-4 xs:mb-6">Order Summary</h3>
                 <div className="space-y-3 xs:space-y-4 text-sm xs:text-base">
-                  <div className="flex justify-between"><span>Subtotal</span><span>{format(subtotal)}</span></div>
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span>{format(subtotal)}</span>
+                  </div>
                   {gst > 0 && (
-                    <div className="flex justify-between"><span>GST</span><span>{format(gst)}</span></div>
+                    <div className="flex justify-between">
+                      <span>GST</span>
+                      <span>{format(gst)}</span>
+                    </div>
                   )}
-                  <div className="flex justify-between"><span>Shipping</span><span>{shipping === 0 ? (isLoggedIn ? 'Free' : 'Calculated at checkout') : format(shipping)}</span></div>
+                  <div className="flex justify-between">
+                    <span>Shipping</span>
+                    <span>
+                      {shipping === 0
+                        ? (isLoggedIn ? 'Free' : 'Calculated at checkout')
+                        : format(shipping)}
+                    </span>
+                  </div>
                   {!isLoggedIn && (
-                    <p className="text-xs text-muted-foreground mt-2">Shipping, GST, and coupons calculated at checkout</p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Shipping, GST, and coupons calculated at checkout
+                    </p>
                   )}
                   <div className="border-t pt-3 xs:pt-4 flex justify-between font-semibold text-lg xs:text-xl">
                     <span>Total</span>
@@ -504,13 +541,6 @@ const Cart = () => {
                   </Button>
                 </Link>
               </div>
-            </div>
-          ) : (
-            <div className="text-center py-12 xs:py-16 sm:py-20">
-              <ShoppingBag className="w-16 h-16 xs:w-20 xs:h-20 mx-auto text-muted-foreground mb-4 xs:mb-6" />
-              <h2 className="font-cursive text-2xl xs:text-3xl mb-2 xs:mb-3">Your cart is empty</h2>
-              <p className="text-muted-foreground text-sm xs:text-base sm:text-lg mb-6 xs:mb-8">Looks like you haven't added anything yet.</p>
-              <Link to="/products"><Button className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white px-4 sm:px-8 py-2 sm:py-4 text-xs sm:text-sm">Continue Shopping</Button></Link>
             </div>
           )}
         </div>
