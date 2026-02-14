@@ -317,26 +317,13 @@ const CustomProductDetail = () => {
   }, [DESIGN_PRICE, fabricSelectionData, effectiveConfigVariants, selectedConfigVariants]);
 
   const handlePlainProductSelect = (productId: string) => {
-    didPreloadFromCartRef.current = false; // user chose fabric; allow popup to open
+    // User explicitly chose a fabric: remember it and immediately prepare to show variants popup
     setSelectedPlainProductId(productId);
     setShowPlainProductSelection(false);
+    setShowFabricVariant(true);
   };
 
-  const skipFabricPopupOpenRef = useRef(false);
   const preloadFabricDoneRef = useRef(false);
-  const didPreloadFromCartRef = useRef(false);
-
-  // Open fabric variant popup once the selected plain product (fabric) has been fetched (unless preloading from cart)
-  useEffect(() => {
-    if (didPreloadFromCartRef.current) return;
-    if (skipFabricPopupOpenRef.current) {
-      skipFabricPopupOpenRef.current = false;
-      return;
-    }
-    if (selectedPlainProductId && selectedFabricProduct) {
-      setShowFabricVariant(true);
-    }
-  }, [selectedPlainProductId, selectedFabricProduct]);
 
   // Preload from cart item when editing from cart
   useEffect(() => {
@@ -344,8 +331,6 @@ const CustomProductDetail = () => {
     const item = resolvedCartItem as any;
 
     if (item.fabricId) {
-      didPreloadFromCartRef.current = true;
-      skipFabricPopupOpenRef.current = true;
       setSelectedPlainProductId(String(item.fabricId));
     }
 
@@ -793,26 +778,13 @@ const CustomProductDetail = () => {
                       {customConfig?.pageTitle || 'Your Custom Design'}
                     </h1>
                     
-                    {/* Price Display: per meter + total */}
+                    {/* Price Display: only main total for custom product */}
                     <div className="space-y-2 mb-6">
                       <div className="flex items-center gap-4">
-                        <span className="font-cursive text-4xl text-primary">{format(combinedPrice * metersQuantity)}</span>
+                        <span className="font-cursive text-4xl text-primary">
+                          {format(combinedPrice * metersQuantity)}
+                        </span>
                       </div>
-                      {fabricSelectionData && (
-                        <div className="text-sm text-muted-foreground space-y-1">
-                          <p>Per meter: {format(combinedPrice)}/m</p>
-                          <p>Design: {format(DESIGN_PRICE)}/m · Fabric: {format(fabricSelectionData.totalPrice)}/m</p>
-                          {(() => {
-                            let modPerMeter = 0;
-                            effectiveConfigVariants.forEach((v: any) => {
-                              const oid = selectedConfigVariants[String(v.id)];
-                              const opt = oid && v.options ? v.options.find((o: any) => String(o.id) === oid) : null;
-                              if (opt && opt.priceModifier) modPerMeter += Number(opt.priceModifier);
-                            });
-                            return modPerMeter > 0 ? <p>Options: {format(modPerMeter)}/m</p> : null;
-                          })()}
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -860,7 +832,7 @@ const CustomProductDetail = () => {
                             {selectedFabricProduct?.name || 'Fabric selected'}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {format(fabricSelectionData.totalPrice)}/meter (1-meter base)
+                            {format(fabricSelectionData.totalPrice)}/meter
                           </p>
                         </div>
                         <Button
@@ -985,12 +957,7 @@ const CustomProductDetail = () => {
                         variant="outline"
                         size="sm"
                         className="w-full sm:w-auto gap-2"
-                        onClick={() => {
-                          // #region agent log
-                          fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CustomProductDetail.tsx:952',message:'Breakdown button clicked',data:{effectiveConfigVariantsCount:effectiveConfigVariants?.length,effectiveConfigVariants:effectiveConfigVariants?.map((v:any)=>({id:v.id,name:v.name,options:v.options?.map((o:any)=>({id:o.id,value:o.value,priceModifier:o.priceModifier}))})),selectedConfigVariants,fabricPricePerMeter:fabricSelectionData?.totalPrice,metersQuantity,DESIGN_PRICE,combinedPrice},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,C'})}).catch(()=>{});
-                          // #endregion
-                          setShowPriceBreakdown(true);
-                        }}
+                        onClick={() => setShowPriceBreakdown(true)}
                       >
                         <Calculator className="w-4 h-4" />
                         View Price Breakdown
@@ -1133,7 +1100,7 @@ const CustomProductDetail = () => {
           onOpenChange={setShowPriceBreakdown}
           item={currentCartLikeItem}
           productData={{
-            type: 'DESIGNED',
+            type: 'CUSTOM',
             designPrice: DESIGN_PRICE,
             pricePerMeter: fabricSelectionData?.totalPrice,
             variants: effectiveConfigVariants,
@@ -1141,6 +1108,7 @@ const CustomProductDetail = () => {
           selectedVariants={selectedConfigVariants}
           fabricQuantity={metersQuantity}
           fabricPricePerMeter={fabricSelectionData?.totalPrice}
+          selectedFabricVariants={fabricSelectionData?.selectedVariants}
         />
       )}
 

@@ -1708,6 +1708,15 @@ const ProductDetail = () => {
                               })()}
                             </div>
                             <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full sm:w-auto gap-2"
+                              onClick={() => setShowPriceBreakdown(true)}
+                            >
+                              <Calculator className="w-4 h-4" />
+                              View Price Breakdown
+                            </Button>
+                            <Button
                               size="lg"
                               onClick={handleAddToCart}
                               disabled={addToCartMutation.isPending}
@@ -1983,6 +1992,7 @@ const ProductDetail = () => {
             productType: product.type,
             productName: product.name,
             productId: Number(product.id),
+            fabricId: selectedFabricId ? Number(selectedFabricId) : undefined,
             designPrice: product.designPrice,
             fabricPrice: selectedFabricId ? (() => {
               const effectivePrice = effectivePricingSlabs && effectivePricingSlabs.length > 0

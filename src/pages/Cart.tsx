@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { cartApi, productsApi, wishlistApi, saveForLaterApi } from '@/lib/api';
+import { cartApi, productsApi, wishlistApi, saveForLaterApi, customConfigApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import CartItemDetails from '@/components/cart/CartItemDetails';
@@ -256,6 +256,20 @@ const Cart = () => {
     toast.success('Item removed from cart');
   };
   
+  // Fetch custom config when showing breakdown for CUSTOM items
+  const { data: customConfig } = useQuery({
+    queryKey: ['customConfig'],
+    queryFn: () => customConfigApi.getPublicConfig(),
+    enabled: !!selectedItemForBreakdown && selectedItemForBreakdown.productType === 'CUSTOM',
+  });
+
+  // Fetch design product when showing breakdown for DESIGNED items (same breakdown as product page)
+  const { data: designProduct } = useQuery({
+    queryKey: ['product-for-breakdown', selectedItemForBreakdown?.productId],
+    queryFn: () => productsApi.getById(Number(selectedItemForBreakdown!.productId)),
+    enabled: !!selectedItemForBreakdown && selectedItemForBreakdown.productType === 'DESIGNED' && !!selectedItemForBreakdown.productId,
+  });
+
   // Calculate totals
   const items = isLoggedIn ? (cartData?.items || []) : guestCartItems;
   const subtotal = isLoggedIn 
@@ -547,28 +561,70 @@ const Cart = () => {
       </section>
       
       {/* Price Breakdown Popup */}
-      {selectedItemForBreakdown && (
-        <PriceBreakdownPopup
-          open={showPriceBreakdown}
-          onOpenChange={setShowPriceBreakdown}
-          item={{
-            productType: selectedItemForBreakdown.productType,
-            productName: selectedItemForBreakdown.productName,
-            productId: selectedItemForBreakdown.productId,
-            fabricId: selectedItemForBreakdown.fabricId ? Number(selectedItemForBreakdown.fabricId) : undefined,
-            designPrice: selectedItemForBreakdown.designPrice ? Number(selectedItemForBreakdown.designPrice) : undefined,
-            fabricPrice: selectedItemForBreakdown.fabricPrice ? Number(selectedItemForBreakdown.fabricPrice) : undefined,
-            unitPrice: selectedItemForBreakdown.unitPrice ? Number(selectedItemForBreakdown.unitPrice) : undefined,
-            totalPrice: selectedItemForBreakdown.totalPrice ? Number(selectedItemForBreakdown.totalPrice) : undefined,
-            quantity: selectedItemForBreakdown.quantity || 1,
-            variants: selectedItemForBreakdown.variants,
-            variantSelections: selectedItemForBreakdown.variantSelections,
-            pricePerMeter: selectedItemForBreakdown.unitPrice ? Number(selectedItemForBreakdown.unitPrice) : undefined,
-            basePrice: selectedItemForBreakdown.designPrice ? Number(selectedItemForBreakdown.designPrice) : (selectedItemForBreakdown.unitPrice ? Number(selectedItemForBreakdown.unitPrice) : undefined),
-            customFormData: selectedItemForBreakdown.customFormData,
-          }}
-        />
-      )}
+      {selectedItemForBreakdown && (() => {
+        const item = selectedItemForBreakdown;
+        const isCustomOrDesigned = item.productType === 'DESIGNED' || item.productType === 'CUSTOM';
+        const quantity = item.quantity || 1;
+        const fabricTotal = item.fabricPrice ? Number(item.fabricPrice) : 0;
+        const fabricPerMeter = quantity > 0 ? fabricTotal / quantity : 0;
+
+        // Build selectedVariants (design/print) from variantSelections for DESIGNED and CUSTOM
+        const selectedDesignVariants: Record<string, string> = {};
+        if (item.variantSelections && typeof item.variantSelections === 'object') {
+          Object.entries(item.variantSelections).forEach(([, sel]: [string, any]) => {
+            if (sel && (sel.optionId != null || sel.optionValue != null)) {
+              const optVal = String(sel.optionId ?? sel.optionValue);
+              if (sel.variantId != null) selectedDesignVariants[String(sel.variantId)] = optVal;
+              if (sel.variantFrontendId != null && sel.variantFrontendId !== sel.variantId) {
+                selectedDesignVariants[String(sel.variantFrontendId)] = optVal;
+              }
+            }
+          });
+        }
+
+        // productData for CUSTOM: design price + config variants; for DESIGNED: design product
+        const productData = item.productType === 'CUSTOM' && customConfig
+          ? {
+              type: 'CUSTOM' as const,
+              designPrice: item.designPrice ? Number(item.designPrice) : customConfig.designPrice,
+              variants: customConfig.variants || [],
+            }
+          : item.productType === 'DESIGNED' && designProduct
+          ? {
+              type: 'DESIGNED' as const,
+              designPrice: designProduct.designPrice ?? item.designPrice ? Number(item.designPrice) : 0,
+              variants: designProduct.variants || [],
+            }
+          : undefined;
+
+        return (
+          <PriceBreakdownPopup
+            open={showPriceBreakdown}
+            onOpenChange={setShowPriceBreakdown}
+            item={{
+              productType: item.productType,
+              productName: item.productName,
+              productId: item.productId,
+              fabricId: item.fabricId ? Number(item.fabricId) : undefined,
+              designPrice: item.designPrice ? Number(item.designPrice) : undefined,
+              fabricPrice: item.fabricPrice ? Number(item.fabricPrice) : undefined,
+              unitPrice: item.unitPrice ? Number(item.unitPrice) : undefined,
+              totalPrice: item.totalPrice ? Number(item.totalPrice) : undefined,
+              quantity,
+              variants: item.variants,
+              variantSelections: item.variantSelections,
+              pricePerMeter: item.unitPrice ? Number(item.unitPrice) : undefined,
+              basePrice: item.designPrice ? Number(item.designPrice) : (item.unitPrice ? Number(item.unitPrice) : undefined),
+              customFormData: item.customFormData,
+            }}
+            productData={productData}
+            selectedVariants={Object.keys(selectedDesignVariants).length > 0 ? selectedDesignVariants : undefined}
+            fabricQuantity={isCustomOrDesigned && item.fabricId ? quantity : undefined}
+            fabricPricePerMeter={isCustomOrDesigned && item.fabricId ? fabricPerMeter : undefined}
+            selectedFabricVariants={isCustomOrDesigned ? item.variants : undefined}
+          />
+        );
+      })()}
     </Layout>
   );
 };

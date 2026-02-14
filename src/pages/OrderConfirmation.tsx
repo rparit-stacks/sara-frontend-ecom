@@ -210,6 +210,22 @@ const OrderConfirmation = () => {
                               <p className="text-sm text-muted-foreground">
                                 Quantity: {item.quantity} × {formatPrice(toDisplayAmount(Number(item.price ?? item.unitPrice ?? 0)), currency)}
                               </p>
+                              {(item.productType === 'DESIGNED' || item.productType === 'CUSTOM') && item.fabricName && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Fabric: {item.fabricName}
+                                  {item.hsnCode && <span className="ml-2">• HSN: {item.hsnCode}</span>}
+                                </p>
+                              )}
+                              {item.uploadedDesignUrl && (item.productType === 'DESIGNED' || item.productType === 'CUSTOM') && (
+                                <a
+                                  href={item.uploadedDesignUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-primary hover:underline mt-0.5 inline-block"
+                                >
+                                  View design →
+                                </a>
+                              )}
                               {item.productType === 'DIGITAL' && (
                                 <div className="mt-2 space-y-2">
                                   {canDownloadDigital && item.zipPassword && (

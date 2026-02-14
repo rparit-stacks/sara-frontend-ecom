@@ -81,6 +81,9 @@ function AdminOrderItemDetailBlock({
         <LedgerSectionHeading>Product details</LedgerSectionHeading>
         <LedgerRow label="Product Name" value={item.name || '—'} />
         <LedgerRow label="Type" value={item.productType || 'N/A'} />
+        {item.hsnCode && (
+          <LedgerRow label="HSN Code" value={<span className="font-mono">{item.hsnCode}</span>} />
+        )}
         <LedgerRow label="Quantity" value={String(item.quantity ?? '—')} />
         <LedgerRow label="Unit Price" value={price(item.price)} />
         {hasGst && (
@@ -95,7 +98,9 @@ function AdminOrderItemDetailBlock({
 
       {item.variantDisplay && item.variantDisplay.length > 0 && (
         <div className="p-4 pt-0 space-y-1 border-t" style={{ borderColor: LEDGER.divider }}>
-          <LedgerSectionHeading>{item.productType === 'DESIGNED' ? 'Design variant' : 'Variant'}</LedgerSectionHeading>
+          <LedgerSectionHeading>
+            {item.productType === 'DESIGNED' ? 'Design/Print variant' : item.productType === 'CUSTOM' ? 'Print variant' : 'Variant'}
+          </LedgerSectionHeading>
           {item.variantDisplay.map((v: any, idx: number) => (
             <div key={idx} className="space-y-1">
               <LedgerRow label="Name" value={v.variantName || '—'} />
@@ -119,11 +124,32 @@ function AdminOrderItemDetailBlock({
         </div>
       )}
 
-      {item.productType === 'DESIGNED' && (item.fabricId || item.fabricName) && (
+      {(item.productType === 'DESIGNED' || item.productType === 'CUSTOM') && (item.fabricId || item.fabricName) && (
         <div className="p-4 pt-0 space-y-1 border-t" style={{ borderColor: LEDGER.divider }}>
           <LedgerSectionHeading>Fabric</LedgerSectionHeading>
           {item.fabricName && (
-            <LedgerRow label="Fabric" value={item.fabricName} />
+            <LedgerRow label="Selected fabric" value={item.fabricName} />
+          )}
+          {item.fabricVariantDisplay && item.fabricVariantDisplay.length > 0 && (
+            item.fabricVariantDisplay.map((v: any, idx: number) => (
+              <div key={idx} className="space-y-1">
+                <LedgerRow
+                  label={v.variantName || 'Variant'}
+                  value={
+                    <>
+                      {v.optionValue || '—'}
+                      {v.variantUnit && ` (${v.variantUnit})`}
+                      {v.priceModifier != null && Number(v.priceModifier) !== 0 && (
+                        <span className="text-green-600 ml-1">
+                          {Number(v.priceModifier) > 0 ? '+' : ''}
+                          {price(Number(v.priceModifier))}
+                        </span>
+                      )}
+                    </>
+                  }
+                />
+              </div>
+            ))
           )}
           {item.customData && typeof item.customData.fabricMeters !== 'undefined' && item.customData.fabricMeters != null && (
             <LedgerRow label="Fabric (meters)" value={String(item.customData.fabricMeters)} />

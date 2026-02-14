@@ -37,6 +37,7 @@ import AdminInvite from "./pages/admin/AdminInvite";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
+import AdminProductEdit from "./pages/admin/AdminProductEdit";
 import AdminFabrics from "./pages/admin/AdminFabrics";
 import AdminDesigns from "./pages/admin/AdminDesigns";
 import AdminCMS from "./pages/admin/AdminCMS";
@@ -123,6 +124,14 @@ const App = () => (
                 <AdminProducts />
               </ProtectedAdminRoute>
             } 
+          />
+          <Route
+            path="/admin-sara/products/edit/:id"
+            element={
+              <ProtectedAdminRoute>
+                <AdminProductEdit />
+              </ProtectedAdminRoute>
+            }
           />
           <Route 
             path="/admin-sara/fabrics" 

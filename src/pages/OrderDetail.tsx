@@ -58,6 +58,29 @@ function OrderItemDetailBlock({
           <span className="font-medium text-muted-foreground shrink-0">Type</span>
           <span>{item.productType || 'N/A'}</span>
         </div>
+        {(item.productType === 'DESIGNED' || item.productType === 'CUSTOM') && item.fabricName && (
+          <div>
+            <div className="font-medium text-muted-foreground mb-1">Fabric</div>
+            <div className="space-y-1.5">
+              <div className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1">
+                <span className="text-muted-foreground shrink-0">Selected fabric</span>
+                <span>{item.fabricName}</span>
+              </div>
+              {item.hsnCode && (
+                <div className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1">
+                  <span className="text-muted-foreground shrink-0">HSN Code</span>
+                  <span className="font-mono">{item.hsnCode}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {item.hsnCode && (item.productType === 'PLAIN' || item.productType === 'DIGITAL') && (
+          <div className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1">
+            <span className="font-medium text-muted-foreground shrink-0">HSN Code</span>
+            <span className="font-mono">{item.hsnCode}</span>
+          </div>
+        )}
         {item.variantDisplay && item.variantDisplay.length > 0 && (
           <div>
             <div className="font-medium text-muted-foreground mb-1">Variant</div>

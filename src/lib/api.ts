@@ -187,6 +187,10 @@ export const productsApi = {
     const query = searchParams.toString();
     return fetchApi<any[]>(`/api/admin/products${query ? `?${query}` : ''}`);
   },
+  /** Admin: get full product details (including custom fields, detail sections, variants) */
+  getByIdAdmin: (id: number) => {
+    return fetchApi<any>(`/api/admin/products/${id}`);
+  },
   getById: (id: number, userEmail?: string) => {
     const params = new URLSearchParams();
     if (userEmail) params.set('userEmail', userEmail);

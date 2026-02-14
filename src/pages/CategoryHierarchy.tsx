@@ -309,20 +309,59 @@ const CategoryHierarchy = () => {
                 </div>
               )}
             </div>
-          ) : filteredProducts.length === 0 && !hasSubcategories ? (
-            // Empty category - no products and no subcategories
-            <div className="text-center py-12">
-              <div className="max-w-md mx-auto">
-                <p className="text-lg font-semibold text-foreground mb-2">This category is empty.</p>
-                <p className="text-muted-foreground mb-4">There are no products or subcategories in this category.</p>
-                <Link to="/categories">
-                  <Button variant="outline">Browse Other Categories</Button>
-                </Link>
+          ) : products.length === 0 && !hasSubcategories ? (
+            // Empty category - truly no products and no subcategories
+            <div>
+              {slugParts.length > 0 && (
+                <div className="mb-6">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      if (slugParts.length > 1) {
+                        navigate(getBreadcrumbPath(slugParts.length - 2));
+                      } else {
+                        navigate('/categories');
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                  </Button>
+                </div>
+              )}
+              <div className="text-center py-12">
+                <div className="max-w-md mx-auto">
+                  <p className="text-lg font-semibold text-foreground mb-2">This category is empty.</p>
+                  <p className="text-muted-foreground mb-4">There are no products or subcategories in this category.</p>
+                  <Link to="/categories">
+                    <Button variant="outline">Browse Other Categories</Button>
+                  </Link>
+                </div>
               </div>
             </div>
           ) : (
             // Show products
             <>
+              {slugParts.length > 0 && (
+                <div className="mb-6">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      if (slugParts.length > 1) {
+                        navigate(getBreadcrumbPath(slugParts.length - 2));
+                      } else {
+                        navigate('/categories');
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                  </Button>
+                </div>
+              )}
+
               {/* Search Bar */}
               <div className="mb-4 sm:mb-6">
                 <div className="relative max-w-md">

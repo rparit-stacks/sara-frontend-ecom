@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -28,9 +28,8 @@ import { productsApi, plainProductsApi, categoriesApi } from '@/lib/api';
 const AdminProducts = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
   const [deleteProductId, setDeleteProductId] = useState<number | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
@@ -105,32 +104,7 @@ const AdminProducts = () => {
     },
   });
 
-  // Update mutation
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => productsApi.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['plainProducts'] }); // Invalidate plain products for popup
-      toast.success('Product updated successfully!');
-      setIsEditDialogOpen(false);
-      setEditingProduct(null);
-    },
-    onError: (error: any) => {
-      // Handle user-friendly error messages
-      let errorMessage = 'Failed to update product';
-      if (error?.response?.data?.error) {
-        const backendError = error.response.data.error;
-        if (typeof backendError === 'string') {
-          errorMessage = backendError;
-        } else if (backendError.error) {
-          errorMessage = backendError.error;
-        }
-      } else if (error?.message) {
-        errorMessage = error.message;
-      }
-      toast.error(errorMessage);
-    },
-  });
+  // Note: update mutation is handled in the dedicated edit page (AdminProductEdit)
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -233,7 +207,7 @@ const AdminProducts = () => {
   });
 
   // Loading state for admin operations (must be after all mutations are declared)
-  const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || bulkCopyMutation.isPending || bulkUpdateCategoryMutation.isPending || exportMutation.isPending;
+  const isLoading = createMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || bulkCopyMutation.isPending || bulkUpdateCategoryMutation.isPending || exportMutation.isPending;
 
   // Update filter when URL param changes
   useEffect(() => {
@@ -251,7 +225,7 @@ const AdminProducts = () => {
     }
   };
 
-  // Handle form submission
+  // Handle form submission (create only — editing is on the dedicated edit page)
   const handleSaveProduct = (payload: any) => {
     // Validate payload before submission
     if (!payload.name || !payload.name.trim()) {
@@ -263,26 +237,15 @@ const AdminProducts = () => {
       return;
     }
 
-    if (payload.id) {
-      updateMutation.mutate({ id: payload.id, data: payload }, {
-        onError: () => {
-          // Keep dialog open on error so user can fix issues
-          // Dialog will only close on success
-        }
-      });
-    } else {
-      createMutation.mutate(payload, {
-        onError: () => {
-          // Keep dialog open on error so user can fix issues
-          // Dialog will only close on success
-        }
-      });
-    }
+    createMutation.mutate(payload, {
+      onError: () => {
+        // Keep dialog open on error so user can fix issues
+      }
+    });
   };
 
   const handleEdit = (product: any) => {
-    setEditingProduct(product);
-    setIsEditDialogOpen(true);
+    navigate(`/admin-sara/products/edit/${product.id}`);
   };
 
   const handleDelete = (productId: number) => {
@@ -435,13 +398,12 @@ const AdminProducts = () => {
 
   // Global admin loader overlay
   const AdminLoader = () => {
-    const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || bulkCopyMutation.isPending || bulkUpdateCategoryMutation.isPending || exportMutation.isPending;
+    const isLoading = createMutation.isPending || deleteMutation.isPending || toggleStatusMutation.isPending || bulkDeleteMutation.isPending || bulkCopyMutation.isPending || bulkUpdateCategoryMutation.isPending || exportMutation.isPending;
     
     if (!isLoading) return null;
     
     const getLoadingMessage = () => {
       if (createMutation.isPending) return 'Creating your product...';
-      if (updateMutation.isPending) return 'Updating your product...';
       if (deleteMutation.isPending || bulkDeleteMutation.isPending) return 'Deleting products...';
       if (toggleStatusMutation.isPending) return 'Updating product status...';
       if (bulkCopyMutation.isPending) return 'Copying products...';
@@ -558,16 +520,7 @@ const AdminProducts = () => {
             categories={categoriesForForm}
             onSave={handleSaveProduct}
           />
-          <ProductFormDialog
-            open={isEditDialogOpen}
-            onOpenChange={setIsEditDialogOpen}
-            mode="edit"
-            productId={editingProduct?.id}
-            initialData={editingProduct}
-            plainProducts={plainProductsForForm}
-            categories={categoriesForForm}
-            onSave={handleSaveProduct}
-          />
+          {/* Edit is handled on /admin-sara/products/edit/:id page */}
         </motion.div>
 
         {/* Search & Filters */}

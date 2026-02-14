@@ -378,10 +378,10 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
   const [uploadedDigitalFileUrl, setUploadedDigitalFileUrl] = useState<string>('');
   const [uploadError, setUploadError] = useState<string>('');
 
-  // Fetch full product details when editing
+  // Fetch full product details when editing (admin endpoint to include all nested data)
   const { data: fullProductData, isLoading: isLoadingProduct } = useQuery({
-    queryKey: ['product', productId],
-    queryFn: () => productsApi.getById(Number(productId)),
+    queryKey: ['product', 'admin', productId],
+    queryFn: () => productsApi.getByIdAdmin(Number(productId)),
     enabled: mode === 'edit' && !!productId && open,
   });
 
@@ -428,13 +428,28 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
             pricePerMeter: slab.pricePerMeter, // Keep for legacy support
             displayOrder: slab.displayOrder !== undefined ? slab.displayOrder : idx,
           })) : [],
-          detailSections: productData.detailSections || [],
-          customFields: productData.customFields || [],
+          detailSections: (productData.detailSections || []).map((section: any, idx: number) => ({
+            id: `ds-${section.id || idx}`,
+            title: section.title || '',
+            content: section.content || '',
+          })),
+          customFields: (productData.customFields || []).map((field: any, idx: number) => ({
+            id: `cf-${field.id || idx}`,
+            label: field.label || '',
+            fieldType: field.fieldType || 'text',
+            placeholder: field.placeholder || '',
+            isRequired: typeof field.isRequired === 'boolean' ? field.isRequired : !!field.required,
+          })),
           variants: (productData.variants || []).map((v: any, idx: number) => ({
-            ...v,
+            id: `v-${v.id || idx}`,
+            name: v.name || '',
+            type: v.type || '',
+            unit: v.unit || '',
             displayOrder: v.displayOrder !== undefined ? v.displayOrder : idx,
             options: (v.options || []).map((opt: any, optIdx: number) => ({
-              ...opt,
+              id: `vo-${opt.id || optIdx}`,
+              value: opt.value || '',
+              priceModifier: opt.priceModifier || 0,
               displayOrder: opt.displayOrder !== undefined ? opt.displayOrder : optIdx,
             })),
           })),

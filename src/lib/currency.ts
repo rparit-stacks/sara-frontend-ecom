@@ -152,11 +152,12 @@ export const formatPrice = (amount: number, currency: string): string => {
     maximumFractionDigits: 2,
   }).format(amount);
 
-  // For some currencies, symbol comes after
-  if (['EUR', 'GBP', 'INR'].includes(currency)) {
+  // For some currencies, symbol comes after (keep for a few like EUR/GBP)
+  if (['EUR', 'GBP'].includes(currency)) {
     return `${formattedAmount} ${symbol}`;
   }
 
+  // Default: symbol before amount (e.g. ₹300.00)
   return `${symbol}${formattedAmount}`;
 };
 

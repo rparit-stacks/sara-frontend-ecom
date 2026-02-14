@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useMutation } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
@@ -90,6 +90,22 @@ const CustomDesign = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+
+  // Generate and clean up object URLs for previews
+  useEffect(() => {
+    if (!referenceFiles.length) {
+      setPreviewUrls([]);
+      return;
+    }
+
+    const urls = referenceFiles.map((file) => URL.createObjectURL(file));
+    setPreviewUrls(urls);
+
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [referenceFiles]);
 
   // Submit design request mutation
   const submitMutation = useMutation({
@@ -129,6 +145,10 @@ const CustomDesign = () => {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+  
+  const handleRemoveReferenceFile = (index: number) => {
+    setReferenceFiles((prev) => prev.filter((_, i) => i !== index));
   };
   
   const isSubmitting = submitMutation.isPending;
@@ -472,7 +492,7 @@ const CustomDesign = () => {
                       onChange={(e) => {
                         const files = Array.from(e.target.files || []);
                         if (!files.length) {
-                          setReferenceFiles([]);
+                          // If user cancels the dialog, keep existing files
                           return;
                         }
                         const validFiles: File[] = [];
@@ -485,10 +505,21 @@ const CustomDesign = () => {
                         }
                         if (!validFiles.length) {
                           e.target.value = '';
-                          setReferenceFiles([]);
                           return;
                         }
-                        setReferenceFiles(validFiles);
+                        setReferenceFiles((prev) => {
+                          const existingKeys = new Set(
+                            prev.map((file) => `${file.name}-${file.size}-${file.lastModified}`)
+                          );
+                          const merged = [...prev];
+                          for (const file of validFiles) {
+                            const key = `${file.name}-${file.size}-${file.lastModified}`;
+                            if (!existingKeys.has(key)) {
+                              merged.push(file);
+                            }
+                          }
+                          return merged;
+                        });
                       }}
                     />
                     <div
@@ -505,20 +536,56 @@ const CustomDesign = () => {
                       <p className="text-sm xs:text-base text-muted-foreground mt-1">
                         PNG, JPG up to 10MB each
                       </p>
-                      {referenceFiles.length > 0 && (
-                        <div className="mt-2 space-y-1 max-h-24 overflow-y-auto text-left">
-                          {referenceFiles.map((file) => (
-                            <p
-                              key={file.name}
-                              className="text-sm text-primary font-medium truncate"
-                              title={file.name}
+                    </div>
+                    {referenceFiles.length > 0 && (
+                      <div className="mt-4 space-y-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                          {referenceFiles.map((file, index) => (
+                            <div
+                              key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                              className="relative group rounded-lg overflow-hidden border border-primary/10 bg-muted/40"
                             >
-                              {file.name}
-                            </p>
+                              {previewUrls[index] && (
+                                <img
+                                  src={previewUrls[index]}
+                                  alt={file.name}
+                                  className="h-28 w-full object-cover"
+                                />
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveReferenceFile(index)}
+                                className="absolute top-1 right-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                aria-label={`Remove ${file.name}`}
+                              >
+                                ×
+                              </button>
+                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1">
+                                <p
+                                  className="text-[10px] xs:text-xs text-white truncate"
+                                  title={file.name}
+                                >
+                                  {file.name}
+                                </p>
+                              </div>
+                            </div>
                           ))}
                         </div>
-                      )}
-                    </div>
+
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full text-xs xs:text-sm"
+                            onClick={() => fileInputRef.current?.click()}
+                          >
+                            <i className="fa-solid fa-plus mr-1.5" />
+                            Add more images
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <Button 
