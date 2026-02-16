@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Heart, ShoppingBag, Share2, Truck, RotateCcw, Shield, Minus, Plus, Palette, CheckCircle2, Info, ZoomIn, X, Calculator } from 'lucide-react';
+import { Heart, ShoppingBag, Share2, Truck, RotateCcw, Shield, Minus, Plus, Palette, CheckCircle2, Info, ZoomIn, Calculator } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { IndianRupee } from 'lucide-react';
 import { customProductsApi, cartApi, wishlistApi, customConfigApi, productsApi } from '@/lib/api';
 import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
+import { ProductMediaViewer } from '@/components/products/ProductMediaViewer';
 import { guestCart } from '@/lib/guestCart';
 import { usePrice } from '@/lib/currency';
 
@@ -232,18 +233,10 @@ const CustomProductDetail = () => {
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
-  const [zoomImage, setZoomImage] = useState<string | null>(null);
-  const [zoomScale, setZoomScale] = useState(1);
+  const [mediaViewer, setMediaViewer] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
 
   // Price breakdown popup state
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
-
-  // Reset zoom scale when image changes
-  useEffect(() => {
-    if (zoomImage) {
-      setZoomScale(1);
-    }
-  }, [zoomImage]);
   
   // Design Product States (same as normal Design Product)
   const [showPlainProductSelection, setShowPlainProductSelection] = useState(false);
@@ -715,7 +708,7 @@ const CustomProductDetail = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className="aspect-square rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-md relative group cursor-zoom-in"
-                    onClick={() => setZoomImage(displayImages[selectedImage])}
+                    onClick={() => setMediaViewer({ url: displayImages[selectedImage], type: 'image' })}
                   >
                     <img
                       src={displayImages[selectedImage]}
@@ -1112,66 +1105,14 @@ const CustomProductDetail = () => {
         />
       )}
 
-      {/* Image Zoom Modal */}
-      <Dialog open={!!zoomImage} onOpenChange={(open) => !open && setZoomImage(null)}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-0 bg-black/95 border-none">
-          <div className="relative w-full h-full flex items-center justify-center">
-            <button
-              onClick={() => setZoomImage(null)}
-              className="absolute top-4 right-4 z-50 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
-            {zoomImage && (
-              <div 
-                className="relative w-full h-full overflow-auto flex items-center justify-center p-4"
-                onWheel={(e) => {
-                  e.preventDefault();
-                  const delta = e.deltaY > 0 ? -0.1 : 0.1;
-                  setZoomScale(prev => Math.max(0.5, Math.min(3, prev + delta)));
-                }}
-                onTouchStart={(e) => {
-                  if (e.touches.length === 2) {
-                    const touch1 = e.touches[0];
-                    const touch2 = e.touches[1];
-                    const distance = Math.sqrt(
-                      Math.pow(touch2.clientX - touch1.clientX, 2) +
-                      Math.pow(touch2.clientY - touch1.clientY, 2)
-                    );
-                    (e.target as HTMLElement).setAttribute('data-initial-distance', distance.toString());
-                  }
-                }}
-                onTouchMove={(e) => {
-                  if (e.touches.length === 2) {
-                    const touch1 = e.touches[0];
-                    const touch2 = e.touches[1];
-                    const currentDistance = Math.sqrt(
-                      Math.pow(touch2.clientX - touch1.clientX, 2) +
-                      Math.pow(touch2.clientY - touch1.clientY, 2)
-                    );
-                    const initialDistance = parseFloat(
-                      (e.target as HTMLElement).getAttribute('data-initial-distance') || '0'
-                    );
-                    if (initialDistance > 0) {
-                      const scaleChange = currentDistance / initialDistance;
-                      setZoomScale(prev => Math.max(0.5, Math.min(3, prev * scaleChange)));
-                      (e.target as HTMLElement).setAttribute('data-initial-distance', currentDistance.toString());
-                    }
-                  }
-                }}
-              >
-                <img
-                  src={zoomImage}
-                  alt="Zoomed product image"
-                  className="max-w-full max-h-[90vh] object-contain transition-transform duration-200"
-                  style={{ transform: `scale(${zoomScale})` }}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Product Media Viewer - Full-screen image modal */}
+      <ProductMediaViewer
+        open={!!mediaViewer}
+        onClose={() => setMediaViewer(null)}
+        url={mediaViewer?.url ?? null}
+        type="image"
+        alt="Product image"
+      />
 
       {/* Add as new – remove original? */}
       <Dialog open={showAddAsNewConfirm} onOpenChange={setShowAddAsNewConfirm}>
