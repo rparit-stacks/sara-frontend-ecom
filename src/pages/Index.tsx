@@ -529,7 +529,7 @@ const Index = () => {
           backgroundSize: 'cover',
         }}
       >
-        <div className="absolute inset-0 bg-foreground/75" />
+        <div className="absolute inset-0 bg-foreground/85" />
         <div className="relative max-w-4xl mx-auto text-center text-white px-3 xs:px-4 sm:px-6">
           <ScrollReveal>
             <span className="text-xs xs:text-sm uppercase tracking-[0.15em] xs:tracking-[0.2em] sm:tracking-[0.3em] text-white/80 mb-2 xs:mb-3 sm:mb-4 block">

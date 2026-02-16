@@ -2,6 +2,10 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+const scrollToTop = () => {
+  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+};
+
 const footerLinks = {
   shop: [
     { name: 'All Products', path: '/products' },
@@ -52,14 +56,14 @@ export const Footer = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <Link to="/" className="inline-block mb-3">
+            <Link to="/" className="inline-block mb-3" onClick={scrollToTop}>
               <span className="font-cursive text-2xl font-bold">
                 <span className="text-primary">Studio</span>
                 <span className="text-white"> Sara</span>
               </span>
             </Link>
             <p className="text-white/70 text-xs sm:text-sm leading-relaxed mb-4">
-              Modern prints and embroidery, created with intention and purpose.
+              Modern prints and embroideries, created with intention and purpose.
             </p>
           </div>
 
@@ -69,7 +73,7 @@ export const Footer = () => {
             <ul className="space-y-2">
               {footerLinks.shop.map((link) => (
                 <li key={link.name}>
-                  <Link to={link.path} className="text-white/60 hover:text-primary text-sm transition-colors">
+                  <Link to={link.path} className="text-white/60 hover:text-primary text-sm transition-colors" onClick={scrollToTop}>
                     {link.name}
                   </Link>
                 </li>
@@ -83,7 +87,7 @@ export const Footer = () => {
             <ul className="space-y-2">
               {footerLinks.company.map((link) => (
                 <li key={link.name}>
-                  <Link to={link.path} className="text-white/60 hover:text-primary text-sm transition-colors">
+                  <Link to={link.path} className="text-white/60 hover:text-primary text-sm transition-colors" onClick={scrollToTop}>
                     {link.name}
                   </Link>
                 </li>
@@ -97,7 +101,7 @@ export const Footer = () => {
             <ul className="space-y-2">
               {footerLinks.support.map((link) => (
                 <li key={link.name}>
-                  <Link to={link.path} className="text-white/60 hover:text-primary text-sm transition-colors">
+                  <Link to={link.path} className="text-white/60 hover:text-primary text-sm transition-colors" onClick={scrollToTop}>
                     {link.name}
                   </Link>
                 </li>

@@ -7,7 +7,7 @@ const Shipping = () => {
     document.title = 'Shipping Policy - Studio Sara | Delivery Information';
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) {
-      metaDescription.setAttribute('content', 'Studio Sara shipping policy. We use reliable courier services for shipping all over India. Air shipping with 2-3 days delivery time. Learn about our shipping charges and delivery options.');
+      metaDescription.setAttribute('content', 'Studio Sara shipping policy. Courier partners (Trackon, PNS, Tirupati, Delhivery, XpressBees). Shipping charges based on meters and quantity. Delivery 2–3 days India, 5–6 days international. Full payment before dispatch.');
     }
   }, []);
 
@@ -29,51 +29,71 @@ const Shipping = () => {
               <div>
                 <h2 className="font-cursive text-3xl mb-4">Courier Services</h2>
                 <div className="text-muted-foreground space-y-3">
-                  <p>We use reliable courier services (Trackon and PNS) for shipping all over India.</p>
+                  <p>We use reliable courier partners based on the order type:</p>
+                  <ul className="list-disc pl-6 space-y-1">
+                    <li><strong>Print orders:</strong> Trackon and PNS</li>
+                    <li><strong>Embroidery orders:</strong> Tirupati, Delhivery, and XpressBees</li>
+                  </ul>
+                  <p>Courier partner selection depends on serviceability, parcel size, and destination.</p>
                 </div>
               </div>
 
               <div>
                 <h2 className="font-cursive text-3xl mb-4">Shipping Charges</h2>
                 <div className="text-muted-foreground space-y-3">
-                  <p><strong>Air Shipping (2-3 days delivery time):</strong></p>
-                  <ul className="list-disc pl-6 space-y-2">
-                    <li>First 500g: <strong>80 INR</strong></li>
-                    <li>Every additional kg: <strong>100 INR</strong></li>
+                  <p>Courier charges are included in the bill, calculated based on the number of meters and quantity ordered by the client.</p>
+                  <p>As shipping is ultimately based on the actual parcel weight after printing or embroidery, if there is a substantial difference between the initially calculated shipping amount and the final parcel weight:</p>
+                  <ul className="list-disc pl-6 space-y-1">
+                    <li>The client will be informed of the revised courier charges</li>
+                    <li>Any additional amount must be paid before dispatch</li>
+                    <li>Shipping will be processed only after payment confirmation</li>
                   </ul>
-                  <p className="mt-4">The client can ask for one day shipping for which the rates differ substantially.</p>
+                </div>
+              </div>
+
+              <div>
+                <h2 className="font-cursive text-3xl mb-4">Delivery Timelines</h2>
+                <div className="text-muted-foreground space-y-3">
+                  <ul className="list-disc pl-6 space-y-1">
+                    <li><strong>Within India:</strong> Estimated delivery time is 2–3 business days after dispatch</li>
+                    <li><strong>International orders:</strong> Estimated delivery time is 5–6 business days after dispatch</li>
+                  </ul>
+                  <p className="text-sm italic">Note: Delivery timelines are indicative and may vary based on destination, customs clearance (for international shipments), and courier service.</p>
                 </div>
               </div>
 
               <div>
                 <h2 className="font-cursive text-3xl mb-4">Free Shipping Policy</h2>
                 <div className="text-muted-foreground space-y-3">
-                  <p>We do not provide free shipping, as our costings are low enough for any small business that wants custom printing.</p>
+                  <p>We do not offer free shipping. Our pricing is already structured to remain affordable for small businesses opting for custom printing or embroidery.</p>
                 </div>
               </div>
 
               <div>
                 <h2 className="font-cursive text-3xl mb-4">Payment & Tracking</h2>
                 <div className="text-muted-foreground space-y-3">
-                  <p>The courier charges are shared after the parcel moves from factory to courier hub, depending on the weight of the parcel, so they are not included in the invoice. They will be shared at the time of shipping after payment of which the tracking will be shared.</p>
-                  <p className="text-red-600 font-semibold">Failure of payment of courier charges will cancel the shipment and withhold any future orders.</p>
+                  <ul className="list-disc pl-6 space-y-1">
+                    <li>Full payment must be completed before shipping</li>
+                    <li>Tracking details will be shared after the shipment is dispatched</li>
+                    <li>Courier charges are finalized based on actual parcel weight</li>
+                  </ul>
+                  <p className="text-red-600 font-semibold">Failure to clear revised courier charges (if applicable) may result in shipment delay or cancellation and could impact future orders.</p>
                 </div>
               </div>
 
               <div>
                 <h2 className="font-cursive text-3xl mb-4">Client Courier Pickups</h2>
                 <div className="text-muted-foreground space-y-3">
-                  <p>We don't entertain client courier pickups from factory as it disturbs our pickup records and cause misplacement issues.</p>
+                  <p>Client-arranged courier pickups from the factory are not permitted, as they disrupt pickup records and may lead to misplacement issues.</p>
                 </div>
               </div>
 
               <div className="bg-muted p-6 rounded-lg mt-8">
                 <h3 className="font-cursive text-2xl mb-4">Important Notes</h3>
                 <ul className="text-muted-foreground space-y-2 list-disc pl-6">
-                  <li>Complete payment before shipping is mandatory</li>
-                  <li>Shipping charges are calculated based on actual parcel weight</li>
-                  <li>Tracking information will be provided after courier charges payment</li>
-                  <li>Delivery time may vary based on location and courier service</li>
+                  <li>Shipping charges are subject to actual parcel weight</li>
+                  <li>Any weight-related difference will be communicated prior to dispatch</li>
+                  <li>Delivery timelines may vary based on location, courier service, and customs procedures (for international orders)</li>
                 </ul>
               </div>
 

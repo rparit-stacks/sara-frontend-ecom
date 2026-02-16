@@ -65,11 +65,11 @@ const CartItem = ({
         )}
         <div className="flex-1 min-w-0">
           {productUrl ? (
-            <Link to={productUrl} className="font-cursive text-lg xs:text-xl sm:text-2xl hover:text-[#2b9d8f] line-clamp-2">
+            <Link to={productUrl} className="font-sans font-normal text-lg xs:text-xl sm:text-2xl hover:text-[#2b9d8f] line-clamp-2">
               {item.productName}
             </Link>
           ) : (
-            <span className="font-cursive text-lg xs:text-xl sm:text-2xl line-clamp-2">{item.productName}</span>
+            <span className="font-sans font-normal text-lg xs:text-xl sm:text-2xl line-clamp-2">{item.productName}</span>
           )}
           <p className="text-xs xs:text-sm sm:text-base text-muted-foreground mt-1">
             {item.productType === 'DESIGNED' ? 'Print Product' : item.productType === 'PLAIN' ? 'Fabric' : item.productType === 'CUSTOM' ? 'Custom Print' : item.productType}
@@ -466,7 +466,7 @@ const Cart = () => {
                               className="w-16 h-20 xs:w-20 xs:h-24 sm:w-24 sm:h-28 object-cover rounded-lg flex-shrink-0"
                             />
                             <div className="flex-1 min-w-0">
-                              <p className="font-cursive text-base xs:text-lg sm:text-xl line-clamp-2">
+                              <p className="font-sans font-normal text-base xs:text-lg sm:text-xl line-clamp-2">
                                 {item.productName}
                               </p>
                               <p className="text-xs xs:text-sm text-muted-foreground mt-1">

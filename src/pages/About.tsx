@@ -21,7 +21,7 @@ const About = () => {
           <span className="text-primary uppercase tracking-[0.2em] text-sm font-medium">Our Story</span>
           <h1 className="font-cursive text-5xl md:text-6xl lg:text-7xl mt-4 mb-6">About Studio Sara</h1>
           <p className="text-lg lg:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            Custom prints and embroidery, crafted with intention.
+            Custom prints and embroideries, crafted with intention.
           </p>
         </ScrollReveal>
       </div>
@@ -53,7 +53,7 @@ const About = () => {
               Studio Sara was shaped by lived experience. As a fashion designer, sourcing the right prints and embroideries was always a challenge. Ready-made designs lacked originality, while custom development demanded high minimums. Testing a new idea often meant producing in bulk—leading to financial risk, unsold stock, and creative compromise.
             </p>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              That challenge became our purpose. Studio Sara was created to make custom prints and embroidery accessible, flexible, and brand-friendly—especially for emerging fashion labels.
+              That challenge became our purpose. Studio Sara was created to make custom prints and embroideries accessible, flexible, and brand-friendly—especially for emerging fashion labels.
             </p>
           </div>
         </ScrollReveal>
@@ -128,7 +128,7 @@ const About = () => {
             Studio Sara
           </p>
           <p className="text-xl text-muted-foreground mt-4">
-            Custom prints and embroidery, crafted with intention.
+            Custom prints and embroideries, crafted with intention.
           </p>
         </ScrollReveal>
       </div>

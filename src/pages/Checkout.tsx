@@ -1623,7 +1623,7 @@ const Checkout = () => {
                       <Collapsible key={item.id}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <span className="line-clamp-1">{item.productName}</span>
+                            <span className="font-sans font-normal line-clamp-1">{item.productName}</span>
                             {hasBreakdown && (
                               <CollapsibleTrigger asChild>
                                 <button type="button" className="text-xs text-muted-foreground hover:text-foreground mt-0.5 flex items-center gap-0.5">

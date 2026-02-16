@@ -368,7 +368,7 @@ export const PriceBreakdownPopup = ({
         <div className="space-y-4 py-4">
           <div className="bg-secondary/30 rounded-lg p-4 space-y-4">
             <div className="border-b border-border pb-3">
-              <h4 className="font-semibold text-base">
+              <h4 className="font-sans font-semibold text-base not-italic">
                 {item.productName}
                 {breakdown.quantity && breakdown.quantity > 1 && (
                   <span className="text-muted-foreground font-normal ml-2">

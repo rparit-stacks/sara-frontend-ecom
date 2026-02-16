@@ -135,7 +135,7 @@
 .marquee {
   display: inline-block;
   white-space: nowrap;
-  animation: marquee 18s linear infinite;
+  animation: marquee 45s linear infinite;
 }
 
 @layer base {

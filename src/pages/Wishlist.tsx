@@ -42,7 +42,7 @@ const WishlistItemCard = ({ item, index, hasCustomizations, removeMutation, addT
           <p className="text-xs xs:text-sm text-muted-foreground truncate">{item.productType}</p>
           <Link 
             to={productUrl} 
-            className="font-cursive text-base xs:text-lg sm:text-xl hover:text-[#2b9d8f] block mt-1 xs:mt-2 line-clamp-2"
+            className="font-sans font-normal text-base xs:text-lg sm:text-xl hover:text-[#2b9d8f] block mt-1 xs:mt-2 line-clamp-2"
           >
             {item.productName || 'Product'}
           </Link>
