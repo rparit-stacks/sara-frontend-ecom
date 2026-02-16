@@ -44,7 +44,7 @@ export const ListViewProductCard = ({ product, className }: ListViewProductCardP
               <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider truncate mb-1">
                 {product.category}
               </p>
-              <h3 className="font-medium text-sm sm:text-base text-foreground group-hover:text-[#2b9d8f] transition-colors line-clamp-2 mb-2">
+              <h3 className="font-sans font-normal text-sm sm:text-base text-foreground group-hover:text-[#2b9d8f] transition-colors line-clamp-2 mb-2 not-italic">
                 {product.name}
               </h3>
             </div>

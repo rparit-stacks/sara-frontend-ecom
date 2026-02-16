@@ -59,7 +59,7 @@ export const ProductCard = ({ product, className }: ProductCardProps) => {
         {/* Content */}
         <div className="p-2 xs:p-3 sm:p-4">
           <p className="text-[9px] xs:text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider truncate">{product.category}</p>
-          <h3 className="font-medium text-xs xs:text-sm sm:text-base text-foreground mt-1 xs:mt-1.5 group-hover:text-[#2b9d8f] transition-colors line-clamp-2">
+          <h3 className="font-sans font-normal text-xs xs:text-sm sm:text-base text-foreground mt-1 xs:mt-1.5 group-hover:text-[#2b9d8f] transition-colors line-clamp-2 not-italic">
             {product.name}
           </h3>
           <div className="flex items-center gap-1 xs:gap-2 mt-1 xs:mt-2 flex-wrap">
