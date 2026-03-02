@@ -984,25 +984,17 @@ export const paymentConfigApi = {
 // WhatsApp API
 // ===============================
 export const whatsappApi = {
-  // Templates
-  getTemplates: () => fetchApi<any[]>('/api/admin/whatsapp/templates'),
-  createTemplate: (data: any) => fetchApi<any>('/api/admin/whatsapp/templates', { method: 'POST', body: JSON.stringify(data) }),
-  updateTemplate: (id: number, data: any) => fetchApi<any>(`/api/admin/whatsapp/templates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteTemplate: (id: number) => fetchApi<any>(`/api/admin/whatsapp/templates/${id}`, { method: 'DELETE' }),
-  
-  // Custom Statuses
-  getCustomStatuses: () => fetchApi<any[]>('/api/admin/whatsapp/custom-statuses'),
-  createCustomStatus: (data: any) => fetchApi<any>('/api/admin/whatsapp/custom-statuses', { method: 'POST', body: JSON.stringify(data) }),
-  updateCustomStatus: (id: number, data: any) => fetchApi<any>(`/api/admin/whatsapp/custom-statuses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteCustomStatus: (id: number) => fetchApi<any>(`/api/admin/whatsapp/custom-statuses/${id}`, { method: 'DELETE' }),
-  
+  // Template names (DB; fallback to application.properties)
+  getTemplateConfig: () => fetchApi<{ key: string; templateName: string; source: string }[]>('/api/admin/whatsapp/template-config'),
+  updateTemplateConfig: (data: { key: string; templateName: string }) =>
+    fetchApi<void>('/api/admin/whatsapp/template-config', { method: 'PUT', body: JSON.stringify(data) }),
+
   // Logs
   getLogs: (page: number = 0, size: number = 20) => fetchApi<any>(`/api/admin/whatsapp/logs?page=${page}&size=${size}`),
   getLogsByOrder: (orderId: number) => fetchApi<any[]>(`/api/admin/whatsapp/logs/order/${orderId}`),
-  
-  // Config
-  getConfig: () => fetchApi<any>('/api/admin/whatsapp/config'),
-  updateConfig: (data: any) => fetchApi<any>('/api/admin/whatsapp/config', { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Custom statuses (used by Order detail status dropdown)
+  getCustomStatuses: () => fetchApi<any[]>('/api/admin/whatsapp/custom-statuses'),
 };
 
 
