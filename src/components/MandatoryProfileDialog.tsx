@@ -11,11 +11,13 @@ import { COUNTRY_CODES } from '@/lib/countryCodes';
 interface MandatoryProfileDialogProps {
   open: boolean;
   email: string;
+  phoneNumber?: string;
   onComplete: (data: { firstName: string; lastName: string; phoneNumber: string }) => void;
   onCancel: () => void;
 }
 
-export const MandatoryProfileDialog = ({ open, email, onComplete, onCancel }: MandatoryProfileDialogProps) => {
+export const MandatoryProfileDialog = ({ open, email, phoneNumber, onComplete, onCancel }: MandatoryProfileDialogProps) => {
+  const hasExistingPhone = !!phoneNumber && phoneNumber.trim() !== '';
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -36,11 +38,13 @@ export const MandatoryProfileDialog = ({ open, email, onComplete, onCancel }: Ma
       newErrors.lastName = 'Last name is required';
     }
     
-    const digits = formData.phoneNumber.replace(/\D/g, '');
-    if (!digits) {
-      newErrors.phoneNumber = 'Phone number is required';
-    } else if (digits.length < 7 || digits.length > 15) {
-      newErrors.phoneNumber = 'Please enter a valid phone number (7-15 digits)';
+    if (!hasExistingPhone) {
+      const digits = formData.phoneNumber.replace(/\D/g, '');
+      if (!digits) {
+        newErrors.phoneNumber = 'Phone number is required';
+      } else if (digits.length < 7 || digits.length > 15) {
+        newErrors.phoneNumber = 'Please enter a valid phone number (7-15 digits)';
+      }
     }
     
     setErrors(newErrors);
@@ -54,9 +58,12 @@ export const MandatoryProfileDialog = ({ open, email, onComplete, onCancel }: Ma
 
     setIsSubmitting(true);
     try {
-      const digits = formData.phoneNumber.replace(/\D/g, '');
-      const codeDigits = formData.countryCode.replace(/\D/g, '');
-      const fullPhone = codeDigits ? `${formData.countryCode}${digits}` : digits;
+      let fullPhone = (phoneNumber || '').trim();
+      if (!hasExistingPhone) {
+        const digits = formData.phoneNumber.replace(/\D/g, '');
+        const codeDigits = formData.countryCode.replace(/\D/g, '');
+        fullPhone = codeDigits ? `${formData.countryCode}${digits}` : digits;
+      }
       
       await onComplete({
         firstName: formData.firstName.trim(),
@@ -143,49 +150,66 @@ export const MandatoryProfileDialog = ({ open, email, onComplete, onCancel }: Ma
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="phoneNumber" className="flex items-center gap-2">
-              <Phone className="w-4 h-4" />
-              Phone Number *
-            </Label>
-            <div className="flex gap-2 mt-1">
-              <Select
-                value={formData.countryCode}
-                onValueChange={(v) => {
-                  setFormData({ ...formData, countryCode: v });
-                  if (errors.phoneNumber) setErrors({ ...errors, phoneNumber: '' });
-                }}
-              >
-                <SelectTrigger className="w-[140px] shrink-0">
-                  <SelectValue placeholder="Code" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[280px] overflow-y-auto">
-                  {COUNTRY_CODES.map((c) => (
-                    <SelectItem key={c.code + c.country} value={c.code}>
-                      {c.code} {c.country}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {hasExistingPhone ? (
+            <div>
+              <Label className="flex items-center gap-2">
+                <Phone className="w-4 h-4" />
+                Phone Number
+              </Label>
               <Input
-                id="phoneNumber"
-                type="tel"
-                value={formData.phoneNumber}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 15);
-                  setFormData({ ...formData, phoneNumber: value });
-                  if (errors.phoneNumber) setErrors({ ...errors, phoneNumber: '' });
-                }}
-                className={`flex-1 ${errors.phoneNumber ? 'border-destructive' : ''}`}
-                placeholder="Phone number"
-                disabled={isSubmitting}
+                value={phoneNumber}
+                disabled
+                className="mt-1 bg-muted"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                This phone number was provided during login and will be used for your account and WhatsApp alerts.
+              </p>
             </div>
-            {errors.phoneNumber && (
-              <p className="text-xs text-destructive mt-1">{errors.phoneNumber}</p>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">Select country code and enter your phone number</p>
-          </div>
+          ) : (
+            <div>
+              <Label htmlFor="phoneNumber" className="flex items-center gap-2">
+                <Phone className="w-4 h-4" />
+                Phone Number *
+              </Label>
+              <div className="flex gap-2 mt-1">
+                <Select
+                  value={formData.countryCode}
+                  onValueChange={(v) => {
+                    setFormData({ ...formData, countryCode: v });
+                    if (errors.phoneNumber) setErrors({ ...errors, phoneNumber: '' });
+                  }}
+                >
+                  <SelectTrigger className="w-[140px] shrink-0">
+                    <SelectValue placeholder="Code" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[280px] overflow-y-auto">
+                    {COUNTRY_CODES.map((c) => (
+                      <SelectItem key={c.code + c.country} value={c.code}>
+                        {c.code} {c.country}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  id="phoneNumber"
+                  type="tel"
+                  value={formData.phoneNumber}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 15);
+                    setFormData({ ...formData, phoneNumber: value });
+                    if (errors.phoneNumber) setErrors({ ...errors, phoneNumber: '' });
+                  }}
+                  className={`flex-1 ${errors.phoneNumber ? 'border-destructive' : ''}`}
+                  placeholder="Phone number"
+                  disabled={isSubmitting}
+                />
+              </div>
+              {errors.phoneNumber && (
+                <p className="text-xs text-destructive mt-1">{errors.phoneNumber}</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">Select country code and enter your phone number</p>
+            </div>
+          )}
 
           <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-lg p-3 mt-4">
             <p className="text-sm text-yellow-800 dark:text-yellow-400">

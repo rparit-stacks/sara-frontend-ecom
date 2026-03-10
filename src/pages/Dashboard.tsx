@@ -562,6 +562,7 @@ const Dashboard = () => {
         <MandatoryProfileDialog
           open={true}
           email={email || profile?.email || ''}
+          phoneNumber={profile.phoneNumber || ''}
           onComplete={handleMandatoryComplete}
           onCancel={handleMandatoryCancel}
           onLogout={handleMandatoryLogout}

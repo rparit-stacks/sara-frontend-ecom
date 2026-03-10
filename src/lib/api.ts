@@ -989,6 +989,12 @@ export const whatsappApi = {
   updateTemplateConfig: (data: { key: string; templateName: string }) =>
     fetchApi<void>('/api/admin/whatsapp/template-config', { method: 'PUT', body: JSON.stringify(data) }),
 
+  // Template payloads (placeholder mappings per template key)
+  getTemplatePayloads: () =>
+    fetchApi<Array<{ key: string; label: string; templateName: string; placeholders: Array<{ index: number; name: string; description: string }> }>>(
+      '/api/admin/whatsapp/template-payloads'
+    ),
+
   // Logs
   getLogs: (page: number = 0, size: number = 20) => fetchApi<any>(`/api/admin/whatsapp/logs?page=${page}&size=${size}`),
   getLogsByOrder: (orderId: number) => fetchApi<any[]>(`/api/admin/whatsapp/logs/order/${orderId}`),
@@ -1149,8 +1155,15 @@ export const userApi = {
 // Auth API
 // ===============================
 export const authApi = {
-  requestOtp: (email: string) => 
-    fetchApi<any>('/api/auth/otp/request', { method: 'POST', body: JSON.stringify({ email }) }),
+  requestOtp: (email: string, phoneNumber: string) => 
+    fetchApi<any>('/api/auth/otp/request', { method: 'POST', body: JSON.stringify({ email, phoneNumber }) }),
+  requestLoginOtpByEmail: (email: string) =>
+    fetchApi<any>('/api/auth/login/otp/request/email', { method: 'POST', body: JSON.stringify({ email }) }),
+  lookupUsersByPhone: (phoneNumber: string) =>
+    fetchApi<Array<{ email: string; maskedEmail: string }>>('/api/auth/login/phone/lookup', {
+      method: 'POST',
+      body: JSON.stringify({ phoneNumber }),
+    }),
   verifyOtp: (email: string, otp: string) => 
     fetchApi<any>('/api/auth/otp/verify', { method: 'POST', body: JSON.stringify({ email, otp }) }),
   getGoogleLoginUrl: () => `${API_BASE_URL}/oauth2/authorization/google`,
