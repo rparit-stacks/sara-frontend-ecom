@@ -389,15 +389,15 @@ const AdminCategoryForm = () => {
               <div className="space-y-0.5">
                 <Label htmlFor="isUserSpecific">This category is specific for selected users</Label>
                 <p className="text-xs text-muted-foreground">
-                  {formData.parentId !== null 
-                    ? 'Subcategories automatically inherit parent category permissions' 
+                  {formData.parentId !== 'none'
+                    ? 'Subcategories automatically inherit parent category permissions'
                     : 'Restrict this category and all its sub-categories and products to specific users'}
                 </p>
               </div>
               <Switch
                 id="isUserSpecific"
                 checked={formData.isUserSpecific}
-                disabled={formData.parentId !== null}
+                disabled={formData.parentId !== 'none'}
                 onCheckedChange={(checked) =>
                   setFormData((prev) => ({
                     ...prev,
@@ -408,7 +408,7 @@ const AdminCategoryForm = () => {
               />
             </div>
 
-            {formData.isUserSpecific && formData.parentId === null && (
+            {formData.isUserSpecific && formData.parentId === 'none' && (
               <div className="space-y-2">
                 <Label htmlFor="allowedEmails">Allowed User Emails</Label>
                 <Textarea
