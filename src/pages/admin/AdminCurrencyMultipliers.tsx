@@ -143,6 +143,14 @@ const AdminCurrencyMultipliers = () => {
           </Button>
         </div>
 
+        {/* GBP is the active customer-facing currency on studiosara.uk. Surface this here so admins always configure it. */}
+        <div className="rounded-md border border-primary/30 bg-primary/5 p-4 text-sm">
+          <p className="font-medium">studiosara.uk uses GBP as its only customer-facing currency.</p>
+          <p className="text-muted-foreground mt-1">
+            Keep the GBP multiplier and "Rate to INR" up to date. Other currencies remain available in the system but are hidden from the storefronts.
+          </p>
+        </div>
+
         {isLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -167,48 +175,88 @@ const AdminCurrencyMultipliers = () => {
                       </td>
                     </tr>
                   ) : (
-                    multipliers.map((item: any) => (
-                      <tr key={item.id} className="border-b hover:bg-secondary/40">
-                        <td className="p-4 font-medium flex items-center gap-2">
-                          <span>{item.currencyCode}</span>
-                          {item.currencyCode === 'INR' && (
-                            <span className="text-xs text-muted-foreground">
-                              (India base – always treated as 1x)
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-4 flex items-center gap-2">
-                          <Percent className="w-4 h-4 text-muted-foreground" />
-                          <span>{item.multiplier}</span>
-                        </td>
-                        <td className="p-4 text-muted-foreground">
-                          {item.rateToInr != null ? `1 ${item.currencyCode} = ${item.rateToInr} INR` : '—'}
-                        </td>
-                        <td className="p-4">
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEdit(item)}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => deleteMutation.mutate(item.id)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              {deleteMutation.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-destructive" />
-                              ) : (
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                              )}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                    [...multipliers]
+                      .sort((a: Multiplier, b: Multiplier) => {
+                        // Pin GBP first, then INR, then everything else alphabetically.
+                        const rank = (code: string) =>
+                          code === 'GBP' ? 0 : code === 'INR' ? 1 : 2;
+                        const ra = rank(a.currencyCode);
+                        const rb = rank(b.currencyCode);
+                        if (ra !== rb) return ra - rb;
+                        return a.currencyCode.localeCompare(b.currencyCode);
+                      })
+                      .map((item: Multiplier) => {
+                        const isGbp = item.currencyCode === 'GBP';
+                        const isInr = item.currencyCode === 'INR';
+                        const isProtected = isGbp || isInr;
+                        return (
+                          <tr
+                            key={item.id}
+                            className={
+                              'border-b hover:bg-secondary/40 ' +
+                              (isGbp ? 'bg-primary/5' : '')
+                            }
+                          >
+                            <td className="p-4 font-medium">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span>{item.currencyCode}</span>
+                                {isGbp && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
+                                    UK Store Currency
+                                  </span>
+                                )}
+                                {isInr && (
+                                  <span className="text-xs text-muted-foreground">
+                                    (India base – always treated as 1x)
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div className="flex items-center gap-2">
+                                <Percent className="w-4 h-4 text-muted-foreground" />
+                                <span>{item.multiplier}</span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-muted-foreground">
+                              {item.rateToInr != null ? `1 ${item.currencyCode} = ${item.rateToInr} INR` : '—'}
+                            </td>
+                            <td className="p-4">
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openEdit(item)}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => deleteMutation.mutate(item.id)}
+                                  disabled={deleteMutation.isPending || isProtected}
+                                  title={
+                                    isProtected
+                                      ? `${item.currencyCode} cannot be deleted (used by store)`
+                                      : 'Delete'
+                                  }
+                                >
+                                  {deleteMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin text-destructive" />
+                                  ) : (
+                                    <Trash2
+                                      className={
+                                        'w-4 h-4 ' +
+                                        (isProtected ? 'text-muted-foreground/40' : 'text-destructive')
+                                      }
+                                    />
+                                  )}
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                   )}
                 </tbody>
               </table>

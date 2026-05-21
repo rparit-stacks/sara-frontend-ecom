@@ -17,7 +17,12 @@ interface Currency {
 export const CurrencySelector = () => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const { currency, setCurrency, setExchangeRates } = useCurrency();
+  const { currency, setCurrency, setExchangeRates, domainConfig } = useCurrency();
+
+  // On domains that lock currency (e.g. studiosara.uk → GBP), don't render the selector at all.
+  if (!domainConfig.showCurrencyDropdown) {
+    return null;
+  }
 
   // Fetch available currencies and rates
   const { data: currenciesData } = useQuery({
@@ -50,12 +55,17 @@ export const CurrencySelector = () => {
     };
   }, [isOpen]);
 
-  const currencies: Currency[] = currenciesData?.currencies || [
+  const allCurrencies: Currency[] = currenciesData?.currencies || [
     { code: 'INR', name: 'Indian Rupee', symbol: '₹', rate: 1 },
     { code: 'USD', name: 'US Dollar', symbol: '$', rate: 0.012 },
     { code: 'EUR', name: 'Euro', symbol: '€', rate: 0.011 },
     { code: 'GBP', name: 'British Pound', symbol: '£', rate: 0.0095 },
   ];
+
+  // Filter UI-visible currencies by domain config (backend still supports all).
+  const currencies: Currency[] = domainConfig.allowedCurrencies
+    ? allCurrencies.filter((c) => domainConfig.allowedCurrencies!.includes(c.code))
+    : allCurrencies;
 
   const handleCurrencySelect = (code: string) => {
     setCurrency(code);

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { currencyApi } from '@/lib/api';
+import { getCurrentDomainConfig, type DomainConfig } from '@/lib/domainConfig';
 
 interface CurrencyContextType {
   currency: string;
@@ -12,20 +13,27 @@ interface CurrencyContextType {
   ratesToInr: Record<string, number>;
   setRatesToInr: (rates: Record<string, number>) => void;
   baseCurrency: string;
+  /** Domain-derived config for the current hostname. */
+  domainConfig: DomainConfig;
 }
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
 const CURRENCY_STORAGE_KEY = 'selected_currency';
-const DEFAULT_CURRENCY = 'INR';
 const BASE_CURRENCY = 'INR';
 
 export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
+  const domainConfig = getCurrentDomainConfig();
+
   const [currency, setCurrencyState] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(CURRENCY_STORAGE_KEY) || DEFAULT_CURRENCY;
+    // When the domain locks currency (e.g. .uk → GBP), ignore any saved preference.
+    if (!domainConfig.showCurrencyDropdown) {
+      return domainConfig.defaultCurrency;
     }
-    return DEFAULT_CURRENCY;
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(CURRENCY_STORAGE_KEY) || domainConfig.defaultCurrency;
+    }
+    return domainConfig.defaultCurrency;
   });
 
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
@@ -85,12 +93,16 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && domainConfig.showCurrencyDropdown) {
       localStorage.setItem(CURRENCY_STORAGE_KEY, currency);
     }
-  }, [currency]);
+  }, [currency, domainConfig.showCurrencyDropdown]);
 
   const setCurrency = (newCurrency: string) => {
+    // On domains where currency is locked, ignore attempts to change it.
+    if (!domainConfig.showCurrencyDropdown) {
+      return;
+    }
     setCurrencyState(newCurrency);
   };
 
@@ -106,6 +118,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
         ratesToInr,
         setRatesToInr,
         baseCurrency: BASE_CURRENCY,
+        domainConfig,
       }}
     >
       {children}

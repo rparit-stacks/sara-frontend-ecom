@@ -5,6 +5,7 @@ import Autoplay from 'embla-carousel-autoplay';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
+import GeoSuggestionBanner from '@/components/common/GeoSuggestionBanner';
 import { Button } from '@/components/ui/button';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
@@ -328,6 +329,7 @@ const Index = () => {
 
   return (
     <Layout>
+      <GeoSuggestionBanner />
       {/* Hero Slider - Full Width */}
       <section className="relative w-full">
         <div ref={heroRef} className="overflow-hidden">
