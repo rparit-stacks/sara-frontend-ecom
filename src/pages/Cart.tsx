@@ -201,6 +201,39 @@ const Cart = () => {
     window.addEventListener('guestCartUpdated', handleGuestCartUpdate);
     return () => window.removeEventListener('guestCartUpdated', handleGuestCartUpdate);
   }, []);
+
+  // Guest pricing preview: server-authoritative totals + fabric-slab breakdown for guests.
+  // Re-runs whenever guest items change so toggling quantity refreshes the totals.
+  const guestPreviewKey = JSON.stringify(
+    guestCartItems.map((i: any) => ({
+      pid: i.productId,
+      pt: i.productType,
+      fid: i.fabricId,
+      q: i.quantity,
+      up: i.unitPrice,
+      fp: i.fabricPrice,
+      dp: i.designPrice,
+    }))
+  );
+  const { data: guestPreview } = useQuery({
+    queryKey: ['cart', 'guest-preview', guestPreviewKey],
+    queryFn: () => cartApi.previewPricing(
+      guestCartItems.map((i: any) => ({
+        productType: i.productType,
+        productId: Number(i.productId),
+        fabricId: i.fabricId != null ? Number(i.fabricId) : undefined,
+        designId: i.designId != null ? Number(i.designId) : undefined,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        fabricPrice: i.fabricPrice,
+        designPrice: i.designPrice,
+        variants: i.variants,
+        variantSelections: i.variantSelections,
+        customFormData: i.customFormData,
+      }))
+    ),
+    enabled: !isLoggedIn && guestCartItems.length > 0,
+  });
   
   // Update cart item quantity
   const updateMutation = useMutation({
@@ -272,9 +305,12 @@ const Cart = () => {
 
   // Calculate totals
   const items = isLoggedIn ? (cartData?.items || []) : guestCartItems;
+  // Prefer the server-priced subtotal for guests when the preview has arrived; fall back to local.
   const subtotal = isLoggedIn 
     ? (cartData?.subtotal ? Number(cartData.subtotal) : 0)
-    : guestCartItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+    : (guestPreview?.subtotal != null
+        ? Number(guestPreview.subtotal)
+        : guestCartItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0));
   const gst = isLoggedIn 
     ? (cartData?.gst ? Number(cartData.gst) : 0)
     : 0; // GST calculated at checkout for guests
@@ -519,6 +555,41 @@ const Cart = () => {
               
               <div className="bg-card p-4 xs:p-6 sm:p-8 rounded-xl sm:rounded-2xl border border-border h-fit lg:sticky lg:top-24">
                 <h3 className="font-cursive text-xl xs:text-2xl mb-4 xs:mb-6">Order Summary</h3>
+                {(() => {
+                  const fabricDiscounts: any[] = isLoggedIn
+                    ? ((cartData as any)?.fabricDiscounts || [])
+                    : ((guestPreview as any)?.fabricDiscounts || []);
+                  if (!Array.isArray(fabricDiscounts) || fabricDiscounts.length === 0) return null;
+                  return (
+                  <div className="mb-4 xs:mb-5 p-3 xs:p-4 rounded-xl border border-emerald-200 bg-emerald-50/70">
+                    <div className="text-xs xs:text-sm font-semibold text-emerald-800 mb-2">
+                      Quantity discount applied
+                    </div>
+                    <div className="space-y-2">
+                      {fabricDiscounts.map((fd: any) => {
+                        const perMeter = Number(fd.discountPerMeter || 0);
+                        const totalSaved = Number(fd.totalSavings || 0);
+                        const isPct = fd.discountType === 'PERCENTAGE';
+                        return (
+                          <div key={`fd-${fd.fabricId}-${fd.slabId}`} className="text-xs xs:text-sm text-emerald-900/90 flex justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="truncate font-medium">{fd.fabricName || `Fabric #${fd.fabricId}`}</div>
+                              <div className="text-[11px] xs:text-xs text-emerald-800/70">
+                                {fd.combinedMetres}m combined fabric · {fd.slabMinQuantity}
+                                {fd.slabMaxQuantity ? `–${fd.slabMaxQuantity}` : '+'} m
+                              </div>
+                            </div>
+                            <div className="text-right whitespace-nowrap">
+                              <div>−{isPct ? `${Number(fd.discountValue || 0)}%` : `₹${perMeter.toFixed(2)}`}/m</div>
+                              <div className="text-[11px] xs:text-xs text-emerald-800/70">Saved {format(totalSaved)}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  );
+                })()}
                 <div className="space-y-3 xs:space-y-4 text-sm xs:text-base">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
@@ -562,7 +633,33 @@ const Cart = () => {
       
       {/* Price Breakdown Popup */}
       {selectedItemForBreakdown && (() => {
-        const item = selectedItemForBreakdown;
+        const raw = selectedItemForBreakdown;
+        let item: any = raw;
+        if (!isLoggedIn && guestPreview?.items && Array.isArray(guestCartItems)) {
+          const idx = guestCartItems.findIndex((g: any) => g.id === raw.id);
+          const priced = idx >= 0 ? (guestPreview as any).items[idx] : null;
+          if (priced) {
+            item = {
+              ...raw,
+              unitPrice: priced.unitPrice != null ? Number(priced.unitPrice) : raw.unitPrice,
+              fabricPrice: priced.fabricPrice != null ? Number(priced.fabricPrice) : raw.fabricPrice,
+              totalPrice: priced.totalPrice != null ? Number(priced.totalPrice) : raw.totalPrice,
+              discountSource: priced.discountSource ?? raw.discountSource,
+              combinedFabricMetres:
+                priced.combinedFabricMetres != null ? Number(priced.combinedFabricMetres) : raw.combinedFabricMetres,
+              baseFabricPerMeter:
+                priced.baseFabricPerMeter != null ? Number(priced.baseFabricPerMeter) : raw.baseFabricPerMeter,
+              fabricSlabDiscountPerMeter:
+                priced.fabricSlabDiscountPerMeter != null
+                  ? Number(priced.fabricSlabDiscountPerMeter)
+                  : raw.fabricSlabDiscountPerMeter,
+              effectiveFabricPerMeter:
+                priced.effectiveFabricPerMeter != null
+                  ? Number(priced.effectiveFabricPerMeter)
+                  : raw.effectiveFabricPerMeter,
+            };
+          }
+        }
         const isCustomOrDesigned = item.productType === 'DESIGNED' || item.productType === 'CUSTOM';
         const quantity = item.quantity || 1;
         const fabricTotal = item.fabricPrice ? Number(item.fabricPrice) : 0;
@@ -616,6 +713,14 @@ const Cart = () => {
               pricePerMeter: item.unitPrice ? Number(item.unitPrice) : undefined,
               basePrice: item.designPrice ? Number(item.designPrice) : (item.unitPrice ? Number(item.unitPrice) : undefined),
               customFormData: item.customFormData,
+              discountSource: item.discountSource,
+              combinedFabricMetres:
+                item.combinedFabricMetres != null ? Number(item.combinedFabricMetres) : undefined,
+              baseFabricPerMeter: item.baseFabricPerMeter != null ? Number(item.baseFabricPerMeter) : undefined,
+              fabricSlabDiscountPerMeter:
+                item.fabricSlabDiscountPerMeter != null ? Number(item.fabricSlabDiscountPerMeter) : undefined,
+              effectiveFabricPerMeter:
+                item.effectiveFabricPerMeter != null ? Number(item.effectiveFabricPerMeter) : undefined,
             }}
             productData={productData}
             selectedVariants={Object.keys(selectedDesignVariants).length > 0 ? selectedDesignVariants : undefined}

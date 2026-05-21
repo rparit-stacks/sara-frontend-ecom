@@ -328,7 +328,8 @@ const AdminOrders = () => {
                           Status {getSortIcon('status')}
                         </div>
                       </th>
-                      <th 
+                      <th className="px-6 py-4 text-left text-sm font-semibold">Delivery</th>
+                      <th
                         className="px-6 py-4 text-left text-sm font-semibold cursor-pointer hover:bg-muted/70 transition-colors"
                         onClick={() => handleSort('paymentStatus')}
                       >
@@ -342,7 +343,7 @@ const AdminOrders = () => {
                   <tbody className="divide-y divide-border">
                     {orders.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
+                        <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
                           {hasActiveFilters ? 'No orders match your filters' : 'No orders found'}
                         </td>
                       </tr>
@@ -383,6 +384,15 @@ const AdminOrders = () => {
                           </td>
                           <td className="px-6 py-4">
                             {getStatusBadge(order.status)}
+                          </td>
+                          <td className="px-6 py-4 text-sm whitespace-nowrap">
+                            {order.deliveryType === 'PORTER' ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                                Porter
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">Standard</span>
+                            )}
                           </td>
                           <td className="px-6 py-4">
                             {(() => {

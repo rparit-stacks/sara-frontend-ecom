@@ -403,45 +403,52 @@ const ProductDetail = () => {
   // - Slab: 11-50m → ₹10 discount (FIXED_AMOUNT)
   // - Quantity: 15m
   // - Result: ₹150 - ₹10 = ₹140/m
+  //
+  // Semantics (aligned with server CartPricingService):
+  // - Only DESIGN-scope slabs apply here (FABRIC slabs are cart-aggregated on the server).
+  // - Among all slabs whose [min,max] contains quantity, the slab with the **largest** minQuantity wins
+  //   (not the first match in ascending order — otherwise a 1m+ open-ended slab always steals the match).
   const calculatePricePerMeter = (quantity: number, finalFabricPrice: number, slabs?: any[]) => {
     if (!slabs || slabs.length === 0) {
       return finalFabricPrice; // No slabs, use final fabric price
     }
-    
-    // Sort slabs by minQuantity to ensure correct order
-    const sortedSlabs = [...slabs].sort((a, b) => (a.minQuantity || 1) - (b.minQuantity || 1));
-    
-    // Find the matching slab for this quantity
-    for (const slab of sortedSlabs) {
-      const minQty = slab.minQuantity || 1;
-      const maxQty = slab.maxQuantity;
-      
-      if (quantity >= minQty && (maxQty === null || maxQty === undefined || quantity <= maxQty)) {
-        // Apply discount based on slab type
-        const discountType = slab.discountType || 'FIXED_AMOUNT'; // Default to FIXED_AMOUNT for backward compatibility
-        const discountValue = Number(slab.discountValue || slab.pricePerMeter || 0); // Support legacy pricePerMeter
-        
-        if (discountType === 'PERCENTAGE') {
-          // Percentage discount: reduce by X% from final fabric price
-          const discountAmount = (finalFabricPrice * discountValue) / 100;
-          return finalFabricPrice - discountAmount;
-        } else {
-          // FIXED_AMOUNT: reduce by fixed amount per meter
-          // For legacy support: if pricePerMeter is set and discountValue is 0, calculate discount
-          if (discountValue === 0 && slab.pricePerMeter) {
-            // Legacy: pricePerMeter is the final price, calculate discount
-            const legacyFinalPrice = Number(slab.pricePerMeter);
-            return legacyFinalPrice; // Use legacy absolute price
-          } else {
-            // New system: discountValue is the discount amount
-            return finalFabricPrice - discountValue;
-          }
-        }
-      }
+
+    const slabMin = (s: any) =>
+      s.minQuantity != null && !Number.isNaN(Number(s.minQuantity)) ? Number(s.minQuantity) : 0;
+
+    const designSlabsOnly = slabs.filter((s: any) => {
+      const scope = s.slabScope != null ? String(s.slabScope).toUpperCase() : 'DESIGN';
+      return scope === 'DESIGN';
+    });
+    if (designSlabsOnly.length === 0) {
+      return finalFabricPrice;
     }
-    
-    // If no slab matches, use final fabric price
-    return finalFabricPrice;
+
+    const matching = designSlabsOnly.filter((slab: any) => {
+      const minQty = slabMin(slab);
+      const maxQty = slab.maxQuantity;
+      return quantity >= minQty && (maxQty === null || maxQty === undefined || quantity <= maxQty);
+    });
+    if (matching.length === 0) {
+      return finalFabricPrice;
+    }
+
+    const slab = matching.reduce((best: any, cur: any) =>
+      slabMin(cur) >= slabMin(best) ? cur : best
+    );
+
+    const discountType = slab.discountType || 'FIXED_AMOUNT'; // Default to FIXED_AMOUNT for backward compatibility
+    const discountValue = Number(slab.discountValue || slab.pricePerMeter || 0); // Support legacy pricePerMeter
+
+    if (discountType === 'PERCENTAGE') {
+      const discountAmount = (finalFabricPrice * discountValue) / 100;
+      return finalFabricPrice - discountAmount;
+    }
+    if (discountValue === 0 && slab.pricePerMeter) {
+      const legacyFinalPrice = Number(slab.pricePerMeter);
+      return legacyFinalPrice;
+    }
+    return finalFabricPrice - discountValue;
   };
 
   // Update combined price for DESIGNED products: per-meter total (fabric/m + print/m)

@@ -491,9 +491,17 @@ const OrderDetail = () => {
                       <div className="flex justify-between">
                         <span>Shipping</span>
                         <span>
-                          {order.shipping === 0
-                            ? (isNonIndiaOrNonINR ? 'Our executive will contact you soon for shipping rates' : 'Free')
-                            : formatPrice(toDisplayAmount(Number(order.shipping ?? 0)), currency)}
+                          {order.deliveryType === 'PORTER'
+                            ? 'Porter (charges confirmed by team)'
+                            : order.shipping === 0
+                              ? (isNonIndiaOrNonINR ? 'Our executive will contact you soon for shipping rates' : 'Free')
+                              : formatPrice(toDisplayAmount(Number(order.shipping ?? 0)), currency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Delivery</span>
+                        <span className="font-medium">
+                          {order.deliveryType === 'PORTER' ? 'Porter Delivery' : 'Standard Delivery'}
                         </span>
                       </div>
                       {order.couponCode && order.couponDiscount && order.couponDiscount > 0 && (

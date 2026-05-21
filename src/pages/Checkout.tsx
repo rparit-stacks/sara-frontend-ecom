@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import ScrollReveal from '@/components/animations/ScrollReveal';
-import { Loader2, Truck, CreditCard, ShoppingBag, Lock, ChevronDown, Plus } from 'lucide-react';
+import { Loader2, Truck, CreditCard, ShoppingBag, Lock, ChevronDown, Plus, Package, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { cartApi, orderApi, userApi, shippingApi, paymentApi, paymentConfigApi, couponApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
@@ -127,6 +127,9 @@ const CITIES_BY_COUNTRY: Record<string, string[]> = {
   'ID': ['Jakarta', 'Surabaya', 'Bandung', 'Medan', 'Semarang', 'Palembang', 'Makassar', 'Batam', 'Pekanbaru', 'Denpasar'],
 };
 
+/** Same rule as backend ShippingService: above this fabric total (metres, digital excluded), shipping is quoted manually — not auto slab. */
+const FABRIC_MANUAL_SHIPPING_THRESHOLD_METRES = 30;
+
 const Checkout = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -148,6 +151,7 @@ const Checkout = () => {
   });
   
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+  const [deliveryType, setDeliveryType] = useState<'STANDARD' | 'PORTER'>('STANDARD');
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [paymentGateway, setPaymentGateway] = useState<string>('COD');
   const [availableGateways, setAvailableGateways] = useState<string[]>([]);
@@ -237,6 +241,33 @@ const Checkout = () => {
   }, []);
   const subtotalFromLocalStorage = guestCartItems.reduce((sum: number, item: any) =>
     sum + (item.totalPrice || (item.unitPrice || 0) * (item.quantity || 1)), 0);
+
+  // Guest pricing preview (server-authoritative; surfaces fabric-slab breakdown for guests).
+  const guestPreviewKey = JSON.stringify(
+    guestCartItems.map((i: any) => ({
+      pid: i.productId, pt: i.productType, fid: i.fabricId,
+      q: i.quantity, up: i.unitPrice, fp: i.fabricPrice, dp: i.designPrice,
+    }))
+  );
+  const { data: guestPreview } = useQuery({
+    queryKey: ['cart', 'guest-preview', 'checkout', guestPreviewKey],
+    queryFn: () => cartApi.previewPricing(
+      guestCartItems.map((i: any) => ({
+        productType: i.productType,
+        productId: Number(i.productId),
+        fabricId: i.fabricId != null ? Number(i.fabricId) : undefined,
+        designId: i.designId != null ? Number(i.designId) : undefined,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        fabricPrice: i.fabricPrice,
+        designPrice: i.designPrice,
+        variants: i.variants,
+        variantSelections: i.variantSelections,
+        customFormData: i.customFormData,
+      }))
+    ),
+    enabled: !isLoggedIn && guestCartItems.length > 0,
+  });
   
   // Fetch user profile for auto-prefill (only for logged-in users)
   const { data: userProfile } = useQuery({
@@ -382,6 +413,7 @@ const Checkout = () => {
         currency,
         country: getCountryName(),
         exchangeRate: currency === 'INR' ? 1 : (ratesToInr?.[currency] && ratesToInr[currency] > 0 ? 1 / ratesToInr[currency] : (exchangeRates?.[currency] && exchangeRates[currency] > 0 ? exchangeRates[currency] : undefined)),
+        deliveryType,
       };
 
       // Add guest checkout fields if not logged in
@@ -507,6 +539,18 @@ const Checkout = () => {
   
   // Calculate cart items and totals (must be before useMemo that uses items)
   const items = isLoggedIn ? (cartData?.items || []) : guestCartItems;
+
+  /** Fabric quantity in metres: PLAIN / DESIGNED / CUSTOM line quantities; DIGITAL excluded (matches shipping backend). */
+  const totalFabricMetres = useMemo(() => {
+    return items.reduce((sum: number, item: any) => {
+      const t = String(item.productType || '').toUpperCase();
+      if (t === 'DIGITAL') return sum;
+      const q = item.quantity ?? 0;
+      return sum + (typeof q === 'number' ? q : Number(q) || 0);
+    }, 0);
+  }, [items]);
+
+  const needsManualFabricShippingQuote = totalFabricMetres > FABRIC_MANUAL_SHIPPING_THRESHOLD_METRES;
   
   // Check if cart contains Digital products (COD not allowed)
   const hasDigitalProducts = useMemo(() => {
@@ -563,6 +607,16 @@ const Checkout = () => {
         setGuestShipping(0);
         return;
       }
+      const fabricM = guestCartItems.reduce((sum: number, item: any) => {
+        const t = String(item.productType || '').toUpperCase();
+        if (t === 'DIGITAL') return sum;
+        const q = item.quantity ?? 0;
+        return sum + (typeof q === 'number' ? q : Number(q) || 0);
+      }, 0);
+      if (fabricM > FABRIC_MANUAL_SHIPPING_THRESHOLD_METRES) {
+        setGuestShipping(0);
+        return;
+      }
       const country = formData.country === 'IN' ? 'IN' : (formData.country || 'IN');
       shippingApi.calculateForItems(country, guestCartItems.map((item: any) => ({
         productId: item.productId,
@@ -574,17 +628,22 @@ const Checkout = () => {
     }
   }, [isLoggedIn, isIndia, formData.country, guestCartItems]);
   
-  const subtotal = isLoggedIn 
+  const subtotal = isLoggedIn
     ? (cartData?.subtotal ? Number(cartData.subtotal) : 0)
-    : subtotalFromLocalStorage;
+    : (guestPreview?.subtotal != null ? Number(guestPreview.subtotal) : subtotalFromLocalStorage);
   // GST: For logged-in users, get from backend. For guest users, backend calculates it when order is created
-  const gst = isLoggedIn 
+  const gst = isLoggedIn
     ? (cartData?.gst ? Number(cartData.gst) : 0)
     : 0; // Guest GST calculated by backend on order creation
-  const shipping = isLoggedIn 
+  const shippingBase = isLoggedIn
     ? (cartData?.shipping ? Number(cartData.shipping) : 0)
     : guestShipping;
-  const couponDiscount = isLoggedIn 
+  // Porter or large fabric (India standard): no auto shipping in order total — team confirms before confirmation
+  const useManualFabricShippingInTotal =
+    needsManualFabricShippingQuote && deliveryType === 'STANDARD' && isIndia;
+  const shipping =
+    deliveryType === 'PORTER' ? 0 : useManualFabricShippingInTotal ? 0 : shippingBase;
+  const couponDiscount = isLoggedIn
     ? (cartData?.couponDiscount ? Number(cartData.couponDiscount) : 0)
     : 0;
   const total = subtotal + gst + shipping - couponDiscount;
@@ -831,6 +890,7 @@ const Checkout = () => {
           currency,
           country: getCountryName(),
           exchangeRate: currency === 'INR' ? 1 : (ratesToInr?.[currency] && ratesToInr[currency] > 0 ? 1 / ratesToInr[currency] : (exchangeRates?.[currency] && exchangeRates[currency] > 0 ? exchangeRates[currency] : undefined)),
+          deliveryType,
         };
 
         if (!isLoggedIn) {
@@ -903,6 +963,7 @@ const Checkout = () => {
         currency,
         country: getCountryName(),
         exchangeRate: currency === 'INR' ? 1 : (ratesToInr?.[currency] && ratesToInr[currency] > 0 ? 1 / ratesToInr[currency] : (exchangeRates?.[currency] && exchangeRates[currency] > 0 ? exchangeRates[currency] : undefined)),
+        deliveryType,
       };
 
       if (!isLoggedIn) {
@@ -1616,6 +1677,102 @@ const Checkout = () => {
                   <span>Pay in:</span>
                   <CurrencySelector />
                 </div>
+
+                <div className="space-y-3 mb-4 pb-4 border-b text-sm">
+                  <div className="flex gap-3 p-3 rounded-lg border border-sky-200 dark:border-sky-900/40 bg-sky-50 dark:bg-sky-950/25 text-sky-900 dark:text-sky-100">
+                    <Info className="w-5 h-5 shrink-0 mt-0.5 opacity-90" aria-hidden />
+                    <p>
+                      <span className="font-medium">Shipping — weight notice</span>
+                      <span className="block mt-1">
+                        In case of any weight discrepancy in the shipment, the applicable shipping charges will be communicated by the Studio Sara team.
+                      </span>
+                    </p>
+                  </div>
+                  {needsManualFabricShippingQuote && (
+                    <div className="flex gap-3 p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 text-amber-950 dark:text-amber-100">
+                      <Info className="w-5 h-5 shrink-0 mt-0.5 opacity-90" aria-hidden />
+                      <p>
+                        <span className="font-medium">Large fabric order (over {FABRIC_MANUAL_SHIPPING_THRESHOLD_METRES} m)</span>
+                        <span className="block mt-1">
+                          Total fabric in your cart is <span className="font-medium">{totalFabricMetres} metres</span> (digital items excluded). Shipping is not calculated automatically for orders above {FABRIC_MANUAL_SHIPPING_THRESHOLD_METRES} metres. The shipping rate will be communicated manually by the Studio Sara team before your order is confirmed.
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                  {(() => {
+                    const fabricDiscounts: any[] = isLoggedIn
+                      ? ((cartData as any)?.fabricDiscounts || [])
+                      : ((guestPreview as any)?.fabricDiscounts || []);
+                    if (!Array.isArray(fabricDiscounts) || fabricDiscounts.length === 0) return null;
+                    return (
+                    <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50/70 text-emerald-900">
+                      <div className="font-medium mb-1">Quantity discount applied</div>
+                      <div className="space-y-1.5">
+                        {fabricDiscounts.map((fd: any) => {
+                          const perMeter = Number(fd.discountPerMeter || 0);
+                          const totalSaved = Number(fd.totalSavings || 0);
+                          const isPct = fd.discountType === 'PERCENTAGE';
+                          return (
+                            <div key={`co-fd-${fd.fabricId}-${fd.slabId}`} className="flex justify-between gap-3 text-xs">
+                              <div className="min-w-0">
+                                <div className="truncate">{fd.fabricName || `Fabric #${fd.fabricId}`}</div>
+                                <div className="text-emerald-800/70">
+                                  {fd.combinedMetres}m combined fabric · {fd.slabMinQuantity}
+                                  {fd.slabMaxQuantity ? `–${fd.slabMaxQuantity}` : '+'} m
+                                </div>
+                              </div>
+                              <div className="text-right whitespace-nowrap">
+                                <div>−{isPct ? `${Number(fd.discountValue || 0)}%` : `₹${perMeter.toFixed(2)}`}/m</div>
+                                <div className="text-emerald-800/70">Saved {format(totalSaved)}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Delivery Option Selector */}
+                <div className="mb-4 pb-4 border-b">
+                  <h4 className="font-serif text-sm font-semibold flex items-center gap-2 mb-3">
+                    <Package className="w-4 h-4 text-muted-foreground" />
+                    Delivery Option
+                  </h4>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryType('STANDARD')}
+                      className={`px-3 py-2.5 rounded-lg border text-sm text-left transition-colors ${
+                        deliveryType === 'STANDARD'
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border hover:bg-muted/50'
+                      }`}
+                    >
+                      <span className="font-medium">Standard Delivery</span>
+                      <span className="block text-xs text-muted-foreground mt-0.5">Shipping charges as per your location</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryType('PORTER')}
+                      className={`px-3 py-2.5 rounded-lg border text-sm text-left transition-colors ${
+                        deliveryType === 'PORTER'
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border hover:bg-muted/50'
+                      }`}
+                    >
+                      <span className="font-medium">Porter Delivery</span>
+                      <span className="block text-xs text-muted-foreground mt-0.5">Our team will contact you for delivery details</span>
+                    </button>
+                  </div>
+                  {deliveryType === 'PORTER' && (
+                    <div className="mt-2 p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-200">
+                      Delivery charges will depend only on Porter charges. Our team will contact you soon regarding the delivery.
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-2 text-sm sm:text-base border-b pb-4 mb-4">
                   {items.map((item: any) => {
                     const hasBreakdown = item.productType === 'DESIGNED' && (item.designPrice != null || item.fabricPrice != null) || (item.unitPrice != null && (item.quantity || 1) > 0);
@@ -1666,10 +1823,16 @@ const Checkout = () => {
                   <div className="flex justify-between">
                     <span>Shipping</span>
                     <span>
-                      {!isIndia ? (shipping === 0 ? 'To be confirmed' : format(shipping)) : (shipping === 0 ? 'Free' : format(shipping))}
+                      {deliveryType === 'PORTER'
+                        ? 'Porter (TBD)'
+                        : !isIndia
+                          ? (shippingBase === 0 ? 'To be confirmed' : format(shippingBase))
+                          : needsManualFabricShippingQuote && deliveryType === 'STANDARD'
+                            ? 'Manual quote (TBD)'
+                            : (shippingBase === 0 ? 'Free' : format(shippingBase))}
                     </span>
                   </div>
-                  {!isIndia && (
+                  {deliveryType !== 'PORTER' && !isIndia && (
                     <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 text-sm text-amber-800 dark:text-amber-200">
                       Shipping is not included for this country. Our team will contact you to confirm shipping costs.
                     </div>

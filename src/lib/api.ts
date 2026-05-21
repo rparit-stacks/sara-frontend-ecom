@@ -767,6 +767,25 @@ export const cartApi = {
   removeItem: (itemId: number) => fetchApi<void>(`/api/cart/${itemId}`, { method: 'DELETE' }),
   clearCart: () => fetchApi<void>('/api/cart', { method: 'DELETE' }),
   getCartCount: () => fetchApi<{ count: number }>('/api/cart/count'),
+  /**
+   * Server-authoritative pricing preview for guest carts and product-page combined-cart hints.
+   * Sends a list of in-progress items and receives a priced CartDto (including the hybrid
+   * fabric-first slab breakdown) without persisting anything.
+   */
+  previewPricing: (items: Array<{
+    productType: string;
+    productId: number;
+    fabricId?: number;
+    designId?: number;
+    quantity?: number;
+    unitPrice?: number;
+    fabricPrice?: number;
+    designPrice?: number;
+    variants?: Record<string, string>;
+    variantSelections?: Record<string, any>;
+    customFormData?: Record<string, any>;
+  }>) =>
+    fetchApi<any>('/api/cart/pricing-preview', { method: 'POST', body: JSON.stringify({ items }) }),
 };
 
 // ===============================

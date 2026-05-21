@@ -764,19 +764,18 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       payload.price = sellingPrice;
       payload.originalPrice = sellingPrice;
       payload.recommendedPlainProductIds = formData.recommendedPlainProductIds;
-      // Add pricing slabs
+      // Add pricing slabs (DESIGN scope: applied per design product line)
       if (formData.pricingSlabs && formData.pricingSlabs.length > 0) {
         payload.pricingSlabs = formData.pricingSlabs.map(slab => {
-          // Ensure required fields are present
           const discountType = slab.discountType || 'FIXED_AMOUNT';
           const discountValue = slab.discountValue !== undefined && slab.discountValue !== null ? slab.discountValue : 0;
-          
           return {
             minQuantity: slab.minQuantity,
             maxQuantity: slab.maxQuantity,
             discountType: discountType,
             discountValue: discountValue,
-            displayOrder: slab.displayOrder || 0
+            displayOrder: slab.displayOrder || 0,
+            slabScope: 'DESIGN',
           };
         });
       }

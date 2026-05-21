@@ -516,6 +516,13 @@ const AdminProductEdit = () => {
       payload.plainProductId = formData.plainProductId || null;
       payload.price = sp; payload.pricePerMeter = sp; payload.originalPrice = sp;
       payload.unitExtension = ue || 'per meter';
+      if (formData.pricingSlabs?.length > 0) {
+        payload.pricingSlabs = formData.pricingSlabs.map(s => ({
+          minQuantity: s.minQuantity, maxQuantity: s.maxQuantity,
+          discountType: s.discountType || 'FIXED_AMOUNT', discountValue: s.discountValue ?? 0,
+          displayOrder: s.displayOrder || 0, slabScope: 'FABRIC',
+        }));
+      }
     } else if (activeType === 'DESIGNED') {
       const sp = formData.designPrice ?? formData.basePrice;
       payload.designPrice = formData.designPrice; payload.price = sp; payload.originalPrice = sp;
@@ -523,7 +530,8 @@ const AdminProductEdit = () => {
       if (formData.pricingSlabs?.length > 0) {
         payload.pricingSlabs = formData.pricingSlabs.map(s => ({
           minQuantity: s.minQuantity, maxQuantity: s.maxQuantity,
-          discountType: s.discountType || 'FIXED_AMOUNT', discountValue: s.discountValue ?? 0, displayOrder: s.displayOrder || 0
+          discountType: s.discountType || 'FIXED_AMOUNT', discountValue: s.discountValue ?? 0,
+          displayOrder: s.displayOrder || 0, slabScope: 'DESIGN',
         }));
       }
     } else if (activeType === 'DIGITAL') {
@@ -774,6 +782,66 @@ const AdminProductEdit = () => {
 
           {/* 3. Type-Specific Sections */}
           <AnimatePresence mode="wait">
+            {activeType === 'PLAIN' && (
+              <motion.section key="plain" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-6 pt-6 border-t border-border">
+                <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px]">3</span>
+                  Fabric quantity discounts
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-base font-semibold">Combined fabric metres</Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Discount tiers by total fabric metres in the cart (overrides per-design quantity discounts when matched).
+                      </p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={addPricingSlab}><Plus className="w-4 h-4 mr-1" />Add tier</Button>
+                  </div>
+                  {(!formData.pricingSlabs || formData.pricingSlabs.length === 0) ? (
+                    <div className="p-4 border border-dashed border-border rounded-lg text-center text-sm text-muted-foreground">No quantity discount tiers added.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {formData.pricingSlabs.map((slab, index) => (
+                        <div key={slab.id} className="p-4 border border-border rounded-lg space-y-3 bg-muted/30">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm font-medium">Tier {index + 1}</Label>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => removePricingSlab(slab.id!)} className="text-destructive hover:text-destructive"><X className="w-4 h-4" /></Button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Min Quantity (m) *</Label>
+                              <Input type="number" min="1" value={slab.minQuantity} onChange={(e) => updatePricingSlab(slab.id!, 'minQuantity', parseInt(e.target.value) || 1)} className="h-9" />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Max Quantity (m)</Label>
+                              <Input type="number" min={slab.minQuantity || 1} value={slab.maxQuantity || ''} onChange={(e) => updatePricingSlab(slab.id!, 'maxQuantity', e.target.value === '' ? null : parseInt(e.target.value))} className="h-9" placeholder="Leave empty for no limit" />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Discount Type *</Label>
+                              <Select value={slab.discountType || 'FIXED_AMOUNT'} onValueChange={(v: any) => updatePricingSlab(slab.id!, 'discountType', v)}>
+                                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="FIXED_AMOUNT">Fixed Amount (₹/m)</SelectItem>
+                                  <SelectItem value="PERCENTAGE">Percentage (%)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">{slab.discountType === 'PERCENTAGE' ? 'Discount (%) *' : 'Discount Amount (₹/m) *'}</Label>
+                              <Input type="number" min="0" step={slab.discountType === 'PERCENTAGE' ? '0.1' : '0.01'}
+                                value={slab.discountValue ?? ''} onChange={(e) => updatePricingSlab(slab.id!, 'discountValue', parseFloat(e.target.value) || 0)} className="h-9" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.section>
+            )}
             {activeType === 'DESIGNED' && (
               <motion.section key="designed" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-6 pt-6 border-t border-border">
                 <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">

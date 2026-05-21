@@ -1432,6 +1432,12 @@ const AdminOrderDetail = () => {
                   <span>Payment Method</span>
                   <span className="font-medium">{order.paymentMethod || 'N/A'}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span>Delivery Type</span>
+                  <span className={`font-medium ${order.deliveryType === 'PORTER' ? 'text-amber-600' : ''}`}>
+                    {order.deliveryType === 'PORTER' ? 'Porter Delivery' : 'Standard Delivery'}
+                  </span>
+                </div>
                 <div className="space-y-2 pt-2 border-t">
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Payment Status</label>
