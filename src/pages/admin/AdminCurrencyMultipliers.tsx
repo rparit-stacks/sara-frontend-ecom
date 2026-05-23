@@ -5,9 +5,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Trash2, Edit, Plus, Loader2, Globe2, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 import { currencyMultiplierAdminApi } from '@/lib/api';
+
+// Currencies that admins are allowed to add a multiplier for via the dropdown.
+// Keeping this short matches the storefront which only exposes INR (.in) and GBP (.uk).
+const SELECTABLE_CURRENCIES: { code: string; label: string }[] = [
+  { code: 'GBP', label: 'GBP — British Pound (UK Store)' },
+  { code: 'INR', label: 'INR — Indian Rupee (India Store)' },
+];
 
 type Multiplier = {
   id: number;
@@ -75,7 +89,8 @@ const AdminCurrencyMultipliers = () => {
 
   const openCreate = () => {
     setEditing(null);
-    setFormData({ currencyCode: '', multiplier: '', rateToInr: '' });
+    // Pre-select GBP since that's the only customer-facing non-INR currency.
+    setFormData({ currencyCode: 'GBP', multiplier: '', rateToInr: '' });
     setIsDialogOpen(true);
   };
 
@@ -273,15 +288,32 @@ const AdminCurrencyMultipliers = () => {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 pt-2">
               <div className="space-y-2">
-                <Label>Currency Code (e.g., USD, EUR, AED)</Label>
-                <Input
-                  value={formData.currencyCode}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, currencyCode: e.target.value }))
-                  }
-                  placeholder="USD"
-                  maxLength={10}
-                />
+                <Label>Currency</Label>
+                {editing ? (
+                  // Editing an existing row: currency code is locked. Only multiplier/rate are editable.
+                  <Input value={formData.currencyCode} disabled />
+                ) : (
+                  <Select
+                    value={formData.currencyCode}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev, currencyCode: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SELECTABLE_CURRENCIES.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                          {c.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  GBP is the storefront currency for studiosara.uk. Only configurable currencies are listed.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>Multiplier (e.g., 2, 1.2)</Label>
