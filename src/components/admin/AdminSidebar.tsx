@@ -17,7 +17,8 @@ import {
   ShoppingBag,
   CreditCard,
   Percent,
-  Activity
+  Activity,
+  Wrench
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
@@ -70,14 +71,19 @@ const adminMenuItems = [
     label: 'Business Config', 
     path: '/admin-sara/business-config' 
   },
-  { 
-    icon: CreditCard, 
-    label: 'Payment Settings', 
-    path: '/admin-sara/payment-config' 
+  {
+    icon: CreditCard,
+    label: 'Payment Settings',
+    path: '/admin-sara/payment-config'
   },
-  { 
-    icon: Percent, 
-    label: 'Currency Multipliers', 
+  {
+    icon: Wrench,
+    label: 'Maintenance',
+    path: '/admin-sara/maintenance'
+  },
+  {
+    icon: Percent,
+    label: 'Currency Multipliers',
     path: '/admin-sara/currency-multipliers' 
   },
   { 

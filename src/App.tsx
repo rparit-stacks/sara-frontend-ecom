@@ -59,6 +59,7 @@ import AdminOrders from "./pages/admin/AdminOrders";
 import AdminOrderDetail from "./pages/admin/AdminOrderDetail";
 import AdminBusinessConfig from "./pages/admin/AdminBusinessConfig";
 import AdminPaymentConfig from "./pages/admin/AdminPaymentConfig";
+import AdminMaintenance from "./pages/admin/AdminMaintenance";
 import AdminCurrencyMultipliers from "./pages/admin/AdminCurrencyMultipliers";
 import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
 import AdminLogs from "./pages/admin/AdminLogs";
@@ -290,6 +291,14 @@ const App = () => (
             element={
               <ProtectedAdminRoute>
                 <AdminPaymentConfig />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/maintenance"
+            element={
+              <ProtectedAdminRoute>
+                <AdminMaintenance />
               </ProtectedAdminRoute>
             }
           />
