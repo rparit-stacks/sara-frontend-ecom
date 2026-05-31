@@ -1384,41 +1384,6 @@ export const logsApi = {
   },
 };
 
-// ===============================
-// Maintenance subscription API (super-admin gated)
-// ===============================
-export const subscriptionApi = {
-  // -> { maintenanceFreeUntil, complimentaryActive, paidActive, coverageActive, paidUntil,
-  //      monthlyPrice, currency, productTitle, lastSyncedAt, stale }
-  getMaintenanceStatus: () =>
-    fetchApi<any>('/api/admin/subscription/maintenance/status'),
-  // -> { razorpay: boolean, cashfree: boolean }
-  getPaymentProviders: () =>
-    fetchApi<{ razorpay: boolean; cashfree: boolean }>('/api/admin/subscription/payment-providers'),
-  // recent rows for the history table
-  getHistory: () => fetchApi<any[]>('/api/admin/subscription/history'),
-  // -> { subscriptionId, paymentProvider, razorpayOrderId, razorpayKeyId,
-  //      cashfreeOrderId, cashfreePaymentSessionId, cashfreeEnv, amount, currency, free? }
-  initiateMaintenance: (paymentProvider?: string) =>
-    fetchApi<any>('/api/admin/subscription/maintenance/initiate', {
-      method: 'POST',
-      body: JSON.stringify({ paymentProvider }),
-    }),
-  // -> activated subscription. Provider-aware: send razorpay fields OR cashfree fields.
-  verify: (data: {
-    subscriptionId: string;
-    paymentProvider?: string;
-    razorpayOrderId?: string;
-    razorpayPaymentId?: string;
-    razorpaySignature?: string;
-    cashfreeOrderId?: string;
-  }) =>
-    fetchApi<any>('/api/admin/subscription/verify', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-};
-
 export default {
   products: productsApi,
   plainProducts: plainProductsApi,
@@ -1442,5 +1407,4 @@ export default {
   currency: currencyApi,
   payment: paymentApi,
   logs: logsApi,
-  subscription: subscriptionApi,
 };
