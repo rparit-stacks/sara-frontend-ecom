@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ProductFormDialog from '@/components/admin/ProductFormDialog';
+import { AiCreateButton } from '@/components/admin/AiCreateButton';
 import { PlainProduct } from '@/components/admin/PlainProductSelector';
 import { ProductType } from '@/components/admin/ProductTypeSelector';
 import {
@@ -504,6 +505,7 @@ const AdminProducts = () => {
                 {exportMutation.isPending ? 'Exporting...' : 'Export Excel'}
               </Button>
             </motion.div>
+            <AiCreateButton />
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button className="btn-primary gap-2" onClick={() => setIsAddDialogOpen(true)}>
                 <Plus className="w-4 h-4" />

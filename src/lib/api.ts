@@ -29,11 +29,19 @@ const setGlobalLoading = (loading: boolean, message?: string) => {
 // Helper function for API calls
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   // Check if it's an admin route – use adminToken ONLY for admin routes
+  const isSuperAdminRoute = endpoint.startsWith('/api/super-admin');
   const isAdminRoute = endpoint.startsWith('/api/admin');
   const adminToken = localStorage.getItem('adminToken');
   const authToken = localStorage.getItem('authToken');
-  // User endpoints (profile, orders, cart, wishlist) must use authToken. Admin endpoints use adminToken.
-  const token = isAdminRoute ? (adminToken || authToken) : authToken;
+  const superAdminToken = localStorage.getItem('superAdminToken');
+  // OTP request/verify are pre-login (no token); everything else super-admin (incl. /auth/me) needs the token.
+  const isSuperAdminPreLogin = endpoint.startsWith('/api/super-admin/auth/otp/');
+  // User endpoints use authToken; admin endpoints use adminToken; super-admin uses superAdminToken.
+  const token = isSuperAdminRoute
+    ? (isSuperAdminPreLogin ? null : superAdminToken)
+    : isAdminRoute
+      ? (adminToken || authToken)
+      : authToken;
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -993,15 +1001,12 @@ export const businessConfigApi = {
 export const paymentConfigApi = {
   getConfig: () => fetchApi<any>('/api/admin/payment-config'),
   getConfigWithSecrets: () => fetchApi<any>('/api/admin/payment-config/with-secrets'),
-  updateConfig: (data: any) => fetchApi<any>('/api/admin/payment-config', { 
-    method: 'PUT', 
-    body: JSON.stringify(data) 
+  updateConfig: (data: any) => fetchApi<any>('/api/admin/payment-config', {
+    method: 'PUT',
+    body: JSON.stringify(data)
   }),
 };
 
-// ===============================
-// WhatsApp API
-// ===============================
 export const whatsappApi = {
   // Template names (DB; fallback to application.properties)
   getTemplateConfig: () => fetchApi<{ key: string; templateName: string; source: string }[]>('/api/admin/whatsapp/template-config'),
@@ -1408,3 +1413,219 @@ export default {
   payment: paymentApi,
   logs: logsApi,
 };
+
+// ===== Ported from Stancore: subscription / super-admin / AI product APIs =====
+export const subscriptionApi = {
+  // { active, unlockedGateways: string[], endDate, lastSyncedAt }
+  getStatus: () => fetchApi<any>('/api/admin/subscription/status'),
+  // picker cards from super-admin: [{ code, title, description, sortOrder, checkoutFlow }]
+  getProducts: () => fetchApi<any[]>('/api/admin/subscription/products'),
+  // recent rows: id, duration, serviceCount, selectedGateways, amount, currency, status, startDate, endDate, createdAt
+  getHistory: () => fetchApi<any[]>('/api/admin/subscription/history'),
+  // pricing matrix rows: [{ duration, serviceCount, price, currency, active }]
+  getPlans: () => fetchApi<any[]>('/api/admin/subscription/plans'),
+  // -> { razorpay: boolean, cashfree: boolean } — which billing providers super-admin enabled
+  getPaymentProviders: () =>
+    fetchApi<{ razorpay: boolean; cashfree: boolean }>('/api/admin/subscription/payment-providers'),
+  // -> { subscriptionId, paymentProvider, razorpayOrderId, razorpayKeyId,
+  //      cashfreeOrderId, cashfreePaymentSessionId, cashfreeEnv, amount, currency, serviceCount, free? }
+  // When `free` is true, subscription is already active; no checkout.
+  initiate: (data: { duration: string; selectedGateways: string[]; paymentProvider?: string }) =>
+    fetchApi<any>('/api/admin/subscription/initiate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  // -> activated subscription. Provider-aware: send razorpay fields OR cashfree fields.
+  verify: (data: {
+    subscriptionId: string;
+    paymentProvider?: string;
+    razorpayOrderId?: string;
+    razorpayPaymentId?: string;
+    razorpaySignature?: string;
+    cashfreeOrderId?: string;
+  }) =>
+    fetchApi<any>('/api/admin/subscription/verify', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  initiateMaintenance: (paymentProvider?: string) =>
+    fetchApi<any>('/api/admin/subscription/maintenance/initiate', {
+      method: 'POST',
+      body: JSON.stringify({ paymentProvider }),
+    }),
+
+  // ---- Manual (QR + screenshot + super-admin approval) flow ----
+  // -> { manual, subscriptionId, paymentId, upiLink, qrDataUri, amount, currency, upiConfigured }
+  initiateManual: (data: {
+    type: 'PAYMENT_GATEWAY' | 'MAINTENANCE' | 'AI_CREDITS';
+    duration?: string;
+    selectedGateways?: string[];
+    maintenancePlan?: 'STANDARD' | 'PREMIUM';
+    aiCreditPlanId?: number;
+  }) =>
+    fetchApi<any>('/api/admin/subscription/initiate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  submitScreenshot: (subscriptionId: number, data: { transactionScreenshotUrl?: string; transactionRef?: string }) =>
+    fetchApi<any>(`/api/admin/subscription/${subscriptionId}/screenshot`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  // Razorpay auto-checkout (amount already includes surcharge):
+  // -> { subscriptionId, razorpayOrderId, razorpayKeyId, amount, currency, baseAmount, surchargePercent }
+  initiateRazorpay: (data: {
+    type: 'PAYMENT_GATEWAY' | 'MAINTENANCE' | 'AI_CREDITS';
+    duration?: string;
+    selectedGateways?: string[];
+    maintenancePlan?: 'STANDARD' | 'PREMIUM';
+    aiCreditPlanId?: number;
+  }) =>
+    fetchApi<any>('/api/admin/subscription/razorpay/initiate', { method: 'POST', body: JSON.stringify(data) }),
+  verifyRazorpay: (data: {
+    subscriptionId: number;
+    razorpayOrderId: string;
+    razorpayPaymentId: string;
+    razorpaySignature: string;
+  }) => fetchApi<any>('/api/admin/subscription/razorpay/verify', { method: 'POST', body: JSON.stringify(data) }),
+  // WhatsApp is an enquiry (no payment): submit the form -> { enquiry, subscriptionId }
+  submitWhatsappEnquiry: (data: {
+    whatsappNumber: string;
+    whatsappBrand?: string;
+    whatsappUseCase?: string;
+    whatsappVolume?: string;
+  }) =>
+    fetchApi<any>('/api/admin/subscription/initiate', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'WHATSAPP', ...data }),
+    }),
+};
+
+// ===============================
+// AI Product Creation (Gemini, backend-driven)
+// ===============================
+export const aiProductApi = {
+  status: () =>
+    fetchApi<{ configured: boolean; credits: number; plans: any[] }>('/api/admin/ai/status'),
+  creditPlans: () => fetchApi<any[]>('/api/admin/ai/credit-plans'),
+  // IP-based one-time spotlight: has this IP seen the "new feature" highlight?
+  spotlightSeen: () => fetchApi<{ seen: boolean; configured: boolean }>('/api/admin/ai/spotlight-seen'),
+  markSpotlightSeen: () => fetchApi<{ seen: boolean }>('/api/admin/ai/spotlight-seen', { method: 'POST' }),
+  // messages: [{ role: 'user'|'assistant', content, imageUrls? }], categories: [{id,name}]
+  chat: (data: {
+    messages: Array<{ role: 'user' | 'assistant'; content: string; imageUrls?: string[] }>;
+    categories?: Array<{ id: number; name: string }>;
+  }) =>
+    fetchApi<{
+      assistantMessage: string;
+      options?: Array<{ label: string; value: string }>;
+      inputMode?: 'options' | 'text' | 'number' | 'upload';
+      inputField?: 'price' | 'variantPrice' | 'hsn' | 'gst' | string;
+      inputDefault?: string;
+      expectsImage: boolean;
+      ready: boolean;
+      draftProduct: any | null;
+      summary: string | null;
+    }>('/api/admin/ai/product-chat', { method: 'POST', body: JSON.stringify(data) }),
+  // create the confirmed draft (a ProductRequest) -> returns the created ProductDto
+  create: (draftProduct: any) =>
+    fetchApi<any>('/api/admin/ai/product-create', { method: 'POST', body: JSON.stringify(draftProduct) }),
+};
+
+// ===============================
+// Super Admin API (OTP login + master controls)
+// ===============================
+export const superAdminAuthApi = {
+  requestOtp: (email: string) =>
+    fetchApi<{ message: string }>('/api/super-admin/auth/otp/request', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  verifyOtp: (email: string, otp: string) =>
+    fetchApi<{ token: string; email: string; name: string }>('/api/super-admin/auth/otp/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    }),
+  getCurrent: () => fetchApi<{ email: string; name: string }>('/api/super-admin/auth/me'),
+};
+
+export const superAdminApi = {
+  // filter: 'pending' | 'active' | 'expired' | undefined (all)
+  listSubscriptions: (filter?: string) =>
+    fetchApi<any[]>(`/api/super-admin/subscriptions${filter ? `?filter=${filter}` : ''}`),
+  getSubscription: (id: number) => fetchApi<any>(`/api/super-admin/subscriptions/${id}`),
+  history: () => fetchApi<any[]>('/api/super-admin/history'),
+  stores: () => fetchApi<any[]>('/api/super-admin/stores'),
+
+  // Approvals
+  approve: (id: number, data: { days?: number; endDate?: string; lifetime?: boolean; notes?: string }) =>
+    fetchApi<any>(`/api/super-admin/subscriptions/${id}/approve`, { method: 'POST', body: JSON.stringify(data) }),
+  reject: (id: number) =>
+    fetchApi<any>(`/api/super-admin/subscriptions/${id}/reject`, { method: 'POST' }),
+
+  // Lifecycle
+  activate: (id: number) => fetchApi<any>(`/api/super-admin/subscriptions/${id}/activate`, { method: 'POST' }),
+  suspend: (id: number) => fetchApi<any>(`/api/super-admin/subscriptions/${id}/suspend`, { method: 'POST' }),
+  deactivate: (id: number) => fetchApi<any>(`/api/super-admin/subscriptions/${id}/deactivate`, { method: 'POST' }),
+  renew: (id: number, data: { days?: number; endDate?: string; lifetime?: boolean; notes?: string }) =>
+    fetchApi<any>(`/api/super-admin/subscriptions/${id}/renew`, { method: 'POST', body: JSON.stringify(data) }),
+  extend: (id: number, data: { days?: number; endDate?: string; lifetime?: boolean }) =>
+    fetchApi<any>(`/api/super-admin/subscriptions/${id}/extend`, { method: 'POST', body: JSON.stringify(data) }),
+  reduce: (id: number, data: { days?: number; endDate?: string }) =>
+    fetchApi<any>(`/api/super-admin/subscriptions/${id}/reduce`, { method: 'POST', body: JSON.stringify(data) }),
+
+  // Grants (free / promotional / lifetime / custom)
+  grant: (data: {
+    type: 'PAYMENT_GATEWAY' | 'MAINTENANCE';
+    grantType: 'FREE' | 'PROMOTIONAL' | 'LIFETIME';
+    selectedGateways?: string[];
+    maintenancePlan?: 'STANDARD' | 'PREMIUM';
+    days?: number;
+    endDate?: string;
+    offerLabel?: string;
+    notes?: string;
+  }) => fetchApi<any>('/api/super-admin/grants', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Pricing matrix
+  listPrices: () => fetchApi<any[]>('/api/super-admin/prices'),
+  upsertPrice: (data: { serviceCount: number; duration: string; price: number; currency?: string; active?: boolean }) =>
+    fetchApi<any>('/api/super-admin/prices', { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Settings
+  getSettings: () => fetchApi<any>('/api/super-admin/settings'),
+  updateSettings: (data: any) => fetchApi<any>('/api/super-admin/settings', { method: 'PUT', body: JSON.stringify(data) }),
+
+  // AI credit plans (5/10/20 packs)
+  listAiCreditPlans: () => fetchApi<any[]>('/api/super-admin/ai-credit-plans'),
+  upsertAiCreditPlan: (data: {
+    id?: number;
+    label?: string;
+    credits?: number;
+    pricePerProduct?: number;
+    totalPrice?: number;
+    active?: boolean;
+    sortOrder?: number;
+  }) => fetchApi<any>('/api/super-admin/ai-credit-plans', { method: 'PUT', body: JSON.stringify(data) }),
+  deleteAiCreditPlan: (id: number) =>
+    fetchApi<any>(`/api/super-admin/ai-credit-plans/${id}`, { method: 'DELETE' }),
+  aiCreditBalance: () => fetchApi<{ balance: number }>('/api/super-admin/ai-credits/balance'),
+  // Grant free AI credits to the store without any purchase.
+  grantAiCredits: (credits: number) =>
+    fetchApi<{ granted: number; balance: number }>('/api/super-admin/ai-credits/grant', {
+      method: 'POST',
+      body: JSON.stringify({ credits }),
+    }),
+  // Forfeit ALL AI credits (set balance to 0).
+  forfeitAiCredits: () =>
+    fetchApi<{ balance: number }>('/api/super-admin/ai-credits/forfeit', { method: 'POST' }),
+  // Set the AI credit balance to an exact value.
+  setAiCredits: (value: number) =>
+    fetchApi<{ balance: number }>('/api/super-admin/ai-credits/set', {
+      method: 'POST',
+      body: JSON.stringify({ value }),
+    }),
+};
+
+// ===============================
+// WhatsApp API
+// ===============================

@@ -17,108 +17,72 @@ import {
   ShoppingBag,
   CreditCard,
   Percent,
-  Activity
+  Activity,
+  ClipboardList,
+  Wrench
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const adminMenuItems = [
-  { 
-    icon: LayoutDashboard, 
-    label: 'Dashboard', 
-    path: '/admin-sara' 
-  },
-  { 
-    icon: Package, 
-    label: 'Products', 
-    path: '/admin-sara/products' 
-  },
-  { 
-    icon: FileText, 
-    label: 'CMS', 
-    path: '/admin-sara/cms' 
-  },
-  { 
-    icon: FileText, 
-    label: 'Blog', 
-    path: '/admin-sara/blog' 
-  },
-  { 
-    icon: FileText, 
-    label: 'Homepage Blogs', 
-    path: '/admin-sara/homepage-blogs' 
-  },
-  { 
-    icon: HelpCircle, 
-    label: 'FAQ', 
-    path: '/admin-sara/faq' 
-  },
-  { 
-    icon: FolderTree, 
-    label: 'Categories', 
-    path: '/admin-sara/categories' 
-  },
-  { 
-    icon: Settings, 
-    label: 'Custom Config', 
-    path: '/admin-sara/custom-config' 
-  },
-  { 
-    icon: Settings, 
-    label: 'Business Config', 
-    path: '/admin-sara/business-config' 
+// Sidebar grouped into sections, each with a heading.
+const adminMenuSections = [
+  {
+    title: 'Overview',
+    items: [
+      { icon: LayoutDashboard, label: 'Dashboard', path: '/admin-sara' },
+    ],
   },
   {
-    icon: CreditCard,
-    label: 'Payment Settings',
-    path: '/admin-sara/payment-config'
+    title: 'Catalog',
+    items: [
+      { icon: Package, label: 'Products', path: '/admin-sara/products' },
+      { icon: FolderTree, label: 'Categories', path: '/admin-sara/categories' },
+      { icon: Tag, label: 'Coupons', path: '/admin-sara/coupons' },
+    ],
   },
   {
-    icon: Percent,
-    label: 'Currency Multipliers',
-    path: '/admin-sara/currency-multipliers' 
+    title: 'Sales',
+    items: [
+      { icon: ShoppingBag, label: 'Orders', path: '/admin-sara/orders' },
+      { icon: Truck, label: 'Shipping', path: '/admin-sara/shipping' },
+      { icon: Users, label: 'Users', path: '/admin-sara/users' },
+    ],
   },
-  { 
-    icon: Users, 
-    label: 'Users', 
-    path: '/admin-sara/users' 
+  {
+    title: 'Content',
+    items: [
+      { icon: FileText, label: 'CMS', path: '/admin-sara/cms' },
+      { icon: FileText, label: 'Blog', path: '/admin-sara/blog' },
+      { icon: FileText, label: 'Homepage Blogs', path: '/admin-sara/homepage-blogs' },
+      { icon: HelpCircle, label: 'FAQ', path: '/admin-sara/faq' },
+    ],
   },
-  { 
-    icon: Shield, 
-    label: 'Admins', 
-    path: '/admin-sara/admins' 
+  {
+    title: 'Subscriptions',
+    items: [
+      { icon: ClipboardList, label: 'Subscriptions', path: '/admin-sara/subscriptions' },
+      { icon: Wrench, label: 'Maintenance', path: '/admin-sara/subscriptions/maintenance' },
+    ],
   },
-  { 
-    icon: Tag, 
-    label: 'Coupons', 
-    path: '/admin-sara/coupons' 
+  {
+    title: 'Communication',
+    items: [
+      { icon: MessageSquare, label: 'WhatsApp', path: '/admin-sara/whatsapp' },
+      { icon: MessageSquare, label: 'Contact Submissions', path: '/admin-sara/contact-submissions' },
+    ],
   },
-  { 
-    icon: ShoppingBag, 
-    label: 'Orders', 
-    path: '/admin-sara/orders' 
-  },
-  { 
-    icon: Truck, 
-    label: 'Shipping', 
-    path: '/admin-sara/shipping' 
-  },
-  { 
-    icon: MessageSquare, 
-    label: 'WhatsApp', 
-    path: '/admin-sara/whatsapp' 
-  },
-  { 
-    icon: MessageSquare, 
-    label: 'Contact Submissions', 
-    path: '/admin-sara/contact-submissions' 
-  },
-  { 
-    icon: Activity, 
-    label: 'Logs', 
-    path: '/admin-sara/logs' 
+  {
+    title: 'Settings',
+    items: [
+      { icon: Settings, label: 'Custom Config', path: '/admin-sara/custom-config' },
+      { icon: Settings, label: 'Business Config', path: '/admin-sara/business-config' },
+      { icon: CreditCard, label: 'Payment Settings', path: '/admin-sara/payment-config' },
+      { icon: Percent, label: 'Currency Multipliers', path: '/admin-sara/currency-multipliers' },
+      { icon: Shield, label: 'Admins', path: '/admin-sara/admins' },
+      { icon: Activity, label: 'Logs', path: '/admin-sara/logs' },
+    ],
   },
 ];
 
@@ -220,50 +184,57 @@ export const AdminSidebar = () => {
             </Link>
           </motion.div>
 
-          {/* Menu Items */}
-          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-            {adminMenuItems.map((item, index) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path || 
-                (item.path !== '/admin-sara' && location.pathname.startsWith(item.path));
-              
-              return (
-                <motion.div
-                  key={item.path}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05, duration: 0.3 }}
-                >
-                  <Link
-                    to={item.path}
-                    onClick={() => setIsMobileOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 relative",
-                      isActive
-                        ? "text-white shadow-md"
-                        : "text-foreground hover:bg-secondary hover:text-primary"
-                    )}
-                  >
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeTab"
-                        className="absolute inset-0 bg-primary rounded-lg -z-10"
-                        initial={false}
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                      />
-                    )}
+          {/* Menu Items — grouped into sections */}
+          <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
+            {adminMenuSections.map((section, sectionIndex) => (
+              <div key={section.title} className="space-y-1">
+                <p className="px-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                  {section.title}
+                </p>
+                {section.items.map((item, index) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path ||
+                    (item.path !== '/admin-sara' && location.pathname.startsWith(item.path));
+
+                  return (
                     <motion.div
-                      whileHover={{ scale: 1.1, rotate: 5 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="relative z-10"
+                      key={item.path}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: (sectionIndex * 0.04) + (index * 0.03), duration: 0.3 }}
                     >
-                      <Icon className="w-5 h-5" />
+                      <Link
+                        to={item.path}
+                        onClick={() => setIsMobileOpen(false)}
+                        className={cn(
+                          "flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 relative",
+                          isActive
+                            ? "text-white shadow-md"
+                            : "text-foreground hover:bg-secondary hover:text-primary"
+                        )}
+                      >
+                        {isActive && (
+                          <motion.div
+                            layoutId="activeTab"
+                            className="absolute inset-0 bg-primary rounded-lg -z-10"
+                            initial={false}
+                            transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                          />
+                        )}
+                        <motion.div
+                          whileHover={{ scale: 1.1, rotate: 5 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="relative z-10"
+                        >
+                          <Icon className="w-5 h-5" />
+                        </motion.div>
+                        <span className="font-medium relative z-10">{item.label}</span>
+                      </Link>
                     </motion.div>
-                    <span className="font-medium relative z-10">{item.label}</span>
-                  </Link>
-                </motion.div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            ))}
           </nav>
 
           {/* Logout */}

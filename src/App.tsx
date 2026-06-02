@@ -63,6 +63,18 @@ import AdminCurrencyMultipliers from "./pages/admin/AdminCurrencyMultipliers";
 import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
 import AdminLogs from "./pages/admin/AdminLogs";
 import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
+import { WhatsAppLockGate } from "./components/admin/WhatsAppLockGate";
+import SubscriptionOverview from "./pages/admin/SubscriptionOverview";
+import SubscriptionMaintenance from "./pages/admin/SubscriptionMaintenance";
+import ProtectedSuperAdminRoute from "./components/superadmin/ProtectedSuperAdminRoute";
+import SuperAdminLogin from "./pages/superadmin/SuperAdminLogin";
+import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
+import SuperAdminApprovals from "./pages/superadmin/SuperAdminApprovals";
+import SuperAdminEnquiries from "./pages/superadmin/SuperAdminEnquiries";
+import SuperAdminSubscriptions from "./pages/superadmin/SuperAdminSubscriptions";
+import SuperAdminGrants from "./pages/superadmin/SuperAdminGrants";
+import SuperAdminPricing from "./pages/superadmin/SuperAdminPricing";
+import SuperAdminSettings from "./pages/superadmin/SuperAdminSettings";
 
 const queryClient = new QueryClient();
 
@@ -133,8 +145,24 @@ const App = () => (
               </ProtectedAdminRoute>
             }
           />
-          <Route 
-            path="/admin-sara/fabrics" 
+          <Route
+            path="/admin-sara/subscriptions"
+            element={
+              <ProtectedAdminRoute>
+                <SubscriptionOverview />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/subscriptions/maintenance"
+            element={
+              <ProtectedAdminRoute>
+                <SubscriptionMaintenance />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/fabrics"
             element={
               <ProtectedAdminRoute>
                 <AdminFabrics />
@@ -305,7 +333,9 @@ const App = () => (
             path="/admin-sara/whatsapp"
             element={
               <ProtectedAdminRoute>
-                <AdminWhatsApp />
+                <WhatsAppLockGate>
+                  <AdminWhatsApp />
+                </WhatsAppLockGate>
               </ProtectedAdminRoute>
             }
           />
@@ -318,6 +348,16 @@ const App = () => (
             }
           />
           
+          {/* Super Admin */}
+          <Route path="/super-admin/login" element={<SuperAdminLogin />} />
+          <Route path="/super-admin" element={<ProtectedSuperAdminRoute><SuperAdminDashboard /></ProtectedSuperAdminRoute>} />
+          <Route path="/super-admin/approvals" element={<ProtectedSuperAdminRoute><SuperAdminApprovals /></ProtectedSuperAdminRoute>} />
+          <Route path="/super-admin/enquiries" element={<ProtectedSuperAdminRoute><SuperAdminEnquiries /></ProtectedSuperAdminRoute>} />
+          <Route path="/super-admin/subscriptions" element={<ProtectedSuperAdminRoute><SuperAdminSubscriptions /></ProtectedSuperAdminRoute>} />
+          <Route path="/super-admin/grants" element={<ProtectedSuperAdminRoute><SuperAdminGrants /></ProtectedSuperAdminRoute>} />
+          <Route path="/super-admin/pricing" element={<ProtectedSuperAdminRoute><SuperAdminPricing /></ProtectedSuperAdminRoute>} />
+          <Route path="/super-admin/settings" element={<ProtectedSuperAdminRoute><SuperAdminSettings /></ProtectedSuperAdminRoute>} />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
