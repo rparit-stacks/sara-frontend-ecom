@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { SITE_UNDER_MAINTENANCE } from "@/siteMaintenance";
+import Maintenance from "@/pages/Maintenance";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { LoadingProvider } from "@/context/LoadingContext";
 import ScrollToTop from "./components/ScrollToTop";
@@ -78,7 +80,10 @@ import SuperAdminSettings from "./pages/superadmin/SuperAdminSettings";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () =>
+  SITE_UNDER_MAINTENANCE ? (
+    <Maintenance />
+  ) : (
   <QueryClientProvider client={queryClient}>
     <CurrencyProvider>
     <LoadingProvider>
@@ -365,6 +370,6 @@ const App = () => (
     </LoadingProvider>
     </CurrencyProvider>
   </QueryClientProvider>
-);
+  );
 
 export default App;
