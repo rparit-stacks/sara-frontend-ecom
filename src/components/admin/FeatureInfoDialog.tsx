@@ -50,7 +50,7 @@ const loop = (duration: number, delay = 0) => ({
 });
 
 /** A small animated visual per feature so the popup actually *shows* how it works. */
-function FeatureAnimation({ anim }: { anim: FeatureAnim }) {
+export function FeatureAnimation({ anim }: { anim: FeatureAnim }) {
   switch (anim) {
     case 'product-listing':
       return (
