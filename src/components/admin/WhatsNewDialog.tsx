@@ -12,7 +12,7 @@ import type { FeatureAnim } from '@/lib/planFeatures';
 // "Don't show again" will see the tour once more for the new version.
 const WHATS_NEW_VERSION = '2026-06-1';
 const DISMISS_KEY = 'adminWhatsNewDismissedVersion';   // persistent: "Don't show again"
-const SESSION_KEY = 'adminWhatsNewShownSession';        // per session: auto-show once
+const SEEN_LOGIN_KEY = 'adminWhatsNewSeenLoginTime';    // shown once per login session
 
 interface Step {
   anim?: FeatureAnim;        // live demo animation (reused from the feature popups)
@@ -79,14 +79,24 @@ export function WhatsNewDialog() {
 
   useEffect(() => {
     let dismissed = '';
-    let shownThisSession = false;
+    let loginTime = '';
+    let seenForLogin = '';
     try {
       dismissed = localStorage.getItem(DISMISS_KEY) || '';
-      shownThisSession = sessionStorage.getItem(SESSION_KEY) === WHATS_NEW_VERSION;
+      loginTime = localStorage.getItem('adminLoginTime') || '';
+      seenForLogin = localStorage.getItem(SEEN_LOGIN_KEY) || '';
     } catch { /* ignore */ }
-    if (dismissed !== WHATS_NEW_VERSION && !shownThisSession) {
+
+    // Permanently dismissed for this version → never show.
+    if (dismissed === WHATS_NEW_VERSION) return;
+
+    // Show once per login: only if we haven't already shown it for THIS login
+    // session (so route changes within a session don't re-pop, but a fresh
+    // login does). The seen key stores "<loginTime>:<version>".
+    const seenTag = `${loginTime}:${WHATS_NEW_VERSION}`;
+    if (seenForLogin !== seenTag) {
       setOpen(true);
-      try { sessionStorage.setItem(SESSION_KEY, WHATS_NEW_VERSION); } catch { /* ignore */ }
+      try { localStorage.setItem(SEEN_LOGIN_KEY, seenTag); } catch { /* ignore */ }
     }
   }, []);
 
