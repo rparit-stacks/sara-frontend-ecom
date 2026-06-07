@@ -198,7 +198,7 @@ export const PLAN_FEATURES: PlanFeature[] = [
       'Photos stay protected and consistent',
       'No Photoshop, no manual work',
     ],
-    values: { SPARK: false, IGNITE: false, ORBIT: true },
+    values: { SPARK: false, IGNITE: true, ORBIT: true },
   },
   {
     key: 'storage',
@@ -228,7 +228,7 @@ export const PLAN_FEATURES: PlanFeature[] = [
       'Get a branded shareable link or QR',
       'Customer pays, you get notified instantly',
     ],
-    values: { SPARK: false, IGNITE: false, ORBIT: true },
+    values: { SPARK: false, IGNITE: true, ORBIT: true },
   },
   {
     key: 'chatbot',
