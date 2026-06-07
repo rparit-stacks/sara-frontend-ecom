@@ -30,8 +30,8 @@ export interface MaintBilling {
 
 export const MAINT_BILLING: MaintBilling[] = [
   { months: 3, label: '3 months', discountPercent: 0 },
-  { months: 6, label: '6 months', discountPercent: 5, badge: 'Save 5%' },
-  { months: 12, label: '12 months', discountPercent: 10, badge: 'Save 10%' },
+  { months: 6, label: '6 months', discountPercent: 0 },
+  { months: 12, label: '12 months', discountPercent: 0 },
 ];
 
 /** Base monthly rate = annual ÷ 12 (e.g. ₹100000 → ₹8,333/mo). */

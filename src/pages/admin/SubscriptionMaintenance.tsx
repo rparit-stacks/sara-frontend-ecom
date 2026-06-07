@@ -52,10 +52,10 @@ const SubscriptionMaintenance = () => {
     Number((b === 'IGNITE' ? s.maintenanceIgniteAnnual : s.maintenanceOrbitAnnual) ?? MAINT_ANNUAL_BASE[b]);
   const monthlyBase = (b: MaintBase) => Math.round(annualBase(b) / 12);
 
-  // Live discounts (6m / 12m); 3m is always full price.
+  // Live discounts (6m / 12m); default 0 — no maintenance discount.
   const discountFor = (m: number): number =>
-    m === 12 ? Number(s.maintenance12mDiscountPercent ?? 10)
-    : m === 6 ? Number(s.maintenance6mDiscountPercent ?? 5)
+    m === 12 ? Number(s.maintenance12mDiscountPercent ?? 0)
+    : m === 6 ? Number(s.maintenance6mDiscountPercent ?? 0)
     : 0;
 
   const billing = MAINT_BILLING.find((b) => b.months === months) ?? MAINT_BILLING[2];
