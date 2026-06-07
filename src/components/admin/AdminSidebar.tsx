@@ -22,7 +22,7 @@ import {
   Wrench,
   Sparkles
 } from 'lucide-react';
-import { Lock, ChevronLeft } from 'lucide-react';
+import { Lock, ChevronLeft, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -108,6 +108,33 @@ export const AdminSidebar = () => {
   const [collapsed, , toggleCollapsed] = useSidebarCollapsed();
   // Collapse only applies on desktop; mobile drawer is always full-width.
   const isCollapsed = collapsed && isDesktop;
+
+  // Which section is the active route in — that one stays open by default.
+  const activeSectionTitle = adminMenuSections.find((s) =>
+    s.items.some((it) => it.path === location.pathname ||
+      (it.path !== '/admin-sara' && location.pathname.startsWith(it.path))),
+  )?.title;
+
+  // Collapsed sections (accordion). Persisted; "Premium Features" starts folded.
+  const [closedSections, setClosedSections] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('adminSidebarClosedSections');
+      if (saved) return new Set(JSON.parse(saved));
+    } catch { /* ignore */ }
+    return new Set(['Premium Features']);
+  });
+
+  const isSectionOpen = (title: string) =>
+    title === activeSectionTitle || !closedSections.has(title);
+
+  const toggleSection = (title: string) => {
+    setClosedSections((prev) => {
+      const next = new Set(prev);
+      next.has(title) ? next.delete(title) : next.add(title);
+      try { localStorage.setItem('adminSidebarClosedSections', JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   const handleLogout = () => {
     console.log('[Admin Logout] Logging out...');
@@ -210,16 +237,23 @@ export const AdminSidebar = () => {
 
           {/* Menu Items — grouped into sections */}
           <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
-            {adminMenuSections.map((section, sectionIndex) => (
+            {adminMenuSections.map((section, sectionIndex) => {
+              const open = isCollapsed || isSectionOpen(section.title);
+              return (
               <div key={section.title} className="space-y-1">
                 {isCollapsed ? (
                   <div className="mx-2 mb-1 border-t border-border/60" />
                 ) : (
-                  <p className="px-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(section.title)}
+                    className="flex w-full items-center justify-between px-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 transition-colors hover:text-foreground"
+                  >
                     {section.title}
-                  </p>
+                    <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !open && "-rotate-90")} />
+                  </button>
                 )}
-                {section.items.map((item, index) => {
+                {open && section.items.map((item, index) => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.path ||
                     (item.path !== '/admin-sara' && location.pathname.startsWith(item.path));
@@ -264,7 +298,8 @@ export const AdminSidebar = () => {
                   );
                 })}
               </div>
-            ))}
+              );
+            })}
           </nav>
 
           {/* Logout */}
