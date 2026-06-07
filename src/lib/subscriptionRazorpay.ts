@@ -28,6 +28,7 @@ export async function runSubscriptionRazorpay(
     duration?: string;
     selectedGateways?: string[];
     maintenancePlan?: 'STANDARD' | 'PREMIUM';
+    maintenanceBase?: 'ORBIT' | 'IGNITE';
     planTier?: 'SPARK' | 'IGNITE' | 'ORBIT';
     billingMonths?: number;
   },

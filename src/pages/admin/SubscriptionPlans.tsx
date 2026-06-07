@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Check, X, Info, CalendarClock, Sparkles, Loader2, CreditCard } from 'lucide-react';
+import { Check, X, Info, CalendarClock, Sparkles, Loader2, CreditCard, ShieldCheck, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { subscriptionApi } from '@/lib/api';
 import { runSubscriptionRazorpay } from '@/lib/subscriptionRazorpay';
@@ -21,6 +22,7 @@ import { FeatureInfoDialog } from '@/components/admin/FeatureInfoDialog';
 const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
 
 const SubscriptionPlans = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [billingMonths, setBillingMonths] = useState(6);
   const [selected, setSelected] = useState<PlanCode>('ORBIT');
@@ -99,6 +101,27 @@ const SubscriptionPlans = () => {
             <Info className="inline h-4 w-4 align-text-bottom text-rose-500" /> to see exactly how a feature works.
           </p>
         </div>
+
+        {/* Maintenance highlight — these AI plans are also bundled into Maintenance */}
+        {!s.maintenanceActive && (
+          <button
+            type="button"
+            onClick={() => navigate('/admin-sara/subscriptions/maintenance')}
+            className="group flex w-full items-center gap-3 rounded-2xl border border-violet-300 bg-gradient-to-r from-violet-50 to-white p-4 text-left transition-all hover:shadow-md dark:border-violet-900/40 dark:from-violet-950/20 dark:to-zinc-900"
+          >
+            <ShieldCheck className="h-7 w-7 shrink-0 text-violet-600" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-violet-900 dark:text-violet-100">
+                Not on a Maintenance plan? It already includes these AI plans.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Our Maintenance plan bundles the full <span className="font-semibold">🚀 Orbit</span> feature set, multi-server
+                hosting & done-for-you upkeep. <span className="font-medium text-violet-700 group-hover:underline dark:text-violet-300">Check Maintenance →</span>
+              </p>
+            </div>
+            <ArrowRight className="hidden h-5 w-5 shrink-0 text-violet-500 sm:block" />
+          </button>
+        )}
 
         {/* Billing toggle */}
         <div className="flex flex-col items-center gap-3">

@@ -1461,6 +1461,7 @@ export const subscriptionApi = {
     duration?: string;
     selectedGateways?: string[];
     maintenancePlan?: 'STANDARD' | 'PREMIUM';
+    maintenanceBase?: 'ORBIT' | 'IGNITE';
     aiCreditPlanId?: number;
     planTier?: 'SPARK' | 'IGNITE' | 'ORBIT';
     billingMonths?: number;
@@ -1481,6 +1482,7 @@ export const subscriptionApi = {
     duration?: string;
     selectedGateways?: string[];
     maintenancePlan?: 'STANDARD' | 'PREMIUM';
+    maintenanceBase?: 'ORBIT' | 'IGNITE';
     aiCreditPlanId?: number;
     planTier?: 'SPARK' | 'IGNITE' | 'ORBIT';
     billingMonths?: number;

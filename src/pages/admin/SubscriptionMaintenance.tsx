@@ -3,91 +3,38 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Check, X, ShieldCheck, CreditCard, CalendarClock, Wand2 } from 'lucide-react';
+import { Loader2, Check, ShieldCheck, CreditCard, CalendarClock, Rocket } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faScrewdriverWrench, faServer, faHeadset, faRocket } from '@fortawesome/free-solid-svg-icons';
 import { toast } from 'sonner';
 import { subscriptionApi } from '@/lib/api';
 import { QrPaymentDialog, QrOrder } from '@/components/admin/QrPaymentDialog';
 import { PaymentMethodChooser } from '@/components/admin/PaymentMethodChooser';
-import { MockupHighlight } from '@/components/admin/MockupHighlight';
 import { runSubscriptionRazorpay } from '@/lib/subscriptionRazorpay';
 import { cn } from '@/lib/utils';
+import {
+  MAINT_ANNUAL_BASE,
+  MAINT_BASE_CHOICES,
+  MAINT_BILLING,
+  MAINT_GROUPS,
+  type MaintBase,
+} from '@/lib/maintenancePlan';
 
-type Plan = 'STANDARD' | 'PREMIUM';
-
-// Comparison matrix — what each plan includes (feature + optional sub-text + badge).
-type Row = { feature: string; desc?: string; standard: boolean; premium: boolean; note?: string; group?: string };
-const FEATURE_MATRIX: Row[] = [
-  { feature: 'Bug Fixes', standard: true, premium: true },
-  { feature: 'Technical Support', standard: true, premium: true },
-  { feature: 'Security Updates', standard: true, premium: true },
-  { feature: 'Database Maintenance', standard: true, premium: true },
-  { feature: 'Backup Monitoring', standard: true, premium: true },
-  { feature: 'Performance Optimization', standard: true, premium: true },
-  { feature: 'VPS Renewal Included', standard: false, premium: true },
-  { feature: 'Server Monitoring (24×7)', standard: false, premium: true },
-  { feature: 'Priority Support', standard: false, premium: true },
-  { feature: 'Emergency Fixes', standard: false, premium: true },
-  { feature: 'Advanced Security', standard: false, premium: true },
-  { feature: 'Monthly Health Checks', standard: false, premium: true },
-
-  // Premium-only AI perks — the headline value.
-  {
-    feature: 'Razorpay payment gateway — FREE, forever',
-    desc: 'No gateway subscription fee for as long as your maintenance plan is active. Accept cards, UPI, netbanking & wallets at zero extra cost.',
-    standard: false, premium: true, group: 'ai',
-  },
-  {
-    feature: 'AI product listing — 10 free every month',
-    desc: 'Create up to 10 ready-to-sell products a month with the AI assistant — price, GST, variants & description done for you. Credits refresh monthly.',
-    standard: false, premium: true, group: 'ai',
-  },
-  {
-    feature: 'AI SEO optimisation — rank #1 everywhere',
-    desc: 'Get found first — not just on Google, but inside ChatGPT, Gemini and other AI search/browsers. We optimise titles, descriptions & metadata so your store leads your niche and your brand value compounds over time.',
-    standard: false, premium: true, group: 'ai',
-  },
-  {
-    feature: 'AI website fault-check',
-    desc: 'AI continuously scans your live store for broken pages, slow loads, checkout errors & SEO issues — and flags them before customers ever notice.',
-    standard: false, premium: true, group: 'ai',
-  },
-  {
-    feature: 'AI auto-watermark & branding',
-    desc: 'The moment you upload a product image, AI automatically stamps it with your company branding/watermark — so every photo is protected and on-brand, with zero manual editing.',
-    standard: false, premium: true, group: 'ai',
-  },
-  {
-    feature: 'AI mockup generator — 10 free / month',
-    desc: 'Just give a design + fabric name and get a studio-quality, on-brand product mockup in seconds. No designer, no Photoshop. 10 mockups every month.',
-    standard: false, premium: true, group: 'ai',
-  },
-  {
-    feature: 'AI social post generator',
-    desc: 'Turn any product into a ready-to-post Instagram/Facebook creative — catchy caption, smart hashtags and a styled image. Market your store daily without a social media team.',
-    standard: false, premium: true, group: 'ai',
-  },
-  {
-    feature: 'AI size & fit recommender',
-    desc: 'Buyers get the right size suggested from a few quick details — fewer wrong-size orders means far fewer returns and happier customers.',
-    standard: false, premium: true, group: 'ai',
-  },
-  {
-    feature: 'AI product editor',
-    desc: 'Edit any product just by chatting — bulk price changes, rewrites, restyling. Early beta access included.',
-    standard: false, premium: true, note: 'Beta soon', group: 'ai',
-  },
-  {
-    feature: 'AI store themes',
-    desc: 'Generate fresh, on-brand store themes with AI in seconds. Early beta access included.',
-    standard: false, premium: true, note: 'Beta soon', group: 'ai',
-  },
-];
+const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
+const SECTION_ICONS: Record<string, any> = {
+  'screwdriver-wrench': faScrewdriverWrench,
+  server: faServer,
+  headset: faHeadset,
+  rocket: faRocket,
+};
 
 const SubscriptionMaintenance = () => {
   const queryClient = useQueryClient();
-  const [plan, setPlan] = useState<Plan>('STANDARD');
+  const [base, setBase] = useState<MaintBase>('ORBIT');
+  const [months, setMonths] = useState(12);
   const [starting, setStarting] = useState(false);
+  const [payingRzp, setPayingRzp] = useState(false);
+  const [chooserOpen, setChooserOpen] = useState(false);
   const [order, setOrder] = useState<QrOrder | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -95,22 +42,37 @@ const SubscriptionMaintenance = () => {
     queryKey: ['subscription-status'],
     queryFn: () => subscriptionApi.getStatus(),
   });
-
   const s: any = status || {};
-  const standardPrice = Number(s.standardMaintenancePrice ?? 4999);
-  const premiumPrice = Number(s.premiumMaintenancePrice ?? 9999);
-  const price = plan === 'PREMIUM' ? premiumPrice : standardPrice;
+
   const razorpayEnabled: boolean = s.razorpayEnabled ?? false;
   const surcharge: number = Number(s.razorpaySurchargePercent ?? 2);
-  const razorpayTotal = Math.round(price * (1 + surcharge / 100));
-  const [payingRzp, setPayingRzp] = useState(false);
-  const [chooserOpen, setChooserOpen] = useState(false);
-  const [mockupOpen, setMockupOpen] = useState(false);
+
+  // Live annual base per choice; fall back to the static defaults.
+  const annualBase = (b: MaintBase): number =>
+    Number((b === 'IGNITE' ? s.maintenanceIgniteAnnual : s.maintenanceOrbitAnnual) ?? MAINT_ANNUAL_BASE[b]);
+  const monthlyBase = (b: MaintBase) => Math.round(annualBase(b) / 12);
+
+  // Live discounts (6m / 12m); 3m is always full price.
+  const discountFor = (m: number): number =>
+    m === 12 ? Number(s.maintenance12mDiscountPercent ?? 10)
+    : m === 6 ? Number(s.maintenance6mDiscountPercent ?? 5)
+    : 0;
+
+  const billing = MAINT_BILLING.find((b) => b.months === months) ?? MAINT_BILLING[2];
+  const discountPct = discountFor(billing.months);
+  const effMonthly = (b: MaintBase) => Math.round(monthlyBase(b) * (1 - discountPct / 100));
+  const packTotal = (b: MaintBase) => effMonthly(b) * billing.months;
+
+  const price = packTotal(base);
 
   const handleSubscribe = async () => {
     setStarting(true);
     try {
-      const res = await subscriptionApi.initiateManual({ type: 'MAINTENANCE', maintenancePlan: plan });
+      const res = await subscriptionApi.initiateManual({
+        type: 'MAINTENANCE',
+        maintenanceBase: base,
+        billingMonths: billing.months,
+      });
       setChooserOpen(false);
       setOrder(res as QrOrder);
       setDialogOpen(true);
@@ -124,10 +86,10 @@ const SubscriptionMaintenance = () => {
   const handleRazorpay = async () => {
     setPayingRzp(true);
     await runSubscriptionRazorpay(
-      { type: 'MAINTENANCE', maintenancePlan: plan },
+      { type: 'MAINTENANCE', maintenanceBase: base, billingMonths: billing.months },
       {
         onSuccess: () => {
-          toast.success('Maintenance subscription activated.');
+          toast.success('Maintenance plan activated.');
           queryClient.invalidateQueries({ queryKey: ['subscription-status'] });
           setPayingRzp(false);
           setChooserOpen(false);
@@ -148,162 +110,164 @@ const SubscriptionMaintenance = () => {
     );
   }
 
-  const perMonth = (annual: number) => Math.round(annual / 12);
-
-  // Small reusable column header (plan select + price + EMI).
-  const PlanHead = ({ title, annual, recommended }: { title: string; annual: number; recommended?: boolean }) => {
-    const k: Plan = title.includes('Premium') ? 'PREMIUM' : 'STANDARD';
-    const selected = plan === k;
-    return (
-      <button
-        type="button"
-        onClick={() => setPlan(k)}
-        className={cn(
-          // Inner padding + top accent bar instead of a ring, so nothing clips inside the scroll container.
-          'relative flex w-full flex-col items-center px-3 pb-4 pt-5 text-center transition-colors',
-          selected ? 'bg-rose-50 dark:bg-rose-950/30' : 'hover:bg-muted/40',
-        )}
-      >
-        {selected && <span className="absolute inset-x-0 top-0 h-1 bg-rose-500" />}
-        <div className="flex flex-wrap items-center justify-center gap-1.5">
-          <span className="font-bold">{title}</span>
-          {recommended && <Badge className="bg-rose-600 text-[9px] hover:bg-rose-600">Best value</Badge>}
-        </div>
-        <p className="mt-1 text-xl font-bold sm:text-2xl">
-          ₹{perMonth(annual).toLocaleString('en-IN')}
-          <span className="text-xs font-normal text-muted-foreground">/mo</span>
-        </p>
-        <p className="text-[11px] text-muted-foreground">₹{annual.toLocaleString('en-IN')} / year</p>
-        <span
-          className={cn(
-            'mt-2 inline-flex h-5 w-5 items-center justify-center rounded-full border-2',
-            selected ? 'border-rose-500 bg-rose-500 text-white' : 'border-muted-foreground/30',
-          )}
-        >
-          {selected && <Check className="h-3 w-3" />}
-        </span>
-      </button>
-    );
-  };
-
   return (
     <AdminLayout>
-      <div className="mx-auto max-w-3xl space-y-6 p-6">
+      <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+        {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold">Website Maintenance</h1>
+          <h1 className="text-3xl font-bold">Maintenance Plan</h1>
           <p className="text-muted-foreground">
-            Keep your store fast, secure and always-on. Pick a plan — compare what each includes below.
+            Fully managed, done-for-you maintenance + multi-server hosting — with the entire{' '}
+            <span className="font-semibold text-foreground">Orbit plan included</span>.
           </p>
         </div>
 
-        {/* EMI highlight banner */}
-        <div className="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/40 dark:bg-rose-950/20">
-          <CalendarClock className="h-6 w-6 shrink-0 text-rose-600" />
-          <p className="text-sm text-rose-900 dark:text-rose-100">
-            <span className="font-bold">12-month EMI available</span> — pay as low as{' '}
-            <span className="font-bold">₹{perMonth(standardPrice).toLocaleString('en-IN')}/month</span>. Billed annually;
-            convert to no-cost / low-cost EMI at checkout with Razorpay.
+        {/* Headline value banner */}
+        <div className="flex flex-col gap-3 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-white p-5 dark:border-violet-900/40 dark:from-violet-950/20 dark:to-zinc-900 sm:flex-row sm:items-center">
+          <Rocket className="h-8 w-8 shrink-0 text-violet-600" />
+          <p className="text-sm text-violet-900 dark:text-violet-100">
+            <span className="font-bold">Everything in 🚀 Orbit is included</span> — all 13 AI features at full Orbit
+            credits, free Razorpay gateway, multi-server hosting and 24×7 monitoring. One plan, fully managed.
           </p>
         </div>
-
-        {/* AI Mockup generator highlight — click to see how it works */}
-        <button
-          type="button"
-          onClick={() => setMockupOpen(true)}
-          className="group flex w-full items-center gap-4 overflow-hidden rounded-xl border border-rose-300 bg-gradient-to-r from-rose-50 to-white p-4 text-left transition-all hover:shadow-md dark:border-rose-900/40 dark:from-rose-950/30 dark:to-zinc-900"
-        >
-          <div className="flex shrink-0 items-center gap-1.5">
-            <img src="/bg_vectors/design.png" alt="" className="h-14 w-14 rounded-lg bg-white object-contain p-1 ring-1 ring-black/10" />
-            <span className="text-lg font-bold text-rose-500">+</span>
-            <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-rose-600 ring-1 ring-black/10">cotton</span>
-            <span className="text-lg font-bold text-rose-500">=</span>
-            <img src="/bg_vectors/mockup.png" alt="" className="h-14 w-14 rounded-lg bg-white object-contain p-0.5 ring-2 ring-rose-400" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-1.5 text-sm font-bold">
-              <Wand2 className="h-4 w-4 text-rose-600" /> New: AI Mockup Generator
-              <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">Premium</span>
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Design + fabric name → branded mockup in seconds. 10 free/month. <span className="font-medium text-rose-600 group-hover:underline">See how it works →</span>
-            </p>
-          </div>
-        </button>
 
         {s.maintenanceActive && (
           <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/30 dark:bg-green-950/20">
             <ShieldCheck className="h-5 w-5 text-green-600" />
-            <p className="text-sm text-green-800 dark:text-green-400">
-              Maintenance is active{s.maintenancePlan ? ` · ${s.maintenancePlan}` : ''}.
-            </p>
+            <p className="text-sm text-green-800 dark:text-green-400">Maintenance is active.</p>
           </div>
         )}
 
-        {/* Comparison table — horizontally scrollable on small screens so nothing gets cut */}
-        <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-          <div className="min-w-[520px]">
-            {/* Header */}
-            <div className="grid grid-cols-[minmax(0,1.6fr)_1fr_1fr] items-stretch border-b border-border">
-              <div className="flex items-end p-4 text-sm font-semibold text-muted-foreground">Compare plans</div>
-              <PlanHead title="Standard" annual={standardPrice} />
-              <PlanHead title="Premium" annual={premiumPrice} recommended />
-            </div>
-
-            {FEATURE_MATRIX.map((row, i) => {
-              const firstAi = row.group === 'ai' && FEATURE_MATRIX[i - 1]?.group !== 'ai';
+        {/* Feature base choice */}
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <p className="text-sm font-semibold">Choose your feature base</p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Either way you get <span className="font-medium text-foreground">Orbit-level value</span> — pick Ignite to
+            save a little.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {MAINT_BASE_CHOICES.map((c) => {
+              const sel = base === c.code;
+              const saving = annualBase('ORBIT') - annualBase(c.code);
               return (
-                <div key={row.feature}>
-                  {firstAi && (
-                    <div className="bg-rose-50 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
-                      ✨ AI perks — free with Premium
-                    </div>
+                <button
+                  key={c.code}
+                  type="button"
+                  onClick={() => setBase(c.code)}
+                  className={cn(
+                    'relative flex flex-col rounded-xl border p-4 text-left transition-all',
+                    sel ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-border hover:border-rose-300',
                   )}
-                  <div
-                    className={cn(
-                      'grid grid-cols-[minmax(0,1.6fr)_1fr_1fr] items-start text-sm',
-                      i % 2 === 1 && 'bg-muted/30',
-                    )}
-                  >
-                    <div className="px-4 py-2.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="break-words font-medium">{row.feature}</span>
-                        {row.note && (
-                          <span className="whitespace-nowrap rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-                            {row.note}
-                          </span>
-                        )}
-                      </div>
-                      {row.desc && <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{row.desc}</p>}
-                    </div>
-                    <div className={cn('flex justify-center py-2.5', plan === 'STANDARD' && 'bg-rose-50/60 dark:bg-rose-950/20')}>
-                      {row.standard ? <Check className="h-4 w-4 text-green-600" /> : <X className="h-4 w-4 text-muted-foreground/40" />}
-                    </div>
-                    <div className={cn('flex justify-center py-2.5', plan === 'PREMIUM' && 'bg-rose-50/60 dark:bg-rose-950/20')}>
-                      {row.premium ? <Check className="h-4 w-4 text-green-600" /> : <X className="h-4 w-4 text-muted-foreground/40" />}
-                    </div>
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold">{c.emoji} {c.label}</span>
+                    <span className={cn('flex h-5 w-5 items-center justify-center rounded-full border-2',
+                      sel ? 'border-rose-500 bg-rose-500 text-white' : 'border-muted-foreground/30')}>
+                      {sel && <Check className="h-3 w-3" />}
+                    </span>
                   </div>
-                </div>
+                  <span className="mt-1 text-xs text-muted-foreground">{c.note}</span>
+                  <span className="mt-2 text-sm font-semibold">
+                    {inr(annualBase(c.code))}<span className="font-normal text-muted-foreground">/year base</span>
+                  </span>
+                  {saving > 0 && (
+                    <span className="mt-1 text-[11px] font-semibold text-emerald-600">Save {inr(saving)} / year</span>
+                  )}
+                </button>
               );
             })}
           </div>
         </div>
 
+        {/* Billing pack toggle */}
+        <div className="flex flex-col items-center gap-3">
+          <div className="inline-flex rounded-full border border-border bg-card p-1">
+            {MAINT_BILLING.map((b) => (
+              <button
+                key={b.months}
+                type="button"
+                onClick={() => setMonths(b.months)}
+                className={cn(
+                  'rounded-full px-5 py-2 text-sm font-semibold transition-colors',
+                  months === b.months ? 'bg-rose-600 text-white shadow' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {b.label}
+                {discountFor(b.months) > 0 && (
+                  <span className={cn('ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold',
+                    months === b.months ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700')}>
+                    Save {discountFor(b.months)}%
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CalendarClock className="h-3.5 w-3.5 text-rose-500" />
+            Price shown per month · billed as a {billing.months}-month pack · EMI available on Razorpay
+          </p>
+        </div>
+
+        {/* Price summary cards (both choices, side by side) */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {MAINT_BASE_CHOICES.map((c) => (
+            <div
+              key={c.code}
+              className={cn('rounded-2xl border p-5', base === c.code ? 'border-rose-500 shadow' : 'border-border')}
+            >
+              <p className="text-sm font-semibold">{c.emoji} {c.label} base</p>
+              <p className="mt-1 text-3xl font-bold">
+                {inr(effMonthly(c.code))}<span className="text-sm font-normal text-muted-foreground">/mo</span>
+              </p>
+              {discountPct > 0 && <p className="text-xs text-muted-foreground line-through">{inr(monthlyBase(c.code))}/mo</p>}
+              <p className="mt-1 text-xs text-muted-foreground">{inr(packTotal(c.code))} for {billing.months} months</p>
+            </div>
+          ))}
+        </div>
+
+        {/* What's included */}
+        <div className="space-y-4">
+          {MAINT_GROUPS.map((g) => (
+            <div key={g.title} className="rounded-2xl border border-border bg-card p-5">
+              <h2 className="flex items-center gap-2 text-lg font-semibold">
+                <FontAwesomeIcon icon={SECTION_ICONS[g.icon] ?? faServer} className="h-4 w-4 text-rose-500" />
+                {g.title}
+              </h2>
+              <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+                {g.items.map((it) => (
+                  <div key={it.label} className="flex items-start gap-2.5">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                    <div>
+                      <p className="text-sm font-medium">{it.label}</p>
+                      {it.desc && <p className="text-xs text-muted-foreground">{it.desc}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
         {/* Selected + pay */}
         <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm text-muted-foreground">Selected: <span className="font-medium text-foreground">{plan === 'PREMIUM' ? 'Premium' : 'Standard'}</span></p>
-            <p className="text-3xl font-bold">
-              ₹{perMonth(price).toLocaleString('en-IN')}<span className="text-sm font-normal text-muted-foreground">/month</span>
+            <p className="text-sm text-muted-foreground">
+              Selected: <span className="font-medium text-foreground">
+                {MAINT_BASE_CHOICES.find((c) => c.code === base)?.emoji} {base === 'IGNITE' ? 'Ignite' : 'Orbit'} base · {billing.months} months
+              </span>
             </p>
-            <p className="text-xs text-muted-foreground">₹{price.toLocaleString('en-IN')} billed annually · 12-month EMI</p>
+            <p className="text-3xl font-bold">
+              {inr(effMonthly(base))}<span className="text-sm font-normal text-muted-foreground">/month</span>
+            </p>
+            <p className="text-xs text-muted-foreground">{inr(price)} billed for {billing.months} months · EMI on Razorpay</p>
           </div>
           <Button
             size="lg"
-            className="min-w-[180px] bg-gradient-to-tr from-rose-600 to-red-600"
+            className="min-w-[200px] bg-gradient-to-tr from-rose-600 to-red-600"
             disabled={starting || payingRzp}
             onClick={() => setChooserOpen(true)}
           >
-            <CreditCard className="mr-2 h-4 w-4" /> Subscribe
+            <CreditCard className="mr-2 h-4 w-4" /> Subscribe — {inr(price)}
           </Button>
         </div>
       </div>
@@ -325,8 +289,6 @@ const SubscriptionMaintenance = () => {
         onOpenChange={setDialogOpen}
         onSubmitted={() => queryClient.invalidateQueries({ queryKey: ['subscription-status'] })}
       />
-
-      <MockupHighlight open={mockupOpen} onOpenChange={setMockupOpen} />
     </AdminLayout>
   );
 };
