@@ -68,6 +68,7 @@ import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
 import { WhatsAppLockGate } from "./components/admin/WhatsAppLockGate";
 import SubscriptionOverview from "./pages/admin/SubscriptionOverview";
 import SubscriptionMaintenance from "./pages/admin/SubscriptionMaintenance";
+import SubscriptionPlans from "./pages/admin/SubscriptionPlans";
 import ProtectedSuperAdminRoute from "./components/superadmin/ProtectedSuperAdminRoute";
 import SuperAdminLogin from "./pages/superadmin/SuperAdminLogin";
 import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
@@ -163,6 +164,14 @@ const App = () =>
             element={
               <ProtectedAdminRoute>
                 <SubscriptionMaintenance />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/subscriptions/plans"
+            element={
+              <ProtectedAdminRoute>
+                <SubscriptionPlans />
               </ProtectedAdminRoute>
             }
           />

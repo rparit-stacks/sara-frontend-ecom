@@ -24,10 +24,12 @@ function loadRazorpayScript(): Promise<boolean> {
  */
 export async function runSubscriptionRazorpay(
   payload: {
-    type: 'PAYMENT_GATEWAY' | 'MAINTENANCE';
+    type: 'PAYMENT_GATEWAY' | 'MAINTENANCE' | 'PLAN_TIER';
     duration?: string;
     selectedGateways?: string[];
     maintenancePlan?: 'STANDARD' | 'PREMIUM';
+    planTier?: 'SPARK' | 'IGNITE' | 'ORBIT';
+    billingMonths?: number;
   },
   opts: { onSuccess: () => void; onError: (msg: string) => void; onDismiss?: () => void },
 ): Promise<void> {
@@ -53,7 +55,12 @@ export async function runSubscriptionRazorpay(
     amount: Math.round(Number(order.amount) * 100),
     currency: order.currency || 'INR',
     name: BRAND_NAME,
-    description: payload.type === 'MAINTENANCE' ? 'Maintenance subscription' : 'Payment gateway subscription',
+    description:
+      payload.type === 'MAINTENANCE'
+        ? 'Maintenance subscription'
+        : payload.type === 'PLAN_TIER'
+          ? `${payload.planTier ?? ''} plan subscription`
+          : 'Payment gateway subscription',
     order_id: order.razorpayOrderId,
     handler: async (response: any) => {
       try {

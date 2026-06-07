@@ -19,7 +19,8 @@ import {
   Percent,
   Activity,
   ClipboardList,
-  Wrench
+  Wrench,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
@@ -63,6 +64,7 @@ const adminMenuSections = [
     title: 'Subscriptions',
     items: [
       { icon: ClipboardList, label: 'Subscriptions', path: '/admin-sara/subscriptions' },
+      { icon: Sparkles, label: 'Plans', path: '/admin-sara/subscriptions/plans' },
       { icon: Wrench, label: 'Maintenance', path: '/admin-sara/subscriptions/maintenance' },
     ],
   },

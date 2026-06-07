@@ -1457,11 +1457,13 @@ export const subscriptionApi = {
   // ---- Manual (QR + screenshot + super-admin approval) flow ----
   // -> { manual, subscriptionId, paymentId, upiLink, qrDataUri, amount, currency, upiConfigured }
   initiateManual: (data: {
-    type: 'PAYMENT_GATEWAY' | 'MAINTENANCE' | 'AI_CREDITS';
+    type: 'PAYMENT_GATEWAY' | 'MAINTENANCE' | 'AI_CREDITS' | 'PLAN_TIER';
     duration?: string;
     selectedGateways?: string[];
     maintenancePlan?: 'STANDARD' | 'PREMIUM';
     aiCreditPlanId?: number;
+    planTier?: 'SPARK' | 'IGNITE' | 'ORBIT';
+    billingMonths?: number;
   }) =>
     fetchApi<any>('/api/admin/subscription/initiate', {
       method: 'POST',
@@ -1475,11 +1477,13 @@ export const subscriptionApi = {
   // Razorpay auto-checkout (amount already includes surcharge):
   // -> { subscriptionId, razorpayOrderId, razorpayKeyId, amount, currency, baseAmount, surchargePercent }
   initiateRazorpay: (data: {
-    type: 'PAYMENT_GATEWAY' | 'MAINTENANCE' | 'AI_CREDITS';
+    type: 'PAYMENT_GATEWAY' | 'MAINTENANCE' | 'AI_CREDITS' | 'PLAN_TIER';
     duration?: string;
     selectedGateways?: string[];
     maintenancePlan?: 'STANDARD' | 'PREMIUM';
     aiCreditPlanId?: number;
+    planTier?: 'SPARK' | 'IGNITE' | 'ORBIT';
+    billingMonths?: number;
   }) =>
     fetchApi<any>('/api/admin/subscription/razorpay/initiate', { method: 'POST', body: JSON.stringify(data) }),
   verifyRazorpay: (data: {
