@@ -22,10 +22,12 @@ import {
   Wrench,
   Sparkles
 } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PLAN_FEATURES } from '@/lib/planFeatures';
 
 // Sidebar grouped into sections, each with a heading.
 const adminMenuSections = [
@@ -85,6 +87,15 @@ const adminMenuSections = [
       { icon: Shield, label: 'Admins', path: '/admin-sara/admins' },
       { icon: Activity, label: 'Logs', path: '/admin-sara/logs' },
     ],
+  },
+  // Premium Features — one preview page per feature (locked until a plan unlocks it).
+  {
+    title: 'Premium Features',
+    items: PLAN_FEATURES.map((f) => ({
+      icon: Lock,
+      label: f.label,
+      path: `/admin-sara/premium/${f.key}`,
+    })),
   },
 ];
 

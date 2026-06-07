@@ -108,7 +108,7 @@ export const PLAN_FEATURES: PlanFeature[] = [
       'Edit anything you like, then publish',
       'Credits refresh every month',
     ],
-    values: { SPARK: '50/mo', IGNITE: '150/mo', ORBIT: '300/mo' },
+    values: { SPARK: '10/mo', IGNITE: '35/mo', ORBIT: '50/mo' },
   },
   {
     key: 'mockup',
@@ -138,7 +138,7 @@ export const PLAN_FEATURES: PlanFeature[] = [
       'Tweak the tone if you want',
       'Post to Instagram / Facebook',
     ],
-    values: { SPARK: '50/mo', IGNITE: '150/mo', ORBIT: '300/mo' },
+    values: { SPARK: '10/mo', IGNITE: '35/mo', ORBIT: '50/mo' },
   },
   {
     key: 'cart-recovery',
@@ -198,7 +198,7 @@ export const PLAN_FEATURES: PlanFeature[] = [
       'Photos stay protected and consistent',
       'No Photoshop, no manual work',
     ],
-    values: { SPARK: false, IGNITE: true, ORBIT: true },
+    values: { SPARK: false, IGNITE: false, ORBIT: true },
   },
   {
     key: 'storage',
@@ -213,7 +213,7 @@ export const PLAN_FEATURES: PlanFeature[] = [
       'Reuse a design on any product or order',
       'Storage scales with your plan',
     ],
-    values: { SPARK: false, IGNITE: '25 GB', ORBIT: '50 GB' },
+    values: { SPARK: false, IGNITE: '10 GB', ORBIT: '50 GB' },
   },
   {
     key: 'payment-link',
@@ -228,7 +228,7 @@ export const PLAN_FEATURES: PlanFeature[] = [
       'Get a branded shareable link or QR',
       'Customer pays, you get notified instantly',
     ],
-    values: { SPARK: false, IGNITE: true, ORBIT: true },
+    values: { SPARK: false, IGNITE: false, ORBIT: true },
   },
   {
     key: 'chatbot',
@@ -243,7 +243,7 @@ export const PLAN_FEATURES: PlanFeature[] = [
       'Bot handles common questions instantly',
       'Hands off to you when needed',
     ],
-    values: { SPARK: false, IGNITE: true, ORBIT: true },
+    values: { SPARK: false, IGNITE: false, ORBIT: true },
   },
   {
     key: 'size-fit',
@@ -258,7 +258,7 @@ export const PLAN_FEATURES: PlanFeature[] = [
       'Confidence shown so they trust it',
       'Wrong-size returns drop',
     ],
-    values: { SPARK: false, IGNITE: true, ORBIT: true },
+    values: { SPARK: false, IGNITE: false, ORBIT: true },
   },
   {
     key: 'product-editor',
