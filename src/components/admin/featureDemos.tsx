@@ -38,35 +38,71 @@ function LockBtn({ label, onClick, icon }: { label: string; onClick: () => void;
 function Tag({ children }: { children: React.ReactNode }) {
   return <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[11px] font-semibold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">{children}</span>;
 }
+function ChatBubble({ role, children }: { role: 'user' | 'assistant'; children: React.ReactNode }) {
+  return (
+    <div className={`flex gap-2.5 ${role === 'user' ? 'justify-end' : 'justify-start'}`}>
+      {role === 'assistant' && (
+        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-rose-500 to-red-600 text-white">
+          <FontAwesomeIcon icon={faRobot} className="h-3.5 w-3.5" />
+        </span>
+      )}
+      <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
+        role === 'user'
+          ? 'rounded-br-md bg-rose-600 text-white'
+          : 'rounded-bl-md bg-white text-zinc-900 ring-1 ring-black/[0.06] dark:bg-zinc-800 dark:text-zinc-100'
+      }`}>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 type DemoProps = { onLockedAction: () => void };
 
 // per-feature demos ---------------------------------------------------------
 export const FEATURE_DEMOS: Record<string, (p: DemoProps) => JSX.Element> = {
   'product-listing': ({ onLockedAction }) => (
-    <div className="grid gap-4 md:grid-cols-2">
-      <Panel>
-        <p className="mb-3 text-sm font-semibold">Create a product with AI</p>
-        <button onClick={onLockedAction} className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-8 text-muted-foreground hover:border-rose-300">
-          <FontAwesomeIcon icon={faUpload} className="h-6 w-6" />
-          <span className="text-sm">Drop a product photo</span>
-        </button>
-        <div className="mt-3"><FakeInput placeholder="…or describe the product" /></div>
-        <div className="mt-4"><LockBtn label="Generate listing" icon={faWandMagicSparkles} onClick={onLockedAction} /></div>
-      </Panel>
-      <Panel>
-        <p className="mb-3 text-sm font-semibold">AI draft <Tag>preview</Tag></p>
-        <div className="space-y-2 text-sm">
-          <FakeInput value="Handwoven Cotton Saree — Indigo" />
-          <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">A breathable handwoven cotton saree in deep indigo, finished with a contrast border…</div>
-          <div className="flex gap-2">
-            <div className="flex-1"><FakeInput value="₹2,499" /></div>
-            <div className="flex-1"><FakeInput value="GST 5%" /></div>
-          </div>
-          <div className="flex gap-1.5"><Tag>S</Tag><Tag>M</Tag><Tag>L</Tag><Tag>XL</Tag></div>
+    <Panel className="mx-auto max-w-xl !p-0 overflow-hidden">
+      {/* Chat header — matches the real AI product assistant */}
+      <header className="flex items-center gap-3 border-b border-black/[0.06] bg-white/70 px-5 py-3.5 dark:border-white/10 dark:bg-zinc-900/70">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-rose-500 to-red-600 text-white">
+          <FontAwesomeIcon icon={faWandMagicSparkles} className="h-4 w-4" />
+        </span>
+        <div>
+          <p className="text-sm font-semibold leading-none">AI product assistant</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Answers a few prompts → ready product</p>
         </div>
-      </Panel>
-    </div>
+      </header>
+
+      {/* Conversation */}
+      <div className="space-y-3.5 bg-gradient-to-b from-slate-50 via-white to-rose-50 px-5 py-4 dark:from-zinc-900 dark:via-zinc-900 dark:to-red-950/30">
+        <ChatBubble role="assistant">Hi! Let’s create your product. What are you selling?</ChatBubble>
+        <ChatBubble role="user">Handwoven cotton saree, indigo</ChatBubble>
+        <ChatBubble role="assistant">Lovely! I’ve drafted a title, description, price, GST and sizes — review below 👇</ChatBubble>
+
+        {/* AI draft card */}
+        <div className="ml-9 rounded-2xl bg-white p-3 text-sm shadow-sm ring-1 ring-black/[0.06] dark:bg-zinc-800">
+          <p className="font-semibold">Handwoven Cotton Saree — Indigo</p>
+          <p className="mt-1 text-xs text-muted-foreground">A breathable handwoven cotton saree in deep indigo with a contrast border…</p>
+          <div className="mt-2 flex flex-wrap gap-1.5"><Tag>₹2,499</Tag><Tag>GST 5%</Tag><Tag>S</Tag><Tag>M</Tag><Tag>L</Tag><Tag>XL</Tag></div>
+        </div>
+
+        {/* Option chips (inert) */}
+        <div className="flex flex-wrap gap-2 pl-9">
+          {['Publish', 'Edit price', 'Regenerate'].map((o) => (
+            <button key={o} onClick={onLockedAction} className="rounded-full bg-white px-4 py-2 text-sm font-medium text-zinc-800 shadow-sm ring-1 ring-black/[0.08] transition-all hover:-translate-y-0.5 hover:bg-rose-50 hover:text-rose-700 dark:bg-zinc-800 dark:text-zinc-100">
+              {o}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Composer */}
+      <div className="flex items-center gap-2 border-t border-black/[0.06] bg-white px-4 py-3 dark:border-white/10 dark:bg-zinc-900">
+        <div className="flex-1"><FakeInput placeholder="Type a message…" /></div>
+        <LockBtn label="Send" icon={faPaperPlane} onClick={onLockedAction} />
+      </div>
+    </Panel>
   ),
 
   mockup: ({ onLockedAction }) => (

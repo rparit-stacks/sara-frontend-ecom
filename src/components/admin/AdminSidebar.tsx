@@ -22,12 +22,13 @@ import {
   Wrench,
   Sparkles
 } from 'lucide-react';
-import { Lock } from 'lucide-react';
+import { Lock, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PLAN_FEATURES } from '@/lib/planFeatures';
+import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
 
 // Sidebar grouped into sections, each with a heading.
 const adminMenuSections = [
@@ -104,6 +105,9 @@ export const AdminSidebar = () => {
   const navigate = useNavigate();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [collapsed, , toggleCollapsed] = useSidebarCollapsed();
+  // Collapse only applies on desktop; mobile drawer is always full-width.
+  const isCollapsed = collapsed && isDesktop;
 
   const handleLogout = () => {
     console.log('[Admin Logout] Logging out...');
@@ -162,48 +166,59 @@ export const AdminSidebar = () => {
       <motion.aside
         initial={false}
         animate={{
-          x: isDesktop ? 0 : (isMobileOpen ? 0 : -256)
+          x: isDesktop ? 0 : (isMobileOpen ? 0 : -256),
+          width: isCollapsed ? 80 : 256,
         }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
         className={cn(
-          "fixed left-0 top-0 h-full bg-white border-r border-border z-40 w-64",
+          "fixed left-0 top-0 h-full bg-white border-r border-border z-40",
           "lg:translate-x-0"
         )}
+        style={{ width: isCollapsed ? 80 : 256 }}
       >
-        <div className="flex flex-col h-full w-64">
-          {/* Logo */}
+        <div className={cn("flex flex-col h-full", isCollapsed ? "w-20" : "w-64")}>
+          {/* Logo + collapse toggle */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="p-6 border-b border-border"
+            className={cn("relative border-b border-border", isCollapsed ? "p-4" : "p-6")}
           >
-            <Link to="/admin-sara" className="flex items-center">
-              <motion.span
-                whileHover={{ scale: 1.05 }}
-                className="font-cursive text-2xl font-bold"
-              >
-                <span className="text-primary">Studio</span>
-                <span className="text-foreground"> Sara</span>
-              </motion.span>
-              <motion.span
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2 }}
-                className="ml-2 text-xs text-muted-foreground bg-primary/10 px-2 py-1 rounded"
-              >
-                Admin
-              </motion.span>
+            <Link to="/admin-sara" className="flex items-center justify-center">
+              {isCollapsed ? (
+                <span className="font-cursive text-2xl font-bold text-primary">S</span>
+              ) : (
+                <>
+                  <motion.span whileHover={{ scale: 1.05 }} className="font-cursive text-2xl font-bold">
+                    <span className="text-primary">Studio</span>
+                    <span className="text-foreground"> Sara</span>
+                  </motion.span>
+                  <span className="ml-2 text-xs text-muted-foreground bg-primary/10 px-2 py-1 rounded">Admin</span>
+                </>
+              )}
             </Link>
+
+            {/* Desktop-only collapse/expand button */}
+            <button
+              onClick={toggleCollapsed}
+              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 h-6 w-6 items-center justify-center rounded-full border border-border bg-white text-muted-foreground shadow-sm transition hover:text-primary"
+            >
+              <ChevronLeft className={cn("h-4 w-4 transition-transform", isCollapsed && "rotate-180")} />
+            </button>
           </motion.div>
 
           {/* Menu Items — grouped into sections */}
           <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
             {adminMenuSections.map((section, sectionIndex) => (
               <div key={section.title} className="space-y-1">
-                <p className="px-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                  {section.title}
-                </p>
+                {isCollapsed ? (
+                  <div className="mx-2 mb-1 border-t border-border/60" />
+                ) : (
+                  <p className="px-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                    {section.title}
+                  </p>
+                )}
                 {section.items.map((item, index) => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.path ||
@@ -219,8 +234,10 @@ export const AdminSidebar = () => {
                       <Link
                         to={item.path}
                         onClick={() => setIsMobileOpen(false)}
+                        title={isCollapsed ? item.label : undefined}
                         className={cn(
-                          "flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 relative",
+                          "flex items-center gap-3 py-2.5 rounded-lg transition-all duration-200 relative",
+                          isCollapsed ? "justify-center px-0" : "px-4",
                           isActive
                             ? "text-white shadow-md"
                             : "text-foreground hover:bg-secondary hover:text-primary"
@@ -241,7 +258,7 @@ export const AdminSidebar = () => {
                         >
                           <Icon className="w-5 h-5" />
                         </motion.div>
-                        <span className="font-medium relative z-10">{item.label}</span>
+                        {!isCollapsed && <span className="font-medium relative z-10">{item.label}</span>}
                       </Link>
                     </motion.div>
                   );
@@ -259,7 +276,11 @@ export const AdminSidebar = () => {
           >
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
+              title={isCollapsed ? 'Logout' : undefined}
+              className={cn(
+                "w-full flex items-center gap-3 py-3 rounded-lg text-foreground hover:bg-destructive/10 hover:text-destructive transition-all",
+                isCollapsed ? "justify-center px-0" : "px-4"
+              )}
             >
               <motion.div
                 whileHover={{ x: -3 }}
@@ -267,7 +288,7 @@ export const AdminSidebar = () => {
               >
                 <LogOut className="w-5 h-5" />
               </motion.div>
-              <span className="font-medium">Logout</span>
+              {!isCollapsed && <span className="font-medium">Logout</span>}
             </button>
           </motion.div>
         </div>

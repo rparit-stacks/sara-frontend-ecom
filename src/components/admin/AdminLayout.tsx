@@ -2,6 +2,8 @@ import { ReactNode } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
+import { cn } from '@/lib/utils';
+import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -21,11 +23,12 @@ const pageTransition = {
 
 export const AdminLayout = ({ children }: AdminLayoutProps) => {
   const location = useLocation();
+  const [collapsed] = useSidebarCollapsed();
 
   return (
     <div className="min-h-screen flex w-full overflow-x-hidden bg-muted/30">
       <AdminSidebar />
-      <main className="flex-1 lg:ml-64 min-h-screen">
+      <main className={cn('flex-1 min-h-screen transition-[margin] duration-300', collapsed ? 'lg:ml-20' : 'lg:ml-64')}>
         <motion.div
           key={location.pathname}
           initial="initial"
