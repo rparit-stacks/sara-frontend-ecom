@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { AdminSidebar } from './AdminSidebar';
+import { WhatsNewDialog } from './WhatsNewDialog';
 import { motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
 
   return (
     <div className="min-h-screen flex w-full overflow-x-hidden bg-muted/30">
+      <WhatsNewDialog />
       <AdminSidebar />
       <main className={cn('flex-1 min-h-screen transition-[margin] duration-300', collapsed ? 'lg:ml-20' : 'lg:ml-64')}>
         <motion.div
