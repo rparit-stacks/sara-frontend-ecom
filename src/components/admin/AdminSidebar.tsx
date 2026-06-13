@@ -18,16 +18,13 @@ import {
   CreditCard,
   Percent,
   Activity,
-  ClipboardList,
   Wrench,
-  Sparkles
 } from 'lucide-react';
-import { Lock, ChevronLeft, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PLAN_FEATURES } from '@/lib/planFeatures';
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
 
 // Sidebar grouped into sections, each with a heading.
@@ -36,6 +33,7 @@ const adminMenuSections = [
     title: 'Overview',
     items: [
       { icon: LayoutDashboard, label: 'Dashboard', path: '/admin-sara' },
+      { icon: Wrench, label: 'Maintenance', path: '/admin-sara/maintenance' },
     ],
   },
   {
@@ -64,14 +62,6 @@ const adminMenuSections = [
     ],
   },
   {
-    title: 'Subscriptions',
-    items: [
-      { icon: ClipboardList, label: 'Subscriptions', path: '/admin-sara/subscriptions' },
-      { icon: Sparkles, label: 'Plans', path: '/admin-sara/subscriptions/plans' },
-      { icon: Wrench, label: 'Maintenance', path: '/admin-sara/subscriptions/maintenance' },
-    ],
-  },
-  {
     title: 'Communication',
     items: [
       { icon: MessageSquare, label: 'WhatsApp', path: '/admin-sara/whatsapp' },
@@ -88,15 +78,6 @@ const adminMenuSections = [
       { icon: Shield, label: 'Admins', path: '/admin-sara/admins' },
       { icon: Activity, label: 'Logs', path: '/admin-sara/logs' },
     ],
-  },
-  // Premium Features — one preview page per feature (locked until a plan unlocks it).
-  {
-    title: 'Premium Features',
-    items: PLAN_FEATURES.map((f) => ({
-      icon: Lock,
-      label: f.label,
-      path: `/admin-sara/premium/${f.key}`,
-    })),
   },
 ];
 
@@ -115,13 +96,13 @@ export const AdminSidebar = () => {
       (it.path !== '/admin-sara' && location.pathname.startsWith(it.path))),
   )?.title;
 
-  // Collapsed sections (accordion). Persisted; "Premium Features" starts folded.
+  // Collapsed sections (accordion). Persisted across reloads.
   const [closedSections, setClosedSections] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('adminSidebarClosedSections');
       if (saved) return new Set(JSON.parse(saved));
     } catch { /* ignore */ }
-    return new Set(['Premium Features']);
+    return new Set();
   });
 
   const isSectionOpen = (title: string) =>

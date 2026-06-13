@@ -65,20 +65,7 @@ import AdminCurrencyMultipliers from "./pages/admin/AdminCurrencyMultipliers";
 import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
 import AdminLogs from "./pages/admin/AdminLogs";
 import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
-import { WhatsAppLockGate } from "./components/admin/WhatsAppLockGate";
-import SubscriptionOverview from "./pages/admin/SubscriptionOverview";
-import SubscriptionMaintenance from "./pages/admin/SubscriptionMaintenance";
-import SubscriptionPlans from "./pages/admin/SubscriptionPlans";
-import PremiumFeaturePage from "./pages/admin/PremiumFeaturePage";
-import ProtectedSuperAdminRoute from "./components/superadmin/ProtectedSuperAdminRoute";
-import SuperAdminLogin from "./pages/superadmin/SuperAdminLogin";
-import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
-import SuperAdminApprovals from "./pages/superadmin/SuperAdminApprovals";
-import SuperAdminEnquiries from "./pages/superadmin/SuperAdminEnquiries";
-import SuperAdminSubscriptions from "./pages/superadmin/SuperAdminSubscriptions";
-import SuperAdminGrants from "./pages/superadmin/SuperAdminGrants";
-import SuperAdminPricing from "./pages/superadmin/SuperAdminPricing";
-import SuperAdminSettings from "./pages/superadmin/SuperAdminSettings";
+import MaintenancePlan from "./pages/admin/MaintenancePlan";
 
 const queryClient = new QueryClient();
 
@@ -153,34 +140,10 @@ const App = () =>
             }
           />
           <Route
-            path="/admin-sara/subscriptions"
+            path="/admin-sara/maintenance"
             element={
               <ProtectedAdminRoute>
-                <SubscriptionOverview />
-              </ProtectedAdminRoute>
-            }
-          />
-          <Route
-            path="/admin-sara/subscriptions/maintenance"
-            element={
-              <ProtectedAdminRoute>
-                <SubscriptionMaintenance />
-              </ProtectedAdminRoute>
-            }
-          />
-          <Route
-            path="/admin-sara/subscriptions/plans"
-            element={
-              <ProtectedAdminRoute>
-                <SubscriptionPlans />
-              </ProtectedAdminRoute>
-            }
-          />
-          <Route
-            path="/admin-sara/premium/:key"
-            element={
-              <ProtectedAdminRoute>
-                <PremiumFeaturePage />
+                <MaintenancePlan />
               </ProtectedAdminRoute>
             }
           />
@@ -356,9 +319,7 @@ const App = () =>
             path="/admin-sara/whatsapp"
             element={
               <ProtectedAdminRoute>
-                <WhatsAppLockGate>
-                  <AdminWhatsApp />
-                </WhatsAppLockGate>
+                <AdminWhatsApp />
               </ProtectedAdminRoute>
             }
           />
@@ -370,16 +331,6 @@ const App = () =>
               </ProtectedAdminRoute>
             }
           />
-          
-          {/* Super Admin */}
-          <Route path="/super-admin/login" element={<SuperAdminLogin />} />
-          <Route path="/super-admin" element={<ProtectedSuperAdminRoute><SuperAdminDashboard /></ProtectedSuperAdminRoute>} />
-          <Route path="/super-admin/approvals" element={<ProtectedSuperAdminRoute><SuperAdminApprovals /></ProtectedSuperAdminRoute>} />
-          <Route path="/super-admin/enquiries" element={<ProtectedSuperAdminRoute><SuperAdminEnquiries /></ProtectedSuperAdminRoute>} />
-          <Route path="/super-admin/subscriptions" element={<ProtectedSuperAdminRoute><SuperAdminSubscriptions /></ProtectedSuperAdminRoute>} />
-          <Route path="/super-admin/grants" element={<ProtectedSuperAdminRoute><SuperAdminGrants /></ProtectedSuperAdminRoute>} />
-          <Route path="/super-admin/pricing" element={<ProtectedSuperAdminRoute><SuperAdminPricing /></ProtectedSuperAdminRoute>} />
-          <Route path="/super-admin/settings" element={<ProtectedSuperAdminRoute><SuperAdminSettings /></ProtectedSuperAdminRoute>} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

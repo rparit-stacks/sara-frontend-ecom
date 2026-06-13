@@ -1,9 +1,7 @@
-import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
-import { toast } from 'sonner';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faWandMagicSparkles,
@@ -12,15 +10,10 @@ import {
   faImages,
   faReceipt,
   faLanguage,
-  faCheck,
   faCoins,
-  faClock,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
-import { aiProductApi, subscriptionApi } from '@/lib/api';
-import { PaymentMethodChooser } from '@/components/admin/PaymentMethodChooser';
-import { QrPaymentDialog, QrOrder } from '@/components/admin/QrPaymentDialog';
-import { runSubscriptionRazorpay } from '@/lib/subscriptionRazorpay';
+import { aiProductApi } from '@/lib/api';
 
 // Honest, but enthusiastically framed — every claim maps to something the AI actually does.
 const PERKS = [
@@ -40,71 +33,13 @@ export function AiIntroDialog({
   onOpenChange: (v: boolean) => void;
   onStart: () => void; // open the chat (called when credits available)
 }) {
-  const queryClient = useQueryClient();
-  const { data: status, isLoading } = useQuery({
+  const { data: status } = useQuery({
     queryKey: ['ai-status'],
     queryFn: () => aiProductApi.status(),
     enabled: open,
   });
 
   const credits = Number((status as any)?.credits ?? 0);
-  const plans: any[] = (status as any)?.plans ?? [];
-
-  const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
-  const [chooserOpen, setChooserOpen] = useState(false);
-  const [busy, setBusy] = useState<'qr' | 'razorpay' | null>(null);
-  const [qrOrder, setQrOrder] = useState<QrOrder | null>(null);
-  const [qrOpen, setQrOpen] = useState(false);
-
-  // fetch razorpay availability via subscription status (reuse)
-  const { data: subStatus } = useQuery({
-    queryKey: ['subscription-status'],
-    queryFn: () => subscriptionApi.getStatus(),
-    enabled: open,
-  });
-  const razorpayEnabled = (subStatus as any)?.razorpayEnabled ?? false;
-  const surcharge = Number((subStatus as any)?.razorpaySurchargePercent ?? 2);
-
-  const openBuy = (plan: any) => {
-    setSelectedPlan(plan);
-    setChooserOpen(true);
-  };
-
-  const buyQr = async () => {
-    if (!selectedPlan) return;
-    setBusy('qr');
-    try {
-      const res = await subscriptionApi.initiateManual({
-        type: 'AI_CREDITS',
-        aiCreditPlanId: selectedPlan.id,
-      });
-      setChooserOpen(false);
-      setQrOrder(res as QrOrder);
-      setQrOpen(true);
-    } catch (e: any) {
-      toast.error(e?.message || 'Could not start purchase');
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const buyRazorpay = async () => {
-    if (!selectedPlan) return;
-    setBusy('razorpay');
-    await runSubscriptionRazorpay(
-      { type: 'AI_CREDITS', aiCreditPlanId: selectedPlan.id } as any,
-      {
-        onSuccess: () => {
-          toast.success('Payment received! Credits will be added after super-admin approval.');
-          setBusy(null);
-          setChooserOpen(false);
-          queryClient.invalidateQueries({ queryKey: ['ai-status'] });
-        },
-        onError: (m) => { toast.error(m); setBusy(null); },
-        onDismiss: () => setBusy(null),
-      },
-    );
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -161,7 +96,7 @@ export function AiIntroDialog({
               ))}
             </div>
 
-            {/* If has credits: start. Else: plans */}
+            {/* If has credits: start. Else: a simple no-credits notice. */}
             {credits > 0 ? (
               <div className="mt-7 flex justify-center">
                 <Button
@@ -173,78 +108,16 @@ export function AiIntroDialog({
                 </Button>
               </div>
             ) : (
-              <div className="mt-7">
-                <div className="mb-3 text-center">
-                  <h3 className="text-lg font-bold">Pick a credit pack</h3>
-                  <p className="text-sm text-muted-foreground">1 credit = 1 product. Buy once, use anytime.</p>
-                </div>
-                {isLoading ? (
-                  <p className="text-center text-sm text-muted-foreground">Loading plans…</p>
-                ) : plans.length === 0 ? (
-                  <p className="text-center text-sm text-muted-foreground">No plans available right now. Please contact support.</p>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {plans.map((plan, i) => (
-                      <div
-                        key={plan.id}
-                        className={`relative flex flex-col rounded-2xl border p-5 ${
-                          i === 1 ? 'border-rose-400 bg-rose-50/50 shadow-md dark:bg-rose-950/20' : 'border-border bg-white/70 dark:bg-white/5'
-                        }`}
-                      >
-                        {i === 1 && (
-                          <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-rose-600 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                            Popular
-                          </span>
-                        )}
-                        <p className="text-sm font-semibold text-muted-foreground">{plan.label}</p>
-                        <p className="mt-1 text-3xl font-bold">{plan.credits}</p>
-                        <p className="text-xs text-muted-foreground">products</p>
-                        <div className="mt-3">
-                          <p className="text-xl font-bold">₹{Number(plan.totalPrice).toLocaleString('en-IN')}</p>
-                          <p className="text-xs text-muted-foreground">₹{Number(plan.pricePerProduct)}/product</p>
-                        </div>
-                        <Button
-                          className={`mt-4 w-full rounded-full ${i === 1 ? 'bg-gradient-to-tr from-rose-600 to-red-600' : ''}`}
-                          variant={i === 1 ? 'default' : 'outline'}
-                          onClick={() => openBuy(plan)}
-                        >
-                          Buy
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
-                  <FontAwesomeIcon icon={faClock} className="h-3 w-3" />
-                  After payment, the super admin approves it and your credits are added.
+              <div className="mt-7 rounded-2xl border border-dashed border-rose-300 bg-rose-50/60 p-5 text-center dark:border-rose-900 dark:bg-rose-950/20">
+                <p className="text-sm font-semibold">No AI credits available right now</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Credit top-ups are being set up — please contact the administrator to enable AI product creation.
                 </p>
               </div>
             )}
           </div>
         </div>
       </DialogContent>
-
-      {/* Buy: method chooser */}
-      {selectedPlan && (
-        <PaymentMethodChooser
-          open={chooserOpen}
-          onOpenChange={setChooserOpen}
-          basePrice={Number(selectedPlan.totalPrice)}
-          surcharge={surcharge}
-          razorpayEnabled={razorpayEnabled}
-          busy={busy}
-          onQr={buyQr}
-          onRazorpay={buyRazorpay}
-        />
-      )}
-
-      {/* QR pay dialog (then super-admin approval) */}
-      <QrPaymentDialog
-        order={qrOrder}
-        open={qrOpen}
-        onOpenChange={setQrOpen}
-        onSubmitted={() => queryClient.invalidateQueries({ queryKey: ['ai-status'] })}
-      />
     </Dialog>
   );
 }

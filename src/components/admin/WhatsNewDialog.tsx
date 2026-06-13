@@ -34,35 +34,19 @@ const STEPS: Step[] = [
     badge: 'New',
     title: 'AI Product Listing',
     text: 'Just chat — the assistant drafts the title, price, GST, variants and description. A ready-to-sell product in seconds.',
-    to: '/admin-sara/subscriptions/plans',
+    to: '/admin-sara/products',
   },
   {
     anim: 'social-post',
     badge: 'New',
     title: 'AI Social Post Generator',
     text: 'Turn any product into an Instagram / Facebook creative — styled image, caption and smart hashtags, instantly.',
-    to: '/admin-sara/subscriptions/plans',
   },
   {
     anim: 'cart-recovery',
     badge: 'New',
     title: 'AI Abandoned Cart Recovery',
     text: 'Customers who leave get an automatic WhatsApp/email nudge with a smart discount — recovered sales on autopilot.',
-    to: '/admin-sara/subscriptions/plans',
-  },
-  {
-    anim: 'payment-link',
-    badge: 'New',
-    title: 'Payment Collector Links',
-    text: 'Create branded UPI / Razorpay payment links and QR codes — collect money anywhere, under your own brand.',
-    to: '/admin-sara/subscriptions/plans',
-  },
-  {
-    anim: 'seo',
-    badge: 'New',
-    title: 'Maintenance plan — everything included',
-    text: 'One fully-managed plan: the entire 🚀 Orbit feature set + multi-server hosting + done-for-you upkeep.',
-    to: '/admin-sara/subscriptions/maintenance',
   },
 ];
 
