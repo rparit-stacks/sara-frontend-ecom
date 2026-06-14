@@ -16,8 +16,8 @@ export interface BillingOption {
 }
 
 export const BILLING_OPTIONS: BillingOption[] = [
-  { key: 'sixMonth', months: 6, total: 39999, perMonth: 6666, label: '6 Months' },
-  { key: 'twelveMonth', months: 12, total: 59999, perMonth: 5000, label: '12 Months', badge: 'Best value' },
+  { key: 'sixMonth', months: 6, total: 44999, perMonth: 7500, label: '6 Months' },
+  { key: 'twelveMonth', months: 12, total: 71999, perMonth: 6000, label: '12 Months', badge: 'Best value' },
 ];
 
 /** Every AI feature carries the same monthly credit allowance on this plan. */
@@ -29,6 +29,21 @@ export const AI_CREDITS_PER_MONTH = 20;
 export type AiFeature = PlanFeature & { value: string };
 
 export const AI_FEATURES: AiFeature[] = [
+  {
+    key: 'advanced-analytics',
+    label: 'Advanced Analytics Dashboard',
+    icon: 'chart-line',
+    anim: 'fault-check',
+    value: 'Included',
+    short: 'A live, 3D-powered command centre — sales, customers, products & traffic at a glance.',
+    how: 'Unlock a full advanced dashboard on top of your store: real-time revenue trends, a 3D customer globe, top products, conversion funnel, cart abandonment, coupon ROI, sales heatmaps and 15+ more widgets — all driven by your live data.',
+    steps: [
+      'Switch to the Advanced dashboard in one click',
+      'See sales, orders, visitors & revenue trends live',
+      'Drill into top products, categories & customer geography',
+      'Track conversion, cart abandonment & coupon performance',
+    ],
+  },
   {
     key: 'product-listing',
     label: 'AI Product Listing',

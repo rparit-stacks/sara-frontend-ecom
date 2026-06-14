@@ -1,12 +1,29 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState, lazy, Suspense } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Package, Palette, Image, Users, Activity, TrendingUp, ShoppingBag, Loader2, IndianRupee, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { dashboardApi } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
+import { DashboardModeToggle, DashboardMode } from '@/components/admin/analytics/DashboardModeToggle';
+
+// Lazy-load the 3D dashboard so the heavy Three.js bundle is only fetched
+// when the user actually switches to Advanced mode.
+const AdvancedDashboard = lazy(() =>
+  import('@/components/admin/analytics/AdvancedDashboard').then((m) => ({ default: m.AdvancedDashboard }))
+);
+
+const DASHBOARD_MODE_KEY = 'sara_dashboard_mode';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const [mode, setMode] = useState<DashboardMode>(
+    () => (localStorage.getItem(DASHBOARD_MODE_KEY) as DashboardMode) || 'normal'
+  );
+  const changeMode = (m: DashboardMode) => {
+    setMode(m);
+    localStorage.setItem(DASHBOARD_MODE_KEY, m);
+  };
   // Fetch dashboard stats from API
   const { data: statsData, isLoading, error } = useQuery({
     queryKey: ['dashboardStats'],
@@ -87,13 +104,22 @@ const AdminDashboard = () => {
     <AdminLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="font-cursive text-4xl lg:text-5xl font-bold mb-2">
-            Admin <span className="text-primary">Dashboard</span>
-          </h1>
-          <p className="text-muted-foreground text-lg">Welcome back! Here's what's happening today.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="font-cursive text-4xl lg:text-5xl font-bold mb-2">
+              Admin <span className="text-primary">Dashboard</span>
+            </h1>
+            <p className="text-muted-foreground text-lg">Welcome back! Here's what's happening today.</p>
+          </div>
+          <DashboardModeToggle mode={mode} onChange={changeMode} />
         </div>
 
+        {mode === 'advanced' ? (
+          <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}>
+            <AdvancedDashboard />
+          </Suspense>
+        ) : (
+        <>
         {/* Visitor Stats Section - unique visitors per period (one per hour = no double count) */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
@@ -291,6 +317,8 @@ const AdminDashboard = () => {
             </div>
           </motion.div>
         </div>
+        </>
+        )}
       </div>
     </AdminLayout>
   );

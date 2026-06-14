@@ -1095,6 +1095,117 @@ export const dashboardApi = {
   }>('/api/admin/dashboard/visitor-stats'),
 };
 
+// ===============================
+// Advanced Analytics API (dashboard widgets)
+// ===============================
+export interface AnalyticsMetric {
+  value: number;
+  changePercent: number;
+}
+export interface AnalyticsSummary {
+  totalSales: AnalyticsMetric;
+  totalOrders: AnalyticsMetric;
+  totalVisitors: AnalyticsMetric;
+}
+export interface RevenuePoint {
+  date: string;
+  label: string;
+  revenue: number;
+  orders: number;
+}
+export interface MonthlyTarget {
+  target: number;
+  revenue: number;
+  achievedPercent: number;
+  changePercent: number;
+}
+export interface CategorySales {
+  categoryId: number;
+  name: string;
+  sales: number;
+}
+export interface TopCategories {
+  totalSales: number;
+  categories: CategorySales[];
+}
+export interface LocationCount {
+  location: string;
+  count: number;
+  percent: number;
+}
+export interface ActiveUsers {
+  totalActiveUsers: number;
+  byCountry: LocationCount[];
+  byState: LocationCount[];
+}
+export interface ConversionStage {
+  name: string;
+  value: number;
+  estimated: boolean;
+}
+export interface Conversion {
+  stages: ConversionStage[];
+}
+export interface TrafficSource {
+  name: string;
+  percent: number;
+}
+export interface TrafficSources {
+  tracked: boolean;
+  sources: TrafficSource[];
+}
+
+// ---- Extra analytics widget types (all real data) ----
+export interface CountRow { label: string; count: number; percent: number; }
+export interface CountAmountRow { label: string; count: number; amount: number; }
+export interface OrderStatusBreakdown { totalOrders: number; statuses: CountRow[]; }
+export interface PaymentBreakdown { payments: CountAmountRow[]; }
+export interface ProductRow { productId: number; name: string; quantitySold: number; revenue: number; }
+export interface TopProducts { products: ProductRow[]; }
+export interface AovDto { averageOrderValue: number; paidOrders: number; totalRevenue: number; }
+export interface CartAbandonment {
+  usersWithActiveCart: number; usersWhoPurchased: number; abandonedCarts: number;
+  abandonmentRate: number; abandonedValue: number;
+}
+export interface CouponRow { code: string; timesUsed: number; discountGiven: number; }
+export interface CouponPerformance {
+  couponsUsedOrders: number; totalDiscountGiven: number; revenueWithCoupons: number; topCoupons: CouponRow[];
+}
+export interface NewVsReturning { newCustomers: number; returningCustomers: number; repeatRate: number; }
+export interface DayCount { date: string; label: string; count: number; }
+export interface SignupSeries { points: DayCount[]; }
+export interface ProductRefRow { productId: number; name: string; }
+export interface DeadInventory { totalActiveProducts: number; productsWithNoSales: number; sample: ProductRefRow[]; }
+export interface TestimonialsSummary { total: number; active: number; averageRating: number; ratingDistribution: CountRow[]; }
+export interface RevenueByType { total: number; types: CountAmountRow[]; }
+export interface HeatRow { day: string; total: number; hours: number[]; }
+export interface SalesHeatmap { days: HeatRow[]; }
+
+export const analyticsApi = {
+  getSummary: () => fetchApi<AnalyticsSummary>('/api/admin/analytics/summary'),
+  getRevenue: (days = 8) =>
+    fetchApi<{ points: RevenuePoint[] }>(`/api/admin/analytics/revenue?days=${days}`),
+  getMonthlyTarget: () => fetchApi<MonthlyTarget>('/api/admin/analytics/monthly-target'),
+  getTopCategories: () => fetchApi<TopCategories>('/api/admin/analytics/top-categories'),
+  getActiveUsers: () => fetchApi<ActiveUsers>('/api/admin/analytics/active-users'),
+  getConversion: (days = 7) =>
+    fetchApi<Conversion>(`/api/admin/analytics/conversion?days=${days}`),
+  getTrafficSources: () => fetchApi<TrafficSources>('/api/admin/analytics/traffic-sources'),
+  // extra widgets
+  getOrderStatusBreakdown: () => fetchApi<OrderStatusBreakdown>('/api/admin/analytics/order-status-breakdown'),
+  getPaymentBreakdown: () => fetchApi<PaymentBreakdown>('/api/admin/analytics/payment-breakdown'),
+  getTopProducts: (limit = 10) => fetchApi<TopProducts>(`/api/admin/analytics/top-products?limit=${limit}`),
+  getAov: () => fetchApi<AovDto>('/api/admin/analytics/aov'),
+  getCartAbandonment: () => fetchApi<CartAbandonment>('/api/admin/analytics/cart-abandonment'),
+  getCouponPerformance: () => fetchApi<CouponPerformance>('/api/admin/analytics/coupon-performance'),
+  getNewVsReturning: () => fetchApi<NewVsReturning>('/api/admin/analytics/new-vs-returning'),
+  getSignups: (days = 30) => fetchApi<SignupSeries>(`/api/admin/analytics/signups?days=${days}`),
+  getDeadInventory: () => fetchApi<DeadInventory>('/api/admin/analytics/dead-inventory'),
+  getTestimonialsSummary: () => fetchApi<TestimonialsSummary>('/api/admin/analytics/testimonials-summary'),
+  getRevenueByType: () => fetchApi<RevenueByType>('/api/admin/analytics/revenue-by-type'),
+  getSalesHeatmap: () => fetchApi<SalesHeatmap>('/api/admin/analytics/sales-heatmap'),
+};
+
 // Public visit tracking (no auth). Call once per hour per visitor to avoid double count.
 const VISITOR_ID_KEY = 'quout_visitor_id';
 const LAST_VISIT_HOUR_KEY = 'quout_last_visit_hour';
