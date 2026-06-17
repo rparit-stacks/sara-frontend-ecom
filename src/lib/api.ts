@@ -1301,7 +1301,78 @@ export const authApi = {
 // ===============================
 // Mockup API
 // ===============================
+const MOCKUP_AI_URL =
+  import.meta.env.VITE_MOCKUP_AI_URL ?? 'https://mockupai-six.vercel.app';
+
+async function fetchTemplateFile(templateUrl: string, fileName: string): Promise<File> {
+  const response = await fetch(templateUrl);
+  if (!response.ok) {
+    throw new Error('Failed to load mockup template.');
+  }
+  const blob = await response.blob();
+  return new File([blob], fileName, { type: blob.type || 'image/png' });
+}
+
+export interface GenerateMockupParams {
+  designFile: File;
+  templateUrl: string;
+  templateFileName: string;
+  fabricType: string;
+  companyName?: string;
+  brandingMode?: 'name' | 'logo' | 'both';
+}
+
+export interface GenerateMockupResult {
+  imageUrl: string;
+  width: number;
+  height: number;
+  fabricType: string;
+}
+
 export const mockupApi = {
+  /**
+   * Generate a single AI mockup via mockupai-six.vercel.app
+   */
+  generateMockup: async (params: GenerateMockupParams): Promise<GenerateMockupResult> => {
+    const templateFile = await fetchTemplateFile(params.templateUrl, params.templateFileName);
+
+    const formData = new FormData();
+    formData.append('designImage', params.designFile);
+    formData.append('mockupTemplate', templateFile);
+    formData.append('fabricType', params.fabricType);
+    formData.append('companyName', params.companyName ?? 'Studio Sara');
+    formData.append('brandingMode', params.brandingMode ?? 'name');
+    formData.append('responseFormat', 'json');
+
+    const response = await fetch(`${MOCKUP_AI_URL}/api/mockup`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let message = 'Failed to generate mockup.';
+      try {
+        const err = await response.json();
+        message = err.error || message;
+      } catch {
+        message = (await response.text()) || message;
+      }
+      throw new Error(message);
+    }
+
+    const data = await response.json();
+    if (!data.success || !data.image) {
+      throw new Error(data.error || 'No mockup image returned.');
+    }
+
+    return {
+      imageUrl: data.image,
+      width: data.width,
+      height: data.height,
+      fabricType: data.fabricType,
+    };
+  },
+
   /**
    * Generate mockups for all templates using uploaded design
    * @param file - Design image file

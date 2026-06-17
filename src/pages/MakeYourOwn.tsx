@@ -4,10 +4,12 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Button } from '@/components/ui/button';
-import { Upload, ArrowRight, Palette, Sparkles, ShieldCheck, Loader2 } from 'lucide-react';
+import { Upload, ArrowRight, Palette, Sparkles, ShieldCheck, Loader2, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { customProductsApi, customConfigApi, mediaApi, mockupApi, productsApi } from '@/lib/api';
+import { MockupGeneratorPopup, type MockupGeneratorResult } from '@/components/mockup/MockupGeneratorPopup';
+import { MockupResultBanner } from '@/components/mockup/MockupResultBanner';
 
 const MakeYourOwn = () => {
   const navigate = useNavigate();
@@ -18,6 +20,8 @@ const MakeYourOwn = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [generatedMockups, setGeneratedMockups] = useState<Array<{ url: string; template: string; width: number; height: number }>>([]);
   const [originalDesignUrl, setOriginalDesignUrl] = useState<string | null>(null);
+  const [mockupPopupOpen, setMockupPopupOpen] = useState(false);
+  const [aiMockupResult, setAiMockupResult] = useState<MockupGeneratorResult | null>(null);
 
   const isLoggedIn = !!localStorage.getItem('authToken');
 
@@ -230,6 +234,8 @@ const MakeYourOwn = () => {
         <div className="absolute bottom-0 left-0 w-1/2 sm:w-1/4 h-1/4 bg-secondary/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4 sm:-translate-x-1/2 pointer-events-none" />
 
         <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12 relative z-10">
+          <MockupResultBanner result={aiMockupResult} onDismiss={() => setAiMockupResult(null)} />
+
           <div className="max-w-4xl mx-auto text-center space-y-4 xs:space-y-5 sm:space-y-6">
             <ScrollReveal>
               <div className="inline-flex items-center gap-1.5 sm:gap-2 bg-primary/10 text-primary px-3 xs:px-4 py-1.5 xs:py-2 rounded-full text-xs xs:text-sm font-medium mb-3 xs:mb-4">
@@ -297,6 +303,18 @@ const MakeYourOwn = () => {
                           {isGeneratingMockups ? 'Generating Mockups...' : isUploading ? 'Processing...' : 'Choose Design File'}
                         </span>
                       </Button>
+
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={!isLoggedIn}
+                        onClick={() => setMockupPopupOpen(true)}
+                        className="h-11 xs:h-12 sm:h-14 px-4 xs:px-6 text-sm xs:text-base rounded-xl sm:rounded-2xl w-full gap-2 border border-[#2b9d8f]/30 bg-teal-50 text-[#2b9d8f] hover:bg-teal-100"
+                      >
+                        <Wand2 className="w-4 h-4 shrink-0" />
+                        <span className="truncate">Try AI Fabric Mockup (3 free)</span>
+                      </Button>
+
                       <p className="text-[10px] xs:text-xs text-muted-foreground">
                         Maximum file size: 10MB
                       </p>
@@ -400,6 +418,13 @@ const MakeYourOwn = () => {
           </div>
         </div>
       </section>
+
+      <MockupGeneratorPopup
+        open={mockupPopupOpen}
+        onOpenChange={setMockupPopupOpen}
+        onGenerated={(result) => setAiMockupResult(result)}
+        premiumMaintenancePath="/contact"
+      />
     </Layout>
   );
 };

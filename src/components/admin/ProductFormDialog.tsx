@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { X, Save, Upload, IndianRupee, Image as ImageIcon, Plus, Video, Loader2, Trash2, GripVertical } from 'lucide-react';
+import { X, Save, Upload, IndianRupee, Image as ImageIcon, Plus, Video, Loader2, Trash2, GripVertical, Wand2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DndContext,
@@ -28,6 +28,8 @@ import { CSS } from '@dnd-kit/utilities';
 import ProductTypeSelector, { ProductType } from '@/components/admin/ProductTypeSelector';
 import RichTextEditor from '@/components/admin/RichTextEditor';
 import PlainProductSelector, { PlainProduct } from '@/components/admin/PlainProductSelector';
+import { MockupGeneratorPopup, type MockupGeneratorResult } from '@/components/mockup/MockupGeneratorPopup';
+import { MockupResultBanner } from '@/components/mockup/MockupResultBanner';
 import { toast } from 'sonner';
 import { productsApi } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
@@ -375,6 +377,8 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
   // Upload state for digital files
   const [isUploadingDigitalFile, setIsUploadingDigitalFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [mockupPopupOpen, setMockupPopupOpen] = useState(false);
+  const [aiMockupResult, setAiMockupResult] = useState<MockupGeneratorResult | null>(null);
   const [uploadedDigitalFileUrl, setUploadedDigitalFileUrl] = useState<string>('');
   const [uploadError, setUploadError] = useState<string>('');
 
@@ -1879,6 +1883,28 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
           </section>
 
           {/* Step 7: Media Gallery (Images & Videos) */}
+          {activeType === 'DESIGNED' && (
+            <section className="space-y-4 pt-6 border-t border-border">
+              <MockupResultBanner result={aiMockupResult} onDismiss={() => setAiMockupResult(null)} />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50/50 p-4">
+                <div>
+                  <p className="text-sm font-semibold text-[#2b9d8f]">AI Fabric Mockup Preview</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Upload design + pick our template. 3 free previews. Branding: Studio Sara.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2 border-[#2b9d8f]/40 text-[#2b9d8f] hover:bg-teal-100 shrink-0"
+                  onClick={() => setMockupPopupOpen(true)}
+                >
+                  <Wand2 className="w-4 h-4" />
+                  Try AI Mockup
+                </Button>
+              </div>
+            </section>
+          )}
           <MediaUploadSection 
             media={formData.media}
             onMediaChange={(media) => setFormData({ ...formData, media })}
@@ -1992,6 +2018,13 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
           </>
         )}
       </DialogContent>
+
+      <MockupGeneratorPopup
+        open={mockupPopupOpen}
+        onOpenChange={setMockupPopupOpen}
+        onGenerated={(result) => setAiMockupResult(result)}
+        premiumMaintenancePath="/admin-sara/maintenance"
+      />
     </Dialog>
   );
 };
