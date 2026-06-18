@@ -28,8 +28,8 @@ import { CSS } from '@dnd-kit/utilities';
 import ProductTypeSelector, { ProductType } from '@/components/admin/ProductTypeSelector';
 import RichTextEditor from '@/components/admin/RichTextEditor';
 import PlainProductSelector, { PlainProduct } from '@/components/admin/PlainProductSelector';
-import { MockupGeneratorPopup, type MockupGeneratorResult } from '@/components/mockup/MockupGeneratorPopup';
-import { MockupResultBanner } from '@/components/mockup/MockupResultBanner';
+import { MockupGeneratorPopup, type MockupAttachPayload } from '@/components/mockup/MockupGeneratorPopup';
+import { dataUrlToFile } from '@/lib/mockupUtils';
 import { toast } from 'sonner';
 import { productsApi } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
@@ -378,7 +378,6 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
   const [isUploadingDigitalFile, setIsUploadingDigitalFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [mockupPopupOpen, setMockupPopupOpen] = useState(false);
-  const [aiMockupResult, setAiMockupResult] = useState<MockupGeneratorResult | null>(null);
   const [uploadedDigitalFileUrl, setUploadedDigitalFileUrl] = useState<string>('');
   const [uploadError, setUploadError] = useState<string>('');
 
@@ -560,6 +559,21 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       setIsUploadingDigitalFile(false);
       setUploadProgress(0);
     }
+  };
+
+  const handleMockupAttach = async (payload: MockupAttachPayload) => {
+    const mockupFile = dataUrlToFile(payload.mockupDataUrl, `mockup-${Date.now()}.png`);
+    const uploaded = await productsApi.uploadMedia([mockupFile], 'products');
+    const url = uploaded[0]?.url;
+    if (!url) throw new Error('Failed to upload mockup image');
+
+    const newMedia = {
+      url,
+      type: 'image' as const,
+      displayOrder: formData.media.length,
+    };
+    setFormData((prev) => ({ ...prev, media: [...prev.media, newMedia] }));
+    toast.success('Mockup attached to product gallery!');
   };
 
   // Real-time validation function
@@ -1885,12 +1899,11 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
           {/* Step 7: Media Gallery (Images & Videos) */}
           {activeType === 'DESIGNED' && (
             <section className="space-y-4 pt-6 border-t border-border">
-              <MockupResultBanner result={aiMockupResult} onDismiss={() => setAiMockupResult(null)} />
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50/50 p-4">
                 <div>
-                  <p className="text-sm font-semibold text-[#2b9d8f]">AI Fabric Mockup Preview</p>
+                  <p className="text-sm font-semibold text-[#2b9d8f]">AI Fabric Mockup</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Upload design + pick our template. 3 free previews. Branding: Studio Sara.
+                    Design upload karo, template select karo — mockup seedha gallery mein attach ho jayega.
                   </p>
                 </div>
                 <Button
@@ -1900,7 +1913,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
                   onClick={() => setMockupPopupOpen(true)}
                 >
                   <Wand2 className="w-4 h-4" />
-                  Try AI Mockup
+                  Generate & Attach
                 </Button>
               </div>
             </section>
@@ -2022,7 +2035,7 @@ const ProductFormDialog: React.FC<ProductFormDialogProps> = ({
       <MockupGeneratorPopup
         open={mockupPopupOpen}
         onOpenChange={setMockupPopupOpen}
-        onGenerated={(result) => setAiMockupResult(result)}
+        onAttach={handleMockupAttach}
         premiumMaintenancePath="/admin-sara/maintenance"
       />
     </Dialog>

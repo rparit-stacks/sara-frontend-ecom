@@ -1350,12 +1350,22 @@ export const mockupApi = {
     });
 
     if (!response.ok) {
-      let message = 'Failed to generate mockup.';
+      let message = `Mockup API failed (${response.status}).`;
+      const contentType = response.headers.get('content-type') ?? '';
       try {
-        const err = await response.json();
-        message = err.error || message;
+        if (contentType.includes('application/json')) {
+          const err = await response.json();
+          message = err.error || message;
+        } else {
+          const text = await response.text();
+          if (text.includes('server error') || text.includes('__next_error__')) {
+            message = 'Mockup server is down. Redeploy mockupai-six.vercel.app and check OPENAI_API_KEY.';
+          } else if (text) {
+            message = text.slice(0, 200);
+          }
+        }
       } catch {
-        message = (await response.text()) || message;
+        // keep default message
       }
       throw new Error(message);
     }

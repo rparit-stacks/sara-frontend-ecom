@@ -4,14 +4,12 @@
   ],
   "headers": [
     {
-      "comment": "Hashed build assets (JS/CSS/fonts/images under /assets) never change once their hash changes — cache them for a year, immutable. Vercel gzips/brotlis these automatically.",
       "source": "/assets/(.*)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     },
     {
-      "comment": "index.html must always be revalidated so users get the latest asset references after a deploy.",
       "source": "/index.html",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }

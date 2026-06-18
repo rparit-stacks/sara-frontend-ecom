@@ -7,29 +7,26 @@ import { Button } from '@/components/ui/button';
 import { Upload, ArrowRight, Palette, Sparkles, ShieldCheck, Loader2, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { customProductsApi, customConfigApi, mediaApi, mockupApi, productsApi } from '@/lib/api';
-import { MockupGeneratorPopup, type MockupGeneratorResult } from '@/components/mockup/MockupGeneratorPopup';
-import { MockupResultBanner } from '@/components/mockup/MockupResultBanner';
+import { customProductsApi, customConfigApi } from '@/lib/api';
+import { MockupGeneratorPopup, type MockupAttachPayload } from '@/components/mockup/MockupGeneratorPopup';
+import { dataUrlToFile } from '@/lib/mockupUtils';
 
 const MakeYourOwn = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isGeneratingMockups, setIsGeneratingMockups] = useState(false);
+  const [isAttachingMockup, setIsAttachingMockup] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [attachedMockupUrl, setAttachedMockupUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [generatedMockups, setGeneratedMockups] = useState<Array<{ url: string; template: string; width: number; height: number }>>([]);
   const [originalDesignUrl, setOriginalDesignUrl] = useState<string | null>(null);
   const [mockupPopupOpen, setMockupPopupOpen] = useState(false);
-  const [aiMockupResult, setAiMockupResult] = useState<MockupGeneratorResult | null>(null);
 
   const isLoggedIn = !!localStorage.getItem('authToken');
 
-  // Get or create guest identifier for non-logged-in users
   const getGuestIdentifier = () => {
-    const isLoggedIn = !!localStorage.getItem('authToken');
-    if (isLoggedIn) return null; // Logged in users don't need guest ID
-    
+    if (localStorage.getItem('authToken')) return null;
     let guestId = localStorage.getItem('guestId');
     if (!guestId) {
       guestId = `guest_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
@@ -40,82 +37,98 @@ const MakeYourOwn = () => {
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-    if (!isLoggedIn) return;
+    if (!file || !isLoggedIn) return;
 
-    // Validate file type
     const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
     if (!validTypes.includes(file.type)) {
       toast.error('Please upload a valid image file (PNG, JPG, GIF, or WEBP)');
       return;
     }
-
-    // Validate file size (10MB max)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
+    if (file.size > 10 * 1024 * 1024) {
       toast.error('File size must be less than 10MB');
       return;
     }
 
     setSelectedFile(file);
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    
-    // Upload original design file first, then generate mockups
-    setIsGeneratingMockups(true);
+    setPreviewUrl(URL.createObjectURL(file));
+    setAttachedMockupUrl(null);
+    setGeneratedMockups([]);
+
+    setIsUploading(true);
     try {
-      // Step 1: Upload original design file to save it for admin
       const uploadedFiles = await customProductsApi.uploadMedia([file], 'products/original-designs');
       const originalUrl = uploadedFiles[0]?.url;
-      
-      if (!originalUrl) {
-        throw new Error('Failed to upload original design file');
-      }
-      
+      if (!originalUrl) throw new Error('Failed to upload original design file');
       setOriginalDesignUrl(originalUrl);
-      console.log('[MakeYourOwn] Original design uploaded:', originalUrl);
-      
-      // Step 2: Generate mockups from the design
-      const mockups = await mockupApi.generateAllMockups(file);
-      setGeneratedMockups(mockups);
-      toast.success(`Design uploaded! Generated ${mockups.length} mockup${mockups.length > 1 ? 's' : ''}.`);
+      toast.success('Design uploaded. Now generate AI mockup to attach it.');
     } catch (error) {
-      console.error('Failed to process design:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to process design. Please try again.');
-      // Clear the file selection if processing fails
+      toast.error(error instanceof Error ? error.message : 'Failed to upload design.');
       setSelectedFile(null);
       setPreviewUrl(null);
       setOriginalDesignUrl(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } finally {
-      setIsGeneratingMockups(false);
+      setIsUploading(false);
     }
   };
 
-  // Fetch custom config
+  const handleMockupAttach = async (payload: MockupAttachPayload) => {
+    setIsAttachingMockup(true);
+    try {
+      let designUrl = originalDesignUrl;
+
+      if (!designUrl || selectedFile?.name !== payload.designFile.name) {
+        const designUpload = await customProductsApi.uploadMedia(
+          [payload.designFile],
+          'products/original-designs',
+        );
+        designUrl = designUpload[0]?.url;
+        if (!designUrl) throw new Error('Failed to upload design');
+        setOriginalDesignUrl(designUrl);
+        setSelectedFile(payload.designFile);
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(URL.createObjectURL(payload.designFile));
+      }
+
+      const mockupFile = dataUrlToFile(payload.mockupDataUrl, `mockup-${Date.now()}.png`);
+      const mockupUpload = await customProductsApi.uploadMedia([mockupFile], 'products/mockups');
+      const mockupUrl = mockupUpload[0]?.url;
+      if (!mockupUrl) throw new Error('Failed to upload mockup image');
+
+      const entry = {
+        url: mockupUrl,
+        template: payload.templateName,
+        width: payload.width,
+        height: payload.height,
+      };
+
+      setGeneratedMockups((prev) => [...prev, entry]);
+      setAttachedMockupUrl(mockupUrl);
+    } finally {
+      setIsAttachingMockup(false);
+    }
+  };
+
   const { data: customConfig } = useQuery({
     queryKey: ['customConfig'],
     queryFn: () => customConfigApi.getPublicConfig(),
   });
 
-  // Create custom product mutation (Make Your Own)
   const createProductMutation = useMutation({
     mutationFn: async (data: any) => {
       setIsUploading(true);
       try {
         if (!originalDesignUrl) {
-          throw new Error('Original design file not available. Please upload your design again.');
+          throw new Error('Design not available. Please upload your design again.');
         }
-        
-        // Create custom product (user-specific, never appears in public listings)
-        // Get user email from token if logged in, otherwise use guestId
+        if (generatedMockups.length === 0) {
+          throw new Error('No mockup attached. Generate AI mockup first.');
+        }
+
         const isLoggedIn = !!localStorage.getItem('authToken');
         let userEmail: string | null = null;
-        
+
         if (isLoggedIn) {
-          // Try to get email from auth token
           try {
             const token = localStorage.getItem('authToken');
             if (token) {
@@ -126,30 +139,25 @@ const MakeYourOwn = () => {
             console.error('Failed to parse auth token:', e);
           }
         }
-        
-        // If not logged in or couldn't get email from token, use guestId
+
         if (!userEmail) {
-          const guestId = getGuestIdentifier();
-          userEmail = guestId;
+          userEmail = getGuestIdentifier();
         }
-        
-        const customProductData = {
+
+        return customProductsApi.create({
           name: data.name || 'Custom Design',
           description: data.description || 'Your custom design',
           designPrice: data.designPrice || 0,
-          images: [originalDesignUrl], // Use original design URL
-          mockupUrls: generatedMockups.map(m => m.url), // Include all generated mockup URLs
-          userEmail: userEmail, // Use actual email if logged in, otherwise guestId
-        };
-        
-        return customProductsApi.create(customProductData);
+          images: [originalDesignUrl],
+          mockupUrls: generatedMockups.map((m) => m.url),
+          userEmail,
+        });
       } finally {
         setIsUploading(false);
       }
     },
     onSuccess: (createdProduct) => {
       toast.success('Custom product created! Now select your fabric.');
-      // Navigate to custom product detail page
       if (createdProduct.id) {
         navigate(`/custom-product/${createdProduct.id}`);
       } else {
@@ -161,28 +169,19 @@ const MakeYourOwn = () => {
     },
   });
 
-  const handleProceed = async () => {
-    if (!selectedFile || !previewUrl) {
+  const handleProceed = () => {
+    if (!originalDesignUrl) {
       toast.error('Please upload your design first.');
       return;
     }
-    
     if (!customConfig) {
       toast.error('Loading configuration... Please try again.');
       return;
     }
-    
     if (generatedMockups.length === 0) {
-      toast.error('Please wait for mockups to be generated.');
+      toast.error('Generate & attach AI mockup first.');
       return;
     }
-    
-    if (isGeneratingMockups) {
-      toast.error('Please wait for mockups to finish generating.');
-      return;
-    }
-    
-    // Create product with custom config using generated mockup images
     createProductMutation.mutate({
       name: customConfig.pageTitle || 'Custom Design',
       description: customConfig.pageDescription || 'Your custom design',
@@ -191,227 +190,118 @@ const MakeYourOwn = () => {
     });
   };
 
-  const isGlobalLoading =
-    isGeneratingMockups || isUploading || createProductMutation.isPending;
+  const displayImageUrl = attachedMockupUrl || previewUrl;
+  const isGlobalLoading = isUploading || isAttachingMockup || createProductMutation.isPending;
 
   return (
     <Layout>
-      {/* Full-screen loading overlay during upload/mockup generation/product creation */}
       <AnimatePresence>
         {isGlobalLoading && (
           <motion.div
-            key="full-screen-loading"
+            key="loading"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center"
           >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="flex flex-col items-center gap-4 px-6 py-5 sm:px-8 sm:py-6 rounded-2xl bg-background/95 shadow-2xl border border-white/10 max-w-sm text-center"
-            >
-              <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 text-primary animate-spin" />
-              <div className="space-y-1">
-                <p className="text-base sm:text-lg font-semibold text-foreground">
-                  {isGeneratingMockups
-                    ? 'Generating mockups for your design...'
-                    : 'Creating your custom product...'}
-                </p>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  Please do not close this tab. This may take a few seconds.
-                </p>
-              </div>
+            <motion.div className="flex flex-col items-center gap-4 px-8 py-6 rounded-2xl bg-background/95 shadow-2xl border max-w-sm text-center">
+              <Loader2 className="w-10 h-10 text-primary animate-spin" />
+              <p className="font-semibold">
+                {isAttachingMockup ? 'Attaching mockup to product…' : isUploading ? 'Uploading design…' : 'Creating product…'}
+              </p>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <section className="w-full py-8 sm:py-12 lg:py-20 xl:py-24 relative overflow-hidden">
-        {/* Decorative elements */}
-        <div className="absolute top-0 right-0 w-1/2 sm:w-1/3 h-1/3 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 sm:translate-x-1/2 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-1/2 sm:w-1/4 h-1/4 bg-secondary/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4 sm:-translate-x-1/2 pointer-events-none" />
-
-        <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12 relative z-10">
-          <MockupResultBanner result={aiMockupResult} onDismiss={() => setAiMockupResult(null)} />
-
-          <div className="max-w-4xl mx-auto text-center space-y-4 xs:space-y-5 sm:space-y-6">
+        <div className="absolute top-0 right-0 w-1/3 h-1/3 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-12 relative z-10">
+          <div className="max-w-4xl mx-auto text-center space-y-4 sm:space-y-6">
             <ScrollReveal>
-              <div className="inline-flex items-center gap-1.5 sm:gap-2 bg-primary/10 text-primary px-3 xs:px-4 py-1.5 xs:py-2 rounded-full text-xs xs:text-sm font-medium mb-3 xs:mb-4">
-                <Sparkles className="w-3 h-3 xs:w-4 xs:h-4 flex-shrink-0" />
-                <span className="truncate">Upload Your Design</span>
+              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium">
+                <Sparkles className="w-4 h-4" />
+                Upload Your Design
               </div>
-              <h1 className="font-cursive text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl px-2">
+              <h1 className="font-cursive text-4xl sm:text-6xl lg:text-7xl">
                 Upload Your <span className="text-primary">Design</span>
               </h1>
-              <p className="text-muted-foreground text-sm xs:text-base sm:text-lg lg:text-xl max-w-2xl mx-auto leading-relaxed px-2">
-                Upload your unique design and we'll create a temporary product page. 
-                Your design will be saved permanently once you add it to your cart or wishlist.
+              <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
+                Upload design, generate AI mockup — seedha product page pe attach ho jayega.
               </p>
             </ScrollReveal>
           </div>
 
-          <div className="mt-8 xs:mt-10 sm:mt-12 lg:mt-16 xl:mt-20 max-w-5xl mx-auto">
+          <div className="mt-12 max-w-5xl mx-auto">
             {!isLoggedIn && (
-              <ScrollReveal>
-                <div className="mb-8 p-6 bg-primary/10 border border-primary/20 rounded-xl text-center space-y-4">
-                  <p className="text-base sm:text-lg text-foreground font-medium">
-                    Log in to upload your design so it can be saved to your cart or wishlist.
-                  </p>
-                  <Button
-                    onClick={() => navigate('/login', { state: { returnTo: '/make-your-own' } })}
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                  >
-                    Log in
-                  </Button>
-                </div>
-              </ScrollReveal>
+              <div className="mb-8 p-6 bg-primary/10 border border-primary/20 rounded-xl text-center space-y-4">
+                <p className="font-medium">Log in to upload your design.</p>
+                <Button onClick={() => navigate('/login', { state: { returnTo: '/make-your-own' } })}>Log in</Button>
+              </div>
             )}
-            <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
-              {/* Left: Upload Area */}
+
+            <div className="grid lg:grid-cols-2 gap-8 items-center">
               <ScrollReveal direction="left">
-                <div className="space-y-5 sm:space-y-6 lg:space-y-8">
-                  <div className="bg-white rounded-xl sm:rounded-2xl lg:rounded-3xl border-2 border-dashed border-border p-5 xs:p-6 sm:p-8 lg:p-10 xl:p-16 text-center space-y-4 xs:space-y-5 sm:space-y-6 transition-all hover:border-primary/50 group bg-gradient-to-b from-white to-secondary/5">
-                    <div className="w-14 h-14 xs:w-16 xs:h-16 sm:w-20 sm:h-20 bg-primary/5 text-primary rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
-                      <Upload className="w-7 h-7 xs:w-8 xs:h-8 sm:w-10 sm:h-10" />
-                    </div>
-                    <div className="space-y-1.5 xs:space-y-2">
-                      <h3 className="text-lg xs:text-xl sm:text-2xl font-semibold">Upload Your Design</h3>
-                      <p className="text-muted-foreground text-xs xs:text-sm sm:text-base">
-                        Transparent PNG or high-resolution JPG files work best.
-                      </p>
-                    </div>
-                    
-                    <div className="flex flex-col gap-3 xs:gap-4">
-                      <input
-                        ref={fileInputRef}
-                        id="design-upload"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleFileChange}
-                      />
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        disabled={!isLoggedIn || isUploading || isGeneratingMockups}
-                        onClick={() => fileInputRef.current?.click()}
-                        className="h-11 xs:h-12 sm:h-14 px-4 xs:px-6 sm:px-8 lg:px-10 text-sm xs:text-base sm:text-lg rounded-xl sm:rounded-2xl cursor-pointer w-full"
-                      >
-                        <span className="truncate">
-                          {isGeneratingMockups ? 'Generating Mockups...' : isUploading ? 'Processing...' : 'Choose Design File'}
-                        </span>
-                      </Button>
-
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        disabled={!isLoggedIn}
-                        onClick={() => setMockupPopupOpen(true)}
-                        className="h-11 xs:h-12 sm:h-14 px-4 xs:px-6 text-sm xs:text-base rounded-xl sm:rounded-2xl w-full gap-2 border border-[#2b9d8f]/30 bg-teal-50 text-[#2b9d8f] hover:bg-teal-100"
-                      >
-                        <Wand2 className="w-4 h-4 shrink-0" />
-                        <span className="truncate">Try AI Fabric Mockup (3 free)</span>
-                      </Button>
-
-                      <p className="text-[10px] xs:text-xs text-muted-foreground">
-                        Maximum file size: 10MB
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Features */}
-                  <div className="grid grid-cols-2 gap-2 xs:gap-3 sm:gap-4">
-                    <div className="flex items-center gap-2 xs:gap-3 p-3 xs:p-4 rounded-xl sm:rounded-2xl bg-secondary/20">
-                      <Palette className="w-4 h-4 xs:w-5 xs:h-5 text-primary flex-shrink-0" />
-                      <span className="text-xs xs:text-sm font-medium truncate">Premium Quality</span>
-                    </div>
-                    <div className="flex items-center gap-2 xs:gap-3 p-3 xs:p-4 rounded-xl sm:rounded-2xl bg-secondary/20">
-                      <ShieldCheck className="w-4 h-4 xs:w-5 xs:h-5 text-primary flex-shrink-0" />
-                      <span className="text-xs xs:text-sm font-medium truncate">Temporary Preview</span>
-                    </div>
+                <div className="bg-white rounded-2xl border-2 border-dashed border-border p-8 text-center space-y-6">
+                  <Upload className="w-12 h-12 text-primary mx-auto" />
+                  <h3 className="text-xl font-semibold">Upload Your Design</h3>
+                  <div className="flex flex-col gap-3">
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                    <Button
+                      variant="outline"
+                      disabled={!isLoggedIn || isUploading || isAttachingMockup}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="h-12 rounded-xl w-full"
+                    >
+                      {isUploading ? 'Uploading…' : 'Choose Design File'}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={!isLoggedIn || isAttachingMockup}
+                      onClick={() => setMockupPopupOpen(true)}
+                      className="h-12 rounded-xl w-full gap-2 border border-[#2b9d8f]/30 bg-teal-50 text-[#2b9d8f] hover:bg-teal-100"
+                    >
+                      <Wand2 className="w-4 h-4" />
+                      Generate & Attach AI Mockup (3 free)
+                    </Button>
                   </div>
                 </div>
               </ScrollReveal>
 
-              {/* Right: Preview & Proceed */}
               <ScrollReveal direction="right">
-                <div className="space-y-5 sm:space-y-6 lg:space-y-8">
-                  <div className="aspect-square bg-white rounded-xl sm:rounded-2xl lg:rounded-3xl border border-border shadow-lg sm:shadow-2xl relative overflow-hidden flex items-center justify-center p-4 xs:p-6 sm:p-8 bg-gradient-to-tr from-secondary/10 to-white">
-                    <AnimatePresence mode="wait">
-                      {previewUrl ? (
-                        <motion.div
-                          key="preview"
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.9 }}
-                          className="w-full h-full flex flex-col items-center justify-center space-y-3 xs:space-y-4"
-                        >
-                          <div className="relative group max-w-full">
-                            <img
-                              src={previewUrl}
-                              alt="Custom design preview"
-                              className="max-h-[200px] xs:max-h-[250px] sm:max-h-[300px] w-auto max-w-full object-contain rounded-lg sm:rounded-xl shadow-lg border border-border"
-                            />
-                            <div className="absolute inset-0 bg-primary/10 rounded-lg sm:rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                          </div>
-                          <p className="text-xs xs:text-sm font-medium text-primary flex items-center gap-1.5 xs:gap-2 px-2 text-center">
-                            <Sparkles className="w-3 h-3 xs:w-4 xs:h-4 flex-shrink-0" />
-                            <span className="truncate">
-                              {isGeneratingMockups 
-                                ? 'Generating mockups...' 
-                                : generatedMockups.length > 0 
-                                  ? `${generatedMockups.length} mockup${generatedMockups.length > 1 ? 's' : ''} ready` 
-                                  : 'Ready to create product page'}
-                            </span>
-                          </p>
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="placeholder"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="text-center space-y-3 xs:space-y-4"
-                        >
-                          <div className="w-16 h-16 xs:w-20 xs:h-20 sm:w-24 sm:h-24 bg-muted rounded-full flex items-center justify-center mx-auto opacity-20">
-                            <Palette className="w-8 h-8 xs:w-10 xs:h-10 sm:w-12 sm:h-12" />
-                          </div>
-                          <p className="text-muted-foreground font-medium text-xs xs:text-sm sm:text-base px-2">
-                            Preview will appear here after upload
-                          </p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                <div className="space-y-6">
+                  <div className="aspect-square bg-white rounded-2xl border shadow-lg flex items-center justify-center p-6">
+                    {displayImageUrl ? (
+                      <div className="text-center space-y-3 w-full">
+                        <img
+                          src={displayImageUrl}
+                          alt={attachedMockupUrl ? 'Attached mockup' : 'Design'}
+                          className="max-h-[280px] mx-auto object-contain rounded-xl shadow border"
+                        />
+                        <p className="text-sm font-medium text-primary flex items-center justify-center gap-2">
+                          <Sparkles className="w-4 h-4" />
+                          {attachedMockupUrl
+                            ? `${generatedMockups.length} mockup attached — ready for product page`
+                            : 'Design uploaded — generate AI mockup to attach'}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">Image will appear here after upload</p>
+                    )}
                   </div>
 
-                  <Button 
-                    size="lg" 
+                  <Button
+                    size="lg"
                     onClick={handleProceed}
-                    disabled={!isLoggedIn || !previewUrl || isUploading || isGeneratingMockups || createProductMutation.isPending || !customConfig || generatedMockups.length === 0}
-                    className="w-full h-12 xs:h-14 sm:h-16 text-sm xs:text-base sm:text-lg lg:text-xl rounded-xl sm:rounded-2xl bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 sm:gap-3 shadow-lg sm:shadow-xl shadow-[#2b9d8f]/20"
+                    disabled={!isLoggedIn || !originalDesignUrl || generatedMockups.length === 0 || isGlobalLoading || !customConfig}
+                    className="w-full h-14 rounded-xl bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2"
                   >
-                    {(isUploading || createProductMutation.isPending) ? (
-                      <>
-                        <Loader2 className="w-5 h-5 xs:w-6 xs:h-6 animate-spin flex-shrink-0" />
-                        <span className="truncate">Creating Product...</span>
-                      </>
-                    ) : isGeneratingMockups ? (
-                      <>
-                        <Loader2 className="w-5 h-5 xs:w-6 xs:h-6 animate-spin flex-shrink-0" />
-                        <span className="truncate">Generating Mockups...</span>
-                      </>
+                    {createProductMutation.isPending ? (
+                      <><Loader2 className="w-5 h-5 animate-spin" />Creating Product…</>
                     ) : (
-                      <>
-                        <span className="truncate">Create Product Page</span>
-                        <ArrowRight className="w-5 h-5 xs:w-6 xs:h-6 flex-shrink-0" />
-                      </>
+                      <><span>Create Product Page</span><ArrowRight className="w-5 h-5" /></>
                     )}
                   </Button>
-
-                  <p className="text-[10px] xs:text-xs text-center text-muted-foreground px-2">
-                    * This will create a temporary product page. Save it to your cart or wishlist to keep it permanently.
-                  </p>
                 </div>
               </ScrollReveal>
             </div>
@@ -422,7 +312,7 @@ const MakeYourOwn = () => {
       <MockupGeneratorPopup
         open={mockupPopupOpen}
         onOpenChange={setMockupPopupOpen}
-        onGenerated={(result) => setAiMockupResult(result)}
+        onAttach={handleMockupAttach}
         premiumMaintenancePath="/contact"
       />
     </Layout>
