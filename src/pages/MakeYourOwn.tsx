@@ -259,7 +259,7 @@ const MakeYourOwn = () => {
                       variant="secondary"
                       disabled={!isLoggedIn || isAttachingMockup}
                       onClick={() => setMockupPopupOpen(true)}
-                      className="h-12 rounded-xl w-full gap-2 border border-[#2b9d8f]/30 bg-teal-50 text-[#2b9d8f] hover:bg-teal-100"
+                      className="h-12 rounded-xl w-full gap-2 border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
                     >
                       <Wand2 className="w-4 h-4" />
                       Generate & Attach AI Mockup (3 free)
@@ -294,7 +294,7 @@ const MakeYourOwn = () => {
                     size="lg"
                     onClick={handleProceed}
                     disabled={!isLoggedIn || !originalDesignUrl || generatedMockups.length === 0 || isGlobalLoading || !customConfig}
-                    className="w-full h-14 rounded-xl bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2"
+                    className="w-full h-14 rounded-xl bg-primary hover:bg-primary/90 text-white gap-2"
                   >
                     {createProductMutation.isPending ? (
                       <><Loader2 className="w-5 h-5 animate-spin" />Creating Product…</>

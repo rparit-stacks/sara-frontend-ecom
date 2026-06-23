@@ -51,7 +51,7 @@ export const ProductCard = ({ product, className }: ProductCardProps) => {
               <Badge className="bg-foreground text-background text-[10px] xs:text-xs px-2 xs:px-2.5 py-0.5 xs:py-1">NEW</Badge>
             )}
             {product.isSale && discount > 0 && (
-              <Badge className="bg-[#2b9d8f] text-white text-[10px] xs:text-xs px-2 xs:px-2.5 py-0.5 xs:py-1">-{discount}%</Badge>
+              <Badge className="bg-primary text-white text-[10px] xs:text-xs px-2 xs:px-2.5 py-0.5 xs:py-1">-{discount}%</Badge>
             )}
           </div>
         </div>
@@ -59,11 +59,11 @@ export const ProductCard = ({ product, className }: ProductCardProps) => {
         {/* Content */}
         <div className="p-2 xs:p-3 sm:p-4">
           <p className="text-[9px] xs:text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider truncate">{product.category}</p>
-          <h3 className="font-sans font-normal text-xs xs:text-sm sm:text-base text-foreground mt-1 xs:mt-1.5 group-hover:text-[#2b9d8f] transition-colors line-clamp-2 not-italic">
+          <h3 className="font-sans font-normal text-xs xs:text-sm sm:text-base text-foreground mt-1 xs:mt-1.5 group-hover:text-primary transition-colors line-clamp-2 not-italic">
             {product.name}
           </h3>
           <div className="flex items-center gap-1 xs:gap-2 mt-1 xs:mt-2 flex-wrap">
-            <span className="font-bold text-xs xs:text-sm sm:text-base text-[#2b9d8f]">
+            <span className="font-bold text-xs xs:text-sm sm:text-base text-primary">
               {format(product.price)}
             </span>
           </div>

@@ -5,7 +5,6 @@ import Autoplay from 'embla-carousel-autoplay';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
-import GeoSuggestionBanner from '@/components/common/GeoSuggestionBanner';
 import { Button } from '@/components/ui/button';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
@@ -329,7 +328,6 @@ const Index = () => {
 
   return (
     <Layout>
-      <GeoSuggestionBanner />
       {/* Hero Slider - Full Width */}
       <section className="relative w-full">
         <div ref={heroRef} className="overflow-hidden">
@@ -391,8 +389,8 @@ const Index = () => {
                 key={feature.title}
                 className="flex flex-col items-center justify-center text-center gap-2 xs:gap-3 sm:gap-4 min-w-[150px] xs:min-w-[170px] sm:min-w-0"
               >
-                <div className="w-8 h-8 xs:w-10 xs:h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 xl:w-16 xl:h-16 rounded-full bg-[#2b9d8f]/10 flex items-center justify-center flex-shrink-0">
-                  <i className={`fa-solid ${feature.icon} text-xs xs:text-sm sm:text-base lg:text-lg xl:text-xl text-[#2b9d8f]`}></i>
+                <div className="w-8 h-8 xs:w-10 xs:h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 xl:w-16 xl:h-16 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <i className={`fa-solid ${feature.icon} text-xs xs:text-sm sm:text-base lg:text-lg xl:text-xl text-primary`}></i>
                 </div>
                 <div className="min-w-0">
                   <h4 className="font-semibold text-[10px] xs:text-xs sm:text-sm lg:text-base xl:text-lg truncate">{feature.title}</h4>

@@ -15,6 +15,7 @@ import { usePrice } from '@/lib/currency';
 import { useCurrency } from '@/context/CurrencyContext';
 import { CurrencySelector } from '@/components/currency/CurrencySelector';
 import { lookupPincode } from '@/lib/pincodeLookup';
+import { getDomainBrandColorHex } from '@/lib/domainTheme';
 
 // Countries list
 const COUNTRIES = [
@@ -1141,7 +1142,7 @@ const Checkout = () => {
           contact: formData.phone,
         },
         theme: {
-          color: '#2b9d8f',
+          color: getDomainBrandColorHex(),
         },
         modal: {
           ondismiss: function() {
@@ -2048,7 +2049,7 @@ const Checkout = () => {
                 </Collapsible>
 
                 <Button 
-                  className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white mt-2 h-12 sm:h-14 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-primary hover:bg-primary/90 text-white mt-2 h-12 sm:h-14 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handlePlaceOrder}
                   disabled={createOrderMutation.isPending || isProcessingPayment || !isFormValid}
                 >

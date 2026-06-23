@@ -92,7 +92,7 @@ const PlainProductSelectionPopup: React.FC<PlainProductSelectionPopupProps> = ({
       >
         <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border flex-shrink-0">
           <DialogTitle className="font-semibold text-lg sm:text-xl md:text-2xl lg:text-3xl flex items-center gap-2 sm:gap-3">
-            <Package className="w-5 h-5 sm:w-6 sm:h-6 text-[#2b9d8f] flex-shrink-0" />
+            <Package className="w-5 h-5 sm:w-6 sm:h-6 text-primary flex-shrink-0" />
             <span className="break-words">Select Fabric</span>
           </DialogTitle>
           <DialogDescription className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2">

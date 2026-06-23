@@ -7,6 +7,7 @@ import { MobileBottomNav } from './MobileBottomNav';
 import AnimatedWaveBackground from '@/components/animations/AnimatedWaveBackground';
 import FloatingCurlyLines from '@/components/animations/FloatingCurlyLines';
 import FloatingWhatsApp from '@/components/common/FloatingWhatsApp';
+import GeoSuggestionBanner from '@/components/common/GeoSuggestionBanner';
 
 interface LayoutProps {
   children: ReactNode;
@@ -42,6 +43,7 @@ export const Layout = ({ children, showFooter = true }: LayoutProps) => {
       <AnimatedWaveBackground />
       <FloatingCurlyLines />
       <Navbar />
+      <GeoSuggestionBanner />
       <main className="flex-1 pb-16 lg:pb-0 w-full max-w-full relative z-10 min-w-0">
         {children}
       </main>

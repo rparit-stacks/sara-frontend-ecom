@@ -33,7 +33,7 @@ export const ListViewProductCard = ({ product, className }: ListViewProductCardP
                 <Badge className="bg-foreground text-background text-[9px] px-1.5 py-0.5">NEW</Badge>
               )}
               {product.isSale && discount > 0 && (
-                <Badge className="bg-[#2b9d8f] text-white text-[9px] px-1.5 py-0.5">-{discount}%</Badge>
+                <Badge className="bg-primary text-white text-[9px] px-1.5 py-0.5">-{discount}%</Badge>
               )}
             </div>
           </div>
@@ -44,13 +44,13 @@ export const ListViewProductCard = ({ product, className }: ListViewProductCardP
               <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider truncate mb-1">
                 {product.category}
               </p>
-              <h3 className="font-sans font-normal text-sm sm:text-base text-foreground group-hover:text-[#2b9d8f] transition-colors line-clamp-2 mb-2 not-italic">
+              <h3 className="font-sans font-normal text-sm sm:text-base text-foreground group-hover:text-primary transition-colors line-clamp-2 mb-2 not-italic">
                 {product.name}
               </h3>
             </div>
             
             <div className="flex items-center gap-2">
-              <span className="font-bold text-sm sm:text-base text-[#2b9d8f]">
+              <span className="font-bold text-sm sm:text-base text-primary">
                 {format(product.price)}
               </span>
             </div>

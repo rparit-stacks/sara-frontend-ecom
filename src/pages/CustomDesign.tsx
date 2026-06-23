@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useMutation } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
@@ -91,6 +91,8 @@ const CustomDesign = () => {
   const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
 
   // Generate and clean up object URLs for previews
   useEffect(() => {
@@ -119,29 +121,42 @@ const CustomDesign = () => {
     },
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    let payload: Record<string, unknown> = { ...formData };
-    if (referenceFiles.length > 0) {
-      try {
-        const uploadPromises = referenceFiles.map((file) =>
-          customConfigApi.uploadReferenceImage(file)
-        );
-        const results = await Promise.all(uploadPromises);
-        const urls = results
-          .map((res) => res.url)
-          .filter((url) => typeof url === 'string' && url.length > 0);
-        if (urls.length > 0) {
-          // Store as comma-separated URLs so backend can keep using a single string field
-          payload = { ...payload, referenceImage: urls.join(',') };
+    if (submitLockRef.current || isSubmitting) return;
+
+    submitLockRef.current = true;
+    setIsSubmitting(true);
+
+    try {
+      let payload: Record<string, unknown> = { ...formData };
+      if (referenceFiles.length > 0) {
+        try {
+          const uploadPromises = referenceFiles.map((file) =>
+            customConfigApi.uploadReferenceImage(file)
+          );
+          const results = await Promise.all(uploadPromises);
+          const urls = results
+            .map((res) => res.url)
+            .filter((url) => typeof url === 'string' && url.length > 0);
+          if (urls.length > 0) {
+            payload = { ...payload, referenceImage: urls.join(',') };
+          }
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : 'Failed to upload reference files');
+          return;
         }
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to upload reference files');
-        return;
       }
+      await submitMutation.mutateAsync(payload);
+    } catch (err) {
+      if (!(err instanceof Error && err.message)) {
+        toast.error('Failed to submit request');
+      }
+    } finally {
+      submitLockRef.current = false;
+      setIsSubmitting(false);
     }
-    submitMutation.mutate(payload);
-  };
+  }, [formData, isSubmitting, referenceFiles, submitMutation]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -151,8 +166,6 @@ const CustomDesign = () => {
     setReferenceFiles((prev) => prev.filter((_, i) => i !== index));
   };
   
-  const isSubmitting = submitMutation.isPending;
-
   return (
     <Layout>
       {/* Animated Wave Background */}
@@ -392,8 +405,9 @@ const CustomDesign = () => {
             ) : (
               <ScrollReveal>
                 <motion.form 
-                  onSubmit={handleSubmit} 
-                  className="bg-white/95 backdrop-blur-sm p-4 xs:p-5 sm:p-6 md:p-8 lg:p-10 rounded-xl sm:rounded-2xl shadow-xl border border-primary/10"
+                  onSubmit={handleSubmit}
+                  aria-busy={isSubmitting}
+                  className={`bg-white/95 backdrop-blur-sm p-4 xs:p-5 sm:p-6 md:p-8 lg:p-10 rounded-xl sm:rounded-2xl shadow-xl border border-primary/10${isSubmitting ? ' pointer-events-none opacity-80' : ''}`}
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6 }}
@@ -590,12 +604,13 @@ const CustomDesign = () => {
 
                   <Button 
                     type="submit" 
-                    className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white py-4 xs:py-5 sm:py-6 text-sm xs:text-base sm:text-lg rounded-full"
+                    className="w-full bg-primary hover:bg-primary/90 text-white py-4 xs:py-5 sm:py-6 text-sm xs:text-base sm:text-lg rounded-full disabled:opacity-70 disabled:cursor-not-allowed"
                     disabled={isSubmitting}
+                    aria-disabled={isSubmitting}
                   >
                     {isSubmitting ? (
                       <>
-                        <i className="fa-solid fa-spinner fa-spin mr-2"></i>
+                        <i className="fa-solid fa-spinner fa-spin mr-2" aria-hidden="true"></i>
                         <span className="truncate">Submitting...</span>
                       </>
                     ) : (

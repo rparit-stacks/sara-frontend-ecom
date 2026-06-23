@@ -42,11 +42,11 @@ const WishlistItemCard = ({ item, index, hasCustomizations, removeMutation, addT
           <p className="text-xs xs:text-sm text-muted-foreground truncate">{item.productType}</p>
           <Link 
             to={productUrl} 
-            className="font-sans font-normal text-base xs:text-lg sm:text-xl hover:text-[#2b9d8f] block mt-1 xs:mt-2 line-clamp-2"
+            className="font-sans font-normal text-base xs:text-lg sm:text-xl hover:text-primary block mt-1 xs:mt-2 line-clamp-2"
           >
             {item.productName || 'Product'}
           </Link>
-          <p className="font-semibold text-[#2b9d8f] text-base xs:text-lg sm:text-xl mt-2 xs:mt-3">
+          <p className="font-semibold text-primary text-base xs:text-lg sm:text-xl mt-2 xs:mt-3">
             {(() => {
               // Prefer numeric unitPrice from backend (already includes variants/customizations)
               if (item.unitPrice != null) {
@@ -91,7 +91,7 @@ const WishlistItemCard = ({ item, index, hasCustomizations, removeMutation, addT
           )}
           
           <Button 
-            className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white mt-auto gap-2 h-10 xs:h-11 sm:h-12 text-xs xs:text-sm sm:text-base"
+            className="w-full bg-primary hover:bg-primary/90 text-white mt-auto gap-2 h-10 xs:h-11 sm:h-12 text-xs xs:text-sm sm:text-base"
             onClick={() => addToCartMutation.mutate(item)}
             disabled={addToCartMutation.isPending}
           >
@@ -201,7 +201,7 @@ const Wishlist = () => {
               <h2 className="font-cursive text-2xl xs:text-3xl mb-2 xs:mb-3">Login to use your wishlist</h2>
               <p className="text-muted-foreground text-sm xs:text-base sm:text-lg mb-6 xs:mb-8">Save items you love for later. Sign in to view and manage your wishlist.</p>
               <Button
-                className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white px-4 sm:px-8 py-2 sm:py-4 text-xs sm:text-sm"
+                className="bg-primary hover:bg-primary/90 text-white px-4 sm:px-8 py-2 sm:py-4 text-xs sm:text-sm"
                 onClick={() => navigate('/login', { state: { returnTo: '/wishlist' } })}
               >
                 Log in
@@ -257,7 +257,7 @@ const Wishlist = () => {
               <Heart className="w-16 h-16 xs:w-20 xs:h-20 mx-auto text-muted-foreground mb-4 xs:mb-6" />
               <h2 className="font-cursive text-2xl xs:text-3xl mb-2 xs:mb-3">Your wishlist is empty</h2>
               <p className="text-muted-foreground text-sm xs:text-base sm:text-lg mb-6 xs:mb-8">Save items you love for later.</p>
-              <Link to="/products"><Button className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white px-4 sm:px-8 py-2 sm:py-4 text-xs sm:text-sm">Browse Products</Button></Link>
+              <Link to="/products"><Button className="bg-primary hover:bg-primary/90 text-white px-4 sm:px-8 py-2 sm:py-4 text-xs sm:text-sm">Browse Products</Button></Link>
             </div>
           )}
         </div>

@@ -65,7 +65,7 @@ const CartItem = ({
         )}
         <div className="flex-1 min-w-0">
           {productUrl ? (
-            <Link to={productUrl} className="font-sans font-normal text-lg xs:text-xl sm:text-2xl hover:text-[#2b9d8f] line-clamp-2">
+            <Link to={productUrl} className="font-sans font-normal text-lg xs:text-xl sm:text-2xl hover:text-primary line-clamp-2">
               {item.productName}
             </Link>
           ) : (
@@ -106,7 +106,7 @@ const CartItem = ({
           </Collapsible>
 
           <div className="flex items-center justify-between mt-2 xs:mt-3">
-            <p className="font-semibold text-[#2b9d8f] text-base xs:text-lg sm:text-xl">
+            <p className="font-semibold text-primary text-base xs:text-lg sm:text-xl">
               {format(item.totalPrice || item.unitPrice || 0)}
             </p>
             <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => { setSelectedItemForBreakdown(item); setShowPriceBreakdown(true); }}>
@@ -476,7 +476,7 @@ const Cart = () => {
                       Looks like you haven't added anything yet.
                     </p>
                     <Link to="/products">
-                      <Button className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white px-4 sm:px-6 py-2 text-xs sm:text-sm">
+                      <Button className="bg-primary hover:bg-primary/90 text-white px-4 sm:px-6 py-2 text-xs sm:text-sm">
                         Continue Shopping
                       </Button>
                     </Link>
@@ -509,7 +509,7 @@ const Cart = () => {
                                 {item.productType}
                               </p>
                               <div className="flex items-center justify-between mt-2 xs:mt-3">
-                                <p className="font-semibold text-[#2b9d8f] text-sm xs:text-base sm:text-lg">
+                                <p className="font-semibold text-primary text-sm xs:text-base sm:text-lg">
                                   {format(item.totalPrice || item.unitPrice || 0)}
                                 </p>
                                 <p className="text-xs xs:text-sm text-muted-foreground">
@@ -519,7 +519,7 @@ const Cart = () => {
                               <div className="flex flex-wrap items-center gap-2 xs:gap-3 sm:gap-4 mt-3 xs:mt-4">
                                 <Button
                                   size="sm"
-                                  className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white text-xs xs:text-sm"
+                                  className="bg-primary hover:bg-primary/90 text-white text-xs xs:text-sm"
                                   onClick={() =>
                                     moveToCartFromSaveForLaterMutation.mutate(item.id as number)
                                   }
@@ -620,7 +620,7 @@ const Cart = () => {
                   </div>
                 </div>
                 <Link to="/checkout" className="block mt-4 xs:mt-6">
-                  <Button className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white h-12 xs:h-14 text-sm sm:text-base">
+                  <Button className="w-full bg-primary hover:bg-primary/90 text-white h-12 xs:h-14 text-sm sm:text-base">
                     <span className="truncate">Checkout</span>
                     <ArrowRight className="w-4 h-4 xs:w-5 xs:h-5 ml-1.5 xs:ml-2 flex-shrink-0" />
                   </Button>

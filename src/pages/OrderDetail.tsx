@@ -548,7 +548,7 @@ const OrderDetail = () => {
                                 </p>
                                 <Button
                                   size="sm"
-                                  className="mt-2 bg-[#2b9d8f] hover:bg-[#238a7d] text-white"
+                                  className="mt-2 bg-primary hover:bg-primary/90 text-white"
                                   onClick={handlePayRemaining}
                                 >
                                   Pay remaining

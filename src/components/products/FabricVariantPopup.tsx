@@ -195,8 +195,8 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
                           className={cn(
                             "px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 md:py-2.5 rounded-full border-2 transition-all text-[11px] sm:text-xs md:text-sm flex items-center gap-1 sm:gap-1.5",
                             isSelected
-                              ? "border-[#2b9d8f] bg-[#2b9d8f]/10 text-[#2b9d8f]"
-                              : "border-border hover:border-[#2b9d8f]/50"
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border hover:border-primary/50"
                           )}
                         >
                           <span className="truncate">{option.value}</span>
@@ -310,11 +310,11 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
           )}
 
           {/* Price summary: per meter only (1-meter base) */}
-          <div className="p-2.5 sm:p-3 md:p-4 bg-[#2b9d8f]/5 rounded-lg border border-[#2b9d8f]/20">
+          <div className="p-2.5 sm:p-3 md:p-4 bg-primary/5 rounded-lg border border-primary/20">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Fabric price per meter</p>
-                <p className="text-lg sm:text-xl md:text-2xl font-semibold text-[#2b9d8f] mt-0.5 sm:mt-1">
+                <p className="text-lg sm:text-xl md:text-2xl font-semibold text-primary mt-0.5 sm:mt-1">
                   {format(pricePerMeter)}/meter
                 </p>
               </div>
@@ -330,7 +330,7 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
           <Button
             onClick={handleAddToCart}
             disabled={customFields.length > 0 && !fabricRequiredFilled}
-            className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-1.5 sm:gap-2 flex-1 sm:max-w-xs h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base"
+            className="bg-primary hover:bg-primary/90 text-white gap-1.5 sm:gap-2 flex-1 sm:max-w-xs h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base"
           >
             <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
             <span className="truncate">Add to Cart</span>

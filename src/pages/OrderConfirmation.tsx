@@ -366,7 +366,7 @@ const OrderConfirmation = () => {
                   <>
                     <Button
                       onClick={() => navigate('/dashboard')}
-                      className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white"
+                      className="bg-primary hover:bg-primary/90 text-white"
                       size="lg"
                     >
                       <Package className="w-4 h-4 mr-2" />
@@ -385,7 +385,7 @@ const OrderConfirmation = () => {
                   <>
                     <Button
                       onClick={() => navigate('/login')}
-                      className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white"
+                      className="bg-primary hover:bg-primary/90 text-white"
                       size="lg"
                     >
                       <LogIn className="w-4 h-4 mr-2" />

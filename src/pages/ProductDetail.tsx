@@ -1342,14 +1342,14 @@ const ProductDetail = () => {
                                   className={cn(
                                     "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-full border-2 transition-all text-xs sm:text-sm h-full min-h-[44px] sm:min-h-[48px]",
                                     isSelected
-                                      ? "border-[#2b9d8f] bg-[#2b9d8f]/10 text-[#2b9d8f]"
-                                      : "border-border hover:border-[#2b9d8f]/50 text-foreground"
+                                      ? "border-primary bg-primary/10 text-primary"
+                                      : "border-border hover:border-primary/50 text-foreground"
                                   )}
                                 >
                                   <div className={cn(
                                     "w-3.5 h-3.5 sm:w-4 sm:h-4 rounded border-2 flex items-center justify-center transition-all flex-shrink-0",
                                     isSelected
-                                      ? "border-[#2b9d8f] bg-[#2b9d8f]"
+                                      ? "border-primary bg-primary"
                                       : "border-border"
                                   )}>
                                     {isSelected && (
@@ -1727,7 +1727,7 @@ const ProductDetail = () => {
                               size="lg"
                               onClick={handleAddToCart}
                               disabled={addToCartMutation.isPending}
-                              className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
+                              className="w-full bg-primary hover:bg-primary/90 text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
                             >
                               {addToCartMutation.isPending ? (
                                 <>
@@ -1748,7 +1748,7 @@ const ProductDetail = () => {
                           <Button
                             size="lg"
                             onClick={() => setShowPlainProductSelection(true)}
-                            className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
+                            className="w-full bg-primary hover:bg-primary/90 text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
                           >
                             <Palette className="w-5 h-5 flex-shrink-0" />
                             <span className="text-center">Select Fabric First</span>
@@ -1762,7 +1762,7 @@ const ProductDetail = () => {
                         size="lg"
                         onClick={handlePlainProductAddToCart}
                         disabled={addToCartMutation.isPending}
-                        className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
+                        className="w-full bg-primary hover:bg-primary/90 text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
                       >
                         {addToCartMutation.isPending ? (
                           <>
@@ -1783,7 +1783,7 @@ const ProductDetail = () => {
                         size="lg"
                         onClick={handleDigitalAddToCart}
                         disabled={addToCartMutation.isPending}
-                        className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
+                        className="w-full bg-primary hover:bg-primary/90 text-white gap-2 h-14 text-base px-4 sm:px-6 font-semibold whitespace-normal"
                       >
                         {addToCartMutation.isPending ? (
                           <>

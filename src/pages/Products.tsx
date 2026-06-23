@@ -59,8 +59,17 @@ const Products = () => {
   useEffect(() => {
     const handleResize = () => {
       const newPageSize = getPageSize();
-      setPageSize(newPageSize);
-      setCurrentPage(1);
+      // Only reset to page 1 when the responsive page size actually changes
+      // (breakpoint crossed). Plain resize events — e.g. the mobile address bar
+      // hiding on scroll, the on-screen keyboard, or rotation — must NOT reset
+      // the page, otherwise navigating to page 2+ snaps back to page 1.
+      setPageSize((prev) => {
+        if (prev !== newPageSize) {
+          setCurrentPage(1);
+          return newPageSize;
+        }
+        return prev;
+      });
     };
     setPageSize(getPageSize());
     window.addEventListener('resize', handleResize);

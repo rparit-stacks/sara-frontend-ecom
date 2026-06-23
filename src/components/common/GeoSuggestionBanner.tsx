@@ -1,37 +1,7 @@
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
 import { useCurrency } from '@/context/CurrencyContext';
-import {
-  INDIA_DOMAIN,
-  UK_DOMAIN,
-  type DomainRegion,
-} from '@/lib/domainConfig';
-
-const DISMISS_STORAGE_KEY = 'geo_banner_dismissed';
-const COUNTRY_STORAGE_KEY = 'visitor_country_code';
-const GEO_ENDPOINT = 'https://ipapi.co/json/';
-
-interface GeoLookupResponse {
-  country_code?: string;
-}
-
-const fetchVisitorCountry = async (): Promise<string | null> => {
-  try {
-    const cached = sessionStorage.getItem(COUNTRY_STORAGE_KEY);
-    if (cached) return cached;
-
-    const res = await fetch(GEO_ENDPOINT, { method: 'GET' });
-    if (!res.ok) return null;
-    const data: GeoLookupResponse = await res.json();
-    const code = (data.country_code || '').toUpperCase();
-    if (code) {
-      sessionStorage.setItem(COUNTRY_STORAGE_KEY, code);
-    }
-    return code || null;
-  } catch {
-    return null;
-  }
-};
+import { type DomainRegion } from '@/lib/domainConfig';
+import { fetchVisitorCountry } from '@/lib/visitorGeo';
 
 /**
  * Decide whether the visitor's country mismatches the current store.
@@ -69,7 +39,6 @@ export const GeoSuggestionBanner = () => {
 
     const run = async () => {
       if (typeof window === 'undefined') return;
-      if (localStorage.getItem(DISMISS_STORAGE_KEY) === '1') return;
       if (!domainConfig.suggestDomain) return;
 
       const country = await fetchVisitorCountry();
@@ -88,17 +57,8 @@ export const GeoSuggestionBanner = () => {
   if (!visible || !domainConfig.suggestDomain) return null;
 
   const targetDomain = domainConfig.suggestDomain;
-  const targetHref =
-    targetDomain === INDIA_DOMAIN || targetDomain === UK_DOMAIN
-      ? `https://${targetDomain}`
-      : `https://${targetDomain}`;
-
+  const targetHref = `https://${targetDomain}`;
   const { heading, body, cta } = buildMessage(domainConfig.region, targetDomain);
-
-  const handleDismiss = () => {
-    localStorage.setItem(DISMISS_STORAGE_KEY, '1');
-    setVisible(false);
-  };
 
   return (
     <div className="w-full bg-primary text-primary-foreground">
@@ -107,22 +67,12 @@ export const GeoSuggestionBanner = () => {
           <span className="font-semibold">{heading}</span>{' '}
           <span className="opacity-90">{body}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <a
-            href={targetHref}
-            className="inline-flex items-center rounded-md bg-white/15 hover:bg-white/25 transition-colors px-3 py-1.5 text-sm font-medium"
-          >
-            {cta}
-          </a>
-          <button
-            type="button"
-            onClick={handleDismiss}
-            aria-label="Dismiss"
-            className="inline-flex items-center justify-center rounded-md p-1.5 hover:bg-white/15 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        <a
+          href={targetHref}
+          className="inline-flex items-center rounded-md bg-white/15 hover:bg-white/25 transition-colors px-3 py-1.5 text-sm font-medium shrink-0"
+        >
+          {cta}
+        </a>
       </div>
     </div>
   );

@@ -195,7 +195,7 @@ export function MockupGeneratorPopup({
         <div className="relative bg-gradient-to-b from-teal-50 via-white to-teal-50/50">
           <div className="relative z-10 max-h-[92vh] overflow-y-auto px-5 py-7 sm:px-8">
             <div className="text-center pr-8">
-              <span className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#2b9d8f] to-teal-600 text-white shadow-lg">
+              <span className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary to-primary/80 text-white shadow-lg">
                 <Wand2 className="h-6 w-6" />
               </span>
               <h2 className="text-xl font-bold tracking-tight sm:text-2xl">AI Fabric Mockup</h2>
@@ -203,7 +203,7 @@ export function MockupGeneratorPopup({
                 Upload design, pick template — mockup seedha aapke product mein attach ho jayega.
               </p>
               <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                <Badge variant="secondary" className="gap-1.5 bg-teal-100 text-teal-800 hover:bg-teal-100">
+                <Badge variant="secondary" className="gap-1.5 bg-teal-100 text-teal-800 hover:bg-primary/10">
                   <Coins className="h-3 w-3" />
                   {tokensLeft} of {MAX_MOCKUP_TOKENS} left
                 </Badge>
@@ -213,7 +213,7 @@ export function MockupGeneratorPopup({
                     type="button"
                     disabled={isBusy}
                     onClick={handleRefillTokens}
-                    className="text-xs font-medium text-[#2b9d8f] underline underline-offset-2 hover:text-teal-700 disabled:opacity-50"
+                    className="text-xs font-medium text-primary underline underline-offset-2 hover:text-primary/80 disabled:opacity-50"
                   >
                     Refill credits
                   </button>
@@ -223,7 +223,7 @@ export function MockupGeneratorPopup({
 
             {attached ? (
               <div className="mt-8 flex flex-col items-center gap-3 py-6 text-center">
-                <CheckCircle2 className="h-14 w-14 text-[#2b9d8f]" />
+                <CheckCircle2 className="h-14 w-14 text-primary" />
                 <p className="text-lg font-semibold">Mockup attached!</p>
                 <p className="text-sm text-muted-foreground">Product page pe mockup image add ho gayi hai.</p>
               </div>
@@ -233,7 +233,7 @@ export function MockupGeneratorPopup({
                   <p className="mb-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">How it works</p>
                   <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
                     <div className="flex flex-col items-center">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-teal-50 ring-1 ring-teal-200">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/5 ring-1 ring-teal-200">
                         {designPreview ? (
                           <img src={designPreview} alt="Design" className="max-h-14 max-w-14 object-contain" />
                         ) : (
@@ -244,7 +244,7 @@ export function MockupGeneratorPopup({
                     </div>
                     <Plus className="h-4 w-4 text-teal-500" />
                     <div className="flex flex-col items-center">
-                      <div className="flex h-16 w-16 overflow-hidden rounded-xl bg-teal-50 ring-1 ring-teal-200">
+                      <div className="flex h-16 w-16 overflow-hidden rounded-xl bg-primary/5 ring-1 ring-teal-200">
                         {selectedTemplate ? (
                           <img src={selectedTemplate.imageUrl} alt="" className="h-full w-full object-cover" />
                         ) : (
@@ -255,7 +255,7 @@ export function MockupGeneratorPopup({
                     </div>
                     <Equal className="h-4 w-4 text-teal-500" />
                     <div className="flex flex-col items-center">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-[#2b9d8f] text-white">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-br from-primary/80 to-primary text-white">
                         <Sparkles className="h-5 w-5" />
                       </div>
                       <span className="mt-1 text-[10px] font-semibold text-teal-700">Attached mockup</span>
@@ -294,7 +294,7 @@ export function MockupGeneratorPopup({
                         disabled={isBusy}
                         onClick={() => handleTemplateSelect(t)}
                         className={`relative aspect-square overflow-hidden rounded-xl ring-2 transition disabled:opacity-50 ${
-                          selectedTemplate?.id === t.id ? 'ring-[#2b9d8f] shadow-md' : 'ring-black/10 hover:ring-teal-300'
+                          selectedTemplate?.id === t.id ? 'ring-primary shadow-md' : 'ring-black/10 hover:ring-primary/30'
                         }`}
                       >
                         <img src={t.imageUrl} alt={t.name} className="h-full w-full object-cover" />
@@ -314,7 +314,7 @@ export function MockupGeneratorPopup({
                         disabled={isBusy}
                         onClick={() => setFabricType(f.id)}
                         className={`rounded-full px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
-                          fabricType === f.id ? 'bg-[#2b9d8f] text-white' : 'bg-white ring-1 ring-black/10 text-muted-foreground'
+                          fabricType === f.id ? 'bg-primary text-white' : 'bg-white ring-1 ring-black/10 text-muted-foreground'
                         }`}
                       >
                         {f.label}
@@ -326,7 +326,7 @@ export function MockupGeneratorPopup({
                 <div className="mt-5 rounded-xl bg-white/70 p-3 ring-1 ring-black/5">
                   <p className="text-xs font-semibold uppercase text-muted-foreground">Branding</p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <Badge className="bg-[#2b9d8f] hover:bg-[#2b9d8f]">{STUDIO_SARA_BRAND} (text)</Badge>
+                    <Badge className="bg-primary hover:bg-primary">{STUDIO_SARA_BRAND} (text)</Badge>
                     <button type="button" onClick={handleLogoPremiumClick} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
                       <Lock className="h-3 w-3" /> Logo — Premium
                     </button>
@@ -337,7 +337,7 @@ export function MockupGeneratorPopup({
 
             {!attached && (
               <Button
-                className="mt-6 w-full h-12 rounded-full bg-gradient-to-r from-[#2b9d8f] to-teal-600"
+                className="mt-6 w-full h-12 rounded-full bg-gradient-to-r from-primary to-primary/80"
                 disabled={!canGenerate}
                 onClick={handleGenerate}
               >

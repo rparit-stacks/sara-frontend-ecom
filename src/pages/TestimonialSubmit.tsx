@@ -86,7 +86,7 @@ const TestimonialSubmit = () => {
                 <p className="text-lg text-muted-foreground mb-8">
                   Your testimonial has been submitted successfully. Our team will review it and it will be displayed on our homepage once approved.
                 </p>
-                <Button onClick={() => navigate('/')} className="bg-[#2b9d8f] hover:bg-[#238a7d] text-white">
+                <Button onClick={() => navigate('/')} className="bg-primary hover:bg-primary/90 text-white">
                   Back to Home
                 </Button>
               </ScrollReveal>
@@ -188,7 +188,7 @@ const TestimonialSubmit = () => {
 
                   <Button
                     type="submit"
-                    className="w-full bg-[#2b9d8f] hover:bg-[#238a7d] text-white h-12 sm:h-14 text-base"
+                    className="w-full bg-primary hover:bg-primary/90 text-white h-12 sm:h-14 text-base"
                     disabled={submitMutation.isPending}
                   >
                     {submitMutation.isPending ? (
