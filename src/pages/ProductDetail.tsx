@@ -25,6 +25,7 @@ import PlainProductSelectionPopup from '@/components/products/PlainProductSelect
 import FabricVariantPopup, { FabricVariant } from '@/components/products/FabricVariantPopup';
 import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import { ProductMediaViewer } from '@/components/products/ProductMediaViewer';
+import { QuantityStepper } from '@/components/common/QuantityStepper';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { productsApi, cartApi, wishlistApi, customConfigApi, customProductsApi } from '@/lib/api';
@@ -1379,25 +1380,12 @@ const ProductDetail = () => {
                         })() : product.type === 'DESIGNED' && selectedFabricId ? '(Meters)' : ''}
                       </h4>
                       <div className="flex items-center gap-5">
-                        <div className="flex items-center border border-border rounded-full">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="rounded-full w-12 h-12"
-                            onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                          >
-                            <Minus className="w-5 h-5" />
-                          </Button>
-                          <span className="w-14 text-center font-medium text-lg">{quantity}</span>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="rounded-full w-12 h-12"
-                            onClick={() => setQuantity(quantity + 1)}
-                          >
-                            <Plus className="w-5 h-5" />
-                          </Button>
-                        </div>
+                        <QuantityStepper
+                          size="lg"
+                          value={quantity}
+                          min={1}
+                          onChange={setQuantity}
+                        />
                       </div>
                     </div>
                   )}
@@ -1407,25 +1395,12 @@ const ProductDetail = () => {
                     <div>
                       <h4 className="font-bold mb-4 text-lg">Quantity (Licenses)</h4>
                       <div className="flex items-center gap-5">
-                        <div className="flex items-center border border-border rounded-full">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="rounded-full w-12 h-12"
-                            onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                          >
-                            <Minus className="w-5 h-5" />
-                          </Button>
-                          <span className="w-14 text-center font-medium text-lg">{quantity}</span>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="rounded-full w-12 h-12"
-                            onClick={() => setQuantity(quantity + 1)}
-                          >
-                            <Plus className="w-5 h-5" />
-                          </Button>
-                        </div>
+                        <QuantityStepper
+                          size="lg"
+                          value={quantity}
+                          min={1}
+                          onChange={setQuantity}
+                        />
                         <p className="text-sm text-muted-foreground">
                           {quantity === 1 ? 'Single license' : `${quantity} licenses`}
                         </p>

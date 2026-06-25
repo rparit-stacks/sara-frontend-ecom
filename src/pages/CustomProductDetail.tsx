@@ -20,6 +20,7 @@ import { IndianRupee } from 'lucide-react';
 import { customProductsApi, cartApi, wishlistApi, customConfigApi, productsApi } from '@/lib/api';
 import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import { ProductMediaViewer } from '@/components/products/ProductMediaViewer';
+import { QuantityStepper } from '@/components/common/QuantityStepper';
 import { guestCart } from '@/lib/guestCart';
 import { usePrice } from '@/lib/currency';
 
@@ -844,37 +845,13 @@ const CustomProductDetail = () => {
                       <div className="pt-3 border-t border-border/50">
                         <h4 className="font-medium text-sm mb-2">Quantity (Meters)</h4>
                         <div className="flex items-center gap-3">
-                          <div className="flex items-center border border-border rounded-full">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="rounded-full w-10 h-10"
-                              onClick={() =>
-                                setMetersQuantity((q) => Math.max(minMeters, q - 1))
-                              }
-                              disabled={metersQuantity <= minMeters}
-                            >
-                              <Minus className="w-4 h-4" />
-                            </Button>
-                            <span className="w-12 text-center font-medium text-sm">{metersQuantity}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="rounded-full w-10 h-10"
-                              onClick={() =>
-                                setMetersQuantity((q) => {
-                                  const next = q + 1;
-                                  if (maxMeters != null) {
-                                    return Math.min(next, maxMeters);
-                                  }
-                                  return next;
-                                })
-                              }
-                              disabled={maxMeters != null && metersQuantity >= maxMeters}
-                            >
-                              <Plus className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          <QuantityStepper
+                            size="md"
+                            value={metersQuantity}
+                            min={minMeters}
+                            max={maxMeters}
+                            onChange={setMetersQuantity}
+                          />
                           <span className="text-sm text-muted-foreground">
                             Total: {format(combinedPrice * metersQuantity)}
                           </span>

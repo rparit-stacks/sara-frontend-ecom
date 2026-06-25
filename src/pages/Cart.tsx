@@ -12,6 +12,7 @@ import { cartApi, productsApi, wishlistApi, saveForLaterApi, customConfigApi } f
 import { guestCart } from '@/lib/guestCart';
 import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import CartItemDetails from '@/components/cart/CartItemDetails';
+import { QuantityStepper } from '@/components/common/QuantityStepper';
 import { usePrice } from '@/lib/currency';
 
 // Separate component for cart item to allow hooks usage; compact with expandable variants/details
@@ -115,15 +116,13 @@ const CartItem = ({
             </Button>
           </div>
           <div className="flex flex-wrap items-center gap-2 xs:gap-3 sm:gap-4 mt-3 xs:mt-4">
-            <div className="flex items-center border border-border rounded-full">
-              <Button variant="ghost" size="icon" className="h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 rounded-full" onClick={() => handleQuantityChange(item.id, item.quantity - 1)} disabled={isLoggedIn && updateMutation.isPending}>
-                <Minus className="w-3 h-3 xs:w-4 xs:h-4" />
-              </Button>
-              <span className="w-8 xs:w-9 sm:w-10 text-center text-xs xs:text-sm sm:text-base">{item.quantity || 1}</span>
-              <Button variant="ghost" size="icon" className="h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 rounded-full" onClick={() => handleQuantityChange(item.id, item.quantity + 1)} disabled={isLoggedIn && updateMutation.isPending}>
-                <Plus className="w-3 h-3 xs:w-4 xs:h-4" />
-              </Button>
-            </div>
+            <QuantityStepper
+              size="sm"
+              value={item.quantity || 1}
+              min={1}
+              disabled={isLoggedIn && updateMutation.isPending}
+              onChange={(next) => handleQuantityChange(item.id, next)}
+            />
             {onAddToWishlist && (
               <Button
                 variant="outline"
