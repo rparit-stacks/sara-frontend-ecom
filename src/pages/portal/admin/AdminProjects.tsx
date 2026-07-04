@@ -11,6 +11,20 @@ import { projectApi } from '@/lib/api';
 
 const stageLabel = (key?: string) => stageDef((key as StageKey) || 'INQUIRY').label;
 
+// A project is "new" for 48h after it's created (so fresh inquiries stand out).
+const NEW_WINDOW_MS = 48 * 60 * 60 * 1000;
+const isNew = (createdAt?: string) => {
+  if (!createdAt) return false;
+  const t = new Date(createdAt).getTime();
+  return !isNaN(t) && Date.now() - t < NEW_WINDOW_MS;
+};
+const fmtDate = (iso?: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 const stageTone = (key?: string) => STAGE_TONE[stageLabel(key) as Stage];
 
 function formatUpdated(iso?: string) {
@@ -99,10 +113,29 @@ export default function PortalAdminProjects() {
                   </td>
                 </tr>
               ) : projects.map((p, i) => (
-                <tr key={p.code} onClick={() => navigate(`/portal-admin/projects/${p.code}`)} className="cursor-pointer hover:bg-black/[0.02]" style={{ borderTop: i ? '1px solid var(--p-outline-variant)' : undefined }}>
+                <tr
+                  key={p.code}
+                  onClick={() => navigate(`/portal-admin/projects/${p.code}`)}
+                  className="cursor-pointer hover:bg-black/[0.02]"
+                  style={{
+                    borderTop: i ? '1px solid var(--p-outline-variant)' : undefined,
+                    // subtle highlight for brand-new projects
+                    background: isNew(p.createdAt) ? 'color-mix(in srgb, var(--p-primary) 6%, transparent)' : undefined,
+                  }}
+                >
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-[13px]">{p.title?.trim() || 'Untitled project'}</p>
-                    <p className="text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}>{p.code} · {p.inquiryReference}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-[13px]">{p.title?.trim() || 'Untitled project'}</p>
+                      {isNew(p.createdAt) && (
+                        <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full text-white" style={{ background: 'var(--p-primary)' }}>
+                          New
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}>
+                      {p.code} · {p.inquiryReference}
+                      {p.createdAt && <> · Created {fmtDate(p.createdAt)}</>}
+                    </p>
                   </td>
                   <td className="px-4 py-3 text-[13px]">{p.clientName || p.brand || '—'}</td>
                   <td className="px-4 py-3 text-[13px]">{p.designCount ?? 1}</td>

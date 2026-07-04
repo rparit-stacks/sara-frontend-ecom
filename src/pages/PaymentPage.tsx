@@ -228,7 +228,11 @@ function DetailsPanel({ target, currency }: { target: ResolvedPayTarget; currenc
     <div className="bg-white rounded-2xl shadow-xl border border-[#e6ddcd] overflow-hidden">
       <div className="px-6 py-4 border-b border-[#efe8db]">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8a7f6d]">Payment summary</p>
-        {hasQuote && <p className="font-semibold text-[16px] text-[#2b2620] mt-0.5">Quotation {target.quoteReference}</p>}
+        {hasQuote ? (
+          <p className="font-semibold text-[16px] text-[#2b2620] mt-0.5">Quotation {target.quoteReference}</p>
+        ) : (
+          target.title && <p className="font-semibold text-[16px] text-[#2b2620] mt-0.5">{target.title}</p>
+        )}
       </div>
 
       <div className="p-6 space-y-5">
@@ -277,14 +281,14 @@ function DetailsPanel({ target, currency }: { target: ResolvedPayTarget; currenc
           </div>
         )}
 
-        {/* Totals */}
-        {hasQuote && (
+        {/* Totals — always show the amount being requested (quote breakdown when present) */}
+        {(hasQuote || target.amount != null) && (
           <div className="space-y-1.5 text-[13px] border-t border-[#f0e9dc] pt-4">
-            {target.subtotal != null && <Row label="Subtotal" value={money(target.subtotal, currency)} />}
-            {!!target.discount && <Row label="Discount" value={`− ${money(target.discount, currency)}`} />}
-            {!!target.gstPercent && <Row label={`GST (${target.gstPercent}%)`} value={money(target.gstAmount || 0, currency)} />}
+            {hasQuote && target.subtotal != null && <Row label="Subtotal" value={money(target.subtotal, currency)} />}
+            {hasQuote && !!target.discount && <Row label="Discount" value={`− ${money(target.discount, currency)}`} />}
+            {hasQuote && !!target.gstPercent && <Row label={`GST (${target.gstPercent}%)`} value={money(target.gstAmount || 0, currency)} />}
             <div className="flex items-center justify-between pt-2 border-t-2 mt-1" style={{ borderColor: ACCENT }}>
-              <span className="font-bold text-[15px]">Total amount</span>
+              <span className="font-bold text-[15px]">Amount to pay</span>
               <span className="font-bold text-[20px]" style={{ color: ACCENT }}>{money(target.amount || 0, currency)}</span>
             </div>
           </div>

@@ -18,7 +18,7 @@ import MessageHoverActions from '@/components/portal/MessageHoverActions';
 import { Sym } from '@/components/portal/Sym';
 import { STAGES, STAGE_INDEX, defaultStatusFor, statusLabelFor, type StageKey } from '@/components/manufacturing/stages';
 import { useProjectEventStream, useProjectMessagePolling } from '@/hooks/useProjectEventStream';
-import { mediaApi, projectApi, type ProjectMessageDto, type WorkspaceView, type ManufacturingProjectDetailDto } from '@/lib/api';
+import { mediaApi, projectApi, manufacturingApi, type ProjectMessageDto, type WorkspaceView, type ManufacturingProjectDetailDto } from '@/lib/api';
 
 type DisplayMessage = ProjectMessageDto & { pending?: boolean };
 
@@ -131,6 +131,41 @@ export default function PortalAdminProjectDetail() {
     enabled: !!code && view === 'files',
     staleTime: 30_000,
   });
+
+  // Files the client uploaded on the original inquiry form live in the inquiry's
+  // answers, not as chat attachments. Surface them in the Files tab too.
+  const { data: briefInquiry } = useQuery({
+    queryKey: ['project-inquiry-files', shell?.inquiryId],
+    queryFn: () => manufacturingApi.getInquiry(shell!.inquiryId),
+    enabled: !!shell?.inquiryId && view === 'files',
+    staleTime: 60_000,
+  });
+
+  const allFiles = useMemo(() => {
+    const isUrl = (v: unknown): v is string =>
+      typeof v === 'string' && (/^data:/.test(v) || /^(https?:)?\/\//.test(v));
+    const formFiles: ProjectMessageDto[] = [];
+    if (briefInquiry?.values) {
+      let i = 0;
+      for (const v of Object.values(briefInquiry.values)) {
+        for (const one of Array.isArray(v) ? v : [v]) {
+          if (isUrl(one)) {
+            formFiles.push({
+              id: -(++i), // synthetic negative id (not a real message)
+              projectId: 0,
+              type: 'SYSTEM',
+              body: '',
+              authorName: 'Inquiry form',
+              attachmentUrl: one,
+              createdAt: shell?.createdAt || briefInquiry.createdAt,
+            } as ProjectMessageDto);
+          }
+        }
+      }
+    }
+    // Chat attachments first (newest), then original form uploads.
+    return [...attachments, ...formFiles];
+  }, [attachments, briefInquiry, shell?.createdAt]);
 
   useEffect(() => {
     if (!code || activeDesignId == null || view !== 'channels' || messagesFetching) return;
@@ -563,7 +598,7 @@ export default function PortalAdminProjectDetail() {
             <Sym name="folder_open" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
             <h2 className="font-display text-[18px]">Files</h2>
           </div>
-          <ProjectFilesPanel files={attachments} isLoading={attachmentsLoading} />
+          <ProjectFilesPanel files={allFiles} isLoading={attachmentsLoading} />
         </main>
       ) : (
         <>

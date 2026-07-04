@@ -1,7 +1,44 @@
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Sym } from '@/components/portal/Sym';
 import { Pill } from '@/components/portal/Pill';
-import type { ManufacturingProjectDetailDto } from '@/lib/api';
+import { manufacturingApi, type ManufacturingProjectDetailDto } from '@/lib/api';
+
+// Detect image / file values inside submitted form answers.
+const isImageUrl = (v: unknown): v is string =>
+  typeof v === 'string' &&
+  (/^data:image\//.test(v) || (/^(https?:)?\/\//.test(v) && /\.(png|jpe?g|gif|webp|svg|avif)(\?|#|$)/i.test(v)));
+const isFileUrl = (v: unknown): v is string =>
+  typeof v === 'string' && /^(https?:)?\/\//.test(v) && !isImageUrl(v);
+
+/** Render one form answer: text, image thumbnails (new tab), or file links. */
+function AnswerValue({ value }: { value: unknown }) {
+  const arr = Array.isArray(value) ? value : [value];
+  const images = arr.filter(isImageUrl);
+  const files = arr.filter((v) => isFileUrl(v));
+  const text = arr.filter((v) => !isImageUrl(v) && !isFileUrl(v) && v != null && v !== '');
+  return (
+    <div className="space-y-2">
+      {text.length > 0 && (
+        <p className="text-[14px] whitespace-pre-wrap break-words">{text.map((v) => String(v)).join(', ')}</p>
+      )}
+      {images.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {images.map((src, i) => (
+            <a key={i} href={src} target="_blank" rel="noopener noreferrer" className="block" title="Open in new tab">
+              <img src={src} alt="" className="w-24 h-24 object-cover rounded-lg border" style={{ borderColor: 'var(--p-outline-variant)' }} />
+            </a>
+          ))}
+        </div>
+      )}
+      {files.map((src, i) => (
+        <a key={i} href={src} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[13px] underline" style={{ color: 'var(--p-primary)' }}>
+          <Sym name="attach_file" className="text-[16px]" /> {String(src).split('/').pop()}
+        </a>
+      ))}
+    </div>
+  );
+}
 
 /** Row in the "client details" card. */
 function Detail({ icon, label, value }: { icon: string; label: string; value?: string | null }) {
@@ -27,6 +64,21 @@ function Detail({ icon, label, value }: { icon: string; label: string; value?: s
 export default function ProjectBriefPanel({ project, clientMode }: { project: ManufacturingProjectDetailDto; clientMode?: boolean }) {
   const navigate = useNavigate();
   const isRegistered = !!project.accountEmail;
+
+  // Pull the full inquiry so we can show exactly what the client filled in the
+  // form (all answers + uploaded images/files) right here in the brief.
+  const { data: inquiry } = useQuery({
+    queryKey: ['project-brief-inquiry', project.inquiryId],
+    queryFn: () => manufacturingApi.getInquiry(project.inquiryId!),
+    enabled: !!project.inquiryId,
+    staleTime: 60_000,
+  });
+
+  const answers = inquiry?.values
+    ? Object.entries(inquiry.values).filter(
+        ([, v]) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0),
+      )
+    : [];
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -91,10 +143,32 @@ export default function ProjectBriefPanel({ project, clientMode }: { project: Ma
           )}
         </div>
 
+        {/* Submitted form answers — exactly what the client filled in, with images/files */}
+        <div className="border rounded-xl overflow-hidden" style={{ borderColor: 'var(--p-outline-variant)' }}>
+          <div className="px-4 py-3 flex items-center gap-2 border-b" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-low)' }}>
+            <Sym name="assignment" className="text-[18px]" style={{ color: 'var(--p-primary)' }} />
+            <h3 className="font-bold text-[14px]">Submitted brief</h3>
+          </div>
+          {answers.length === 0 ? (
+            <p className="px-4 py-5 text-[13px]" style={{ color: 'var(--p-on-surface-variant)' }}>
+              {inquiry ? 'No form answers were submitted.' : 'Loading form answers…'}
+            </p>
+          ) : (
+            <div className="divide-y" style={{ borderColor: 'var(--p-outline-variant)' }}>
+              {answers.map(([key, val]) => (
+                <div key={key} className="px-4 py-3" style={{ borderColor: 'var(--p-outline-variant)' }}>
+                  <p className="text-[11px] font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--p-on-surface-variant)' }}>{key}</p>
+                  <AnswerValue value={val} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {!clientMode && (
           <p className="text-[12px] flex items-center gap-1.5" style={{ color: 'var(--p-on-surface-variant)' }}>
             <Sym name="info" className="text-[15px]" />
-            Full form answers, attachments and timeline live on the inquiry — use “Open full inquiry”.
+            Uploaded files also appear under the Files tab. Use “Open full inquiry” for the raw submission &amp; timeline.
           </p>
         )}
       </div>
