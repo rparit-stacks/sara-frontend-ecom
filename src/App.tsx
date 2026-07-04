@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SITE_UNDER_MAINTENANCE } from "@/siteMaintenance";
 import Maintenance from "@/pages/Maintenance";
 import { CurrencyProvider } from "@/context/CurrencyContext";
@@ -34,6 +34,7 @@ import Dashboard from "./pages/Dashboard";
 import OrderDetail from "./pages/OrderDetail";
 import OrderConfirmation from "./pages/OrderConfirmation";
 import TestimonialSubmit from "./pages/TestimonialSubmit";
+import PaymentPage from "./pages/PaymentPage";
 import AuthCallback from "./pages/AuthCallback";
 import AdminInvite from "./pages/admin/AdminInvite";
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -51,6 +52,7 @@ import AdminAdmins from "./pages/admin/AdminAdmins";
 import CustomProductDetail from "./pages/CustomProductDetail";
 import Blog from "./pages/Blog";
 import BlogDetail from "./pages/BlogDetail";
+import Inquiry from "./pages/Inquiry";
 import AdminBlog from "./pages/admin/AdminBlog";
 import AdminHomepageBlogs from "./pages/admin/AdminHomepageBlogs";
 import AdminFAQ from "./pages/admin/AdminFAQ";
@@ -66,8 +68,46 @@ import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
 import AdminLogs from "./pages/admin/AdminLogs";
 import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
 import MaintenancePlan from "./pages/admin/MaintenancePlan";
+import PortalGuard from "./components/portal/PortalGuard";
+import PortalHome from "./pages/portal/PortalHome";
+import ClientProjectDetail from "./pages/portal/ClientProjectDetail";
+import PortalMessages from "./pages/portal/PortalMessages";
+import PortalActivity from "./pages/portal/PortalActivity";
+import PortalFiles from "./pages/portal/PortalFiles";
+import PortalProfile from "./pages/portal/PortalProfile";
+import PortalSettings from "./pages/portal/PortalSettings";
+import PortalThreads from "./pages/portal/PortalThreads";
+import PortalInvoices from "./pages/portal/PortalInvoices";
+import PortalAdminDashboard from "./pages/portal/admin/AdminDashboard";
+import PortalAdminProjects from "./pages/portal/admin/AdminProjects";
+import PortalAdminProjectDetail from "./pages/portal/admin/AdminProjectDetail";
+import PortalAdminInquiries from "./pages/portal/admin/AdminInquiries";
+import PortalAdminQuotations from "./pages/portal/admin/AdminQuotations";
+import PortalAdminPaymentLinks from "./pages/portal/admin/AdminPaymentLinks";
+import PortalAdminInvoices from "./pages/portal/admin/AdminInvoices";
+import PortalAdminTechPacks from "./pages/portal/admin/AdminTechPacks";
+import PortalAdminClients from "./pages/portal/admin/AdminClients";
+import PortalAdminSettings from "./pages/portal/admin/AdminSettings";
+import PortalAdminInquiryForm from "./pages/portal/admin/AdminInquiryForm";
+import PortalAdminInquiryContent from "./pages/portal/admin/AdminInquiryContent";
+import PortalAdminForms from "./pages/portal/admin/AdminForms";
+import PortalAdminFormBuilder from "./pages/portal/admin/AdminFormBuilder";
+import PortalAdminQuoteBuilder from "./pages/portal/admin/AdminQuoteBuilder";
+import PortalAdminInquiryDetail from "./pages/portal/admin/AdminInquiryDetail";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Serve cached data instantly and treat it as fresh for 60s, so revisiting
+      // a page shows immediately instead of a 2s refetch. Data older than this
+      // still shows instantly, then refreshes in the background.
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const App = () =>
   SITE_UNDER_MAINTENANCE ? (
@@ -97,6 +137,8 @@ const App = () =>
           <Route path="/orders/:id" element={<OrderDetail />} />
           <Route path="/order-confirmation/:id" element={<OrderConfirmation />} />
           <Route path="/testimonial/:linkId" element={<TestimonialSubmit />} />
+          <Route path="/pay" element={<PaymentPage />} />
+          <Route path="/pay/:code" element={<PaymentPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/about" element={<About />} />
@@ -111,7 +153,45 @@ const App = () =>
           <Route path="/custom-product" element={<CustomProductDetail />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/:id" element={<BlogDetail />} />
+          <Route path="/inquiry" element={<Inquiry />} />
           
+          {/* Manufacturing Portal (client side) */}
+          <Route path="/portal" element={<PortalGuard><PortalHome /></PortalGuard>} />
+          <Route path="/portal/projects/:code" element={<PortalGuard><ClientProjectDetail /></PortalGuard>} />
+          <Route path="/portal/workspace" element={<PortalGuard><Navigate to="/portal" replace /></PortalGuard>} />
+          <Route path="/portal/quotation" element={<PortalGuard><Navigate to="/portal" replace /></PortalGuard>} />
+          <Route path="/portal/messages" element={<PortalGuard><PortalMessages /></PortalGuard>} />
+          <Route path="/portal/activity" element={<PortalGuard><PortalActivity /></PortalGuard>} />
+          <Route path="/portal/files" element={<PortalGuard><PortalFiles /></PortalGuard>} />
+          <Route path="/portal/profile" element={<PortalGuard><PortalProfile /></PortalGuard>} />
+          <Route path="/portal/settings" element={<PortalGuard><PortalSettings /></PortalGuard>} />
+          <Route path="/portal/threads" element={<PortalGuard><PortalThreads /></PortalGuard>} />
+          <Route path="/portal/drafts" element={<PortalGuard><Navigate to="/portal" replace /></PortalGuard>} />
+          <Route path="/portal/brief" element={<PortalGuard><Navigate to="/portal" replace /></PortalGuard>} />
+          <Route path="/portal/moodboards" element={<PortalGuard><Navigate to="/portal" replace /></PortalGuard>} />
+          <Route path="/portal/pins" element={<PortalGuard><Navigate to="/portal" replace /></PortalGuard>} />
+          <Route path="/portal/invoices" element={<PortalGuard><PortalInvoices /></PortalGuard>} />
+
+          {/* Manufacturing Portal — ADMIN side (guarded by existing store-admin auth) */}
+          <Route path="/portal-admin" element={<ProtectedAdminRoute><PortalAdminDashboard /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/projects" element={<ProtectedAdminRoute><PortalAdminProjects /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/projects/:code" element={<ProtectedAdminRoute><PortalAdminProjectDetail /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/inquiries" element={<ProtectedAdminRoute><PortalAdminInquiries /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/inquiries/:id" element={<ProtectedAdminRoute><PortalAdminInquiryDetail /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/inquiry-form" element={<ProtectedAdminRoute><PortalAdminInquiryForm /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/inquiry-content" element={<ProtectedAdminRoute><PortalAdminInquiryContent /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/quotations" element={<ProtectedAdminRoute><PortalAdminQuotations /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/payment-links" element={<ProtectedAdminRoute><PortalAdminPaymentLinks /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/quote-editor/new" element={<ProtectedAdminRoute><PortalAdminQuoteBuilder /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/quote-editor/:reference" element={<ProtectedAdminRoute><PortalAdminQuoteBuilder /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/quotations/:project" element={<ProtectedAdminRoute><Navigate to="/portal-admin/quotations" replace /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/forms" element={<ProtectedAdminRoute><PortalAdminForms /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/forms/:id" element={<ProtectedAdminRoute><PortalAdminFormBuilder /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/invoices" element={<ProtectedAdminRoute><PortalAdminInvoices /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/tech-packs" element={<ProtectedAdminRoute><PortalAdminTechPacks /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/clients" element={<ProtectedAdminRoute><PortalAdminClients /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/settings" element={<ProtectedAdminRoute><PortalAdminSettings /></ProtectedAdminRoute>} />
+
           {/* Admin Routes */}
           <Route path="/admin-sara/login" element={<AdminLogin />} />
           <Route path="/admin-sara/invite/:token" element={<AdminInvite />} />

@@ -9,7 +9,7 @@ import { cartApi, wishlistApi, cmsApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import { CategoryDropdown } from '@/components/categories/CategoryDropdown';
 import { CurrencySelector } from '@/components/currency/CurrencySelector';
-import { Package, LayoutDashboard, Settings, LogOut } from 'lucide-react';
+import { Package, LayoutDashboard, Settings, LogOut, Factory } from 'lucide-react';
 
 const navLinks = [
   { name: 'Home', path: '/' },
@@ -170,6 +170,16 @@ export const Navbar = () => {
 
           {/* Right Actions - Compact */}
           <div className="flex items-center gap-2 xs:gap-3">
+            {/* Get a Quote CTA - desktop */}
+            <Link to="/inquiry" className="hidden lg:block">
+              <Button
+                size="sm"
+                className="rounded-full px-5 h-10 font-medium bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Get a Quote
+              </Button>
+            </Link>
+
             {/* Search - desktop */}
             <Button 
               variant="ghost" 
@@ -243,6 +253,13 @@ export const Navbar = () => {
                       className="absolute top-full right-0 mt-2 w-56 bg-white border border-border rounded-lg shadow-lg z-50"
                     >
                       <div className="py-2">
+                        <button
+                          onClick={() => { setIsProfileMenuOpen(false); navigate('/portal'); }}
+                          className="w-full px-4 py-2.5 text-left text-sm font-medium text-foreground hover:bg-secondary transition-colors flex items-center gap-3"
+                        >
+                          <Factory className="w-4 h-4" />
+                          Manufacturing Portal
+                        </button>
                         <button
                           onClick={() => handleProfileMenuClick('orders')}
                           className="w-full px-4 py-2.5 text-left text-sm font-medium text-foreground hover:bg-secondary transition-colors flex items-center gap-3"
@@ -341,6 +358,21 @@ export const Navbar = () => {
                   </div>
                 </motion.div>
                 
+                {/* Get a Quote (highlighted) */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 1.5 * 0.05 }}
+                >
+                  <Link
+                    to="/inquiry"
+                    onClick={() => setIsOpen(false)}
+                    className="block py-3 px-4 rounded-lg text-sm font-semibold transition-colors bg-primary/10 text-primary hover:bg-primary/15"
+                  >
+                    Get a Quote
+                  </Link>
+                </motion.div>
+
                 {/* Other nav links */}
                 {navLinks.filter(link => link.name !== 'Home').map((link, index) => (
                   <motion.div
@@ -383,12 +415,28 @@ export const Navbar = () => {
                   <i className="fa-solid fa-search"></i>
                   Search
                 </Button>
-                <Link to={isAuthenticated ? "/dashboard" : "/login"} onClick={() => setIsOpen(false)} className="flex-1">
-                  <Button className="w-full btn-primary gap-2">
-                    <i className="fa-regular fa-user"></i>
-                    {isAuthenticated ? 'Dashboard' : 'Login'}
+                <Link to="/dashboard" onClick={() => setIsOpen(false)} className="flex-1">
+                  <Button variant="outline" className="w-full gap-2">
+                    <LayoutDashboard className="w-4 h-4" />
+                    Dashboard
                   </Button>
                 </Link>
+                {isAuthenticated && (
+                  <Link to="/portal" onClick={() => setIsOpen(false)} className="flex-1">
+                    <Button className="w-full btn-primary gap-2">
+                      <Factory className="w-4 h-4" />
+                      Portal
+                    </Button>
+                  </Link>
+                )}
+                {!isAuthenticated && (
+                <Link to="/login" onClick={() => setIsOpen(false)} className="flex-1">
+                  <Button className="w-full btn-primary gap-2">
+                    <i className="fa-regular fa-user"></i>
+                    Login
+                  </Button>
+                </Link>
+                )}
               </motion.div>
             </div>
           </motion.div>

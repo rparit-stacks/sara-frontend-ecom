@@ -1,4 +1,6 @@
 // API Configuration
+import type { InquiryPageContent } from '@/components/inquiry/inquiryContent';
+
 export const API_BASE_URL = import.meta.env.VITE_API_URL as string;
 
 // Helper function to get user email from JWT token
@@ -61,19 +63,34 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
   const startTime = Date.now();
   const minDuration = 300; // Minimum 300ms loading visibility
   
-  // Show loading for non-GET requests or if explicitly needed
-  const shouldShowLoading = method !== 'GET' || endpoint.includes('/cart') || endpoint.includes('/checkout');
+  // Show loading for non-GET requests — but not for chat/workspace actions (they use optimistic UI).
+  const isChatAction =
+    endpoint.includes('/api/portal/projects/') ||
+    endpoint.includes('/api/admin/manufacturing/projects/');
+  const shouldShowLoading = (method !== 'GET' || endpoint.includes('/cart') || endpoint.includes('/checkout'))
+    && !isChatAction;
   
   if (shouldShowLoading) {
     setGlobalLoading(true, 'Loading...');
   }
   
+  // Fail hung GETs instead of showing the spinner forever. Only GET is aborted:
+  // it is idempotent and safe to retry. Mutations/uploads (POST/PUT/PATCH/DELETE)
+  // are NEVER aborted — killing them mid-flight risks half-applied writes and
+  // spams Tomcat with RecycleRequiredException. Caller-supplied signals win.
+  const timeoutMs = 30000;
+  const controller = new AbortController();
+  const canTimeout = method === 'GET' && !options?.signal;
+  const timeoutId = canTimeout ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
+
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
+      signal: options?.signal ?? (canTimeout ? controller.signal : undefined),
     });
-    
+    if (timeoutId) clearTimeout(timeoutId);
+
     const duration = Date.now() - startTime;
     
     if (!response.ok) {
@@ -149,12 +166,14 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     
     return data;
   } catch (error) {
+    if (timeoutId) clearTimeout(timeoutId);
     const duration = Date.now() - startTime;
+    const isAbort = error instanceof DOMException && error.name === 'AbortError';
     console.error(`[API Exception] ${method} ${endpoint}`, {
-      error: error instanceof Error ? error.message : error,
+      error: isAbort ? `timed out after ${timeoutMs}ms` : error instanceof Error ? error.message : error,
       duration: `${duration}ms`,
     });
-    
+
     // Ensure minimum duration before hiding loading
     if (shouldShowLoading) {
       const remaining = Math.max(0, minDuration - duration);
@@ -163,7 +182,8 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
       }
       setGlobalLoading(false);
     }
-    
+
+    if (isAbort) throw new Error('Request timed out. Please check your connection and try again.');
     throw error;
   }
 }
@@ -627,6 +647,166 @@ export const contactApi = {
 };
 
 // ===============================
+// Manufacturing Portal — Inquiry Form API
+// ===============================
+export interface ManufacturingFormDto {
+  id: number;
+  name: string;
+  category: string;
+  purpose: string;
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  version: number;
+  schema: Record<string, unknown> | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ManufacturingInquiryDto {
+  id: number;
+  reference: string;
+  formId?: number;
+  formVersion?: number;
+  values: Record<string, unknown>;
+  clientName?: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  brand?: string;
+  source?: string;         // INQUIRY_FORM | CUSTOM_DESIGN
+  adminNote?: string;
+  status: 'NEW' | 'REVIEWING' | 'QUOTED' | 'DECLINED';
+  currentStage?: string;   // INQUIRY | QUOTATION | SAMPLING | PRODUCTION | INVOICING | COMPLETED
+  currentStatus?: string;  // stage-specific status
+  accountEmail?: string;   // signed-in user (id=email) at submit time
+  accountName?: string;
+  accountPhone?: string;
+  createdAt: string;
+}
+
+export interface ManufacturingFormSaveRequest {
+  name?: string;
+  category?: string;
+  purpose?: string;
+  status?: string;
+  schema?: Record<string, unknown>;
+}
+
+export interface CompanyProfile {
+  name: string;
+  tagline?: string;
+  logoUrl?: string;
+  addressLines: string[];
+  phone?: string;
+  email?: string;
+  website?: string;
+  gstin?: string;
+}
+
+export interface ManufacturingQuoteDto {
+  id: number;
+  reference: string;
+  inquiryId?: number;
+  title: string;
+  clientName?: string;
+  clientEmail?: string;
+  currency: string;
+  total: number;
+  status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'DECLINED';
+  doc: Record<string, unknown> | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ManufacturingQuoteSaveRequest {
+  inquiryId?: number;
+  title?: string;
+  clientName?: string;
+  clientEmail?: string;
+  currency?: string;
+  total?: number;
+  status?: string;
+  doc?: Record<string, unknown>;
+}
+
+export const manufacturingApi = {
+  // Public
+  getPublishedInquiryForm: () =>
+    fetchApi<ManufacturingFormDto | null>('/api/manufacturing/inquiry-form'),
+  submitInquiry: (data: { formId?: number; values: Record<string, unknown> }) =>
+    fetchApi<ManufacturingInquiryDto>('/api/manufacturing/inquiry', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getInquiryContent: () =>
+    fetchApi<InquiryPageContent | null>('/api/manufacturing/inquiry-content'),
+
+  // Admin — inquiry page CMS content
+  getInquiryContentAdmin: () =>
+    fetchApi<InquiryPageContent | null>('/api/admin/manufacturing/inquiry-content'),
+  saveInquiryContent: (content: InquiryPageContent) =>
+    fetchApi<InquiryPageContent>('/api/admin/manufacturing/inquiry-content', {
+      method: 'PUT',
+      body: JSON.stringify(content),
+    }),
+
+  // Admin
+  getInquiryForm: () =>
+    fetchApi<ManufacturingFormDto>('/api/admin/manufacturing/inquiry-form'),
+  saveInquiryForm: (data: ManufacturingFormSaveRequest) =>
+    fetchApi<ManufacturingFormDto>('/api/admin/manufacturing/inquiry-form', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  listInquiries: (status?: string) => {
+    const q = status ? `?status=${encodeURIComponent(status)}` : '';
+    return fetchApi<ManufacturingInquiryDto[]>(`/api/admin/manufacturing/inquiries${q}`);
+  },
+  getInquiry: (id: number) =>
+    fetchApi<ManufacturingInquiryDto>(`/api/admin/manufacturing/inquiries/${id}`),
+  updateInquiryStatus: (id: number, status: string, note?: string) =>
+    fetchApi<ManufacturingInquiryDto>(`/api/admin/manufacturing/inquiries/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, note }),
+    }),
+  updateInquiryStage: (id: number, stage?: string, status?: string, note?: string) =>
+    fetchApi<ManufacturingInquiryDto>(`/api/admin/manufacturing/inquiries/${id}/stage`, {
+      method: 'PATCH',
+      body: JSON.stringify({ stage, status, note }),
+    }),
+
+  // Admin — company profile (branding for quotes)
+  getCompanyProfile: () =>
+    fetchApi<CompanyProfile | null>('/api/admin/manufacturing/company-profile'),
+  saveCompanyProfile: (profile: CompanyProfile) =>
+    fetchApi<CompanyProfile>('/api/admin/manufacturing/company-profile', {
+      method: 'PUT',
+      body: JSON.stringify(profile),
+    }),
+
+  // Admin — quotations
+  listQuotes: () =>
+    fetchApi<ManufacturingQuoteDto[]>('/api/admin/manufacturing/quotes'),
+  getQuote: (id: number) =>
+    fetchApi<ManufacturingQuoteDto>(`/api/admin/manufacturing/quotes/${id}`),
+  getQuoteByReference: (reference: string) =>
+    fetchApi<ManufacturingQuoteDto>(`/api/admin/manufacturing/quotes/by-reference/${encodeURIComponent(reference)}`),
+  createQuote: (data: ManufacturingQuoteSaveRequest) =>
+    fetchApi<ManufacturingQuoteDto>('/api/admin/manufacturing/quotes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateQuote: (id: number, data: ManufacturingQuoteSaveRequest) =>
+    fetchApi<ManufacturingQuoteDto>(`/api/admin/manufacturing/quotes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  sendQuote: (id: number, opts?: { message?: string; pdfBase64?: string }) =>
+    fetchApi<ManufacturingQuoteDto>(`/api/admin/manufacturing/quotes/${id}/send`, {
+      method: 'POST',
+      body: JSON.stringify({ message: opts?.message, pdfBase64: opts?.pdfBase64 }),
+    }),
+};
+
+// ===============================
 // Media API
 // ===============================
 export const mediaApi = {
@@ -641,7 +821,7 @@ export const mediaApi = {
     formData.append('file', file);
     formData.append('folder', folder);
     
-    const token = localStorage.getItem('adminToken');
+    const token = localStorage.getItem('adminToken') || localStorage.getItem('authToken');
     
     const response = await fetch(`${API_BASE_URL}/api/admin/media/upload`, {
       method: 'POST',
@@ -1460,6 +1640,408 @@ export const paymentApi = {
   verify: (data: any) => fetchApi<any>('/api/payment/verify', { method: 'POST', body: JSON.stringify(data) }),
   recordPaymentFailed: (orderNumber: string, gateway: string) =>
     fetchApi<{ success: boolean }>('/api/payment/record-failed', { method: 'POST', body: JSON.stringify({ orderNumber, gateway }) }),
+};
+
+// ===============================
+// Payment Links (Studio Sara pay page)
+// ===============================
+export type PaymentLinkMode = 'OPEN' | 'FIXED' | 'CLIENT' | 'QUOTE';
+
+export interface PaymentLinkDto {
+  id: number;
+  code: string;
+  mode: PaymentLinkMode;
+  title?: string;
+  amount?: number;
+  currency: string;
+  clientEmail?: string;
+  clientName?: string;
+  quoteReference?: string;
+  note?: string;
+  active: boolean;
+  createdAt?: string;
+}
+
+export interface PayLineItem { description: string; qty: number; rate: number; amount: number; }
+export interface PayContact { name?: string; email?: string; phone?: string; address?: string; gstin?: string; }
+
+export interface ResolvedPayTarget {
+  code?: string;
+  mode: PaymentLinkMode;
+  title?: string;
+  amount?: number;
+  currency?: string;
+  amountEditable?: boolean;
+  clientEmail?: string;
+  clientName?: string;
+  clientAddress?: string;
+  quoteReference?: string;
+  quoteTitle?: string;
+  companyName?: string;
+  companyGstin?: string;
+  note?: string;
+  date?: string;
+  validityDays?: number;
+  items?: PayLineItem[];
+  subtotal?: number;
+  discount?: number;
+  gstPercent?: number;
+  gstAmount?: number;
+  contact?: PayContact;
+}
+
+// ===============================
+// Manufacturing Projects API (Admin)
+// ===============================
+export interface ProjectMessageDto {
+  id: number;
+  projectId: number;
+  designId?: number | null;
+  parentMessageId?: number | null;
+  replyCount?: number;
+  authorType: 'ADMIN' | 'CLIENT' | 'SYSTEM';
+  authorName?: string;
+  body?: string;
+  attachmentUrl?: string;
+  createdAt?: string;
+}
+
+export interface ProjectThreadSummaryDto {
+  messageId: number;
+  designId?: number | null;
+  designName: string;
+  rootAuthorName?: string;
+  rootAuthorType: string;
+  snippet: string;
+  replyCount: number;
+  lastReplyBy?: string;
+  lastReplyAuthorType?: string;
+  lastReplyAt?: string;
+  createdAt?: string;
+  unread: boolean;
+}
+
+export type WorkspaceView = 'channels' | 'threads' | 'quotation' | 'brief' | 'invoices' | 'files';
+
+export interface ProjectDesignDto {
+  id: number;
+  projectId: number;
+  name: string;
+  imageUrl?: string | null;
+  description?: string | null;
+  sortOrder?: number;
+  system?: boolean;
+  createdAt?: string;
+  unreadCount?: number;
+}
+
+export interface ManufacturingProjectDto {
+  id: number;
+  code: string;
+  inquiryReference: string;
+  inquiryId: number;
+  title?: string;
+  brand?: string;
+  clientName?: string;
+  clientEmail?: string;
+  currentStage: string;
+  currentStatus: string;
+  progressPercent: number;
+  designCount: number;
+  valueDisplay?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ManufacturingProjectDetailDto extends ManufacturingProjectDto {
+  clientPhone?: string;
+  accountEmail?: string;
+  designs: ProjectDesignDto[];
+  messages: ProjectMessageDto[];
+  quotes: {
+    id: number;
+    reference: string;
+    title?: string;
+    total?: number;
+    currency?: string;
+    status: string;
+  }[];
+  invoices: {
+    id: number;
+    reference: string;
+    quoteReference?: string;
+    title?: string;
+    amount?: number;
+    currency?: string;
+    status: string;
+  }[];
+}
+
+export const projectApi = {
+  list: (opts?: { search?: string; stage?: string }) => {
+    const p = new URLSearchParams();
+    if (opts?.search) p.set('search', opts.search);
+    if (opts?.stage) p.set('stage', opts.stage);
+    const q = p.toString();
+    return fetchApi<ManufacturingProjectDto[]>(`/api/admin/manufacturing/projects${q ? `?${q}` : ''}`);
+  },
+  getByCode: (code: string, designId?: number, opts?: { includeMessages?: boolean; includeFinancials?: boolean }) => {
+    const p = new URLSearchParams();
+    if (designId != null) p.set('designId', String(designId));
+    if (opts?.includeMessages === false) p.set('includeMessages', 'false');
+    if (opts?.includeFinancials === false) p.set('includeFinancials', 'false');
+    const q = p.toString();
+    return fetchApi<ManufacturingProjectDetailDto>(
+      `/api/admin/manufacturing/projects/${encodeURIComponent(code)}${q ? `?${q}` : ''}`,
+    );
+  },
+  getChannelMessages: (code: string, designId?: number) => {
+    const q = designId != null ? `?designId=${designId}` : '';
+    return fetchApi<ProjectMessageDto[]>(
+      `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/messages${q}`,
+    );
+  },
+  listAttachments: (code: string) =>
+    fetchApi<ProjectMessageDto[]>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/attachments`),
+  getQuote: (code: string, quoteId: number) =>
+    fetchApi<ManufacturingQuoteDto>(
+      `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/quotes/${quoteId}`,
+    ),
+  renameDesign: (code: string, designId: number, name: string) =>
+    fetchApi<ProjectDesignDto>(
+      `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/designs/${designId}`,
+      { method: 'PATCH', body: JSON.stringify({ name }) },
+    ),
+  renameProject: (code: string, title: string) =>
+    fetchApi<ManufacturingProjectDto>(
+      `/api/admin/manufacturing/projects/${encodeURIComponent(code)}`,
+      { method: 'PATCH', body: JSON.stringify({ title }) },
+    ),
+  deleteProject: (code: string) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}`, {
+      method: 'DELETE',
+    }),
+  createDesign: (code: string, name: string, imageUrl?: string, description?: string) =>
+    fetchApi<ProjectDesignDto>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/designs`, {
+      method: 'POST',
+      body: JSON.stringify({ name, imageUrl, description }),
+    }),
+  deleteDesign: (code: string, designId: number) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/designs/${designId}`, {
+      method: 'DELETE',
+    }),
+  updateStage: (code: string, stage: string, status: string, note?: string) =>
+    fetchApi<ManufacturingProjectDetailDto>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/stage`, {
+      method: 'PATCH',
+      body: JSON.stringify({ stage, status, note }),
+    }),
+  updateProgress: (code: string, progressPercent: number) =>
+    fetchApi<ManufacturingProjectDetailDto>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/progress`, {
+      method: 'PATCH',
+      body: JSON.stringify({ progressPercent }),
+    }),
+  postMessage: (
+    code: string,
+    body: string,
+    opts?: { attachmentUrl?: string; authorName?: string; designId?: number; parentMessageId?: number },
+  ) =>
+    fetchApi<ProjectMessageDto>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({
+        body,
+        ...(opts?.attachmentUrl != null ? { attachmentUrl: opts.attachmentUrl } : {}),
+        ...(opts?.authorName != null ? { authorName: opts.authorName } : {}),
+        ...(opts?.designId != null ? { designId: opts.designId } : {}),
+        ...(opts?.parentMessageId != null ? { parentMessageId: opts.parentMessageId } : {}),
+      }),
+    }),
+  deleteMessage: (code: string, messageId: number) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/messages/${messageId}`, {
+      method: 'DELETE',
+    }),
+  requestPayment: (code: string, amount: number, opts?: { currency?: string; label?: string }) =>
+    fetchApi<ProjectMessageDto>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/request-payment`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, currency: opts?.currency || 'INR', label: opts?.label }),
+    }),
+  listThreads: (code: string) =>
+    fetchApi<ProjectThreadSummaryDto[]>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/threads`),
+  markThreadRead: (code: string, messageId: number) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/threads/${messageId}/read`, {
+      method: 'POST',
+    }),
+};
+
+/** Client manufacturing project workspace — scoped to logged-in user's projects. */
+export const clientProjectApi = {
+  list: () => fetchApi<ManufacturingProjectDto[]>('/api/portal/projects'),
+  aggregate: () => fetchApi<PortalAggregateDto>('/api/portal/projects/aggregate'),
+  getByCode: (code: string, designId?: number, opts?: { includeMessages?: boolean; includeFinancials?: boolean }) => {
+    const p = new URLSearchParams();
+    if (designId != null) p.set('designId', String(designId));
+    if (opts?.includeMessages === false) p.set('includeMessages', 'false');
+    if (opts?.includeFinancials) p.set('includeFinancials', 'true');
+    const q = p.toString();
+    return fetchApi<ManufacturingProjectDetailDto>(
+      `/api/portal/projects/${encodeURIComponent(code)}${q ? `?${q}` : ''}`,
+    );
+  },
+  getChannelMessages: (code: string, designId?: number) => {
+    const q = designId != null ? `?designId=${designId}` : '';
+    return fetchApi<ProjectMessageDto[]>(
+      `/api/portal/projects/${encodeURIComponent(code)}/messages${q}`,
+    );
+  },
+  listAttachments: (code: string) =>
+    fetchApi<ProjectMessageDto[]>(`/api/portal/projects/${encodeURIComponent(code)}/attachments`),
+  postMessage: (
+    code: string,
+    body: string,
+    opts?: { attachmentUrl?: string; designId?: number; parentMessageId?: number },
+  ) =>
+    fetchApi<ProjectMessageDto>(`/api/portal/projects/${encodeURIComponent(code)}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({
+        body,
+        ...(opts?.attachmentUrl != null ? { attachmentUrl: opts.attachmentUrl } : {}),
+        ...(opts?.designId != null ? { designId: opts.designId } : {}),
+        ...(opts?.parentMessageId != null ? { parentMessageId: opts.parentMessageId } : {}),
+      }),
+    }),
+  deleteMessage: (code: string, messageId: number) =>
+    fetchApi<{ ok: boolean }>(`/api/portal/projects/${encodeURIComponent(code)}/messages/${messageId}`, {
+      method: 'DELETE',
+    }),
+  listThreads: (code: string) =>
+    fetchApi<ProjectThreadSummaryDto[]>(`/api/portal/projects/${encodeURIComponent(code)}/threads`),
+  markThreadRead: (code: string, messageId: number) =>
+    fetchApi<{ ok: boolean }>(`/api/portal/projects/${encodeURIComponent(code)}/threads/${messageId}/read`, {
+      method: 'POST',
+    }),
+  createDesign: (code: string, name: string, imageUrl?: string, description?: string) =>
+    fetchApi<ProjectDesignDto>(`/api/portal/projects/${encodeURIComponent(code)}/designs`, {
+      method: 'POST',
+      body: JSON.stringify({ name, imageUrl, description }),
+    }),
+  renameDesign: (code: string, designId: number, name: string) =>
+    fetchApi<ProjectDesignDto>(
+      `/api/portal/projects/${encodeURIComponent(code)}/designs/${designId}`,
+      { method: 'PATCH', body: JSON.stringify({ name }) },
+    ),
+  renameProject: (code: string, title: string) =>
+    fetchApi<ManufacturingProjectDto>(
+      `/api/portal/projects/${encodeURIComponent(code)}`,
+      { method: 'PATCH', body: JSON.stringify({ title }) },
+    ),
+  getQuote: (code: string, quoteId: number) =>
+    fetchApi<ManufacturingQuoteDto>(
+      `/api/portal/projects/${encodeURIComponent(code)}/quotes/${quoteId}`,
+    ),
+};
+
+export interface PortalAggregateDto {
+  projects: ManufacturingProjectDto[];
+  threads: (ProjectThreadSummaryDto & { projectCode: string; projectTitle: string })[];
+  attachments: {
+    id: number;
+    projectCode: string;
+    projectTitle: string;
+    attachmentUrl: string;
+    authorName?: string;
+    createdAt?: string;
+  }[];
+  quotes: {
+    id: number;
+    projectCode: string;
+    projectTitle: string;
+    reference: string;
+    title?: string;
+    total?: number;
+    currency?: string;
+    status: string;
+  }[];
+  invoices: {
+    id: number;
+    projectCode: string;
+    projectTitle: string;
+    reference: string;
+    quoteReference?: string;
+    title?: string;
+    amount?: number;
+    currency?: string;
+    status: string;
+  }[];
+}
+
+export interface ManufacturingInvoiceDto {
+  id: number;
+  reference: string;
+  quoteId?: number;
+  quoteReference?: string;
+  inquiryId?: number;
+  title: string;
+  amount: number;
+  currency: string;
+  clientName?: string;
+  clientEmail?: string;
+  status: 'PENDING' | 'PAID' | 'CANCELLED';
+  doc?: Record<string, unknown> | null;
+  paymentLinkCode?: string;
+  pdfUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export const invoiceApi = {
+  list: (quote?: string) =>
+    fetchApi<ManufacturingInvoiceDto[]>(`/api/admin/manufacturing/invoices${quote ? `?quote=${encodeURIComponent(quote)}` : ''}`),
+  get: (id: number) => fetchApi<ManufacturingInvoiceDto>(`/api/admin/manufacturing/invoices/${id}`),
+  create: (data: { quoteId: number; title?: string; amount: number; send?: boolean }) =>
+    fetchApi<ManufacturingInvoiceDto>('/api/admin/manufacturing/invoices', { method: 'POST', body: JSON.stringify(data) }),
+  savePdf: (id: number, pdfUrl: string) =>
+    fetchApi<ManufacturingInvoiceDto>(`/api/admin/manufacturing/invoices/${id}/pdf`, { method: 'PATCH', body: JSON.stringify({ pdfUrl }) }),
+  send: (id: number, pdfBase64?: string) =>
+    fetchApi<ManufacturingInvoiceDto>(`/api/admin/manufacturing/invoices/${id}/send`, { method: 'POST', body: JSON.stringify({ pdfBase64 }) }),
+};
+
+// ---- Tech Pack documents (shared with the standalone Tech Pack Studio) ----
+export interface TechPackSummary {
+  id: string;
+  name: string;
+  isTemplate: boolean;
+  updatedAt: string;
+}
+export const techPackApi = {
+  list: (template?: boolean) =>
+    fetchApi<TechPackSummary[]>(
+      `/api/admin/tech-packs${template === undefined ? '' : `?template=${template}`}`,
+    ),
+  remove: (id: string) =>
+    fetchApi<void>(`/api/admin/tech-packs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
+export const paymentLinkApi = {
+  // public
+  resolve: (opts: { code?: string; quote?: string }) => {
+    const p = new URLSearchParams();
+    if (opts.code) p.set('code', opts.code);
+    if (opts.quote) p.set('quote', opts.quote);
+    return fetchApi<ResolvedPayTarget>(`/api/pay/resolve?${p.toString()}`);
+  },
+  createOrder: (data: {
+    code?: string; quote?: string; amount: number; currency?: string; gateway: string;
+    payerName?: string; payerEmail?: string; payerPhone?: string;
+  }) => fetchApi<{ orderData: Record<string, unknown>; gateway: string; paymentRecordId: number }>(
+    '/api/pay/create-order', { method: 'POST', body: JSON.stringify(data) }),
+  verify: (data: any) => fetchApi<{ status: string; paymentId?: string; message?: string }>(
+    '/api/pay/verify', { method: 'POST', body: JSON.stringify(data) }),
+
+  // admin
+  list: () => fetchApi<PaymentLinkDto[]>('/api/admin/payment-links'),
+  create: (data: Partial<PaymentLinkDto>) =>
+    fetchApi<PaymentLinkDto>('/api/admin/payment-links', { method: 'POST', body: JSON.stringify(data) }),
+  setActive: (id: number, active: boolean) =>
+    fetchApi<PaymentLinkDto>(`/api/admin/payment-links/${id}/active`, { method: 'PATCH', body: JSON.stringify({ active }) }),
 };
 
 // ===============================

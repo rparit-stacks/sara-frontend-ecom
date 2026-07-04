@@ -186,6 +186,14 @@ const AdminCustomConfig = () => {
     setAdminNotes(request.adminNotes || '');
     setIsDetailDialogOpen(true);
   };
+
+  // Open the manufacturing portal inquiries in a new tab, pre-searched by this
+  // request's email so the admin lands on the mirrored (CUSTOM_DESIGN) inquiry.
+  const openOnPortal = (request: any) => {
+    const q = request?.email || request?.fullName || '';
+    const url = `/portal-admin/inquiries${q ? `?q=${encodeURIComponent(q)}` : ''}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
   
   const handleUpdateStatus = (status: string) => {
     if (selectedRequest) {
@@ -905,6 +913,16 @@ const AdminCustomConfig = () => {
                             <Eye className="w-4 h-4" />
                             View Details
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openOnPortal(request)}
+                            className="gap-2"
+                            title="Find this request in the manufacturing portal"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            Check on Portal
+                          </Button>
                         </div>
                       </div>
                     </motion.div>
@@ -985,15 +1003,23 @@ const AdminCustomConfig = () => {
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         {urls.map((url, idx) => (
-                          <img
+                          <a
                             key={`detail-img-${idx}`}
-                            src={url}
-                            alt={`Reference ${idx + 1}`}
-                            className="max-h-[180px] w-full object-contain rounded-lg border border-border bg-muted"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block"
+                            title="Open in new tab"
+                          >
+                            <img
+                              src={url}
+                              alt={`Reference ${idx + 1}`}
+                              className="max-h-[180px] w-full object-contain rounded-lg border border-border bg-muted cursor-zoom-in hover:ring-2 hover:ring-primary/50 transition-all"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          </a>
                         ))}
                       </div>
                     </div>

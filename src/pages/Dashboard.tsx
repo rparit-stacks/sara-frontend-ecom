@@ -607,6 +607,29 @@ const Dashboard = () => {
             </Button>
           </div>
 
+          {/* Manufacturing Portal entry point */}
+          <Card
+            className="mb-4 md:mb-6 bg-gradient-to-r from-[#924623] to-[#b15e39] text-white border-none cursor-pointer hover:brightness-105 transition-all overflow-hidden"
+            onClick={() => navigate('/portal')}
+          >
+            <CardContent className="p-5 md:p-6 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                  <LayoutGrid className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg md:text-xl font-bold">Manufacturing Portal</h3>
+                  <p className="text-sm text-white/80 mt-0.5">
+                    Track your custom production projects — quotations, sampling, design channels & delivery.
+                  </p>
+                </div>
+              </div>
+              <Button variant="secondary" size="sm" className="gap-1 shrink-0 bg-white text-[#924623] hover:bg-white/90">
+                Open <ArrowRight className="w-4 h-4" />
+              </Button>
+            </CardContent>
+          </Card>
+
           {/* Dashboard Notification for Restricted Categories - CTA to Personalized Portal */}
           {hasRestrictedCategories && (
             <Card

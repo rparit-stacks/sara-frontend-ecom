@@ -19,6 +19,7 @@ import {
   Percent,
   Activity,
   Wrench,
+  Factory,
 } from 'lucide-react';
 import { ChevronLeft, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,12 @@ const adminMenuSections = [
     items: [
       { icon: LayoutDashboard, label: 'Dashboard', path: '/admin-sara' },
       { icon: Wrench, label: 'Maintenance', path: '/admin-sara/maintenance' },
+    ],
+  },
+  {
+    title: 'Manufacturing',
+    items: [
+      { icon: Factory, label: 'Go to Manufacturing Portal', path: '/portal-admin' },
     ],
   },
   {

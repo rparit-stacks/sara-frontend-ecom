@@ -1,0 +1,134 @@
+/**
+ * Scoped theme for the Manufacturing Portal (Studio Sara).
+ * All tokens live under `.portal-root` so the rest of the StudioSara app
+ * is completely unaffected. Mirrors the Material color tokens used in the
+ * reference HTML screens (primary #924623, Playfair + Inter).
+ */
+
+/* Material Symbols + fonts are loaded once when any portal page mounts. */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
+
+.portal-root {
+  /* Color tokens */
+  --p-surface: #fff8f6;
+  --p-surface-bright: #fff8f6;
+  --p-surface-dim: #e7d7d1;
+  --p-surface-container-lowest: #ffffff;
+  --p-surface-container-low: #fff1ec;
+  --p-surface-container: #fbeae5;
+  --p-surface-container-high: #f5e5df;
+  --p-surface-container-highest: #efdfda;
+  --p-surface-variant: #efdfda;
+  --p-primary: #924623;
+  --p-primary-container: #b15e39;
+  --p-primary-fixed: #ffdbcd;
+  --p-primary-fixed-dim: #ffb597;
+  --p-on-primary: #ffffff;
+  --p-on-primary-fixed: #360f00;
+  --p-on-primary-fixed-variant: #773210;
+  --p-secondary: #5c614d;
+  --p-secondary-container: #e0e5cc;
+  --p-secondary-fixed: #e0e5cc;
+  --p-on-secondary: #ffffff;
+  --p-on-secondary-container: #626753;
+  --p-on-secondary-fixed: #191d0e;
+  --p-on-secondary-fixed-variant: #444937;
+  --p-tertiary: #00676a;
+  --p-on-surface: #221a17;
+  --p-on-surface-variant: #54433c;
+  --p-on-background: #221a17;
+  --p-background: #fff8f6;
+  --p-outline: #87736b;
+  --p-outline-variant: #dac1b8;
+  --p-error: #ba1a1a;
+  --p-error-container: #ffdad6;
+  --p-on-error: #ffffff;
+  --p-on-error-container: #93000a;
+
+  color: var(--p-on-surface);
+  background: var(--p-surface);
+  font-family: 'Inter', system-ui, sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---- Typography helpers ---- */
+.portal-root .font-display { font-family: 'Playfair Display', serif; }
+.portal-root .font-serif-head { font-family: 'Playfair Display', serif; }
+
+/* ---- Material Symbols ---- */
+.portal-root .msym {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-flex;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  vertical-align: middle;
+  user-select: none;
+}
+.portal-root .msym.fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20; }
+
+/* ---- Scrollbar (matches reference) ---- */
+.portal-root *::-webkit-scrollbar { width: 5px; height: 5px; }
+.portal-root *::-webkit-scrollbar-track { background: transparent; }
+.portal-root *::-webkit-scrollbar-thumb { background: var(--p-outline-variant); border-radius: 10px; }
+
+/* ---- Background / surface utility shorthands used in JSX ---- */
+.portal-root .bg-p-surface { background: var(--p-surface); }
+.portal-root .bg-p-white { background: var(--p-surface-container-lowest); }
+.portal-root .bg-p-primary { background: var(--p-primary); }
+.portal-root .bg-p-scl { background: var(--p-surface-container-low); }
+.portal-root .bg-p-sc { background: var(--p-surface-container); }
+.portal-root .bg-p-sch { background: var(--p-surface-container-high); }
+
+.portal-root .text-p-primary { color: var(--p-primary); }
+.portal-root .text-p-on-surface { color: var(--p-on-surface); }
+.portal-root .text-p-on-variant { color: var(--p-on-surface-variant); }
+
+.portal-root .border-p { border-color: var(--p-outline-variant); }
+
+/* card hover from reference */
+.portal-root .card-hover { transition: all .3s cubic-bezier(.4,0,.2,1); }
+.portal-root .card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.06);
+  border-color: var(--p-primary);
+}
+.portal-root .progress-ring__circle {
+  transition: stroke-dashoffset .6s ease;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+.portal-root .luxury-shadow { box-shadow: 0 1px 3px rgba(0,0,0,.05), 0 8px 24px rgba(146,70,35,.04); }
+.portal-root .slack-input-shadow { box-shadow: 0 0 0 1px rgba(135,115,107,.2), 0 2px 4px rgba(0,0,0,.05); }
+
+.portal-root .composer-editor code {
+  background: var(--p-surface-container-high);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.9em;
+  font-family: ui-monospace, monospace;
+}
+
+.portal-root .composer-editor a {
+  color: var(--p-primary);
+  text-decoration: underline;
+}
+
+.portal-root .thread-panel-bg {
+  background-color: var(--p-surface-container-lowest);
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(146, 70, 35, 0.05) 1px, transparent 0),
+    linear-gradient(180deg, rgba(146, 70, 35, 0.03) 0%, transparent 120px);
+  background-size: 22px 22px, 100% 100%;
+}
