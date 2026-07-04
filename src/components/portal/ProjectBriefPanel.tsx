@@ -65,12 +65,13 @@ export default function ProjectBriefPanel({ project, clientMode }: { project: Ma
   const navigate = useNavigate();
   const isRegistered = !!project.accountEmail;
 
-  // Pull the full inquiry so we can show exactly what the client filled in the
-  // form (all answers + uploaded images/files) right here in the brief.
+  // Pull the full inquiry (admin-only endpoint) to show exactly what the client
+  // filled in the form. ONLY in admin mode — the client side has no admin token,
+  // and calling the admin endpoint there 401s.
   const { data: inquiry } = useQuery({
     queryKey: ['project-brief-inquiry', project.inquiryId],
     queryFn: () => manufacturingApi.getInquiry(project.inquiryId!),
-    enabled: !!project.inquiryId,
+    enabled: !clientMode && !!project.inquiryId,
     staleTime: 60_000,
   });
 
@@ -143,7 +144,8 @@ export default function ProjectBriefPanel({ project, clientMode }: { project: Ma
           )}
         </div>
 
-        {/* Submitted form answers — exactly what the client filled in, with images/files */}
+        {/* Submitted form answers — admin only (uses the admin inquiry endpoint) */}
+        {!clientMode && (
         <div className="border rounded-xl overflow-hidden" style={{ borderColor: 'var(--p-outline-variant)' }}>
           <div className="px-4 py-3 flex items-center gap-2 border-b" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-low)' }}>
             <Sym name="assignment" className="text-[18px]" style={{ color: 'var(--p-primary)' }} />
@@ -164,6 +166,7 @@ export default function ProjectBriefPanel({ project, clientMode }: { project: Ma
             </div>
           )}
         </div>
+        )}
 
         {!clientMode && (
           <p className="text-[12px] flex items-center gap-1.5" style={{ color: 'var(--p-on-surface-variant)' }}>
