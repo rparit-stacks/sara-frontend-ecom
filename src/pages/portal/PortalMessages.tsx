@@ -85,11 +85,11 @@ export default function PortalMessages() {
       )}
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--p-surface-container-lowest)' }}>
-        <div className="h-14 px-8 border-b flex items-center justify-between shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+        <div className="h-14 px-4 sm:px-8 border-b flex items-center justify-between shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
           <h2 className="font-display text-[18px]">Projects</h2>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-8 py-8">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 sm:py-8">
           <div className="max-w-6xl mx-auto">
             {isLoading ? (
               <div className="flex justify-center py-24">

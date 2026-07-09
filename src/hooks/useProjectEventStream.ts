@@ -64,6 +64,7 @@ export function useProjectEventStream(
 
     const connect = async () => {
       if (cancelled) return;
+      let cleanEnd = false;
       try {
         const res = await fetch(`${API_BASE_URL}${eventsPath}`, {
           headers: {
@@ -88,7 +89,7 @@ export function useProjectEventStream(
 
         while (!cancelled) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) { cleanEnd = true; break; }
           buffer += decoder.decode(value, { stream: true });
           const parts = buffer.split(/\n\n/);
           buffer = parts.pop() || '';
@@ -121,9 +122,17 @@ export function useProjectEventStream(
         readerRef.current = null;
       }
       if (!cancelled) {
-        failCountRef.current += 1;
-        const delay = Math.min(30_000, 2000 * failCountRef.current);
-        retryRef.current = setTimeout(connect, delay);
+        // A clean stream end is the server's normal ~90s emitter timeout, not a
+        // failure — reconnect quickly so live updates stay seamless. Only apply
+        // exponential backoff on actual errors.
+        if (cleanEnd) {
+          failCountRef.current = 0;
+          retryRef.current = setTimeout(connect, 500);
+        } else {
+          failCountRef.current += 1;
+          const delay = Math.min(30_000, 2000 * failCountRef.current);
+          retryRef.current = setTimeout(connect, delay);
+        }
       }
     };
 

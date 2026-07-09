@@ -15,26 +15,22 @@ import Lightbox from '@/components/portal/Lightbox';
 import RichMessageBody from '@/components/portal/RichMessageBody';
 import PaymentCard, { parsePaymentCard, formatMessagePreview } from '@/components/portal/PaymentCard';
 import MessageHoverActions from '@/components/portal/MessageHoverActions';
+import DesignStagePicker from '@/components/portal/DesignStagePicker';
 import { Sym } from '@/components/portal/Sym';
 import { STAGES, STAGE_INDEX, defaultStatusFor, statusLabelFor, type StageKey } from '@/components/manufacturing/stages';
 import { useProjectEventStream, useProjectMessagePolling } from '@/hooks/useProjectEventStream';
 import { mediaApi, projectApi, manufacturingApi, type ProjectMessageDto, type WorkspaceView, type ManufacturingProjectDetailDto } from '@/lib/api';
+import { formatServerTime, formatServerDate } from '@/lib/serverTime';
 
 type DisplayMessage = ProjectMessageDto & { pending?: boolean };
 
 function formatMsgTime(iso?: string) {
   if (!iso) return 'now';
-  const d = new Date(iso);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-  return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return formatServerTime(iso) || 'now';
 }
 
 function formatDateDivider(iso?: string) {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+  return formatServerDate(iso);
 }
 
 function isImageUrl(url: string) {
@@ -103,6 +99,21 @@ export default function PortalAdminProjectDetail() {
     staleTime: 60_000,
     select: (d) => ({ quotes: d.quotes, invoices: d.invoices, valueDisplay: d.valueDisplay }),
   });
+
+  // Outstanding balance = latest quote with a value, minus everything already
+  // invoiced against it (cancelled invoices don't count). Used to prefill the
+  // "Request payment" amount so the admin isn't stuck typing it from memory.
+  const outstandingBalance = useMemo(() => {
+    const quotes = financials?.quotes ?? [];
+    const invoices = financials?.invoices ?? [];
+    const quote = quotes.find((q) => (q.total ?? 0) > 0);
+    if (!quote) return null;
+    const invoiced = invoices
+      .filter((inv) => inv.quoteReference === quote.reference && inv.status?.toUpperCase() !== 'CANCELLED')
+      .reduce((sum, inv) => sum + (inv.amount ?? 0), 0);
+    const balance = (quote.total ?? 0) - invoiced;
+    return { amount: Math.max(0, balance), currency: quote.currency };
+  }, [financials]);
 
   const { data: messages = [], isFetching: messagesFetching } = useQuery({
     queryKey: ['admin-project-messages', code, activeDesignId],
@@ -225,6 +236,16 @@ export default function PortalAdminProjectDetail() {
       toast.success(`Renamed to "${d.name}"`);
     },
     onError: (e: Error) => toast.error(e.message || 'Failed to rename'),
+  });
+
+  const designStageMutation = useMutation({
+    mutationFn: ({ designId, stage }: { designId: number; stage: string }) =>
+      projectApi.updateDesignStage(code!, designId, stage),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-project-shell', code] });
+      toast.success('Design stage updated');
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to update design stage'),
   });
 
   const renameProjectMutation = useMutation({
@@ -609,12 +630,22 @@ export default function PortalAdminProjectDetail() {
                   <Sym name="tag" className="text-[18px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
                   <h2 className="font-display text-[16px] sm:text-[18px] truncate">{channelName}</h2>
                 </div>
+                {activeDesign && !activeDesign.system && (
+                  <DesignStagePicker
+                    stage={activeDesign.stage}
+                    disabled={designStageMutation.isPending}
+                    onChange={(stage) => designStageMutation.mutate({ designId: activeDesign.id, stage })}
+                  />
+                )}
                 {messagesFetching && (
                   <Sym name="progress_activity" className="text-[18px] animate-spin shrink-0" style={{ color: 'var(--p-primary)' }} />
                 )}
                 <button
                   type="button"
-                  onClick={() => setPayModal(true)}
+                  onClick={() => {
+                    setPayAmount(outstandingBalance && outstandingBalance.amount > 0 ? String(outstandingBalance.amount) : '');
+                    setPayModal(true);
+                  }}
                   className="shrink-0 px-3 py-1.5 rounded-lg text-[13px] font-semibold border flex items-center gap-1.5"
                   style={{ borderColor: 'var(--p-outline)', color: 'var(--p-primary)' }}
                 >
@@ -807,7 +838,19 @@ export default function PortalAdminProjectDetail() {
             <p className="text-[13px] mb-4" style={{ color: 'var(--p-on-surface-variant)' }}>
               A secure pay link is created for <b>{shell.clientEmail || 'the client'}</b> and posted as a card in Announcements. They’ll be notified.
             </p>
-            <label className="block text-[11px] font-bold uppercase mb-1" style={{ color: 'var(--p-on-surface-variant)' }}>Amount (INR)</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-bold uppercase" style={{ color: 'var(--p-on-surface-variant)' }}>Amount (INR)</label>
+              {outstandingBalance && outstandingBalance.amount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPayAmount(String(outstandingBalance.amount))}
+                  className="text-[11px] font-semibold underline"
+                  style={{ color: 'var(--p-primary)' }}
+                >
+                  Use outstanding balance ({outstandingBalance.currency} {outstandingBalance.amount.toLocaleString()})
+                </button>
+              )}
+            </div>
             <input
               type="number"
               value={payAmount}

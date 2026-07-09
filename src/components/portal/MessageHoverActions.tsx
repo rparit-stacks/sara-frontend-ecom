@@ -34,7 +34,10 @@ export default function MessageHoverActions({
 
   return (
     <div
-      className={`absolute right-2 sm:right-4 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all duration-150 flex items-center gap-0.5 border rounded-lg px-0.5 py-0.5 shadow-sm scale-95 group-hover:scale-100 ${inThread ? 'right-0' : ''}`}
+      // Always visible on touch devices (no :hover there) — only fades in on
+      // hover for mouse/trackpad users (md and up), where it would otherwise
+      // clutter every message row.
+      className={`absolute right-2 sm:right-4 top-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-all duration-150 flex items-center gap-0.5 border rounded-lg px-0.5 py-0.5 shadow-sm scale-100 md:scale-95 md:group-hover:scale-100 z-10 ${inThread ? 'right-0' : ''}`}
       style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
     >
       <div className="relative">
@@ -45,7 +48,7 @@ export default function MessageHoverActions({
           <>
             <div className="fixed inset-0 z-30" onClick={() => setEmojiOpen(false)} />
             <div
-              className="absolute right-0 top-9 z-40 grid grid-cols-6 gap-0.5 p-1.5 border rounded-xl shadow-lg animate-in fade-in slide-in-from-top-1 duration-150"
+              className="absolute right-0 top-9 z-40 grid grid-cols-4 sm:grid-cols-6 gap-0.5 p-1.5 border rounded-xl shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 max-w-[calc(100vw-2rem)]"
               style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
             >
               {QUICK_EMOJIS.map((e) => (

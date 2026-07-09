@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PortalShell from '@/components/portal/PortalShell';
-import SettingsNav from '@/components/portal/SettingsNav';
+import SettingsNav, { SettingsNavMobile } from '@/components/portal/SettingsNav';
 import { Sym } from '@/components/portal/Sym';
 
 const Toggle = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
@@ -62,12 +62,13 @@ export default function PortalSettings() {
     <PortalShell active="more">
       <SettingsNav active="settings" />
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--p-surface-container-lowest)' }}>
-        <div className="h-14 px-8 border-b flex items-center justify-between shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+        <SettingsNavMobile active="settings" />
+        <div className="h-auto min-h-14 px-4 sm:px-8 py-3 sm:py-0 border-b flex flex-wrap items-center justify-between gap-3 shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
           <h2 className="font-display text-[18px]">Notification settings</h2>
-          <button className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white hover:brightness-110" style={{ background: 'var(--p-primary)' }}>Save preferences</button>
+          <button className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white hover:brightness-110 shrink-0" style={{ background: 'var(--p-primary)' }}>Save preferences</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-8 py-8">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 sm:py-8">
           <div className="max-w-2xl space-y-6">
             <Section title="Email notifications" icon="mail" items={EMAIL_PREFS} />
             <Section title="WhatsApp notifications" icon="chat" items={WA_PREFS} />

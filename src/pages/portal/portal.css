@@ -50,9 +50,31 @@
   background: var(--p-surface);
   font-family: 'Inter', system-ui, sans-serif;
   height: 100vh;
+  height: 100dvh; /* dynamic viewport height — avoids composer being hidden under iOS Safari's address bar */
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* ---- Mobile bottom nav ---- */
+.portal-root {
+  --bottom-nav-height: 0px;
+}
+@media (max-width: 767px) {
+  .portal-root {
+    /* icon+label row (~52px) plus the iOS home-indicator safe area */
+    --bottom-nav-height: calc(52px + env(safe-area-inset-bottom));
+  }
+}
+.portal-root .bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+/* Anything that must never sit under the bottom nav (e.g. an absolutely
+   positioned overlay panel) can use bottom: var(--bottom-nav-height) instead
+   of bottom-0, regardless of which ancestor actually establishes its
+   containing block. */
+.portal-root .above-bottom-nav {
+  bottom: var(--bottom-nav-height);
 }
 
 /* ---- Typography helpers ---- */

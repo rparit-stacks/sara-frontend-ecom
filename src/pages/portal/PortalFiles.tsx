@@ -28,9 +28,9 @@ export default function PortalFiles() {
   return (
     <PortalShell active="files">
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--p-surface-container-lowest)' }}>
-        <div className="h-14 px-8 border-b flex items-center justify-between shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+        <div className="h-14 px-4 sm:px-8 border-b flex items-center justify-between shrink-0 gap-2" style={{ borderColor: 'var(--p-outline-variant)' }}>
           <h2 className="font-display text-[18px]">Files</h2>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             <div className="flex items-center rounded-lg border overflow-hidden" style={{ borderColor: 'var(--p-outline-variant)' }}>
               <button type="button" onClick={() => setView('grid')} className="px-2 py-1.5" style={view === 'grid' ? { background: 'var(--p-primary)', color: '#fff' } : { color: 'var(--p-on-surface-variant)' }}><Sym name="grid_view" className="text-[18px]" /></button>
               <button type="button" onClick={() => setView('list')} className="px-2 py-1.5" style={view === 'list' ? { background: 'var(--p-primary)', color: '#fff' } : { color: 'var(--p-on-surface-variant)' }}><Sym name="view_list" className="text-[18px]" /></button>
@@ -39,7 +39,7 @@ export default function PortalFiles() {
         </div>
 
         {projects.length > 0 && (
-          <div className="px-8 pt-5">
+          <div className="px-4 sm:px-8 pt-5">
             <div className="max-w-md flex items-center gap-2 border rounded-lg px-3 h-9" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-low)' }}>
               <Sym name="search" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search files…" className="flex-1 bg-transparent border-none outline-none focus:ring-0 text-[13px]" />
@@ -47,7 +47,7 @@ export default function PortalFiles() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto px-8 py-5">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-5">
           {isLoading ? (
             <div className="flex justify-center py-20"><Sym name="progress_activity" className="text-[28px] animate-spin" /></div>
           ) : projects.length === 0 ? (

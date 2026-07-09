@@ -3,7 +3,7 @@
 // in the backend (manufacturing_page_content). The admin can edit text and
 // add/remove/reorder sections from a set of pre-built section types.
 
-export type InquirySectionType = 'steps' | 'cards' | 'form' | 'richtext';
+export type InquirySectionType = 'steps' | 'cards' | 'form' | 'richtext' | 'imagetext' | 'textblock' | 'carousel' | 'marquee';
 
 export interface InquiryItem {
   title: string;
@@ -43,7 +43,51 @@ export interface RichTextSection extends SectionBase {
   body: string;
 }
 
-export type InquirySection = StepsSection | CardsSection | FormSection | RichTextSection;
+/** Photo + text side-by-side. `layout` picks which side the image sits on. */
+export interface ImageTextSection extends SectionBase {
+  type: 'imagetext';
+  heading: string;
+  body: string;
+  imageUrl: string;
+  layout: 'image-left' | 'image-right';
+}
+
+/**
+ * Flexible text-only block: header alignment, rich body (bullets, underline,
+ * bold, links — via the shared RichTextEditor) instead of the plain paragraph
+ * `richtext` section uses.
+ */
+export interface TextBlockSection extends SectionBase {
+  type: 'textblock';
+  heading: string;
+  headingAlign: 'left' | 'center';
+  bodyHtml: string;
+}
+
+/** Swipeable photo carousel — one slide at a time, with arrows + autoplay. */
+export interface CarouselSection extends SectionBase {
+  type: 'carousel';
+  heading: string;
+  images: string[];
+}
+
+/** Continuous horizontal scrolling strip of photos (logo-marquee style, no controls). */
+export interface MarqueeSection extends SectionBase {
+  type: 'marquee';
+  heading: string;
+  images: string[];
+  speed: 'slow' | 'normal' | 'fast';
+}
+
+export type InquirySection =
+  | StepsSection
+  | CardsSection
+  | FormSection
+  | RichTextSection
+  | ImageTextSection
+  | TextBlockSection
+  | CarouselSection
+  | MarqueeSection;
 
 export interface InquiryHero {
   title: string;
@@ -133,6 +177,62 @@ export const SECTION_TEMPLATES: {
       visible: true,
       heading: 'Our Promise',
       body: 'We partner with brands of every size to manufacture products they are proud of.',
+    }),
+  },
+  {
+    type: 'imagetext',
+    label: 'Photo + Text',
+    description: 'An image beside a block of text — pick which side the photo sits on',
+    icon: 'fa-image',
+    create: () => ({
+      id: newId(),
+      type: 'imagetext',
+      visible: true,
+      heading: 'Made With Care',
+      body: 'Every piece is crafted by skilled hands, checked at every stage so what reaches you matches exactly what you signed off on.',
+      imageUrl: '',
+      layout: 'image-left',
+    }),
+  },
+  {
+    type: 'textblock',
+    label: 'Text Block',
+    description: 'Flexible text with bullets, bold, underline and header alignment',
+    icon: 'fa-paragraph',
+    create: () => ({
+      id: newId(),
+      type: 'textblock',
+      visible: true,
+      heading: 'Good to Know',
+      headingAlign: 'center',
+      bodyHtml: '<p>A few things to keep in mind before you send your inquiry:</p><ul><li>Minimum order quantities vary by product</li><li>Sampling typically takes 7–10 days</li><li>Bulk pricing improves with volume</li></ul>',
+    }),
+  },
+  {
+    type: 'carousel',
+    label: 'Photo Carousel',
+    description: 'Swipeable slideshow of photos, one at a time, with arrows',
+    icon: 'fa-images',
+    create: () => ({
+      id: newId(),
+      type: 'carousel',
+      visible: true,
+      heading: 'Our Work',
+      images: [],
+    }),
+  },
+  {
+    type: 'marquee',
+    label: 'Photo Marquee',
+    description: 'Photos scrolling continuously in a row, like a logo strip',
+    icon: 'fa-panorama',
+    create: () => ({
+      id: newId(),
+      type: 'marquee',
+      visible: true,
+      heading: '',
+      images: [],
+      speed: 'normal',
     }),
   },
 ];

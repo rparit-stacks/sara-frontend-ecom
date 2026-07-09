@@ -19,22 +19,17 @@ import { Sym } from '@/components/portal/Sym';
 import { STAGES, STAGE_INDEX, statusLabelFor, type StageKey } from '@/components/manufacturing/stages';
 import { useProjectEventStream, useProjectMessagePolling } from '@/hooks/useProjectEventStream';
 import { clientProjectApi, getUserEmailFromToken, mediaApi, type ProjectMessageDto, type WorkspaceView, type ManufacturingProjectDetailDto } from '@/lib/api';
+import { formatServerTime, formatServerDate } from '@/lib/serverTime';
 
 type DisplayMessage = ProjectMessageDto & { pending?: boolean };
 
 function formatMsgTime(iso?: string) {
   if (!iso) return 'now';
-  const d = new Date(iso);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-  return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return formatServerTime(iso) || 'now';
 }
 
 function formatDateDivider(iso?: string) {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+  return formatServerDate(iso);
 }
 
 function isImageUrl(url: string) {
@@ -72,6 +67,14 @@ export default function ClientProjectDetail() {
   const [designModal, setDesignModal] = useState(false);
   const [renameTarget, setRenameTarget] = useState<{ id: number; name: string } | null>(null);
   const [renameProjectOpen, setRenameProjectOpen] = useState(false);
+  // Mobile only: false = show the design/resource list full-screen (WhatsApp-style);
+  // true = a chat/panel is open full-screen with a back button. Desktop ignores this
+  // entirely — both the list and the panel are always visible side-by-side there.
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  // Header "more" dropdown on the chat screen: jump to Brief/Quote/Files/Invoices
+  // or switch design/announcements — without leaving the chat (mainly for mobile,
+  // where the sidebar list is hidden while a chat is open).
+  const [chatMenuOpen, setChatMenuOpen] = useState(false);
   const skipSseRef = useRef(0);
 
   useProjectEventStream(code, 'client', () => skipSseRef.current);
@@ -412,25 +415,29 @@ export default function ClientProjectDetail() {
   return (
     <PortalShell active="home">
       <ClientProjectSidebar
+        mobileHidden={mobilePanelOpen}
         projectTitle={projectTitle}
         projectCode={shell.code}
         designs={shell.designs || []}
         activeDesignId={activeDesignId}
-        onSelectDesign={setActiveDesignId}
+        onSelectDesign={(id) => { setActiveDesignId(id); setMobilePanelOpen(true); }}
         onAddDesign={() => setDesignModal(true)}
         onRenameDesign={(id, name) => setRenameTarget({ id, name })}
         onRenameProject={() => setRenameProjectOpen(true)}
         view={view}
-        onViewChange={setView}
+        onViewChange={(v) => { setView(v); setMobilePanelOpen(true); }}
         threadsUnread={threadsUnread}
       />
 
       {view === 'threads' ? (
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--p-surface-container-lowest)' }}>
-          <div className="h-14 px-6 border-b flex items-center justify-between shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
-            <div className="flex items-center gap-3">
-              <Sym name="list_alt" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-              <h2 className="font-display text-[18px]">Threads</h2>
+        <main className={`flex-1 flex-col min-w-0 overflow-hidden ${mobilePanelOpen ? 'flex' : 'hidden md:flex'}`} style={{ background: 'var(--p-surface-container-lowest)' }}>
+          <div className="h-14 px-4 sm:px-6 border-b flex items-center justify-between shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <button type="button" onClick={() => setMobilePanelOpen(false)} className="md:hidden p-1.5 -ml-1.5 rounded-lg hover:bg-black/5 shrink-0" aria-label="Back">
+                <Sym name="arrow_back" className="text-[20px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+              </button>
+              <Sym name="list_alt" className="text-[18px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
+              <h2 className="font-display text-[18px] truncate">Threads</h2>
               {threadsUnread > 0 && <span className="text-[12px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: 'var(--p-primary)' }}>{threadsUnread} new</span>}
             </div>
             <div className="flex gap-2">
@@ -481,47 +488,125 @@ export default function ClientProjectDetail() {
           </div>
         </main>
       ) : view === 'brief' ? (
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--p-surface-container-lowest)' }}>
-          <div className="h-14 px-6 border-b flex items-center gap-3 shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
-            <Sym name="description" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-            <h2 className="font-display text-[18px]">Project Brief</h2>
+        <main className={`flex-1 flex-col min-w-0 overflow-hidden ${mobilePanelOpen ? 'flex' : 'hidden md:flex'}`} style={{ background: 'var(--p-surface-container-lowest)' }}>
+          <div className="h-14 px-4 sm:px-6 border-b flex items-center gap-2 sm:gap-3 shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+            <button type="button" onClick={() => setMobilePanelOpen(false)} className="md:hidden p-1.5 -ml-1.5 rounded-lg hover:bg-black/5 shrink-0" aria-label="Back">
+              <Sym name="arrow_back" className="text-[20px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+            </button>
+            <Sym name="description" className="text-[18px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
+            <h2 className="font-display text-[18px] truncate">Project Brief</h2>
           </div>
           <ProjectBriefPanel project={workspaceProject} clientMode />
         </main>
       ) : view === 'invoices' ? (
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--p-surface-container-lowest)' }}>
-          <div className="h-14 px-6 border-b flex items-center gap-3 shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
-            <Sym name="receipt_long" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-            <h2 className="font-display text-[18px]">Invoices</h2>
+        <main className={`flex-1 flex-col min-w-0 overflow-hidden ${mobilePanelOpen ? 'flex' : 'hidden md:flex'}`} style={{ background: 'var(--p-surface-container-lowest)' }}>
+          <div className="h-14 px-4 sm:px-6 border-b flex items-center gap-2 sm:gap-3 shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+            <button type="button" onClick={() => setMobilePanelOpen(false)} className="md:hidden p-1.5 -ml-1.5 rounded-lg hover:bg-black/5 shrink-0" aria-label="Back">
+              <Sym name="arrow_back" className="text-[20px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+            </button>
+            <Sym name="receipt_long" className="text-[18px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
+            <h2 className="font-display text-[18px] truncate">Invoices</h2>
           </div>
           <ProjectInvoicesPanel project={workspaceProject} clientMode />
         </main>
       ) : view === 'quotation' ? (
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--p-surface-container-lowest)' }}>
-          <div className="h-14 px-6 border-b flex items-center gap-3 shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
-            <Sym name="request_quote" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-            <h2 className="font-display text-[18px]">Quotation</h2>
+        <main className={`flex-1 flex-col min-w-0 overflow-hidden ${mobilePanelOpen ? 'flex' : 'hidden md:flex'}`} style={{ background: 'var(--p-surface-container-lowest)' }}>
+          <div className="h-14 px-4 sm:px-6 border-b flex items-center gap-2 sm:gap-3 shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+            <button type="button" onClick={() => setMobilePanelOpen(false)} className="md:hidden p-1.5 -ml-1.5 rounded-lg hover:bg-black/5 shrink-0" aria-label="Back">
+              <Sym name="arrow_back" className="text-[20px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+            </button>
+            <Sym name="request_quote" className="text-[18px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
+            <h2 className="font-display text-[18px] truncate">Quotation</h2>
           </div>
           <ClientProjectQuotationPanel project={workspaceProject} projectCode={shell.code} />
         </main>
       ) : view === 'files' ? (
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--p-surface-container-lowest)' }}>
-          <div className="h-14 px-6 border-b flex items-center gap-3 shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
-            <Sym name="folder_open" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-            <h2 className="font-display text-[18px]">Files</h2>
+        <main className={`flex-1 flex-col min-w-0 overflow-hidden ${mobilePanelOpen ? 'flex' : 'hidden md:flex'}`} style={{ background: 'var(--p-surface-container-lowest)' }}>
+          <div className="h-14 px-4 sm:px-6 border-b flex items-center gap-2 sm:gap-3 shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+            <button type="button" onClick={() => setMobilePanelOpen(false)} className="md:hidden p-1.5 -ml-1.5 rounded-lg hover:bg-black/5 shrink-0" aria-label="Back">
+              <Sym name="arrow_back" className="text-[20px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+            </button>
+            <Sym name="folder_open" className="text-[18px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
+            <h2 className="font-display text-[18px] truncate">Files</h2>
           </div>
           <ProjectFilesPanel files={attachments} isLoading={attachmentsLoading} />
         </main>
       ) : (
         <>
-          <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative" style={{ background: 'var(--p-surface-container-lowest)' }}>
+          <main className={`flex-1 flex-col min-w-0 overflow-hidden relative ${mobilePanelOpen ? 'flex' : 'hidden md:flex'}`} style={{ background: 'var(--p-surface-container-lowest)' }}>
             <div className="border-b shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
               <div className="h-14 px-4 sm:px-6 flex items-center gap-2 min-w-0">
+                <button type="button" onClick={() => setMobilePanelOpen(false)} className="md:hidden p-1.5 -ml-1.5 rounded-lg hover:bg-black/5 shrink-0" aria-label="Back">
+                  <Sym name="arrow_back" className="text-[20px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+                </button>
                 <Sym name="tag" className="text-[18px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
                 <h2 className="font-display text-[16px] sm:text-[18px] truncate">{channelName}</h2>
+                {activeDesign && !activeDesign.system && (
+                  <span className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap border" style={{ borderColor: 'var(--p-outline)', color: 'var(--p-primary)' }}>
+                    <Sym name="flag" className="text-[13px]" /> {STAGES.find((s) => s.key === activeDesign.stage)?.label ?? activeDesign.stage ?? 'Inquiry'}
+                  </span>
+                )}
                 {messagesFetching && (
                   <Sym name="progress_activity" className="text-[18px] animate-spin shrink-0" style={{ color: 'var(--p-primary)' }} />
                 )}
+                <div className="flex-1" />
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setChatMenuOpen((o) => !o)}
+                    className="p-1.5 rounded-lg hover:bg-black/5"
+                    aria-label="More"
+                  >
+                    <Sym name="more_vert" className="text-[20px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+                  </button>
+                  {chatMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setChatMenuOpen(false)} />
+                      <div
+                        className="absolute right-0 top-9 w-56 rounded-xl border py-1.5 z-50 shadow-xl"
+                        style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
+                      >
+                        <p className="px-3 pt-1 pb-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--p-on-surface-variant)' }}>Project resources</p>
+                        {[
+                          { icon: 'description', label: 'Brief', v: 'brief' as WorkspaceView },
+                          { icon: 'request_quote', label: 'Quotation', v: 'quotation' as WorkspaceView },
+                          { icon: 'folder_open', label: 'Files', v: 'files' as WorkspaceView },
+                          { icon: 'receipt_long', label: 'Invoices', v: 'invoices' as WorkspaceView },
+                        ].map((r) => (
+                          <button
+                            key={r.v}
+                            type="button"
+                            onClick={() => { setChatMenuOpen(false); setView(r.v); setMobilePanelOpen(true); }}
+                            className="w-full text-left px-3 py-2 text-[13px] flex items-center gap-3 hover:bg-black/5 transition-colors"
+                            style={{ color: 'var(--p-on-surface)' }}
+                          >
+                            <Sym name={r.icon} className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+                            {r.label}
+                          </button>
+                        ))}
+                        {(shell.designs?.length ?? 0) > 1 && (
+                          <>
+                            <div className="border-t my-1" style={{ borderColor: 'var(--p-outline-variant)' }} />
+                            <p className="px-3 pt-1 pb-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--p-on-surface-variant)' }}>Switch chat</p>
+                            {shell.designs!.map((d) => (
+                              <button
+                                key={d.id}
+                                type="button"
+                                onClick={() => { setChatMenuOpen(false); setActiveDesignId(d.id); setView('channels'); setMobilePanelOpen(true); }}
+                                className="w-full text-left px-3 py-2 text-[13px] flex items-center gap-3 hover:bg-black/5 transition-colors"
+                                style={d.id === activeDesignId ? { color: 'var(--p-primary)', fontWeight: 700 } : { color: 'var(--p-on-surface)' }}
+                              >
+                                <Sym name={d.system ? 'campaign' : 'palette'} className="text-[18px]" style={{ color: d.id === activeDesignId ? 'var(--p-primary)' : 'var(--p-on-surface-variant)' }} />
+                                <span className="truncate flex-1">{d.system && '#'}{d.name}</span>
+                                {d.id === activeDesignId && <Sym name="check" className="text-[16px]" />}
+                              </button>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="px-4 sm:px-6 pb-3 flex items-center gap-1 overflow-x-auto">
                 {STAGES.map((st, i) => {
@@ -573,7 +658,7 @@ export default function ClientProjectDetail() {
           </main>
 
           <aside
-            className={`${openThreadId ? 'flex' : 'hidden'} flex-col w-full sm:w-96 lg:w-[340px] border-l shrink-0 absolute lg:relative right-0 top-0 bottom-0 z-20 lg:z-auto thread-panel-bg transition-transform duration-200 ${openThreadId ? 'translate-x-0' : 'translate-x-full'}`}
+            className={`above-bottom-nav ${openThreadId ? 'flex' : 'hidden'} flex-col w-full sm:w-96 lg:w-[340px] border-l shrink-0 fixed md:absolute lg:relative right-0 top-12 md:top-0 z-20 lg:z-auto thread-panel-bg transition-transform duration-200 ${openThreadId ? 'translate-x-0' : 'translate-x-full'}`}
             style={{ borderColor: 'var(--p-outline-variant)', boxShadow: openThreadId ? '0 0 40px rgba(0,0,0,0.08)' : undefined }}
           >
             <div className="h-14 px-4 border-b flex items-center justify-between shrink-0 backdrop-blur-sm" style={{ borderColor: 'var(--p-outline-variant)', background: 'rgba(255,255,255,0.7)' }}>

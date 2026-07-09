@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -45,10 +45,30 @@ export default function QuoteViewerModal({
   fetchQuote?: () => Promise<ManufacturingQuoteDto>;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   const [doc, setDoc] = useState<QuoteDoc | null>(null);
   const [reference, setReference] = useState<string | null>(null);
   const [currency, setCurrency] = useState('INR');
+  const [scale, setScale] = useState(1);
+
+  // The quote page is a fixed 794px-wide A4 design (built for PDF export) — on
+  // narrow screens (phones) it must shrink to fit, otherwise it overflows or
+  // gets clipped. Scale it down to the available width; never scale up past 1.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const el = scrollAreaRef.current;
+    if (!el) return;
+    const PAGE_WIDTH = 794;
+    const compute = () => {
+      const available = el.clientWidth - 32; // matches the px-4 padding on both sides
+      setScale(available > 0 && available < PAGE_WIDTH ? available / PAGE_WIDTH : 1);
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open]);
 
   const { data: business } = useQuery({
     queryKey: ['business-config'],
@@ -103,12 +123,20 @@ export default function QuoteViewerModal({
           <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-white/15"><Sym name="close" /></button>
         </div>
       </header>
-      <div className="flex-1 overflow-y-auto py-8 px-4 flex justify-center" style={{ background: '#e5e7eb' }}>
+      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto py-8 px-4 flex justify-center" style={{ background: '#e5e7eb' }}>
         {isLoading || !doc ? (
           <Sym name="progress_activity" className="text-[32px] animate-spin" style={{ color: 'var(--p-primary)' }} />
         ) : (
-          <div ref={canvasRef} className="flex flex-col gap-8 items-center">
-            <QuotePreview doc={doc} accent={doc.accent || '#924623'} currency={currency} reference={reference} />
+          <div style={{ width: 794 * scale }}>
+            {/* The scale transform lives one level above canvasRef, so html2canvas
+                captures canvasRef's own untransformed pixel size — the exported
+                PDF always renders at full native resolution regardless of the
+                on-screen zoom level applied here for narrow viewports. */}
+            <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+              <div ref={canvasRef} className="flex flex-col gap-8 items-center">
+                <QuotePreview doc={doc} accent={doc.accent || '#924623'} currency={currency} reference={reference} />
+              </div>
+            </div>
           </div>
         )}
       </div>

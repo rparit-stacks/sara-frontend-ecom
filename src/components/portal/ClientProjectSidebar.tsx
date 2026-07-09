@@ -30,6 +30,7 @@ function UnreadBadge({ count }: { count: number }) {
 }
 
 export default function ClientProjectSidebar({
+  mobileHidden = false,
   projectTitle,
   projectCode,
   designs,
@@ -42,6 +43,8 @@ export default function ClientProjectSidebar({
   onViewChange,
   threadsUnread = 0,
 }: {
+  /** True once a chat/panel is open on mobile — hides this full-screen list there. Desktop ignores it (always visible). */
+  mobileHidden?: boolean;
   projectTitle: string;
   projectCode: string;
   designs: ClientProjectDesign[];
@@ -80,7 +83,10 @@ export default function ClientProjectSidebar({
   );
 
   return (
-    <aside className="w-60 sm:w-64 border-r flex-col shrink-0 hidden md:flex" style={{ background: 'var(--p-surface-container-low)', borderColor: 'var(--p-outline-variant)' }}>
+    <aside
+      className={`w-full md:w-60 lg:w-64 border-r shrink-0 flex-col ${mobileHidden ? 'hidden md:flex' : 'flex'}`}
+      style={{ background: 'var(--p-surface-container-low)', borderColor: 'var(--p-outline-variant)' }}
+    >
       <div className="p-4 border-b flex items-center justify-between gap-2 min-w-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
         <button onClick={() => navigate('/portal')} className="flex items-center gap-2 min-w-0 text-left flex-1">
           <Sym name="arrow_back_ios" className="text-[14px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />

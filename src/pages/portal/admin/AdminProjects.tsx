@@ -8,22 +8,17 @@ import { Sym } from '@/components/portal/Sym';
 import { STAGE_TONE, type Stage } from '@/components/portal/adminData';
 import { STAGES, stageDef, type StageKey } from '@/components/manufacturing/stages';
 import { projectApi } from '@/lib/api';
+import { parseServerDate, formatServerDate } from '@/lib/serverTime';
 
 const stageLabel = (key?: string) => stageDef((key as StageKey) || 'INQUIRY').label;
 
 // A project is "new" for 48h after it's created (so fresh inquiries stand out).
 const NEW_WINDOW_MS = 48 * 60 * 60 * 1000;
 const isNew = (createdAt?: string) => {
-  if (!createdAt) return false;
-  const t = new Date(createdAt).getTime();
-  return !isNaN(t) && Date.now() - t < NEW_WINDOW_MS;
+  const d = parseServerDate(createdAt);
+  return !!d && Date.now() - d.getTime() < NEW_WINDOW_MS;
 };
-const fmtDate = (iso?: string) => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
-};
+const fmtDate = (iso?: string) => formatServerDate(iso);
 
 const stageTone = (key?: string) => STAGE_TONE[stageLabel(key) as Stage];
 

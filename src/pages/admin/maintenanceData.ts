@@ -16,8 +16,8 @@ export interface BillingOption {
 }
 
 export const BILLING_OPTIONS: BillingOption[] = [
-  { key: 'sixMonth', months: 6, total: 44999, perMonth: 7500, label: '6 Months' },
-  { key: 'twelveMonth', months: 12, total: 71999, perMonth: 6000, label: '12 Months', badge: 'Best value' },
+  { key: 'sixMonth', months: 6, total: 24000, perMonth: 4000, label: '6 Months' },
+  { key: 'twelveMonth', months: 12, total: 42000, perMonth: 3500, label: '12 Months', badge: 'Best value' },
 ];
 
 /** Every AI feature carries the same monthly credit allowance on this plan. */

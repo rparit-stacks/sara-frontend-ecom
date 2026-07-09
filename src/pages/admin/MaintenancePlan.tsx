@@ -33,11 +33,11 @@ import {
 } from 'lucide-react';
 import { FeatureInfoDialog } from '@/components/admin/FeatureInfoDialog';
 import { MaintenanceInfoDialog } from '@/components/admin/MaintenanceInfoDialog';
+import MaintenanceStatusBanner from '@/components/admin/MaintenanceStatusBanner';
 import {
   BILLING_OPTIONS,
   AI_FEATURES,
   MAINTENANCE_GROUPS,
-  AI_CREDITS_PER_MONTH,
   type BillingOption,
   type MaintFeature,
   type AiFeature,
@@ -80,7 +80,7 @@ export default function MaintenancePlan() {
 
   const payNow = () => {
     const plan = `Studio Sara — Website Maintenance (${billing.label})`;
-    const desc = `Done-for-you upkeep + all AI features (20 credits/mo each). Billed ₹${billing.total.toLocaleString('en-IN')} for ${billing.months} months.`;
+    const desc = `Done-for-you website upkeep. Billed monthly: ₹${billing.perMonth.toLocaleString('en-IN')}/month × ${billing.months} months (not paid upfront).`;
     const url = `${ELYVATE_PAY_URL}?amount=${billing.total}&plan=${encodeURIComponent(plan)}&desc=${encodeURIComponent(desc)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
@@ -88,6 +88,8 @@ export default function MaintenancePlan() {
   return (
     <AdminLayout>
       <div className="mx-auto max-w-6xl">
+        {/* Live "free maintenance" status + countdown + activity log */}
+        <MaintenanceStatusBanner />
         {/* Hero */}
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-rose-600 via-red-600 to-rose-700 p-7 text-white shadow-xl sm:p-10">
           <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
@@ -114,8 +116,7 @@ export default function MaintenancePlan() {
               transition={{ delay: 0.1 }}
               className="mt-3 max-w-2xl text-sm text-white/85 sm:text-base"
             >
-              One done-for-you plan that keeps your store fast, secure and online — plus every AI feature unlocked
-              with <strong>{AI_CREDITS_PER_MONTH} credits per month</strong> on each. You build the brand; we handle
+              One done-for-you plan that keeps your store fast, secure and online. You build the brand; we handle
               the engine behind it.
             </motion.p>
           </div>
@@ -123,6 +124,14 @@ export default function MaintenancePlan() {
 
         {/* Billing + price */}
         <section className="mt-8">
+          {/* Big, unmissable monthly-billing disclaimer */}
+          <div className="mb-5 flex items-start gap-3 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 dark:border-amber-500/60 dark:bg-amber-950/30 sm:p-5">
+            <FontAwesomeIcon icon={faCircleInfo} className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <p className="text-base font-extrabold uppercase tracking-wide text-amber-900 dark:text-amber-200 sm:text-lg">
+              This is NOT a one-time payment. You will be billed EVERY MONTH for the plan you choose — not the full amount upfront.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {BILLING_OPTIONS.map((opt) => {
               const active = billing.key === opt.key;
@@ -156,8 +165,11 @@ export default function MaintenancePlan() {
                     <span className="text-4xl font-extrabold">{inr(opt.perMonth)}</span>
                     <span className="pb-1 text-sm text-muted-foreground">/ month</span>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    billed {inr(opt.total)} for {opt.months} months
+                  <p className="mt-1 text-sm font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                    Paid monthly — {opt.months} separate payments of {inr(opt.perMonth)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    ({inr(opt.total)} total over {opt.months} months, NOT paid upfront)
                   </p>
                 </button>
               );
@@ -172,7 +184,9 @@ export default function MaintenancePlan() {
                 {inr(billing.perMonth)}
                 <span className="text-sm font-normal text-muted-foreground">/month</span>
               </p>
-              <p className="text-xs text-muted-foreground">billed {inr(billing.total)} for {billing.months} months</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                Billed every month — {billing.months} payments of {inr(billing.perMonth)} each, not {inr(billing.total)} at once
+              </p>
             </div>
             <button
               type="button"
@@ -239,21 +253,26 @@ export default function MaintenancePlan() {
           </div>
         </section>
 
-        {/* AI features */}
+        {/* AI features — shown grayscale/locked: not included in this plan, must be added separately */}
         <section className="mt-12">
-          <div className="mb-4 flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-950">
-              <FontAwesomeIcon icon={faWandMagicSparkles} className="h-4 w-4" />
-            </span>
-            <div>
-              <h3 className="text-lg font-bold">All AI features unlocked</h3>
-              <p className="text-xs text-muted-foreground">
-                <FontAwesomeIcon icon={faCoins} className="mr-1 text-amber-500" />
-                {AI_CREDITS_PER_MONTH} credits per month on every credit-based AI tool.
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-200 text-gray-500 dark:bg-gray-800">
+                <FontAwesomeIcon icon={faWandMagicSparkles} className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-lg font-bold text-gray-500 dark:text-gray-400">AI features (not included)</h3>
+                <p className="text-xs text-muted-foreground">Preview of what's available — not part of this maintenance plan.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border-2 border-gray-300 bg-gray-100 px-4 py-2.5 dark:border-gray-700 dark:bg-gray-900">
+              <FontAwesomeIcon icon={faHeadset} className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+              <p className="text-sm font-bold text-gray-700 dark:text-gray-200">
+                Want AI features added? <span className="underline">Call admin dev</span> to enable them.
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 grayscale opacity-70">
             {AI_FEATURES.map((f, i) => (
               <motion.div
                 key={f.key}
@@ -261,13 +280,13 @@ export default function MaintenancePlan() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.03 }}
-                className="group relative flex flex-col rounded-2xl border border-border bg-card p-4 transition-all hover:border-rose-300 hover:shadow-md"
+                className="group relative flex flex-col rounded-2xl border border-border bg-card p-4 transition-all"
               >
                 <div className="flex items-start justify-between gap-2">
                   <h4 className="font-semibold leading-tight">
                     {f.label}
                     {f.beta && (
-                      <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">
+                      <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-bold uppercase text-gray-600">
                         Beta soon
                       </span>
                     )}
@@ -276,14 +295,14 @@ export default function MaintenancePlan() {
                     type="button"
                     aria-label={`How ${f.label} works`}
                     onClick={() => setAiInfo(f)}
-                    className="shrink-0 text-muted-foreground/60 transition-colors hover:text-rose-500"
+                    className="shrink-0 text-muted-foreground/60 transition-colors hover:text-gray-700"
                   >
                     <FontAwesomeIcon icon={faCircleInfo} className="h-4 w-4" />
                   </button>
                 </div>
                 <p className="mt-1 flex-1 text-xs text-muted-foreground">{f.short}</p>
-                <span className="mt-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-600 dark:bg-rose-950/40">
-                  {f.value === '20/mo' && <FontAwesomeIcon icon={faCoins} className="h-3 w-3 text-amber-500" />}
+                <span className="mt-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-gray-200 px-2.5 py-1 text-xs font-bold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                  {f.value === '20/mo' && <FontAwesomeIcon icon={faCoins} className="h-3 w-3" />}
                   {f.value}
                 </span>
               </motion.div>

@@ -711,6 +711,8 @@ export interface ManufacturingQuoteDto {
   currency: string;
   total: number;
   status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'DECLINED';
+  isTemplate?: boolean;
+  pdfUrl?: string;
   doc: Record<string, unknown> | null;
   createdAt?: string;
   updatedAt?: string;
@@ -724,6 +726,8 @@ export interface ManufacturingQuoteSaveRequest {
   currency?: string;
   total?: number;
   status?: string;
+  isTemplate?: boolean;
+  pdfUrl?: string;
   doc?: Record<string, unknown>;
 }
 
@@ -783,8 +787,10 @@ export const manufacturingApi = {
     }),
 
   // Admin — quotations
-  listQuotes: () =>
-    fetchApi<ManufacturingQuoteDto[]>('/api/admin/manufacturing/quotes'),
+  listQuotes: (template?: boolean) => {
+    const q = template === undefined ? '' : `?template=${template}`;
+    return fetchApi<ManufacturingQuoteDto[]>(`/api/admin/manufacturing/quotes${q}`);
+  },
   getQuote: (id: number) =>
     fetchApi<ManufacturingQuoteDto>(`/api/admin/manufacturing/quotes/${id}`),
   getQuoteByReference: (reference: string) =>
@@ -798,6 +804,11 @@ export const manufacturingApi = {
     fetchApi<ManufacturingQuoteDto>(`/api/admin/manufacturing/quotes/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    }),
+  duplicateQuote: (id: number, opts?: { title?: string; inquiryId?: number; clientName?: string; clientEmail?: string }) =>
+    fetchApi<ManufacturingQuoteDto>(`/api/admin/manufacturing/quotes/${id}/duplicate`, {
+      method: 'POST',
+      body: JSON.stringify(opts ?? {}),
     }),
   sendQuote: (id: number, opts?: { message?: string; pdfBase64?: string }) =>
     fetchApi<ManufacturingQuoteDto>(`/api/admin/manufacturing/quotes/${id}/send`, {
@@ -1731,6 +1742,7 @@ export interface ProjectDesignDto {
   description?: string | null;
   sortOrder?: number;
   system?: boolean;
+  stage?: string;
   createdAt?: string;
   unreadCount?: number;
 }
@@ -1756,6 +1768,9 @@ export interface ManufacturingProjectDto {
 export interface ManufacturingProjectDetailDto extends ManufacturingProjectDto {
   clientPhone?: string;
   accountEmail?: string;
+  /** Original inquiry-form answers (what the client filled). Served by both the
+   *  admin and client project endpoints, so no admin-only call is needed. */
+  briefValues?: Record<string, unknown> | null;
   designs: ProjectDesignDto[];
   messages: ProjectMessageDto[];
   quotes: {
@@ -1811,6 +1826,11 @@ export const projectApi = {
     fetchApi<ProjectDesignDto>(
       `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/designs/${designId}`,
       { method: 'PATCH', body: JSON.stringify({ name }) },
+    ),
+  updateDesignStage: (code: string, designId: number, stage: string) =>
+    fetchApi<ProjectDesignDto>(
+      `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/designs/${designId}/stage`,
+      { method: 'PATCH', body: JSON.stringify({ stage }) },
     ),
   renameProject: (code: string, title: string) =>
     fetchApi<ManufacturingProjectDto>(
@@ -2016,8 +2036,35 @@ export const techPackApi = {
     fetchApi<TechPackSummary[]>(
       `/api/admin/tech-packs${template === undefined ? '' : `?template=${template}`}`,
     ),
+  patch: (id: string, data: { name?: string; isTemplate?: boolean }) =>
+    fetchApi<TechPackSummary>(`/api/admin/tech-packs/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  duplicate: (id: string, name?: string) =>
+    fetchApi<TechPackSummary>(`/api/admin/tech-packs/${encodeURIComponent(id)}/duplicate`, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
   remove: (id: string) =>
     fetchApi<void>(`/api/admin/tech-packs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
+// ---- Maintenance activity log (store-admin Maintenance page) ----
+export interface MaintenanceLogDto {
+  id: number;
+  title: string;
+  detail?: string;
+  category: string; // FIX | CRASH | IMPROVEMENT | DEPLOY | OTHER
+  occurredAt: string;
+  createdAt: string;
+}
+export const maintenanceLogApi = {
+  list: () => fetchApi<MaintenanceLogDto[]>('/api/admin/maintenance-logs'),
+  create: (data: { title: string; detail?: string; category?: string; occurredAt?: string }) =>
+    fetchApi<MaintenanceLogDto>('/api/admin/maintenance-logs', { method: 'POST', body: JSON.stringify(data) }),
+  remove: (id: number) =>
+    fetchApi<void>(`/api/admin/maintenance-logs/${id}`, { method: 'DELETE' }),
 };
 
 export const paymentLinkApi = {

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { businessConfigApi, manufacturingApi } from '@/lib/api';
+import { businessConfigApi, manufacturingApi, mediaApi } from '@/lib/api';
 import {
   businessConfigToProfile,
   createBlock,
@@ -212,9 +212,19 @@ export default function PortalAdminQuoteBuilder() {
 
       // Generate the quote PDF in the browser and attach it to the email.
       let pdfBase64: string | undefined;
+      let pdfUrl: string | undefined;
       try {
         const pdf = await buildQuotePdf();
-        if (pdf) pdfBase64 = pdf.output('datauristring'); // "data:application/pdf;base64,...."
+        if (pdf) {
+          pdfBase64 = pdf.output('datauristring'); // "data:application/pdf;base64,...."
+          // Also upload to Cloudinary for a public URL — needed so WhatsApp's
+          // document-header template can attach the actual PDF (it fetches by
+          // URL, not raw bytes like the email attachment).
+          const blob = pdf.output('blob');
+          const file = new File([blob], `${saved.reference || 'quotation'}.pdf`, { type: 'application/pdf' });
+          pdfUrl = await mediaApi.upload(file, 'quotations');
+          await manufacturingApi.updateQuote(saved.id, { pdfUrl });
+        }
       } catch { /* send without attachment rather than fail */ }
 
       const sent = await manufacturingApi.sendQuote(saved.id, { pdfBase64 });
@@ -228,6 +238,29 @@ export default function PortalAdminQuoteBuilder() {
       toast.error((e as Error).message || 'Failed to send');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Save the current doc as a brand-new reusable template (does not touch this quote).
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const saveAsTemplate = async () => {
+    if (!doc) return;
+    setSavingTemplate(true);
+    try {
+      const payload = {
+        title: `${doc.meta.quoteTitle || 'Quotation'} — Template`,
+        currency,
+        total: computeTotals(doc).grandTotal,
+        status: 'DRAFT',
+        isTemplate: true,
+        doc: doc as unknown as Record<string, unknown>,
+      };
+      const saved = await manufacturingApi.createQuote(payload);
+      toast.success(`Saved as template · ${saved.reference}`);
+    } catch (e) {
+      toast.error((e as Error).message || 'Failed to save template');
+    } finally {
+      setSavingTemplate(false);
     }
   };
 
@@ -327,6 +360,9 @@ export default function PortalAdminQuoteBuilder() {
           </select>
           <button onClick={downloadPdf} disabled={exporting} className="h-9 px-3 rounded-lg text-[13px] font-semibold border border-gray-200 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5" title="Download pixel-perfect PDF">
             <i className={`fa-solid ${exporting ? 'fa-spinner fa-spin' : 'fa-file-pdf'} text-[12px]`} /> <span className="hidden sm:inline">{exporting ? 'Exporting…' : 'Download PDF'}</span>
+          </button>
+          <button onClick={saveAsTemplate} disabled={savingTemplate} className="h-9 px-3 rounded-lg text-[13px] font-semibold border border-gray-200 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5" title="Save a copy of this quote as a reusable template">
+            <i className={`fa-solid ${savingTemplate ? 'fa-spinner fa-spin' : 'fa-copy'} text-[12px]`} /> <span className="hidden sm:inline">{savingTemplate ? 'Saving…' : 'Save as template'}</span>
           </button>
           <button onClick={() => save()} disabled={saving} className="h-9 px-3 rounded-lg text-[13px] font-semibold border border-gray-200 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5">
             <i className="fa-solid fa-floppy-disk text-[12px]" /> {saving ? 'Saving…' : 'Save'}

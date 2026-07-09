@@ -39,8 +39,8 @@ export default function PortalActivity() {
   return (
     <PortalShell active="activity">
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--p-surface-container-lowest)' }}>
-        <div className="h-14 px-8 border-b flex items-center justify-between shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
-          <div className="flex items-center gap-3">
+        <div className="h-14 px-4 sm:px-8 border-b flex items-center justify-between shrink-0 gap-2" style={{ borderColor: 'var(--p-outline-variant)' }}>
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <h2 className="font-display text-[18px]">Activity</h2>
             {alerts.some((a) => a.unread) && (
               <span className="text-[11px] font-bold text-white rounded-full px-2 py-0.5" style={{ background: 'var(--p-primary)' }}>
@@ -56,12 +56,12 @@ export default function PortalActivity() {
         </div>
 
         {projects.length > 0 && (
-          <div className="px-8 pt-5 flex gap-2">
+          <div className="px-4 sm:px-8 pt-5 flex gap-2 overflow-x-auto">
             {FILTERS.map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className="px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors"
+                className="shrink-0 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors"
                 style={f === filter ? { background: 'var(--p-primary)', color: '#fff' } : { background: 'var(--p-surface-container-high)', color: 'var(--p-on-surface-variant)' }}
               >
                 {f}
@@ -70,7 +70,7 @@ export default function PortalActivity() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto px-8 py-5">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-5">
           <div className="max-w-3xl">
             {isLoading ? (
               <div className="flex justify-center py-20"><Sym name="progress_activity" className="text-[28px] animate-spin" /></div>

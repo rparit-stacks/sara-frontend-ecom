@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import PortalShell from '@/components/portal/PortalShell';
-import SettingsNav from '@/components/portal/SettingsNav';
+import SettingsNav, { SettingsNavMobile } from '@/components/portal/SettingsNav';
 import { Sym } from '@/components/portal/Sym';
 import { getUserEmailFromToken, userApi } from '@/lib/api';
 
@@ -62,7 +62,8 @@ export default function PortalProfile() {
     <PortalShell active="more">
       <SettingsNav active="profile" />
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--p-surface-container-lowest)' }}>
-        <div className="h-14 px-8 border-b flex items-center justify-between shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+        <SettingsNavMobile active="profile" />
+        <div className="h-14 px-4 sm:px-8 border-b flex items-center justify-between shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
           <h2 className="font-display text-[18px]">Profile</h2>
           {edit ? (
             <div className="flex gap-2">

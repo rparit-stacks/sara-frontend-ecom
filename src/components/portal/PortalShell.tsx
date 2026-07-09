@@ -165,9 +165,9 @@ export default function PortalShell({
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* ---- Slim left icon rail ---- */}
+        {/* ---- Slim left icon rail (desktop/tablet only — replaced by the bottom nav on mobile) ---- */}
         <aside
-          className="w-16 flex flex-col items-center py-4 gap-6 shrink-0 z-30 border-r border-white/10"
+          className="w-16 hidden md:flex flex-col items-center py-4 gap-6 shrink-0 z-30 border-r border-white/10"
           style={{ background: 'var(--p-primary)' }}
         >
           <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center text-white font-serif-head font-bold mb-2 font-display">
@@ -208,6 +208,36 @@ export default function PortalShell({
         {/* ---- Page content (secondary sidebar + main + optional right pane) ---- */}
         {children}
       </div>
+
+      {/* ---- Bottom nav (mobile/tablet only — replaces the left rail below md) ---- */}
+      <nav
+        className="bottom-nav md:hidden flex items-center justify-around border-t shrink-0 z-30"
+        style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
+      >
+        {rail.map((item) => {
+          const on = item.key === active;
+          return (
+            <button
+              key={item.key}
+              onClick={() => navigate(item.to)}
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-w-0"
+            >
+              <span
+                className={`msym ${on ? 'fill' : ''}`}
+                style={{ color: on ? 'var(--p-primary)' : 'var(--p-on-surface-variant)' }}
+              >
+                {item.icon}
+              </span>
+              <span
+                className="text-[10px] font-semibold truncate max-w-full px-0.5"
+                style={{ color: on ? 'var(--p-primary)' : 'var(--p-on-surface-variant)' }}
+              >
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }

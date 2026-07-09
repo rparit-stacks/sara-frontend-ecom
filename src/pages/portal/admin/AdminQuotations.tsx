@@ -1,30 +1,196 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import AdminShell, { AdminBtn } from '@/components/portal/AdminShell';
 import { Pill } from '@/components/portal/Pill';
 import { Sym } from '@/components/portal/Sym';
-import { manufacturingApi } from '@/lib/api';
+import { manufacturingApi, type ManufacturingQuoteDto } from '@/lib/api';
 import { formatInquiryDate } from '@/components/inquiry/inquiryUtils';
 
 const CUR: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
 const money = (n: number, c: string) => `${CUR[c] ?? ''}${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export default function PortalAdminQuotations() {
-  const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const inquiryFilter = params.get('inquiry');
+type Tab = 'quotes' | 'templates';
+type ForKind = 'inquiry' | 'external';
 
-  const { data: quotes = [], isLoading } = useQuery({
-    queryKey: ['admin-quotes'],
-    queryFn: () => manufacturingApi.listQuotes(),
+/**
+ * "Use template" asks who the new quotation is for, then either links an
+ * existing inquiry (client data pulled from it; nothing else about the
+ * template changes) or takes manually-entered client details for a
+ * standalone/external quote. Everything else — sections, pricing, branding —
+ * is always copied byte-for-byte from the template.
+ */
+function UseTemplateModal({
+  template,
+  onClose,
+  onConfirm,
+  pending,
+}: {
+  template: ManufacturingQuoteDto;
+  onClose: () => void;
+  onConfirm: (opts: { inquiryId?: number; clientName?: string; clientEmail?: string }) => void;
+  pending: boolean;
+}) {
+  const [kind, setKind] = useState<ForKind>('inquiry');
+  const [q, setQ] = useState('');
+  const [pickedInquiryId, setPickedInquiryId] = useState<number | null>(null);
+  const [clientName, setClientName] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+
+  const { data: inquiries = [], isLoading } = useQuery({
+    queryKey: ['admin-inquiries', 'use-template'],
+    queryFn: () => manufacturingApi.listInquiries(),
+    enabled: kind === 'inquiry',
   });
 
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return inquiries;
+    return inquiries.filter((i) =>
+      [i.reference, i.clientName, i.brand, i.clientEmail].filter(Boolean).some((s) => String(s).toLowerCase().includes(term)),
+    );
+  }, [inquiries, q]);
+
+  const canConfirm = kind === 'inquiry' ? pickedInquiryId != null : clientName.trim().length > 0 || clientEmail.trim().length > 0;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-black/40" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 border rounded-2xl shadow-2xl p-6" style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}>
+        <h3 className="font-display text-[18px] mb-1">Use template</h3>
+        <p className="text-[13px] mb-4" style={{ color: 'var(--p-on-surface-variant)' }}>
+          "{template.title}" — everything stays the same, only the client changes.
+        </p>
+
+        <div className="flex items-center bg-black/[0.04] rounded-lg p-1 w-fit mb-4">
+          {([['inquiry', 'For an inquiry'], ['external', 'External']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setKind(key)}
+              className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors ${kind === key ? 'bg-white shadow-sm' : ''}`}
+              style={{ color: kind === key ? 'var(--p-primary)' : 'var(--p-on-surface-variant)' }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {kind === 'inquiry' ? (
+          <div>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search by reference, client, brand…"
+              className="w-full h-9 px-2.5 rounded-lg border text-[13px] mb-2 outline-none focus:ring-2 focus:ring-[#924623]/20"
+              style={{ borderColor: 'var(--p-outline-variant)' }}
+            />
+            <div className="max-h-56 overflow-y-auto rounded-lg border divide-y" style={{ borderColor: 'var(--p-outline-variant)' }}>
+              {isLoading ? (
+                <p className="px-3 py-4 text-[12px] text-center" style={{ color: 'var(--p-on-surface-variant)' }}>Loading…</p>
+              ) : filtered.length === 0 ? (
+                <p className="px-3 py-4 text-[12px] text-center" style={{ color: 'var(--p-on-surface-variant)' }}>No inquiries found.</p>
+              ) : (
+                filtered.map((i) => (
+                  <button
+                    key={i.id}
+                    onClick={() => setPickedInquiryId(i.id)}
+                    className="w-full text-left px-3 py-2 hover:bg-black/[0.02] flex items-center gap-3"
+                    style={{ background: pickedInquiryId === i.id ? 'var(--p-primary-container)' : undefined }}
+                  >
+                    <span className="text-[12px] font-bold shrink-0" style={{ color: 'var(--p-primary)' }}>{i.reference}</span>
+                    <span className="text-[13px] truncate flex-1">{i.clientName || i.brand || '—'}</span>
+                    <span className="text-[11px] truncate hidden sm:block" style={{ color: 'var(--p-on-surface-variant)' }}>{i.clientEmail}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-[11px] font-bold uppercase mb-1" style={{ color: 'var(--p-on-surface-variant)' }}>Client name</label>
+              <input
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                placeholder="e.g. Aanya Textiles"
+                className="w-full h-10 px-3 rounded-lg border text-[14px] outline-none focus:ring-2 focus:ring-[#924623]/20"
+                style={{ borderColor: 'var(--p-outline-variant)' }}
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase mb-1" style={{ color: 'var(--p-on-surface-variant)' }}>Client email</label>
+              <input
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
+                placeholder="e.g. client@example.com"
+                className="w-full h-10 px-3 rounded-lg border text-[14px] outline-none focus:ring-2 focus:ring-[#924623]/20"
+                style={{ borderColor: 'var(--p-outline-variant)' }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 justify-end mt-5">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-[13px] font-semibold border" style={{ borderColor: 'var(--p-outline)' }}>Cancel</button>
+          <button
+            type="button"
+            disabled={!canConfirm || pending}
+            onClick={() =>
+              onConfirm(
+                kind === 'inquiry'
+                  ? { inquiryId: pickedInquiryId! }
+                  : { clientName: clientName.trim() || undefined, clientEmail: clientEmail.trim() || undefined },
+              )
+            }
+            className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50"
+            style={{ background: 'var(--p-primary)' }}
+          >
+            {pending ? 'Creating…' : 'Create quotation'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export default function PortalAdminQuotations() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [params] = useSearchParams();
+  const inquiryFilter = params.get('inquiry');
+  const [tab, setTab] = useState<Tab>('quotes');
+  const [templateModal, setTemplateModal] = useState<ManufacturingQuoteDto | null>(null);
+
+  const { data: quotes = [], isLoading: loadingQuotes } = useQuery({
+    queryKey: ['admin-quotes', 'quotes'],
+    queryFn: () => manufacturingApi.listQuotes(false),
+  });
+  const { data: templates = [], isLoading: loadingTemplates } = useQuery({
+    queryKey: ['admin-quotes', 'templates'],
+    queryFn: () => manufacturingApi.listQuotes(true),
+  });
+
+  const useTemplate = useMutation({
+    mutationFn: (opts: { inquiryId?: number; clientName?: string; clientEmail?: string }) =>
+      manufacturingApi.duplicateQuote(templateModal!.id, opts),
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-quotes'] });
+      setTemplateModal(null);
+      toast.success(`New quotation created from template · ${created.reference}`);
+      navigate(`/portal-admin/quote-editor/${created.reference}`);
+    },
+    onError: (e) => toast.error((e as Error).message || 'Failed to use template'),
+  });
+
+  const isLoading = tab === 'quotes' ? loadingQuotes : loadingTemplates;
+  const list = tab === 'quotes' ? quotes : templates;
+
   const shown = useMemo(() => {
-    if (!inquiryFilter) return quotes;
+    if (!inquiryFilter || tab !== 'quotes') return list;
     const id = Number(inquiryFilter);
-    return quotes.filter((q) => q.inquiryId === id);
-  }, [quotes, inquiryFilter]);
+    return list.filter((q) => q.inquiryId === id);
+  }, [list, inquiryFilter, tab]);
 
   return (
     <AdminShell
@@ -38,6 +204,20 @@ export default function PortalAdminQuotations() {
             <button onClick={() => navigate('/portal-admin/quotations')} className="ml-2 font-bold underline" style={{ color: 'var(--p-primary)' }}>Show all</button>
           </p>
         )}
+
+        <div className="flex items-center bg-black/[0.04] rounded-lg p-1 w-fit mb-5">
+          {([['quotes', 'Quotations'], ['templates', 'Templates']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-colors ${tab === key ? 'bg-white shadow-sm' : ''}`}
+              style={{ color: tab === key ? 'var(--p-primary)' : 'var(--p-on-surface-variant)' }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {isLoading ? (
           <div className="flex items-center justify-center py-20" style={{ color: 'var(--p-on-surface-variant)' }}>
             <Sym name="progress_activity" className="text-[28px] animate-spin" />
@@ -45,19 +225,25 @@ export default function PortalAdminQuotations() {
         ) : shown.length === 0 ? (
           <div className="border-2 border-dashed rounded-xl p-12 text-center" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>
             <Sym name="request_quote" className="text-[40px]" />
-            <p className="mt-2 text-[15px] font-semibold">No quotations yet</p>
-            <p className="text-[13px]">Create one from an inquiry or start a blank quotation.</p>
-            <button onClick={() => navigate('/portal-admin/quote-editor/new')} className="mt-4 px-4 py-2 rounded-lg text-[13px] font-semibold text-white inline-flex items-center gap-1.5" style={{ background: 'var(--p-primary)' }}>
-              <Sym name="add" className="text-[16px]" /> New quotation
-            </button>
+            <p className="mt-2 text-[15px] font-semibold">{tab === 'templates' ? 'No templates yet' : 'No quotations yet'}</p>
+            <p className="text-[13px]">
+              {tab === 'templates'
+                ? 'Open a quotation and choose "Save as template" to reuse it later.'
+                : 'Create one from an inquiry or start a blank quotation.'}
+            </p>
+            {tab === 'quotes' && (
+              <button onClick={() => navigate('/portal-admin/quote-editor/new')} className="mt-4 px-4 py-2 rounded-lg text-[13px] font-semibold text-white inline-flex items-center gap-1.5" style={{ background: 'var(--p-primary)' }}>
+                <Sym name="add" className="text-[16px]" /> New quotation
+              </button>
+            )}
           </div>
         ) : (
           <div className="border rounded-xl overflow-hidden overflow-x-auto" style={{ borderColor: 'var(--p-outline-variant)' }}>
             <table className="w-full text-left border-collapse min-w-[720px]">
               <thead>
                 <tr style={{ background: 'var(--p-surface-container-low)' }}>
-                  {['Quote', 'Title', 'Client', 'Amount', 'Status', 'Updated', ''].map((h) => (
-                    <th key={h} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>{h}</th>
+                  {[tab === 'templates' ? 'Template' : 'Quote', 'Title', 'Client', 'Amount', tab === 'templates' ? 'Updated' : 'Status', tab === 'templates' ? '' : 'Updated', ''].map((h, i) => (
+                    <th key={i} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -67,16 +253,32 @@ export default function PortalAdminQuotations() {
                     key={q.id}
                     className="cursor-pointer hover:bg-black/[0.02]"
                     style={{ borderTop: i ? '1px solid var(--p-outline-variant)' : undefined }}
-                    onClick={() => navigate(`/portal-admin/quote-editor/${q.reference}`)}
+                    onClick={() => (tab === 'templates' ? undefined : navigate(`/portal-admin/quote-editor/${q.reference}`))}
                   >
                     <td className="px-4 py-3 font-semibold text-[13px]">{q.reference}</td>
                     <td className="px-4 py-3 text-[13px]">{q.title}</td>
                     <td className="px-4 py-3 text-[13px]">{q.clientName || '—'}</td>
                     <td className="px-4 py-3 font-bold text-[13px]">{money(q.total, q.currency)}</td>
-                    <td className="px-4 py-3"><Pill label={q.status} /></td>
-                    <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{q.updatedAt ? formatInquiryDate(q.updatedAt) : '—'}</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-[13px] font-bold" style={{ color: 'var(--p-primary)' }}>Edit</span>
+                    {tab === 'templates' ? (
+                      <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{q.updatedAt ? formatInquiryDate(q.updatedAt) : '—'}</td>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3"><Pill label={q.status} /></td>
+                        <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{q.updatedAt ? formatInquiryDate(q.updatedAt) : '—'}</td>
+                      </>
+                    )}
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      {tab === 'templates' ? (
+                        <button
+                          onClick={() => setTemplateModal(q)}
+                          className="text-[13px] font-bold"
+                          style={{ color: 'var(--p-primary)' }}
+                        >
+                          Use template
+                        </button>
+                      ) : (
+                        <span className="text-[13px] font-bold cursor-pointer" style={{ color: 'var(--p-primary)' }} onClick={() => navigate(`/portal-admin/quote-editor/${q.reference}`)}>Edit</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -85,6 +287,15 @@ export default function PortalAdminQuotations() {
           </div>
         )}
       </div>
+
+      {templateModal && (
+        <UseTemplateModal
+          template={templateModal}
+          onClose={() => setTemplateModal(null)}
+          onConfirm={(opts) => useTemplate.mutate(opts)}
+          pending={useTemplate.isPending}
+        />
+      )}
     </AdminShell>
   );
 }

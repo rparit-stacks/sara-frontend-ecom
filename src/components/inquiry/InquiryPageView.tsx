@@ -1,19 +1,27 @@
-import { useState, type ElementType } from 'react';
+import { useCallback, useEffect, useState, type ElementType } from 'react';
 import { motion } from 'framer-motion';
+import useEmblaCarousel from 'embla-carousel-react';
+import Autoplay from 'embla-carousel-autoplay';
 import { Button } from '@/components/ui/button';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import InquiryFormWidget from '@/components/inquiry/InquiryFormWidget';
+import { RichTextEditor } from '@/components/quote/RichText';
+import { mediaApi } from '@/lib/api';
 import {
   SECTION_TEMPLATES,
   createSection,
   type CardsSection,
+  type CarouselSection,
   type FormSection,
+  type ImageTextSection,
   type InquiryItem,
   type InquiryPageContent,
   type InquirySection,
   type InquirySectionType,
+  type MarqueeSection,
   type RichTextSection,
   type StepsSection,
+  type TextBlockSection,
 } from '@/components/inquiry/inquiryContent';
 
 const SECTION_BG = [
@@ -374,6 +382,294 @@ function RichTextBlock({ section, editable, onPatch }: {
   );
 }
 
+function ImagePicker({ imageUrl, onChange }: { imageUrl: string; onChange: (url: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await mediaApi.upload(file, 'inquiry-page');
+      onChange(url);
+    } catch (err) {
+      window.alert((err as Error).message || 'Image upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+  return (
+    <label className="group relative block w-full aspect-[4/3] rounded-xl sm:rounded-2xl overflow-hidden border-2 border-dashed border-primary/30 bg-warm/40 cursor-pointer">
+      <input type="file" accept="image/*" className="hidden" onChange={pick} disabled={uploading} />
+      {imageUrl ? (
+        <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+      ) : (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-primary/60">
+          <i className="fa-solid fa-image text-3xl" />
+          <span className="text-sm font-semibold">Click to upload photo</span>
+        </div>
+      )}
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+        <span className="text-white text-sm font-semibold flex items-center gap-2">
+          <i className={`fa-solid ${uploading ? 'fa-spinner fa-spin' : 'fa-camera'}`} /> {uploading ? 'Uploading…' : imageUrl ? 'Change photo' : 'Upload photo'}
+        </span>
+      </div>
+    </label>
+  );
+}
+
+function ImageTextBlock({ section, editable, onPatch }: {
+  section: ImageTextSection; editable?: boolean; onPatch: (p: Partial<InquirySection>) => void;
+}) {
+  const imageFirst = section.layout !== 'image-right';
+  const ImageCol = editable ? (
+    <ImagePicker imageUrl={section.imageUrl} onChange={(v) => onPatch({ imageUrl: v })} />
+  ) : section.imageUrl ? (
+    <img src={section.imageUrl} alt="" className="w-full h-full object-cover rounded-xl sm:rounded-2xl" />
+  ) : null;
+  const TextCol = (
+    <div className="flex flex-col justify-center">
+      <EditableText as="h2" editable={editable} value={section.heading} onChange={(v) => onPatch({ heading: v })} className="font-cursive text-3xl xs:text-4xl sm:text-5xl text-primary mb-3 xs:mb-4 inline-block" />
+      <EditableText as="p" editable={editable} value={section.body} onChange={(v) => onPatch({ body: v })} className="text-muted-foreground text-base xs:text-lg leading-relaxed whitespace-pre-line" />
+    </div>
+  );
+  return (
+    <div className="container-custom relative z-10">
+      <Reveal editable={editable}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-center">
+          {editable && (
+            <div className="md:hidden -mb-2">
+              <button
+                type="button"
+                onClick={() => onPatch({ layout: imageFirst ? 'image-right' : 'image-left' })}
+                className="text-[12px] font-semibold text-primary inline-flex items-center gap-1.5"
+              >
+                <i className="fa-solid fa-arrows-left-right" /> Swap photo side ({imageFirst ? 'left' : 'right'})
+              </button>
+            </div>
+          )}
+          <div className={imageFirst ? 'md:order-1' : 'md:order-2'}>{ImageCol}</div>
+          <div className={imageFirst ? 'md:order-2' : 'md:order-1'}>
+            {editable && (
+              <button
+                type="button"
+                onClick={() => onPatch({ layout: imageFirst ? 'image-right' : 'image-left' })}
+                className="hidden md:inline-flex text-[12px] font-semibold text-primary items-center gap-1.5 mb-2"
+              >
+                <i className="fa-solid fa-arrows-left-right" /> Swap photo side
+              </button>
+            )}
+            {TextCol}
+          </div>
+        </div>
+      </Reveal>
+    </div>
+  );
+}
+
+function TextBlockBlock({ section, editable, onPatch }: {
+  section: TextBlockSection; editable?: boolean; onPatch: (p: Partial<InquirySection>) => void;
+}) {
+  const align = section.headingAlign ?? 'center';
+  return (
+    <div className="container-custom relative z-10 max-w-3xl mx-auto">
+      <Reveal editable={editable}>
+        <div className={`mb-6 xs:mb-8 flex items-center gap-3 ${align === 'center' ? 'flex-col text-center' : 'flex-row justify-between'}`}>
+          <EditableText
+            as="h2"
+            editable={editable}
+            value={section.heading}
+            onChange={(v) => onPatch({ heading: v })}
+            className={`font-cursive text-3xl xs:text-4xl sm:text-5xl text-primary inline-block ${align === 'left' ? 'text-left' : 'text-center'}`}
+          />
+          {editable && (
+            <div className="flex items-center gap-1 shrink-0 bg-primary/5 rounded-lg p-1">
+              {(['left', 'center'] as const).map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => onPatch({ headingAlign: a })}
+                  className={`w-7 h-7 rounded-md flex items-center justify-center text-[12px] ${align === a ? 'bg-primary text-white' : 'text-primary/60 hover:bg-primary/10'}`}
+                  title={a === 'left' ? 'Align left' : 'Align center'}
+                >
+                  <i className={`fa-solid fa-align-${a}`} />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {editable ? (
+          <RichTextEditor html={section.bodyHtml} onChange={(html) => onPatch({ bodyHtml: html })} accent="#924623" minHeight={140} />
+        ) : (
+          <div className={`rt text-muted-foreground text-base xs:text-lg leading-relaxed ${align === 'left' ? 'text-left' : 'text-center'}`} dangerouslySetInnerHTML={{ __html: section.bodyHtml }} />
+        )}
+      </Reveal>
+    </div>
+  );
+}
+
+/** Manage a list of photo URLs — upload to add, hover-remove to delete, used by Carousel + Marquee. */
+function ImageListEditor({ images, onChange }: { images: string[]; onChange: (urls: string[]) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const addFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      const urls = await Promise.all(files.map((f) => mediaApi.upload(f, 'inquiry-page')));
+      onChange([...images, ...urls]);
+    } catch (err) {
+      window.alert((err as Error).message || 'Image upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+  const remove = (i: number) => onChange(images.filter((_, idx) => idx !== i));
+
+  return (
+    <div className="grid grid-cols-3 xs:grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-3">
+      {images.map((url, i) => (
+        <div key={i} className="group relative aspect-square rounded-lg overflow-hidden border border-primary/15">
+          <img src={url} alt="" className="w-full h-full object-cover" />
+          <button
+            type="button"
+            onClick={() => remove(i)}
+            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center shadow opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Remove photo"
+          >
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </div>
+      ))}
+      <label className="aspect-square rounded-lg border-2 border-dashed border-primary/30 text-primary/60 hover:text-primary hover:border-primary/60 transition-colors flex flex-col items-center justify-center gap-1 cursor-pointer">
+        <input type="file" accept="image/*" multiple className="hidden" onChange={addFiles} disabled={uploading} />
+        <i className={`fa-solid ${uploading ? 'fa-spinner fa-spin' : 'fa-plus'} text-lg`} />
+        <span className="text-[10px] font-semibold">{uploading ? 'Uploading…' : 'Add photos'}</span>
+      </label>
+    </div>
+  );
+}
+
+function CarouselBlock({ section, editable, onPatch }: {
+  section: CarouselSection; editable?: boolean; onPatch: (p: Partial<InquirySection>) => void;
+}) {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: section.images.length > 1 }, [Autoplay({ delay: 4000, stopOnInteraction: false })]);
+  const [selected, setSelected] = useState(0);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => setSelected(emblaApi.selectedScrollSnap());
+    emblaApi.on('select', onSelect);
+    onSelect();
+    return () => { emblaApi.off('select', onSelect); };
+  }, [emblaApi]);
+
+  const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
+  const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
+
+  return (
+    <div className="container-custom relative z-10">
+      <Reveal editable={editable}>
+        {section.heading && (
+          <div className="text-center mb-8 xs:mb-10 sm:mb-12">
+            <EditableText as="h2" editable={editable} value={section.heading} onChange={(v) => onPatch({ heading: v })} className="font-cursive text-4xl xs:text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-primary mb-3 xs:mb-4 px-2 inline-block" />
+          </div>
+        )}
+        {editable && (
+          <div className="max-w-3xl mx-auto mb-6">
+            <ImageListEditor images={section.images} onChange={(urls) => onPatch({ images: urls })} />
+          </div>
+        )}
+        {section.images.length > 0 ? (
+          <div className="relative max-w-3xl mx-auto">
+            <div className="overflow-hidden rounded-xl sm:rounded-2xl" ref={emblaRef}>
+              <div className="flex">
+                {section.images.map((url, i) => (
+                  <div key={i} className="flex-[0_0_100%] min-w-0">
+                    <img src={url} alt="" className="w-full aspect-[16/9] object-cover" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            {section.images.length > 1 && (
+              <>
+                <button type="button" onClick={scrollPrev} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 shadow flex items-center justify-center text-primary hover:bg-white transition-colors" title="Previous">
+                  <i className="fa-solid fa-chevron-left" />
+                </button>
+                <button type="button" onClick={scrollNext} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 shadow flex items-center justify-center text-primary hover:bg-white transition-colors" title="Next">
+                  <i className="fa-solid fa-chevron-right" />
+                </button>
+                <div className="flex items-center justify-center gap-1.5 mt-4">
+                  {section.images.map((_, i) => (
+                    <span key={i} className={`w-2 h-2 rounded-full transition-colors ${i === selected ? 'bg-primary' : 'bg-primary/20'}`} />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        ) : editable ? (
+          <p className="text-center text-muted-foreground text-sm">Add photos above to preview the carousel.</p>
+        ) : null}
+      </Reveal>
+    </div>
+  );
+}
+
+const MARQUEE_DURATION: Record<MarqueeSection['speed'], string> = { slow: '60s', normal: '35s', fast: '18s' };
+
+function MarqueeBlock({ section, editable, onPatch }: {
+  section: MarqueeSection; editable?: boolean; onPatch: (p: Partial<InquirySection>) => void;
+}) {
+  const duration = MARQUEE_DURATION[section.speed] ?? MARQUEE_DURATION.normal;
+  return (
+    <div className="relative z-10">
+      <Reveal editable={editable}>
+        {(section.heading || editable) && (
+          <div className="text-center mb-6 xs:mb-8 sm:mb-10 container-custom">
+            <EditableText as="h2" editable={editable} value={section.heading} onChange={(v) => onPatch({ heading: v })} placeholder="(optional heading)" className="font-cursive text-4xl xs:text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-primary mb-3 xs:mb-4 px-2 inline-block" />
+          </div>
+        )}
+        {editable && (
+          <div className="container-custom max-w-3xl mx-auto mb-6 space-y-3">
+            <ImageListEditor images={section.images} onChange={(urls) => onPatch({ images: urls })} />
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-semibold text-muted-foreground">Scroll speed:</span>
+              {(['slow', 'normal', 'fast'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => onPatch({ speed: s })}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-semibold capitalize ${section.speed === s ? 'bg-primary text-white' : 'bg-primary/10 text-primary/70'}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {section.images.length > 0 ? (
+          <div className="overflow-hidden">
+            <div
+              className="flex gap-4 sm:gap-5"
+              style={{
+                animation: editable ? undefined : `sara-marquee ${duration} linear infinite`,
+                width: 'max-content',
+              }}
+            >
+              {[...section.images, ...section.images].map((url, i) => (
+                <img key={i} src={url} alt="" className="h-28 xs:h-32 sm:h-40 w-auto rounded-lg sm:rounded-xl object-cover shrink-0" />
+              ))}
+            </div>
+          </div>
+        ) : editable ? (
+          <p className="text-center text-muted-foreground text-sm">Add photos above to preview the marquee.</p>
+        ) : null}
+      </Reveal>
+    </div>
+  );
+}
+
 /* ---------- main view ---------- */
 
 export default function InquiryPageView({ content, editable, onChange }: InquiryPageViewProps) {
@@ -438,6 +734,14 @@ export default function InquiryPageView({ content, editable, onChange }: Inquiry
         return <FormBlock section={section} editable={editable} onPatch={onPatch} />;
       case 'richtext':
         return <RichTextBlock section={section} editable={editable} onPatch={onPatch} />;
+      case 'imagetext':
+        return <ImageTextBlock section={section} editable={editable} onPatch={onPatch} />;
+      case 'textblock':
+        return <TextBlockBlock section={section} editable={editable} onPatch={onPatch} />;
+      case 'carousel':
+        return <CarouselBlock section={section} editable={editable} onPatch={onPatch} />;
+      case 'marquee':
+        return <MarqueeBlock section={section} editable={editable} onPatch={onPatch} />;
       default:
         return null;
     }
@@ -445,6 +749,18 @@ export default function InquiryPageView({ content, editable, onChange }: Inquiry
 
   return (
     <>
+      {/* Rich-text rendering for the Text Block section's bullets/links/underline/bold */}
+      <style>{`
+        .rt a { color: #2563eb; text-decoration: underline; }
+        .rt ul { list-style: disc; padding-left: 1.25rem; }
+        .rt ol { list-style: decimal; padding-left: 1.25rem; }
+        .rt b, .rt strong { font-weight: 700; }
+        .rt u { text-decoration: underline; }
+        .rt h2 { font-size: 1.25rem; font-weight: 700; margin: 0.4em 0 0.2em; }
+        .rt h3 { font-size: 1.1rem; font-weight: 700; margin: 0.4em 0 0.2em; }
+        .rt p { margin: 0.3em 0; }
+        @keyframes sara-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+      `}</style>
       {/* Hero */}
       <section className="relative bg-white/80 backdrop-blur-sm py-6 sm:py-8 lg:py-12 z-20 overflow-hidden">
         <div className="absolute inset-0 pointer-events-none opacity-[0.12]" style={{ backgroundImage: 'url(/bg_images/watercolor-wallpaper-with-hand-drawn-elements.png)', backgroundPosition: 'center', backgroundSize: 'cover', backgroundRepeat: 'no-repeat' }} />
