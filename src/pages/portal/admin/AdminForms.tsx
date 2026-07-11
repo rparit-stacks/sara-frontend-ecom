@@ -107,7 +107,7 @@ export default function PortalAdminForms() {
             {shown.map((f) => (
               <div key={f.id} className="border rounded-xl p-5 relative" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}>
                 <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(146,70,35,0.1)', color: 'var(--p-primary)' }}>
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,103,106,0.1)', color: 'var(--p-primary)' }}>
                     <Sym name="dynamic_form" className="text-[22px]" />
                   </div>
                   <div className="relative">

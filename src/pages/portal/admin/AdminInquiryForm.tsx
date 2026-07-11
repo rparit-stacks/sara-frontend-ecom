@@ -297,7 +297,7 @@ export default function AdminInquiryForm() {
       className={`${inRow ? 'flex-1 min-w-[120px]' : WIDTH_CLASS[f.width]} group/leaf relative rounded-lg border-2 p-3 pt-7 cursor-pointer transition-all`}
       style={{
         borderColor: selected === f.id ? 'var(--p-primary)' : 'var(--p-outline-variant)',
-        background: selected === f.id ? 'rgba(146,70,35,0.04)' : 'var(--p-surface-container-lowest)',
+        background: selected === f.id ? 'rgba(0,103,106,0.04)' : 'var(--p-surface-container-lowest)',
       }}
     >
       <div className="absolute top-1 left-2 right-2 flex items-center justify-between gap-2">
@@ -542,7 +542,7 @@ export default function AdminInquiryForm() {
                             className="w-full relative rounded-lg border-2 border-dashed p-3 pt-8 transition-all"
                             style={{
                               borderColor: selected === f.id ? 'var(--p-primary)' : 'var(--p-outline-variant)',
-                              background: selected === f.id ? 'rgba(146,70,35,0.03)' : 'var(--p-surface-container-low)',
+                              background: selected === f.id ? 'rgba(0,103,106,0.03)' : 'var(--p-surface-container-low)',
                             }}
                           >
                             <div className="absolute top-1.5 left-3 right-2 flex items-center justify-between gap-2">

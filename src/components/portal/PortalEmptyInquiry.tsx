@@ -12,7 +12,7 @@ export default function PortalEmptyInquiry({ compact }: { compact?: boolean }) {
     >
       <div
         className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-        style={{ background: 'rgba(146,70,35,0.1)', color: 'var(--p-primary)' }}
+        style={{ background: 'rgba(0,103,106,0.1)', color: 'var(--p-primary)' }}
       >
         <Sym name="factory" className="text-[32px]" />
       </div>

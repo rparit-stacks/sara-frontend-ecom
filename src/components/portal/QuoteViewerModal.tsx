@@ -134,7 +134,7 @@ export default function QuoteViewerModal({
                 on-screen zoom level applied here for narrow viewports. */}
             <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
               <div ref={canvasRef} className="flex flex-col gap-8 items-center">
-                <QuotePreview doc={doc} accent={doc.accent || '#924623'} currency={currency} reference={reference} />
+                <QuotePreview doc={doc} accent={doc.accent || '#00676a'} currency={currency} reference={reference} />
               </div>
             </div>
           </div>

@@ -1,8 +1,10 @@
 // The unified manufacturing project journey (MANUFACTURING_PORTAL_PLAN.md §3):
-//   INQUIRY -> QUOTATION -> SAMPLING -> PRODUCTION -> INVOICING -> COMPLETED
-// Each stage carries its own set of stage-specific statuses.
+//   INQUIRY -> QUOTATION -> INVOICING -> DESIGNING -> SAMPLING -> PRODUCTION -> DELIVERED
+// Invoicing is an upfront/advance payment step, collected before design work
+// starts — not a final formality. Each stage carries its own set of
+// stage-specific statuses.
 
-export type StageKey = 'INQUIRY' | 'QUOTATION' | 'SAMPLING' | 'PRODUCTION' | 'INVOICING' | 'COMPLETED';
+export type StageKey = 'INQUIRY' | 'QUOTATION' | 'INVOICING' | 'DESIGNING' | 'SAMPLING' | 'PRODUCTION' | 'DELIVERED';
 
 export interface StageDef {
   key: StageKey;
@@ -27,6 +29,18 @@ export const STAGES: StageDef[] = [
       s('REVISION_REQUESTED', 'Revision requested'),
       s('REJECTED', 'Rejected'),
     ],
+  },
+  {
+    key: 'INVOICING', label: 'Invoicing', icon: 'fa-receipt',
+    statuses: [
+      s('PAYMENT_PENDING', 'Payment pending'),
+      s('PARTIALLY_PAID', 'Partially paid'),
+      s('PAID', 'Paid'),
+    ],
+  },
+  {
+    key: 'DESIGNING', label: 'Designing', icon: 'fa-pen-ruler',
+    statuses: [s('DESIGN_IN_PROGRESS', 'Design in progress')],
   },
   {
     key: 'SAMPLING', label: 'Sampling', icon: 'fa-scissors',
@@ -55,16 +69,8 @@ export const STAGES: StageDef[] = [
     ],
   },
   {
-    key: 'INVOICING', label: 'Invoicing', icon: 'fa-receipt',
-    statuses: [
-      s('PAYMENT_PENDING', 'Payment pending'),
-      s('PARTIALLY_PAID', 'Partially paid'),
-      s('PAID', 'Paid'),
-    ],
-  },
-  {
-    key: 'COMPLETED', label: 'Completed', icon: 'fa-circle-check',
-    statuses: [s('COMPLETED', 'Completed')],
+    key: 'DELIVERED', label: 'Delivered', icon: 'fa-circle-check',
+    statuses: [s('DELIVERED', 'Delivered')],
   },
 ];
 

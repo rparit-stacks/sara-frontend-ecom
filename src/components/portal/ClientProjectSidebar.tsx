@@ -71,7 +71,7 @@ export default function ClientProjectSidebar({
     <button
       onClick={onClick}
       className="w-full flex items-center gap-3 px-3 py-1.5 rounded text-[14px] text-left transition-colors relative"
-      style={on ? { background: 'rgba(146,70,35,0.1)', color: 'var(--p-primary)', fontWeight: 700 } : { color: 'var(--p-on-surface-variant)' }}
+      style={on ? { background: 'rgba(0,103,106,0.1)', color: 'var(--p-primary)', fontWeight: 700 } : { color: 'var(--p-on-surface-variant)' }}
       onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = 'var(--p-surface-container-high)'; }}
       onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = 'transparent'; }}
     >
@@ -144,9 +144,9 @@ export default function ClientProjectSidebar({
                 <button
                   onClick={() => { onSelectDesign(d.id); onViewChange('channels'); }}
                   className={`w-full flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors text-left ${onRenameDesign && !d.system ? 'pr-9' : ''}`}
-                  style={on ? { background: 'rgba(146,70,35,0.1)', color: 'var(--p-primary)' } : hasUnread ? { background: 'var(--p-surface-container-lowest)' } : { color: 'var(--p-on-surface-variant)' }}
+                  style={on ? { background: 'rgba(0,103,106,0.1)', color: 'var(--p-primary)' } : hasUnread ? { background: 'var(--p-surface-container-lowest)' } : { color: 'var(--p-on-surface-variant)' }}
                 >
-                  <div className="relative w-8 h-8 rounded overflow-hidden shrink-0 border flex items-center justify-center" style={{ borderColor: on ? 'var(--p-primary)' : 'var(--p-outline-variant)', background: d.system ? 'rgba(146,70,35,0.12)' : 'var(--p-surface-container-high)' }}>
+                  <div className="relative w-8 h-8 rounded overflow-hidden shrink-0 border flex items-center justify-center" style={{ borderColor: on ? 'var(--p-primary)' : 'var(--p-outline-variant)', background: d.system ? 'rgba(0,103,106,0.12)' : 'var(--p-surface-container-high)' }}>
                     {d.system ? (
                       <Sym name="campaign" className="text-[17px]" style={{ color: 'var(--p-primary)' }} />
                     ) : d.imageUrl ? (

@@ -141,7 +141,7 @@ export default function PortalAdminFormBuilder() {
                           onDrop={(e) => { e.preventDefault(); if (dragIndex !== null && dragIndex !== i) move(dragIndex, i); setDragIndex(null); }}
                           onClick={() => setSelected(f.id)}
                           className={`${WIDTH_CLASS[f.width]} group relative rounded-lg border-2 p-3 cursor-pointer transition-all`}
-                          style={{ borderColor: selected === f.id ? 'var(--p-primary)' : 'transparent', background: selected === f.id ? 'rgba(146,70,35,0.04)' : 'transparent' }}
+                          style={{ borderColor: selected === f.id ? 'var(--p-primary)' : 'transparent', background: selected === f.id ? 'rgba(0,103,106,0.04)' : 'transparent' }}
                         >
                           <div className="pointer-events-none">
                             <FieldRenderer field={f} />
@@ -263,7 +263,7 @@ function SettingsTab() {
           <Field label="Logo URL"><input className={inp} style={cardStyle} /></Field>
           <Field label="Banner URL"><input className={inp} style={cardStyle} /></Field>
         </div>
-        <Field label="Theme color"><input type="color" defaultValue="#924623" className="mt-1 w-12 h-9 rounded border" style={cardStyle} /></Field>
+        <Field label="Theme color"><input type="color" defaultValue="#00676a" className="mt-1 w-12 h-9 rounded border" style={cardStyle} /></Field>
       </div>
       <div className={card + ' space-y-3'} style={cardStyle}>
         <p className="font-bold text-[14px]">Access</p>

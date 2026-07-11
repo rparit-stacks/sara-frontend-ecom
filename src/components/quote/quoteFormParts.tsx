@@ -27,7 +27,7 @@ export const BLOCK_META: Record<QuoteBlockType, { label: string; icon: string; h
   signature: { label: 'Signature', icon: 'fa-signature', hint: 'Sign-off line with name, title and date.' },
 };
 
-export const inputCls = 'w-full h-9 px-2.5 rounded-lg border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#924623]/20';
+export const inputCls = 'w-full h-9 px-2.5 rounded-lg border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#00676a]/20';
 export const labelCls = 'block text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1';
 
 /* ---------- collapsible group ---------- */
@@ -48,7 +48,7 @@ export function Group({ title, icon, defaultOpen = true, accent, children }: { t
 export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label?: string }) {
   return (
     <button onClick={() => onChange(!on)} className="flex items-center gap-2 text-[12px] text-gray-600" type="button">
-      <span className={`relative w-9 h-5 rounded-full transition-colors ${on ? 'bg-[#924623]' : 'bg-gray-300'}`}>
+      <span className={`relative w-9 h-5 rounded-full transition-colors ${on ? 'bg-[#00676a]' : 'bg-gray-300'}`}>
         <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${on ? 'translate-x-4' : ''}`} />
       </span>
       {label}
@@ -75,7 +75,7 @@ export function BrandingForm({ doc, onPatchBranding, accent }: { doc: QuoteDoc; 
         <label className={labelCls}>Logo</label>
         <div className="flex items-center gap-2">
           {doc.branding.logoUrl ? <img src={doc.branding.logoUrl} alt="logo" className="h-8 w-auto object-contain rounded border border-gray-200" /> : null}
-          <label className="text-[12px] cursor-pointer text-gray-600 hover:text-[#924623]">
+          <label className="text-[12px] cursor-pointer text-gray-600 hover:text-[#00676a]">
             <i className="fa-solid fa-cloud-arrow-up" /> {uploading ? 'Uploading…' : doc.branding.logoUrl ? 'Replace' : 'Upload'}
             <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadLogo(e.target.files?.[0])} />
           </label>
@@ -103,8 +103,8 @@ export function BrandingForm({ doc, onPatchBranding, accent }: { doc: QuoteDoc; 
   );
 }
 
-/* ---------- client & meta form ---------- */
-export function MetaForm({ doc, onPatchMeta }: { doc: QuoteDoc; onPatchMeta: (p: Partial<QuoteDoc['meta']>) => void }) {
+/* ---------- quote details form (title/date/validity) ---------- */
+export function QuoteDetailsForm({ doc, onPatchMeta }: { doc: QuoteDoc; onPatchMeta: (p: Partial<QuoteDoc['meta']>) => void }) {
   return (
     <>
       <div><label className={labelCls}>Quote title</label><input className={inputCls} value={doc.meta.quoteTitle} onChange={(e) => onPatchMeta({ quoteTitle: e.target.value })} /></div>
@@ -112,10 +112,21 @@ export function MetaForm({ doc, onPatchMeta }: { doc: QuoteDoc; onPatchMeta: (p:
         <div><label className={labelCls}>Date</label><input type="date" className={inputCls} value={doc.meta.date} onChange={(e) => onPatchMeta({ date: e.target.value })} /></div>
         <div><label className={labelCls}>Valid (days)</label><input type="number" className={inputCls} value={doc.meta.validityDays} onChange={(e) => onPatchMeta({ validityDays: +e.target.value })} /></div>
       </div>
-      <div><label className={labelCls}>Client name</label><input className={inputCls} value={doc.meta.clientName} onChange={(e) => onPatchMeta({ clientName: e.target.value })} /></div>
-      <div><label className={labelCls}>Client email</label><input className={inputCls} value={doc.meta.clientEmail} onChange={(e) => onPatchMeta({ clientEmail: e.target.value })} /></div>
-      <div><label className={labelCls}>Client address</label><input className={inputCls} value={doc.meta.clientAddress} onChange={(e) => onPatchMeta({ clientAddress: e.target.value })} /></div>
     </>
+  );
+}
+
+/* ---------- client information form (name/email/phone/address) ---------- */
+export function ClientInfoForm({ doc, onPatchMeta, highlight }: { doc: QuoteDoc; onPatchMeta: (p: Partial<QuoteDoc['meta']>) => void; highlight?: boolean }) {
+  return (
+    <div className={highlight ? 'ring-2 ring-red-400 rounded-xl p-2 -m-2 transition-shadow' : undefined}>
+      <div><label className={labelCls}>Client name</label><input className={inputCls} value={doc.meta.clientName} onChange={(e) => onPatchMeta({ clientName: e.target.value })} /></div>
+      <div className="grid grid-cols-2 gap-2 mt-2.5">
+        <div><label className={labelCls}>Client email</label><input type="email" className={inputCls} value={doc.meta.clientEmail} onChange={(e) => onPatchMeta({ clientEmail: e.target.value })} /></div>
+        <div><label className={labelCls}>Client phone</label><input type="tel" placeholder="e.g. 98290 00000" className={inputCls} value={doc.meta.clientPhone} onChange={(e) => onPatchMeta({ clientPhone: e.target.value })} /></div>
+      </div>
+      <div className="mt-2.5"><label className={labelCls}>Client address</label><input className={inputCls} value={doc.meta.clientAddress} onChange={(e) => onPatchMeta({ clientAddress: e.target.value })} /></div>
+    </div>
   );
 }
 
@@ -210,7 +221,7 @@ export function SectionRow({ block, accent, currency, onPatch, onRemove, onToggl
   const setRefs = (el: HTMLDivElement | null) => { setNodeRef(el); rowRef.current = el; };
 
   return (
-    <div ref={setRefs} style={style} className={`border rounded-xl bg-white shadow-sm ${block.hidden ? 'border-gray-200 opacity-60' : 'border-gray-200'} ${open ? 'ring-1 ring-[#924623]/20' : ''} ${focus ? 'ring-2 ring-[#924623]/50' : ''}`}>
+    <div ref={setRefs} style={style} className={`border rounded-xl bg-white shadow-sm ${block.hidden ? 'border-gray-200 opacity-60' : 'border-gray-200'} ${open ? 'ring-1 ring-[#00676a]/20' : ''} ${focus ? 'ring-2 ring-[#00676a]/50' : ''}`}>
       {/* rich card header */}
       <div className="flex items-center gap-3 px-3 py-2.5">
         <button {...attributes} {...listeners} className="cursor-grab text-gray-300 hover:text-gray-500 px-0.5" title="Drag to reorder"><i className="fa-solid fa-grip-vertical text-[15px]" /></button>
@@ -282,7 +293,7 @@ function ImageForm({ block, accent, onPatch }: { block: ImageBlock; accent: stri
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={(e) => { e.preventDefault(); setDragOver(false); upload(e.dataTransfer.files?.[0]); }}
-          className={`flex flex-col items-center justify-center gap-2 py-10 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${dragOver ? 'border-[#924623] bg-[#924623]/5' : 'border-gray-300 hover:border-[#924623]'}`}
+          className={`flex flex-col items-center justify-center gap-2 py-10 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${dragOver ? 'border-[#00676a] bg-[#00676a]/5' : 'border-gray-300 hover:border-[#00676a]'}`}
         >
           <i className={`fa-solid ${uploading ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-up'} text-2xl`} style={{ color: accent }} />
           <span className="text-[13px] font-semibold text-gray-600">{uploading ? 'Uploading…' : 'Drag & drop an image, or click to browse'}</span>
@@ -311,7 +322,7 @@ function ImageForm({ block, accent, onPatch }: { block: ImageBlock; accent: stri
         <div className="flex items-center gap-2">
           <button onClick={() => onPatch({ width: 'half', widthPercent: 50 } as Partial<QuoteBlock>)} className={`h-8 px-3 rounded-lg text-[12px] font-semibold border ${widthPct === 50 ? 'text-white' : 'border-gray-200 text-gray-600'}`} style={widthPct === 50 ? { background: accent, borderColor: accent } : undefined}>Half</button>
           <button onClick={() => onPatch({ width: 'full', widthPercent: 100 } as Partial<QuoteBlock>)} className={`h-8 px-3 rounded-lg text-[12px] font-semibold border ${widthPct === 100 ? 'text-white' : 'border-gray-200 text-gray-600'}`} style={widthPct === 100 ? { background: accent, borderColor: accent } : undefined}>Full</button>
-          <input type="range" min={10} max={100} step={5} value={widthPct} onChange={(e) => onPatch({ widthPercent: +e.target.value, width: +e.target.value <= 50 ? 'half' : 'full' } as Partial<QuoteBlock>)} className="flex-1 accent-[#924623]" />
+          <input type="range" min={10} max={100} step={5} value={widthPct} onChange={(e) => onPatch({ widthPercent: +e.target.value, width: +e.target.value <= 50 ? 'half' : 'full' } as Partial<QuoteBlock>)} className="flex-1 accent-[#00676a]" />
         </div>
       </div>
     </div>
@@ -366,7 +377,7 @@ function ItemsForm({ block, accent, currency, onPatch }: { block: ItemsBlock; ac
           )}
         </table>
       </div>
-      <button onClick={addItem} className="h-9 px-4 rounded-lg border border-dashed border-gray-300 text-[13px] font-semibold text-gray-500 hover:border-[#924623] hover:text-[#924623] flex items-center gap-2"><i className="fa-solid fa-plus text-[12px]" /> Add item</button>
+      <button onClick={addItem} className="h-9 px-4 rounded-lg border border-dashed border-gray-300 text-[13px] font-semibold text-gray-500 hover:border-[#00676a] hover:text-[#00676a] flex items-center gap-2"><i className="fa-solid fa-plus text-[12px]" /> Add item</button>
     </div>
   );
 }
@@ -396,7 +407,7 @@ function TableForm({ block, accent, onPatch }: { block: TableBlock; accent: stri
                 </th>
               ))}
               <th className="border-b border-l border-gray-200 px-2 w-12">
-                <button onClick={addCol} title="Add column" className="w-8 h-8 rounded-lg border border-dashed border-gray-300 text-gray-400 hover:border-[#924623] hover:text-[#924623]"><i className="fa-solid fa-plus text-[12px]" /></button>
+                <button onClick={addCol} title="Add column" className="w-8 h-8 rounded-lg border border-dashed border-gray-300 text-gray-400 hover:border-[#00676a] hover:text-[#00676a]"><i className="fa-solid fa-plus text-[12px]" /></button>
               </th>
             </tr>
           </thead>
@@ -417,7 +428,7 @@ function TableForm({ block, accent, onPatch }: { block: TableBlock; accent: stri
           </tbody>
         </table>
       </div>
-      <button onClick={addRow} className="h-9 px-4 rounded-lg border border-dashed border-gray-300 text-[13px] font-semibold text-gray-500 hover:border-[#924623] hover:text-[#924623] flex items-center gap-2"><i className="fa-solid fa-plus text-[12px]" /> Add row</button>
+      <button onClick={addRow} className="h-9 px-4 rounded-lg border border-dashed border-gray-300 text-[13px] font-semibold text-gray-500 hover:border-[#00676a] hover:text-[#00676a] flex items-center gap-2"><i className="fa-solid fa-plus text-[12px]" /> Add row</button>
     </div>
   );
 }
@@ -464,7 +475,7 @@ function SignatureForm({ block, onPatch }: { block: SignatureBlock; onPatch: (p:
       <div><label className={labelCls}>Signer name</label><input className={inputCls} value={block.signerName || ''} onChange={(e) => onPatch({ signerName: e.target.value } as Partial<QuoteBlock>)} /></div>
       <div><label className={labelCls}>Signer title</label><input className={inputCls} value={block.signerTitle || ''} onChange={(e) => onPatch({ signerTitle: e.target.value } as Partial<QuoteBlock>)} /></div>
       <div><label className={labelCls}>Place</label><input className={inputCls} value={block.place || ''} onChange={(e) => onPatch({ place: e.target.value } as Partial<QuoteBlock>)} /></div>
-      <label className="flex items-center gap-2 text-[12px] cursor-pointer text-gray-600 hover:text-[#924623]">
+      <label className="flex items-center gap-2 text-[12px] cursor-pointer text-gray-600 hover:text-[#00676a]">
         <i className="fa-solid fa-cloud-arrow-up" /> {uploading ? 'Uploading…' : block.imageUrl ? 'Replace signature image' : 'Upload signature image'}
         <input type="file" accept="image/*" className="hidden" onChange={(e) => upload(e.target.files?.[0])} />
       </label>
@@ -478,13 +489,13 @@ export function AddSection({ onAdd, accent }: { onAdd: (t: QuoteBlockType) => vo
   const types: QuoteBlockType[] = ['items', 'text', 'image', 'table', 'summary', 'fields', 'signature'];
   return (
     <div className="relative">
-      <button onClick={() => setOpen((o) => !o)} className="w-full py-2 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-[#924623] hover:text-[#924623] text-[13px] font-semibold flex items-center justify-center gap-2">
+      <button onClick={() => setOpen((o) => !o)} className="w-full py-2 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-[#00676a] hover:text-[#00676a] text-[13px] font-semibold flex items-center justify-center gap-2">
         <i className={`fa-solid ${open ? 'fa-xmark' : 'fa-plus'}`} /> Add section
       </button>
       {open && (
         <div className="mt-2 grid grid-cols-3 gap-2">
           {types.map((t) => (
-            <button key={t} onClick={() => { onAdd(t); setOpen(false); }} className="rounded-lg border border-gray-200 p-2.5 hover:border-[#924623] hover:shadow-sm flex flex-col items-center gap-1.5 text-gray-700">
+            <button key={t} onClick={() => { onAdd(t); setOpen(false); }} className="rounded-lg border border-gray-200 p-2.5 hover:border-[#00676a] hover:shadow-sm flex flex-col items-center gap-1.5 text-gray-700">
               <i className={`fa-solid ${BLOCK_META[t].icon} text-[16px]`} style={{ color: accent }} />
               <span className="text-[11px] font-semibold text-center leading-tight">{BLOCK_META[t].label}</span>
             </button>

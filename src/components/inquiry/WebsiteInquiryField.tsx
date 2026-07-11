@@ -1,8 +1,12 @@
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FormField } from '@/components/portal/formbuilder/types';
 import { isDisplay } from '@/components/portal/formbuilder/registry';
+import { mediaApi } from '@/lib/api';
+import { COUNTRY_CODES } from '@/lib/countryCodes';
 
 interface Props {
   field: FormField;
@@ -85,11 +89,10 @@ export default function WebsiteInquiryField({ field, value, onChange, error }: P
       );
     case 'phone':
       return wrap(
-        <Input
-          type="tel"
-          placeholder={field.placeholder || '+91 98765 43210'}
+        <PhoneField
           value={strVal}
-          onChange={(e) => onChange(field.key, e.target.value)}
+          placeholder={field.placeholder}
+          onChange={(v) => onChange(field.key, v)}
         />,
       );
     case 'number':
@@ -217,42 +220,19 @@ export default function WebsiteInquiryField({ field, value, onChange, error }: P
         field.type === 'image' || field.type === 'camera'
           ? 'image/*'
           : field.validation?.allowedExtensions || undefined;
-      const names = Array.isArray(value)
+      const urls = Array.isArray(value)
         ? (value as string[])
         : value
           ? [String(value)]
           : [];
       return wrap(
-        <label
-          className="flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-lg p-5 cursor-pointer hover:border-primary transition-colors"
-          style={{ borderColor: 'hsl(var(--border))' }}
-        >
-          <input
-            type="file"
-            multiple={multiple}
-            accept={accept}
-            capture={field.type === 'camera' ? 'environment' : undefined}
-            className="hidden"
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []).map((f) => f.name);
-              onChange(field.key, multiple ? files : files[0] ?? '');
-            }}
-          />
-          <i
-            className={`fa-solid ${
-              field.type === 'camera' ? 'fa-camera' : field.type === 'image' ? 'fa-image' : 'fa-cloud-arrow-up'
-            } text-xl text-primary`}
-          />
-          {names.length > 0 ? (
-            <p className="text-xs text-foreground font-medium text-center break-all">
-              {names.join(', ')}
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              {field.placeholder || (multiple ? 'Click to upload files' : 'Click to upload a file')}
-            </p>
-          )}
-        </label>,
+        <UploadField
+          field={field}
+          multiple={multiple}
+          accept={accept}
+          urls={urls}
+          onChange={onChange}
+        />,
       );
     }
     case 'rating': {
@@ -298,4 +278,121 @@ export default function WebsiteInquiryField({ field, value, onChange, error }: P
         />,
       );
   }
+}
+
+/** File/image/camera field — uploads to Cloudinary on selection and stores the real URL(s), not just the local filename. */
+function UploadField({
+  field, multiple, accept, urls, onChange,
+}: {
+  field: FormField;
+  multiple: boolean;
+  accept?: string;
+  urls: string[];
+  onChange: (key: string, value: unknown) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFiles = async (fileList: FileList | null) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      const uploaded = await Promise.all(files.map((f) => mediaApi.upload(f, 'inquiries')));
+      onChange(field.key, multiple ? [...urls, ...uploaded] : uploaded[0]);
+    } catch (e) {
+      toast.error((e as Error).message || 'Upload failed — please try again');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <label
+      className={`flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-lg p-5 transition-colors ${uploading ? 'opacity-60 cursor-wait' : 'cursor-pointer hover:border-primary'}`}
+      style={{ borderColor: 'hsl(var(--border))' }}
+    >
+      <input
+        type="file"
+        multiple={multiple}
+        accept={accept}
+        capture={field.type === 'camera' ? 'environment' : undefined}
+        className="hidden"
+        disabled={uploading}
+        onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
+      />
+      <i
+        className={`fa-solid ${
+          uploading ? 'fa-spinner fa-spin' : field.type === 'camera' ? 'fa-camera' : field.type === 'image' ? 'fa-image' : 'fa-cloud-arrow-up'
+        } text-xl text-primary`}
+      />
+      {uploading ? (
+        <p className="text-xs text-muted-foreground">Uploading…</p>
+      ) : urls.length > 0 ? (
+        field.type === 'image' || field.type === 'camera' ? (
+          <div className="flex flex-wrap gap-2 justify-center">
+            {urls.map((url, i) => (
+              <img key={i} src={url} alt="" className="w-14 h-14 object-cover rounded border" />
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-foreground font-medium text-center break-all">
+            {urls.map((u) => u.split('/').pop()).join(', ')}
+          </p>
+        )
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {field.placeholder || (multiple ? 'Click to upload files' : 'Click to upload a file')}
+        </p>
+      )}
+    </label>
+  );
+}
+
+// Longest dial codes first, so e.g. "+1268" (Antigua) matches before "+1" (US/Canada).
+const SORTED_CODES = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length);
+
+/** Split a combined "+<code><digits>" string into its country code + local digits. Defaults to +91 (India). */
+function splitPhone(value: string): { code: string; digits: string } {
+  const match = SORTED_CODES.find((c) => value.startsWith(c.code));
+  if (match) return { code: match.code, digits: value.slice(match.code.length).replace(/\D/g, '') };
+  return { code: '+91', digits: value.replace(/\D/g, '') };
+}
+
+/** Phone field with a country-code dropdown (defaults to +91) — submits one combined "+<code><digits>" string. */
+function PhoneField({
+  value, placeholder, onChange,
+}: {
+  value: string;
+  placeholder?: string;
+  onChange: (value: string) => void;
+}) {
+  const { code, digits } = splitPhone(value);
+
+  const commit = (nextCode: string, nextDigits: string) => {
+    onChange(nextDigits ? `${nextCode}${nextDigits}` : '');
+  };
+
+  return (
+    <div className="flex gap-2">
+      <Select value={code} onValueChange={(v) => commit(v, digits)}>
+        <SelectTrigger className="w-[110px] shrink-0">
+          <SelectValue placeholder="Code" />
+        </SelectTrigger>
+        <SelectContent className="max-h-[280px] overflow-y-auto">
+          {COUNTRY_CODES.map((c) => (
+            <SelectItem key={c.code + c.country} value={c.code}>
+              {c.code} {c.country}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Input
+        type="tel"
+        className="flex-1"
+        placeholder={placeholder || '98765 43210'}
+        value={digits}
+        onChange={(e) => commit(code, e.target.value.replace(/\D/g, '').slice(0, 15))}
+      />
+    </div>
+  );
 }

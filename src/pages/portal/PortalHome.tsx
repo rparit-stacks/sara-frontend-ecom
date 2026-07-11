@@ -12,8 +12,8 @@ const RADIUS = 45;
 const CIRC = 2 * Math.PI * RADIUS;
 
 const TONE: Record<ActivityTone, { icon: string; bg: string; fg: string }> = {
-  approval: { icon: 'request_quote', bg: 'rgba(146,70,35,0.12)', fg: 'var(--p-primary)' },
-  message: { icon: 'forum', bg: 'rgba(146,70,35,0.1)', fg: 'var(--p-primary)' },
+  approval: { icon: 'request_quote', bg: 'rgba(0,103,106,0.12)', fg: 'var(--p-primary)' },
+  message: { icon: 'forum', bg: 'rgba(0,103,106,0.1)', fg: 'var(--p-primary)' },
   stage: { icon: 'conveyor_belt', bg: 'var(--p-secondary-container)', fg: 'var(--p-on-secondary-container)' },
   payment: { icon: 'payments', bg: 'var(--p-primary-fixed)', fg: 'var(--p-on-primary-fixed-variant)' },
   file: { icon: 'description', bg: 'var(--p-surface-container-high)', fg: 'var(--p-on-surface)' },
@@ -83,7 +83,7 @@ function StatCard({
             {value}
           </p>
         </div>
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: accent ? 'rgba(146,70,35,0.12)' : 'var(--p-surface-container-high)' }}>
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: accent ? 'rgba(0,103,106,0.12)' : 'var(--p-surface-container-high)' }}>
           <Sym name={icon} className="text-[20px]" style={{ color: accent ? 'var(--p-primary)' : 'var(--p-on-surface-variant)' }} />
         </div>
       </div>
@@ -99,7 +99,7 @@ function QuickAction({ icon, label, desc, onClick }: { icon: string; label: stri
       className="border rounded-xl p-4 text-left card-hover flex items-center gap-3 w-full"
       style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
     >
-      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(146,70,35,0.1)' }}>
+      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(0,103,106,0.1)' }}>
         <Sym name={icon} className="text-[22px]" style={{ color: 'var(--p-primary)' }} />
       </div>
       <div className="min-w-0">
@@ -220,7 +220,7 @@ export default function PortalHome() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 sm:px-8 py-8">
+        <div className="flex-1 overflow-y-auto px-6 sm:px-8 py-8 chat-feed-bg">
           <div className="max-w-6xl mx-auto space-y-10">
             {isLoading ? (
               <div className="flex justify-center py-24">

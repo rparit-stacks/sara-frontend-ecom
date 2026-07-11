@@ -65,7 +65,7 @@ export default function AddDesignModal({
             onChange={(e) => setName(e.target.value)}
             disabled={uploading}
             placeholder="e.g. Summer dress"
-            className="w-full h-10 px-3 rounded-lg border text-[14px] mb-4 outline-none focus:ring-2 focus:ring-[#924623]/20"
+            className="w-full h-10 px-3 rounded-lg border text-[14px] mb-4 outline-none focus:ring-2 focus:ring-[#00676a]/20"
             style={{ borderColor: 'var(--p-outline-variant)' }}
             onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) submit(); }}
             autoFocus
@@ -94,7 +94,7 @@ export default function AddDesignModal({
           onChange={(e) => setName(e.target.value)}
           disabled={uploading}
           placeholder="e.g. Linen Wrap Dress"
-          className="w-full h-10 px-3 rounded-lg border text-[14px] mb-4 outline-none focus:ring-2 focus:ring-[#924623]/20"
+          className="w-full h-10 px-3 rounded-lg border text-[14px] mb-4 outline-none focus:ring-2 focus:ring-[#00676a]/20"
           style={{ borderColor: 'var(--p-outline-variant)' }}
         />
 
@@ -105,7 +105,7 @@ export default function AddDesignModal({
           disabled={uploading}
           rows={3}
           placeholder="Fabric, colors, sizing, MOQ, target timeline, or any spec notes for this design…"
-          className="w-full px-3 py-2 rounded-lg border text-[14px] mb-4 outline-none resize-none focus:ring-2 focus:ring-[#924623]/20"
+          className="w-full px-3 py-2 rounded-lg border text-[14px] mb-4 outline-none resize-none focus:ring-2 focus:ring-[#00676a]/20"
           style={{ borderColor: 'var(--p-outline-variant)' }}
         />
 

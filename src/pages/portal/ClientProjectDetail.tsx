@@ -325,7 +325,7 @@ export default function ClientProjectDetail() {
         id={!inThread ? `msg-${post.id}` : undefined}
         key={post.id}
         className={`group flex gap-3 items-start -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 transition-all duration-500 relative rounded ${isSystem ? 'opacity-85' : ''}`}
-        style={highlighted ? { background: 'rgba(146,70,35,0.15)', boxShadow: 'inset 0 0 0 2px var(--p-primary)' } : undefined}
+        style={highlighted ? { background: 'rgba(0,103,106,0.15)', boxShadow: 'inset 0 0 0 2px var(--p-primary)' } : undefined}
         onMouseEnter={(e) => { if (!inThread && !highlighted) e.currentTarget.style.background = 'var(--p-surface-container-low)'; }}
         onMouseLeave={(e) => { if (!highlighted) e.currentTarget.style.background = 'transparent'; }}
       >
@@ -625,7 +625,7 @@ export default function ClientProjectDetail() {
               </div>
             </div>
 
-            <div ref={feedRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+            <div ref={feedRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 chat-feed-bg">
               <div className="pb-6 border-b mb-6" style={{ borderColor: 'var(--p-outline-variant)' }}>
                 <h1 className="font-display text-[24px] sm:text-[28px] mb-2" style={{ color: 'var(--p-primary)' }}># {channelName}</h1>
                 {activeDesign?.description && (

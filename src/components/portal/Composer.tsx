@@ -171,12 +171,12 @@ export default function Composer({
   return (
     <div
       className={`border rounded-xl overflow-hidden slack-input-shadow focus-within:ring-2 focus-within:ring-offset-0 transition-all relative ${sending ? 'opacity-90' : ''}`}
-      style={{ borderColor: 'var(--p-outline)', background: 'var(--p-surface-container-lowest)', ['--tw-ring-color' as string]: 'rgba(146,70,35,0.25)' }}
+      style={{ borderColor: 'var(--p-outline)', background: 'var(--p-surface-container-lowest)', ['--tw-ring-color' as string]: 'rgba(0,103,106,0.25)' }}
     >
       {toolbar}
 
       {sending && (
-        <div className="px-3 py-2 flex items-center gap-2 text-[12px] font-semibold border-b animate-pulse" style={{ background: 'rgba(146,70,35,0.08)', borderColor: 'var(--p-outline-variant)', color: 'var(--p-primary)' }}>
+        <div className="px-3 py-2 flex items-center gap-2 text-[12px] font-semibold border-b animate-pulse" style={{ background: 'rgba(0,103,106,0.08)', borderColor: 'var(--p-outline-variant)', color: 'var(--p-primary)' }}>
           <Sym name="cloud_upload" className="text-[16px]" />
           {uploadLabel}
         </div>

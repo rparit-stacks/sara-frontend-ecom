@@ -100,7 +100,7 @@ export default function PortalAdminTechPacks() {
               key={t}
               onClick={() => setTab(t)}
               className={`text-[13px] px-4 py-2 rounded-lg font-medium transition-colors ${
-                tab === t ? 'bg-[#924623] text-white' : 'text-gray-600 hover:bg-black/5'
+                tab === t ? 'bg-[#00676a] text-white' : 'text-gray-600 hover:bg-black/5'
               }`}
             >
               {t === 'saved' ? 'Saved' : 'Templates'}
@@ -114,7 +114,7 @@ export default function PortalAdminTechPacks() {
           <div className="text-center py-16 text-gray-400">
             <Sym name="description" className="text-[40px] mb-2 block" />
             <p className="text-sm">No {tab === 'templates' ? 'templates' : 'tech packs'} yet.</p>
-            <button onClick={() => openBuilder()} className="text-[13px] text-[#924623] hover:underline mt-2">
+            <button onClick={() => openBuilder()} className="text-[13px] text-[#00676a] hover:underline mt-2">
               + Create one
             </button>
           </div>
@@ -126,11 +126,11 @@ export default function PortalAdminTechPacks() {
                 className="border border-gray-200 rounded-xl p-4 bg-white hover:shadow-md transition-shadow flex flex-col"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="w-10 h-10 rounded-lg bg-[#924623]/10 text-[#924623] flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-[#00676a]/10 text-[#00676a] flex items-center justify-center shrink-0">
                     <Sym name={it.isTemplate ? 'bookmark' : 'description'} className="text-[20px]" />
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setRenaming(it.id)} className="text-gray-300 hover:text-[#924623]" title="Rename">
+                    <button onClick={() => setRenaming(it.id)} className="text-gray-300 hover:text-[#00676a]" title="Rename">
                       <Sym name="edit" className="text-[17px]" />
                     </button>
                     <button onClick={() => remove(it.id)} className="text-gray-300 hover:text-red-500" title="Delete">
@@ -148,7 +148,7 @@ export default function PortalAdminTechPacks() {
                       if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                       if (e.key === 'Escape') setRenaming(null);
                     }}
-                    className="mt-3 w-full text-[14px] px-2 py-1 border border-[#924623] rounded outline-none"
+                    className="mt-3 w-full text-[14px] px-2 py-1 border border-[#00676a] rounded outline-none"
                   />
                 ) : (
                   <p className="text-[15px] font-medium text-gray-800 mt-3 truncate">{it.name}</p>
@@ -170,7 +170,7 @@ export default function PortalAdminTechPacks() {
                     <>
                       <button
                         onClick={() => useTemplate(it.id)}
-                        className="w-full py-2 rounded-lg bg-[#924623] text-white text-[13px] font-medium hover:bg-[#7d3c1e] flex items-center justify-center gap-1.5"
+                        className="w-full py-2 rounded-lg bg-[#00676a] text-white text-[13px] font-medium hover:bg-[#004d50] flex items-center justify-center gap-1.5"
                       >
                         <Sym name="add" className="text-[16px]" /> Use template
                       </button>
@@ -183,7 +183,7 @@ export default function PortalAdminTechPacks() {
                     <>
                       <button
                         onClick={() => openBuilder(it.id)}
-                        className="w-full py-2 rounded-lg bg-[#924623] text-white text-[13px] font-medium hover:bg-[#7d3c1e]"
+                        className="w-full py-2 rounded-lg bg-[#00676a] text-white text-[13px] font-medium hover:bg-[#004d50]"
                       >
                         Edit
                       </button>

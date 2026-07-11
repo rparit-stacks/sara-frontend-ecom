@@ -8,7 +8,7 @@ import type { ActivityTone } from '@/lib/clientPortalAggregate';
 
 const TONE: Record<ActivityTone, { icon: string; bg: string; fg: string }> = {
   approval: { icon: 'priority_high', bg: 'var(--p-error-container)', fg: 'var(--p-on-error-container)' },
-  message: { icon: 'forum', bg: 'rgba(146,70,35,0.1)', fg: 'var(--p-primary)' },
+  message: { icon: 'forum', bg: 'rgba(0,103,106,0.1)', fg: 'var(--p-primary)' },
   stage: { icon: 'conveyor_belt', bg: 'var(--p-secondary-container)', fg: 'var(--p-on-secondary-container)' },
   payment: { icon: 'payments', bg: 'var(--p-primary-fixed)', fg: 'var(--p-on-primary-fixed-variant)' },
   file: { icon: 'description', bg: 'var(--p-surface-container-high)', fg: 'var(--p-on-surface)' },

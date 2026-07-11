@@ -19,7 +19,7 @@ export default function SettingsNav({ active }: { active: 'profile' | 'settings'
             key={x.key}
             onClick={() => navigate(x.to)}
             className="w-full flex items-center gap-3 px-3 py-2 rounded text-[14px] text-left"
-            style={x.key === active ? { background: 'rgba(146,70,35,0.1)', color: 'var(--p-primary)', fontWeight: 700 } : { color: 'var(--p-on-surface-variant)' }}
+            style={x.key === active ? { background: 'rgba(0,103,106,0.1)', color: 'var(--p-primary)', fontWeight: 700 } : { color: 'var(--p-on-surface-variant)' }}
           >
             <Sym name={x.icon} fill={x.key === active} /> {x.label}
           </button>

@@ -29,7 +29,7 @@ function UseTemplateModal({
 }: {
   template: ManufacturingQuoteDto;
   onClose: () => void;
-  onConfirm: (opts: { inquiryId?: number; clientName?: string; clientEmail?: string }) => void;
+  onConfirm: (opts: { inquiryId?: number; clientName?: string; clientEmail?: string; clientPhone?: string }) => void;
   pending: boolean;
 }) {
   const [kind, setKind] = useState<ForKind>('inquiry');
@@ -37,6 +37,7 @@ function UseTemplateModal({
   const [pickedInquiryId, setPickedInquiryId] = useState<number | null>(null);
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
 
   const { data: inquiries = [], isLoading } = useQuery({
     queryKey: ['admin-inquiries', 'use-template'],
@@ -52,7 +53,7 @@ function UseTemplateModal({
     );
   }, [inquiries, q]);
 
-  const canConfirm = kind === 'inquiry' ? pickedInquiryId != null : clientName.trim().length > 0 || clientEmail.trim().length > 0;
+  const canConfirm = kind === 'inquiry' ? pickedInquiryId != null : clientName.trim().length > 0 || clientEmail.trim().length > 0 || clientPhone.trim().length > 0;
 
   return (
     <>
@@ -82,7 +83,7 @@ function UseTemplateModal({
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search by reference, client, brand…"
-              className="w-full h-9 px-2.5 rounded-lg border text-[13px] mb-2 outline-none focus:ring-2 focus:ring-[#924623]/20"
+              className="w-full h-9 px-2.5 rounded-lg border text-[13px] mb-2 outline-none focus:ring-2 focus:ring-[#00676a]/20"
               style={{ borderColor: 'var(--p-outline-variant)' }}
             />
             <div className="max-h-56 overflow-y-auto rounded-lg border divide-y" style={{ borderColor: 'var(--p-outline-variant)' }}>
@@ -114,7 +115,7 @@ function UseTemplateModal({
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
                 placeholder="e.g. Aanya Textiles"
-                className="w-full h-10 px-3 rounded-lg border text-[14px] outline-none focus:ring-2 focus:ring-[#924623]/20"
+                className="w-full h-10 px-3 rounded-lg border text-[14px] outline-none focus:ring-2 focus:ring-[#00676a]/20"
                 style={{ borderColor: 'var(--p-outline-variant)' }}
               />
             </div>
@@ -124,7 +125,17 @@ function UseTemplateModal({
                 value={clientEmail}
                 onChange={(e) => setClientEmail(e.target.value)}
                 placeholder="e.g. client@example.com"
-                className="w-full h-10 px-3 rounded-lg border text-[14px] outline-none focus:ring-2 focus:ring-[#924623]/20"
+                className="w-full h-10 px-3 rounded-lg border text-[14px] outline-none focus:ring-2 focus:ring-[#00676a]/20"
+                style={{ borderColor: 'var(--p-outline-variant)' }}
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase mb-1" style={{ color: 'var(--p-on-surface-variant)' }}>Client phone</label>
+              <input
+                value={clientPhone}
+                onChange={(e) => setClientPhone(e.target.value)}
+                placeholder="e.g. 98290 00000"
+                className="w-full h-10 px-3 rounded-lg border text-[14px] outline-none focus:ring-2 focus:ring-[#00676a]/20"
                 style={{ borderColor: 'var(--p-outline-variant)' }}
               />
             </div>
@@ -140,7 +151,11 @@ function UseTemplateModal({
               onConfirm(
                 kind === 'inquiry'
                   ? { inquiryId: pickedInquiryId! }
-                  : { clientName: clientName.trim() || undefined, clientEmail: clientEmail.trim() || undefined },
+                  : {
+                      clientName: clientName.trim() || undefined,
+                      clientEmail: clientEmail.trim() || undefined,
+                      clientPhone: clientPhone.trim() || undefined,
+                    },
               )
             }
             className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50"
@@ -154,6 +169,52 @@ function UseTemplateModal({
   );
 }
 
+/** "New quotation" asks Fresh vs Template before landing in either flow. */
+function NewQuotationChooserModal({
+  onClose, onFresh, onPickTemplate,
+}: {
+  onClose: () => void;
+  onFresh: () => void;
+  onPickTemplate: () => void;
+}) {
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-black/40" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 border rounded-2xl shadow-2xl p-6" style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}>
+        <h3 className="font-display text-[18px] mb-1">New quotation</h3>
+        <p className="text-[13px] mb-4" style={{ color: 'var(--p-on-surface-variant)' }}>How do you want to start?</p>
+        <div className="grid gap-3">
+          <button
+            onClick={onPickTemplate}
+            className="text-left p-4 rounded-xl border hover:bg-black/[0.02] flex items-center gap-3"
+            style={{ borderColor: 'var(--p-outline-variant)' }}
+          >
+            <Sym name="content_copy" className="text-[22px]" style={{ color: 'var(--p-primary)' }} />
+            <div>
+              <div className="text-[14px] font-semibold">Create from existing template</div>
+              <div className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>Reuse sections, pricing & branding from a saved template.</div>
+            </div>
+          </button>
+          <button
+            onClick={onFresh}
+            className="text-left p-4 rounded-xl border hover:bg-black/[0.02] flex items-center gap-3"
+            style={{ borderColor: 'var(--p-outline-variant)' }}
+          >
+            <Sym name="note_add" className="text-[22px]" style={{ color: 'var(--p-primary)' }} />
+            <div>
+              <div className="text-[14px] font-semibold">Create fresh</div>
+              <div className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>Start from a blank quotation.</div>
+            </div>
+          </button>
+        </div>
+        <div className="flex justify-end mt-5">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-[13px] font-semibold border" style={{ borderColor: 'var(--p-outline)' }}>Cancel</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function PortalAdminQuotations() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -161,6 +222,7 @@ export default function PortalAdminQuotations() {
   const inquiryFilter = params.get('inquiry');
   const [tab, setTab] = useState<Tab>('quotes');
   const [templateModal, setTemplateModal] = useState<ManufacturingQuoteDto | null>(null);
+  const [showEntryChooser, setShowEntryChooser] = useState(false);
 
   const { data: quotes = [], isLoading: loadingQuotes } = useQuery({
     queryKey: ['admin-quotes', 'quotes'],
@@ -172,7 +234,7 @@ export default function PortalAdminQuotations() {
   });
 
   const useTemplate = useMutation({
-    mutationFn: (opts: { inquiryId?: number; clientName?: string; clientEmail?: string }) =>
+    mutationFn: (opts: { inquiryId?: number; clientName?: string; clientEmail?: string; clientPhone?: string }) =>
       manufacturingApi.duplicateQuote(templateModal!.id, opts),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['admin-quotes'] });
@@ -195,7 +257,7 @@ export default function PortalAdminQuotations() {
   return (
     <AdminShell
       title={inquiryFilter ? 'Quotations · Project' : 'Quotations'}
-      actions={<AdminBtn icon="add" onClick={() => navigate('/portal-admin/quote-editor/new')}>New quotation</AdminBtn>}
+      actions={<AdminBtn icon="add" onClick={() => setShowEntryChooser(true)}>New quotation</AdminBtn>}
     >
       <div className="p-5 sm:p-8">
         {inquiryFilter && (
@@ -232,7 +294,7 @@ export default function PortalAdminQuotations() {
                 : 'Create one from an inquiry or start a blank quotation.'}
             </p>
             {tab === 'quotes' && (
-              <button onClick={() => navigate('/portal-admin/quote-editor/new')} className="mt-4 px-4 py-2 rounded-lg text-[13px] font-semibold text-white inline-flex items-center gap-1.5" style={{ background: 'var(--p-primary)' }}>
+              <button onClick={() => setShowEntryChooser(true)} className="mt-4 px-4 py-2 rounded-lg text-[13px] font-semibold text-white inline-flex items-center gap-1.5" style={{ background: 'var(--p-primary)' }}>
                 <Sym name="add" className="text-[16px]" /> New quotation
               </button>
             )}
@@ -287,6 +349,14 @@ export default function PortalAdminQuotations() {
           </div>
         )}
       </div>
+
+      {showEntryChooser && (
+        <NewQuotationChooserModal
+          onClose={() => setShowEntryChooser(false)}
+          onFresh={() => { setShowEntryChooser(false); navigate('/portal-admin/quote-editor/new'); }}
+          onPickTemplate={() => { setShowEntryChooser(false); setTab('templates'); }}
+        />
+      )}
 
       {templateModal && (
         <UseTemplateModal

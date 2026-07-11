@@ -13,7 +13,7 @@ export function EditableText({
 }) {
   return (
     <As
-      className={`${className ?? ''} outline-none focus:ring-2 focus:ring-[#924623]/30 rounded transition-shadow ${!value ? 'text-gray-300' : ''}`}
+      className={`${className ?? ''} outline-none focus:ring-2 focus:ring-[#00676a]/30 rounded transition-shadow ${!value ? 'text-gray-300' : ''}`}
       contentEditable
       suppressContentEditableWarning
       spellCheck={false}
@@ -67,7 +67,7 @@ export function RichText({
         suppressContentEditableWarning
         onFocus={() => setFocused(true)}
         onBlur={() => { setFocused(false); commit(); }}
-        className={`rt text-[13px] text-gray-700 leading-relaxed outline-none focus:ring-2 focus:ring-[#924623]/20 rounded min-h-[1.5em] ${alignClass(align)}`}
+        className={`rt text-[13px] text-gray-700 leading-relaxed outline-none focus:ring-2 focus:ring-[#00676a]/20 rounded min-h-[1.5em] ${alignClass(align)}`}
         style={{ ['--rt-accent' as string]: accent }}
       />
     </div>
@@ -79,7 +79,7 @@ export function RichText({
    Used inside the section forms (wizard + split panel).
    ===================================================================== */
 
-const SWATCHES = ['#111827', '#924623', '#2563eb', '#16a34a', '#dc2626', '#d97706', '#7c3aed', '#6b7280'];
+const SWATCHES = ['#111827', '#00676a', '#2563eb', '#16a34a', '#dc2626', '#d97706', '#7c3aed', '#6b7280'];
 
 export function RichTextEditor({
   html, onChange, accent, minHeight = 160,
@@ -186,8 +186,8 @@ export function RichTextEditor({
         {linkOpen && (
           <div className="absolute z-40 top-10 right-2 w-72 bg-white rounded-xl shadow-xl border border-gray-200 p-3 space-y-2">
             <p className="text-[12px] font-semibold text-gray-700">Insert link</p>
-            <input autoFocus value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://example.com" className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#924623]/20" />
-            <input value={linkText} onChange={(e) => setLinkText(e.target.value)} placeholder="Link text (optional)" className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#924623]/20" />
+            <input autoFocus value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://example.com" className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#00676a]/20" />
+            <input value={linkText} onChange={(e) => setLinkText(e.target.value)} placeholder="Link text (optional)" className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#00676a]/20" />
             <div className="flex justify-end gap-2 pt-1">
               <button type="button" onClick={() => setLinkOpen(false)} className="h-8 px-3 rounded-lg text-[12px] font-semibold border border-gray-200">Cancel</button>
               <button type="button" onClick={applyLink} className="h-8 px-3 rounded-lg text-[12px] font-semibold text-white" style={{ background: accent }}>Add link</button>

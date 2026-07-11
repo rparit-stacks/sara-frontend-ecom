@@ -37,7 +37,7 @@ export default function ProjectSidebar({
     <button
       onClick={() => navigate(to)}
       className="w-full flex items-center gap-3 px-3 py-1.5 rounded text-[14px] text-left transition-colors"
-      style={on ? { background: 'rgba(146,70,35,0.1)', color: 'var(--p-primary)', fontWeight: 700 } : { color: 'var(--p-on-surface-variant)' }}
+      style={on ? { background: 'rgba(0,103,106,0.1)', color: 'var(--p-primary)', fontWeight: 700 } : { color: 'var(--p-on-surface-variant)' }}
       onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = 'var(--p-surface-container-high)'; }}
       onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = 'transparent'; }}
     >
@@ -81,9 +81,9 @@ export default function ProjectSidebar({
                     key={d.name}
                     onClick={() => onSelectDesign?.(i)}
                     className="w-full flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors text-left"
-                    style={on ? { background: 'rgba(146,70,35,0.1)', color: 'var(--p-primary)' } : { color: 'var(--p-on-surface-variant)' }}
+                    style={on ? { background: 'rgba(0,103,106,0.1)', color: 'var(--p-primary)' } : { color: 'var(--p-on-surface-variant)' }}
                   >
-                    <div className="w-8 h-8 rounded overflow-hidden shrink-0 border flex items-center justify-center" style={{ borderColor: on ? 'var(--p-primary)' : 'var(--p-outline-variant)', background: d.system ? 'rgba(146,70,35,0.12)' : undefined }}>
+                    <div className="w-8 h-8 rounded overflow-hidden shrink-0 border flex items-center justify-center" style={{ borderColor: on ? 'var(--p-primary)' : 'var(--p-outline-variant)', background: d.system ? 'rgba(0,103,106,0.12)' : undefined }}>
                       {d.system ? (
                         <Sym name="campaign" className="text-[17px]" style={{ color: 'var(--p-primary)' }} />
                       ) : (

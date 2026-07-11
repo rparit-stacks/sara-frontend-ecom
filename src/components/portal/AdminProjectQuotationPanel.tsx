@@ -89,7 +89,7 @@ export default function AdminProjectQuotationPanel({
                   <div className="flex-1 min-w-[200px]">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-[14px]">{row.quoteRef}</span>
-                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold" style={{ background: 'rgba(146,70,35,0.12)', color: 'var(--p-primary)' }}>
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold" style={{ background: 'rgba(0,103,106,0.12)', color: 'var(--p-primary)' }}>
                         v{row.rev.version}{row.latest ? ' · current' : ''}
                       </span>
                       <Pill label={row.rev.status} />

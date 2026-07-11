@@ -14,13 +14,25 @@ const humanize = (k: string) => k.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => 
 
 const isImageUrl = (v: unknown): v is string =>
   typeof v === 'string' &&
-  (/^data:image\//.test(v) || (/^(https?:)?\/\//.test(v) && /\.(png|jpe?g|gif|webp|svg|avif)(\?|#|$)/i.test(v)));
+  (/^data:image\//.test(v) ||
+    (/^(https?:)?\/\//.test(v) &&
+      (/\.(png|jpe?g|gif|webp|svg|avif)(\?|#|$)/i.test(v) || v.includes('cloudinary.com'))));
 
 const isFileUrl = (v: unknown): v is string =>
   typeof v === 'string' && /^(https?:)?\/\//.test(v) && !isImageUrl(v);
 
-function ValueDisplay({ value }: { value: unknown }) {
+/** Some upload flows (e.g. custom design requests) store multiple URLs joined into one comma-separated string rather than an array — split those back out before classifying. */
+function expandValues(value: unknown): unknown[] {
   const arr = Array.isArray(value) ? value : [value];
+  return arr.flatMap((v) =>
+    typeof v === 'string' && v.includes(',') && v.split(',').filter((s) => isImageUrl(s.trim()) || isFileUrl(s.trim())).length > 1
+      ? v.split(',').map((s) => s.trim()).filter(Boolean)
+      : [v],
+  );
+}
+
+function ValueDisplay({ value }: { value: unknown }) {
+  const arr = expandValues(value);
   const images = arr.filter(isImageUrl);
   const files = arr.filter((v) => isFileUrl(v));
   const text = arr.filter((v) => !isImageUrl(v) && !isFileUrl(v) && v != null && v !== '');
@@ -128,7 +140,7 @@ export default function PortalAdminInquiryDetail() {
                       <span className="text-[12px] font-bold opacity-60">{inq.reference}</span>
                       <Pill label={statusLabel(inq.status)} />
                       {inq.source === 'CUSTOM_DESIGN' && (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#924623]/10 text-[#924623]">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#00676a]/10 text-[#00676a]">
                           Custom Design
                         </span>
                       )}
@@ -149,7 +161,7 @@ export default function PortalAdminInquiryDetail() {
                 {inq.accountEmail && (
                   <div className="mt-5 pt-5 border-t" style={{ borderColor: 'var(--p-outline-variant)' }}>
                     <div className="flex items-center gap-2 mb-3">
-                      <Sym name="verified_user" className="text-[18px]" style={{ color: '#924623' }} />
+                      <Sym name="verified_user" className="text-[18px]" style={{ color: '#00676a' }} />
                       <span className="text-[12px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>Account holder (signed-in)</span>
                     </div>
                     <div className="grid sm:grid-cols-3 gap-4">

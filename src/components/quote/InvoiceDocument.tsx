@@ -17,7 +17,7 @@ const stripHtml = (html: string) => html.replace(/<br\s*\/?>/gi, '\n').replace(/
  */
 export default function InvoiceDocument({ invoice, txnId }: { invoice: ManufacturingInvoiceDto; txnId?: string }) {
   const doc: QuoteDoc = normalizeQuoteDoc(invoice.doc ?? {}, null);
-  const accent = doc.accent || '#924623';
+  const accent = doc.accent || '#00676a';
   const cur = invoice.currency || 'INR';
   const branding = doc.branding;
   const paid = invoice.status === 'PAID';

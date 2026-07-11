@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AdminShell from '@/components/portal/AdminShell';
@@ -6,6 +6,7 @@ import { Pill } from '@/components/portal/Pill';
 import { Sym } from '@/components/portal/Sym';
 import { manufacturingApi, ManufacturingInquiryDto } from '@/lib/api';
 import { formatInquiryDate, statusLabel } from '@/components/inquiry/inquiryUtils';
+import { useMarkNavRead } from '@/hooks/useAdminNotificationCounts';
 import { toast } from 'sonner';
 
 const TABS: { key: string; label: string; status?: string }[] = [
@@ -25,6 +26,9 @@ export default function PortalAdminInquiries() {
   // so the match isn't hidden by the Open-only filter.
   const [tab, setTab] = useState(initialQ ? 'all' : 'open');
   const [query, setQuery] = useState(initialQ);
+  const markRead = useMarkNavRead('inquiries');
+
+  useEffect(() => { markRead(); }, []);
 
   const activeTab = TABS.find((t) => t.key === tab);
 
@@ -190,7 +194,7 @@ export default function PortalAdminInquiries() {
                       </span>
                       <Pill label={statusLabel(inq.status)} />
                       {inq.source === 'CUSTOM_DESIGN' && (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#924623]/10 text-[#924623]">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#00676a]/10 text-[#00676a]">
                           Custom Design
                         </span>
                       )}

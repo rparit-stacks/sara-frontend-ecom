@@ -6,13 +6,25 @@ import type { ManufacturingProjectDetailDto } from '@/lib/api';
 // Detect image / file values inside submitted form answers.
 const isImageUrl = (v: unknown): v is string =>
   typeof v === 'string' &&
-  (/^data:image\//.test(v) || (/^(https?:)?\/\//.test(v) && /\.(png|jpe?g|gif|webp|svg|avif)(\?|#|$)/i.test(v)));
+  (/^data:image\//.test(v) ||
+    (/^(https?:)?\/\//.test(v) &&
+      (/\.(png|jpe?g|gif|webp|svg|avif)(\?|#|$)/i.test(v) || v.includes('cloudinary.com'))));
 const isFileUrl = (v: unknown): v is string =>
   typeof v === 'string' && /^(https?:)?\/\//.test(v) && !isImageUrl(v);
 
+/** Some upload flows (e.g. custom design requests) store multiple URLs joined into one comma-separated string rather than an array — split those back out before classifying. */
+function expandValues(value: unknown): unknown[] {
+  const arr = Array.isArray(value) ? value : [value];
+  return arr.flatMap((v) =>
+    typeof v === 'string' && v.includes(',') && v.split(',').filter((s) => isImageUrl(s.trim()) || isFileUrl(s.trim())).length > 1
+      ? v.split(',').map((s) => s.trim()).filter(Boolean)
+      : [v],
+  );
+}
+
 /** Render one form answer: text, image thumbnails (new tab), or file links. */
 function AnswerValue({ value }: { value: unknown }) {
-  const arr = Array.isArray(value) ? value : [value];
+  const arr = expandValues(value);
   const images = arr.filter(isImageUrl);
   const files = arr.filter((v) => isFileUrl(v));
   const text = arr.filter((v) => !isImageUrl(v) && !isFileUrl(v) && v != null && v !== '');

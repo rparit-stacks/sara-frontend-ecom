@@ -2,7 +2,7 @@
  * Scoped theme for the Manufacturing Portal (Studio Sara).
  * All tokens live under `.portal-root` so the rest of the StudioSara app
  * is completely unaffected. Mirrors the Material color tokens used in the
- * reference HTML screens (primary #924623, Playfair + Inter).
+ * reference HTML screens (primary #00676a, Playfair + Inter).
  */
 
 /* Material Symbols + fonts are loaded once when any portal page mounts. */
@@ -11,36 +11,36 @@
 
 .portal-root {
   /* Color tokens */
-  --p-surface: #fff8f6;
-  --p-surface-bright: #fff8f6;
-  --p-surface-dim: #e7d7d1;
+  --p-surface: #f6fafa;
+  --p-surface-bright: #f6fafa;
+  --p-surface-dim: #d7e5e4;
   --p-surface-container-lowest: #ffffff;
-  --p-surface-container-low: #fff1ec;
-  --p-surface-container: #fbeae5;
-  --p-surface-container-high: #f5e5df;
-  --p-surface-container-highest: #efdfda;
-  --p-surface-variant: #efdfda;
-  --p-primary: #924623;
-  --p-primary-container: #b15e39;
-  --p-primary-fixed: #ffdbcd;
-  --p-primary-fixed-dim: #ffb597;
+  --p-surface-container-low: #eff8f7;
+  --p-surface-container: #e6f1f0;
+  --p-surface-container-high: #dbe9e8;
+  --p-surface-container-highest: #cfdfde;
+  --p-surface-variant: #cfdfde;
+  --p-primary: #00676a;
+  --p-primary-container: #0d8a8d;
+  --p-primary-fixed: #d8f3f0;
+  --p-primary-fixed-dim: #8fd4d0;
   --p-on-primary: #ffffff;
-  --p-on-primary-fixed: #360f00;
-  --p-on-primary-fixed-variant: #773210;
-  --p-secondary: #5c614d;
-  --p-secondary-container: #e0e5cc;
-  --p-secondary-fixed: #e0e5cc;
+  --p-on-primary-fixed: #00282a;
+  --p-on-primary-fixed-variant: #004d50;
+  --p-secondary: #4d615f;
+  --p-secondary-container: #cce5e2;
+  --p-secondary-fixed: #cce5e2;
   --p-on-secondary: #ffffff;
-  --p-on-secondary-container: #626753;
-  --p-on-secondary-fixed: #191d0e;
-  --p-on-secondary-fixed-variant: #444937;
-  --p-tertiary: #00676a;
-  --p-on-surface: #221a17;
-  --p-on-surface-variant: #54433c;
-  --p-on-background: #221a17;
-  --p-background: #fff8f6;
-  --p-outline: #87736b;
-  --p-outline-variant: #dac1b8;
+  --p-on-secondary-container: #536765;
+  --p-on-secondary-fixed: #0e1d1b;
+  --p-on-secondary-fixed-variant: #374947;
+  --p-tertiary: #924623;
+  --p-on-surface: #171d1c;
+  --p-on-surface-variant: #3f4948;
+  --p-on-background: #171d1c;
+  --p-background: #f6fafa;
+  --p-outline: #6f7978;
+  --p-outline-variant: #bfd2d0;
   --p-error: #ba1a1a;
   --p-error-container: #ffdad6;
   --p-on-error: #ffffff;
@@ -131,8 +131,8 @@
   transform: rotate(-90deg);
   transform-origin: 50% 50%;
 }
-.portal-root .luxury-shadow { box-shadow: 0 1px 3px rgba(0,0,0,.05), 0 8px 24px rgba(146,70,35,.04); }
-.portal-root .slack-input-shadow { box-shadow: 0 0 0 1px rgba(135,115,107,.2), 0 2px 4px rgba(0,0,0,.05); }
+.portal-root .luxury-shadow { box-shadow: 0 1px 3px rgba(0,0,0,.05), 0 8px 24px rgba(0,103,106,.04); }
+.portal-root .slack-input-shadow { box-shadow: 0 0 0 1px rgba(111,121,120,.2), 0 2px 4px rgba(0,0,0,.05); }
 
 .portal-root .composer-editor code {
   background: var(--p-surface-container-high);
@@ -148,9 +148,42 @@
 }
 
 .portal-root .thread-panel-bg {
+  position: relative;
   background-color: var(--p-surface-container-lowest);
   background-image:
-    radial-gradient(circle at 1px 1px, rgba(146, 70, 35, 0.05) 1px, transparent 0),
-    linear-gradient(180deg, rgba(146, 70, 35, 0.03) 0%, transparent 120px);
+    radial-gradient(circle at 1px 1px, rgba(0, 103, 106, 0.05) 1px, transparent 0),
+    linear-gradient(180deg, rgba(0, 103, 106, 0.03) 0%, transparent 120px);
   background-size: 22px 22px, 100% 100%;
+}
+.portal-root .thread-panel-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  background-image: url(/bg_images/watercolor-wallpaper-with-hand-drawn-elements.png);
+  background-size: cover;
+  background-position: center;
+}
+
+/* Same abstract watercolor art used on the quotation PDF — applied faintly
+   behind the project chat feed so channel/announcements screens feel branded. */
+.portal-root .chat-feed-bg {
+  position: relative;
+}
+.portal-root .chat-feed-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  background-image: url(/bg_images/watercolor-wallpaper-with-hand-drawn-elements.png);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  z-index: 0;
+}
+.portal-root .chat-feed-bg > * {
+  position: relative;
+  z-index: 1;
 }

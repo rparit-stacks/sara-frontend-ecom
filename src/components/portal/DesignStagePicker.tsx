@@ -82,7 +82,7 @@ export default function DesignStagePicker({
               onChange={(e) => setCustomValue(e.target.value)}
               placeholder="e.g. Fabric Sourcing"
               onKeyDown={(e) => { if (e.key === 'Enter' && customValue.trim()) { pick(customValue.trim()); setCustomOpen(false); } }}
-              className="w-full h-10 px-3 rounded-lg border text-[14px] mb-4 outline-none focus:ring-2 focus:ring-[#924623]/20"
+              className="w-full h-10 px-3 rounded-lg border text-[14px] mb-4 outline-none focus:ring-2 focus:ring-[#00676a]/20"
               style={{ borderColor: 'var(--p-outline-variant)' }}
             />
             <div className="flex gap-2 justify-end">

@@ -499,7 +499,7 @@ function TextBlockBlock({ section, editable, onPatch }: {
           )}
         </div>
         {editable ? (
-          <RichTextEditor html={section.bodyHtml} onChange={(html) => onPatch({ bodyHtml: html })} accent="#924623" minHeight={140} />
+          <RichTextEditor html={section.bodyHtml} onChange={(html) => onPatch({ bodyHtml: html })} accent="#00676a" minHeight={140} />
         ) : (
           <div className={`rt text-muted-foreground text-base xs:text-lg leading-relaxed ${align === 'left' ? 'text-left' : 'text-center'}`} dangerouslySetInnerHTML={{ __html: section.bodyHtml }} />
         )}

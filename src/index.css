@@ -234,6 +234,14 @@
   p {
     line-height: 1.75;
   }
+
+  /* Quote/invoice rich-text content (section bodies) must stay in a normal
+     font even when a heading is inserted via the H1/H2 toolbar buttons —
+     the cursive/script site branding fonts above don't belong on documents. */
+  .rt h1, .rt h2, .rt h3, .rt h4, .rt h5, .rt h6 {
+    font-family: inherit;
+    line-height: 1.4;
+  }
 }
 
 @layer components {

@@ -4,16 +4,27 @@ import type { ManufacturingInquiryDto } from '@/lib/api';
 import type { QuoteDoc, QuoteBlock, FieldRow, LineItem } from './quoteDoc';
 import { newId } from './quoteDoc';
 
-/** Flatten the inquiry's JSONB values into label/value rows for display + import. */
-function valueRows(inq: ManufacturingInquiryDto): { key: string; label: string; value: string }[] {
-  const out: { key: string; label: string; value: string }[] = [];
+/** A single Cloudinary/http(s) image URL, or a bare data:image URI — never a filename string. */
+function isImageUrl(v: unknown): v is string {
+  if (typeof v !== 'string') return false;
+  if (/^data:image\//.test(v)) return true;
+  if (!/^https?:\/\//i.test(v)) return false;
+  return /\.(png|jpe?g|gif|webp|svg|avif)(\?|#|$)/i.test(v) || v.includes('cloudinary.com');
+}
+
+/** Flatten the inquiry's JSONB values into label/value rows for display + import. Image-valued fields (single URL or array of URLs) are separated out so they render as thumbnails instead of raw link text. */
+function valueRows(inq: ManufacturingInquiryDto): { key: string; label: string; value: string; images: string[] }[] {
+  const out: { key: string; label: string; value: string; images: string[] }[] = [];
   const vals = (inq.values || {}) as Record<string, unknown>;
   for (const [k, v] of Object.entries(vals)) {
     if (v == null || v === '') continue;
-    const value = Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? JSON.stringify(v) : String(v);
-    if (!value.trim()) continue;
+    const items = Array.isArray(v) ? v : [v];
+    const images = items.filter(isImageUrl);
+    const rest = items.filter((x) => !isImageUrl(x));
+    const value = rest.map((x) => (typeof x === 'object' ? JSON.stringify(x) : String(x))).join(', ');
+    if (!value.trim() && images.length === 0) continue;
     const label = k.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-    out.push({ key: k, label, value });
+    out.push({ key: k, label, value, images });
   }
   return out;
 }
@@ -62,6 +73,11 @@ export default function InquiryImport({
     toast.success(`Added ${items.length} line item(s)`);
   };
 
+  const insertImage = (url: string, label: string) => {
+    onAddBlockFull({ id: newId(), type: 'image', title: label, align: 'left', url, width: 'half' });
+    toast.success('Image added to the quote');
+  };
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100" style={{ background: `${accent}0a` }}>
@@ -79,19 +95,42 @@ export default function InquiryImport({
         <p className="px-4 py-3 text-[12px] text-gray-400">This inquiry has no extra form answers to import.</p>
       ) : (
         <>
-          <div className="px-4 py-3 max-h-56 overflow-y-auto space-y-1">
+          <div className="px-4 py-3 max-h-72 overflow-y-auto space-y-2">
             {rows.map((r) => (
-              <label key={r.key} className="flex items-start gap-2.5 py-1 cursor-pointer">
-                <input type="checkbox" checked={picked.has(r.key)} onChange={() => toggle(r.key)} className="mt-0.5 accent-[#924623]" />
-                <span className="text-[12px] min-w-[120px] font-semibold text-gray-600">{r.label}</span>
-                <span className="text-[12px] text-gray-500 break-words">{r.value}</span>
-              </label>
+              <div key={r.key} className="space-y-1.5">
+                {r.value.trim() && (
+                  <label className="flex items-start gap-2.5 py-1 cursor-pointer">
+                    <input type="checkbox" checked={picked.has(r.key)} onChange={() => toggle(r.key)} className="mt-0.5 accent-[#00676a]" />
+                    <span className="text-[12px] min-w-[120px] font-semibold text-gray-600">{r.label}</span>
+                    <span className="text-[12px] text-gray-500 break-words">{r.value}</span>
+                  </label>
+                )}
+                {r.images.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pl-6">
+                    {r.images.map((url, i) => (
+                      <div key={i} className="relative group">
+                        <a href={url} target="_blank" rel="noreferrer">
+                          <img src={url} alt={r.label} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                        </a>
+                        <button
+                          onClick={() => insertImage(url, r.label)}
+                          title="Insert into quote"
+                          className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full text-white flex items-center justify-center shadow"
+                          style={{ background: accent }}
+                        >
+                          <i className="fa-solid fa-plus text-[10px]" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
           <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-100 bg-gray-50/60">
             <span className="text-[11px] text-gray-400 mr-auto">{selected.length} of {rows.length} selected</span>
-            <button onClick={addAsFields} className="h-8 px-3 rounded-lg text-[12px] font-semibold border border-gray-200 hover:border-[#924623] flex items-center gap-1.5"><i className="fa-solid fa-list text-[11px]" /> Add as fields</button>
-            <button onClick={addAsItems} className="h-8 px-3 rounded-lg text-[12px] font-semibold border border-gray-200 hover:border-[#924623] flex items-center gap-1.5"><i className="fa-solid fa-list-check text-[11px]" /> Add as items</button>
+            <button onClick={addAsFields} className="h-8 px-3 rounded-lg text-[12px] font-semibold border border-gray-200 hover:border-[#00676a] flex items-center gap-1.5"><i className="fa-solid fa-list text-[11px]" /> Add as fields</button>
+            <button onClick={addAsItems} className="h-8 px-3 rounded-lg text-[12px] font-semibold border border-gray-200 hover:border-[#00676a] flex items-center gap-1.5"><i className="fa-solid fa-list-check text-[11px]" /> Add as items</button>
           </div>
         </>
       )}

@@ -37,7 +37,7 @@ export const SYSTEM_FIELDS: FormField[] = [
     type: 'phone',
     key: 'phone',
     label: 'Phone number',
-    placeholder: '+91 …',
+    placeholder: '98765 43210',
     required: true,
     locked: true,
     width: '50',

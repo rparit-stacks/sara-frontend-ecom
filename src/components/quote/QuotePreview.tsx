@@ -67,7 +67,7 @@ export default function QuotePreview({
                     {doc.branding.logoUrl ? (
                       <img src={doc.branding.logoUrl} alt="logo" className="h-12 w-auto object-contain" />
                     ) : null}
-                    <EditableText as="h2" value={doc.branding.name} onChange={(v) => patchBranding({ name: v })} className="font-cursive text-3xl" style={{ color: accent }} placeholder="Company name" />
+                    <EditableText as="h2" value={doc.branding.name} onChange={(v) => patchBranding({ name: v })} className="font-sans font-bold text-3xl" style={{ color: accent }} placeholder="Company name" />
                   </div>
                   <EditableText value={doc.branding.tagline || ''} onChange={(v) => patchBranding({ tagline: v })} className="text-[12px] text-gray-500 mt-0.5" placeholder="Tagline" />
                   <div className="mt-3 text-[12px] text-gray-600 leading-relaxed">
@@ -91,7 +91,7 @@ export default function QuotePreview({
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <EditableText as="h1" value={doc.meta.quoteTitle} onChange={(v) => patchMeta({ quoteTitle: v })} className="font-bold text-2xl tracking-wide uppercase" style={{ color: accent }} placeholder="Quotation" />
+                  <EditableText as="h1" value={doc.meta.quoteTitle} onChange={(v) => patchMeta({ quoteTitle: v })} className="font-sans font-bold text-2xl tracking-wide uppercase" style={{ color: accent }} placeholder="Quotation" />
                   <p className="text-[12px] text-gray-500 mt-1">Ref: {reference || '— (save to generate)'}</p>
                   <div className="text-[12px] text-gray-600 mt-1">Date: {doc.meta.date}</div>
                   <p className="text-[12px] text-gray-600">Valid for {doc.meta.validityDays} days</p>
@@ -118,13 +118,13 @@ export default function QuotePreview({
                 <div
                   key={block.id}
                   onDoubleClick={onEditBlock ? () => onEditBlock(page.id, block.id) : undefined}
-                  className={onEditBlock ? 'group/sec relative rounded-lg hover:ring-2 hover:ring-[#924623]/15 hover:ring-offset-4 transition-shadow' : undefined}
+                  className={onEditBlock ? 'group/sec relative rounded-lg hover:ring-2 hover:ring-[#00676a]/15 hover:ring-offset-4 transition-shadow' : undefined}
                   title={onEditBlock ? 'Double-click to edit this section' : undefined}
                 >
                   {onEditBlock && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onEditBlock(page.id, block.id); }}
-                      className="no-print opacity-0 group-hover/sec:opacity-100 absolute -top-2 -right-2 z-20 w-7 h-7 rounded-full bg-white border border-gray-200 shadow text-gray-500 hover:text-[#924623] transition-opacity"
+                      className="no-print opacity-0 group-hover/sec:opacity-100 absolute -top-2 -right-2 z-20 w-7 h-7 rounded-full bg-white border border-gray-200 shadow text-gray-500 hover:text-[#00676a] transition-opacity"
                       title="Edit in side panel"
                     ><i className="fa-solid fa-pen text-[11px]" /></button>
                   )}

@@ -2,44 +2,48 @@ import { useEffect, useState, ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Sym } from './Sym';
 import { getUserEmailFromToken } from '@/lib/api';
+import { useAdminNotificationCounts } from '@/hooks/useAdminNotificationCounts';
 import '@/pages/portal/portal.css';
 
 type NavItem = { icon: string; label: string; to: string; badge?: number };
 type NavGroup = { title?: string; items: NavItem[] };
 
-const NAV_GROUPS: NavGroup[] = [
-  {
-    items: [{ icon: 'grid_view', label: 'Dashboard', to: '/portal-admin' }],
-  },
-  {
-    title: 'Inquiries',
-    items: [
-      { icon: 'inbox', label: 'Inquiries', to: '/portal-admin/inquiries' },
-      { icon: 'contract_edit', label: 'Inquiry Form', to: '/portal-admin/inquiry-form' },
-      { icon: 'web', label: 'Inquiry Page', to: '/portal-admin/inquiry-content' },
-    ],
-  },
-  {
-    title: 'Sales & Billing',
-    items: [
-      { icon: 'request_quote', label: 'Quotations', to: '/portal-admin/quotations' },
-      { icon: 'receipt_long', label: 'Invoices', to: '/portal-admin/invoices' },
-      { icon: 'link', label: 'Payment Links', to: '/portal-admin/payment-links' },
-    ],
-  },
-  {
-    title: 'Work',
-    items: [
-      { icon: 'folder_open', label: 'Projects', to: '/portal-admin/projects' },
-      { icon: 'description', label: 'Tech Packs', to: '/portal-admin/tech-packs' },
-      { icon: 'group', label: 'Clients', to: '/portal-admin/clients' },
-    ],
-  },
-  {
-    title: 'Tools',
-    items: [{ icon: 'dynamic_form', label: 'Forms', to: '/portal-admin/forms' }],
-  },
-];
+function buildNavGroups(counts: { inquiries: number; paymentLinks: number; paymentHistory: number }): NavGroup[] {
+  return [
+    {
+      items: [{ icon: 'grid_view', label: 'Dashboard', to: '/portal-admin' }],
+    },
+    {
+      title: 'Inquiries',
+      items: [
+        { icon: 'inbox', label: 'Inquiries', to: '/portal-admin/inquiries', badge: counts.inquiries },
+        { icon: 'contract_edit', label: 'Inquiry Form', to: '/portal-admin/inquiry-form' },
+        { icon: 'web', label: 'Inquiry Page', to: '/portal-admin/inquiry-content' },
+      ],
+    },
+    {
+      title: 'Sales & Billing',
+      items: [
+        { icon: 'request_quote', label: 'Quotations', to: '/portal-admin/quotations' },
+        { icon: 'receipt_long', label: 'Invoices', to: '/portal-admin/invoices' },
+        { icon: 'link', label: 'Payment Links', to: '/portal-admin/payment-links', badge: counts.paymentLinks },
+        { icon: 'history', label: 'Payment History', to: '/portal-admin/payment-history', badge: counts.paymentHistory },
+      ],
+    },
+    {
+      title: 'Work',
+      items: [
+        { icon: 'folder_open', label: 'Projects', to: '/portal-admin/projects' },
+        { icon: 'description', label: 'Tech Packs', to: '/portal-admin/tech-packs' },
+        { icon: 'group', label: 'Clients', to: '/portal-admin/clients' },
+      ],
+    },
+    {
+      title: 'Tools',
+      items: [{ icon: 'dynamic_form', label: 'Forms', to: '/portal-admin/forms' }],
+    },
+  ];
+}
 const NAV_BOTTOM: NavItem[] = [
   { icon: 'settings', label: 'Settings', to: '/portal-admin/settings' },
 ];
@@ -84,6 +88,8 @@ export default function AdminShell({
   const displayName = email.split('@')[0].replace(/[._]/g, ' ');
   const searchValue = search ?? localSearch;
   const setSearch = onSearchChange ?? setLocalSearch;
+  const notifCounts = useAdminNotificationCounts();
+  const navGroups = buildNavGroups(notifCounts);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -110,7 +116,7 @@ export default function AdminShell({
         onClick={() => navigate(item.to)}
         title={navCollapsed ? item.label : undefined}
         className={`w-full flex items-center gap-3 ${navCollapsed ? 'justify-center px-0' : 'px-3'} py-2 rounded-lg text-[14px] text-left transition-colors relative`}
-        style={on ? { background: 'rgba(146,70,35,0.12)', color: 'var(--p-primary)', fontWeight: 700 } : { color: 'var(--p-on-surface-variant)' }}
+        style={on ? { background: 'rgba(0,103,106,0.12)', color: 'var(--p-primary)', fontWeight: 700 } : { color: 'var(--p-on-surface-variant)' }}
         onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = 'var(--p-surface-container-high)'; }}
         onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = 'transparent'; }}
       >
@@ -145,7 +151,7 @@ export default function AdminShell({
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/portal-admin/inquiries')} className="msym text-white/70 hover:text-white relative">
             inbox
-            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white" />
+            {notifCounts.inquiries > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white" />}
           </button>
           <div className="relative">
             <button onClick={() => setMenuOpen((o) => !o)} className="flex items-center gap-2 group">
@@ -188,7 +194,7 @@ export default function AdminShell({
             <Sym name={navCollapsed ? 'menu' : 'menu_open'} />
           </button>
           <nav className="flex-1 overflow-y-auto p-3 space-y-3">
-            {NAV_GROUPS.map((group, gi) => (
+            {navGroups.map((group, gi) => (
               <div key={group.title ?? `grp-${gi}`} className="space-y-1">
                 {group.title && (
                   navCollapsed ? (

@@ -1,6 +1,6 @@
 import { STAGES, STAGE_INDEX, stageDef, statusLabelFor, defaultStatusFor, type StageKey } from './stages';
 
-const ACCENT = '#924623';
+const ACCENT = '#00676a';
 
 /**
  * Horizontal stage stepper for the manufacturing journey. Read-only by default;
@@ -68,7 +68,7 @@ export default function StageStepper({
           <select
             value={status || defaultStatusFor(current)}
             onChange={(e) => onStatusChange(e.target.value)}
-            className="h-8 px-2 rounded-lg border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#924623]/20"
+            className="h-8 px-2 rounded-lg border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#00676a]/20"
           >
             {def.statuses.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
           </select>

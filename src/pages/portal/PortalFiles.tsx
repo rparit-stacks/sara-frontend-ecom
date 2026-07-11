@@ -7,7 +7,7 @@ import { useClientPortalAggregate } from '@/hooks/useClientPortalAggregate';
 
 const KIND_META = {
   pdf: { icon: 'picture_as_pdf', bg: 'rgba(186,26,26,0.1)', fg: 'var(--p-error)' },
-  image: { icon: 'image', bg: 'rgba(146,70,35,0.1)', fg: 'var(--p-primary)' },
+  image: { icon: 'image', bg: 'rgba(0,103,106,0.1)', fg: 'var(--p-primary)' },
   doc: { icon: 'description', bg: 'var(--p-secondary-container)', fg: 'var(--p-on-secondary-container)' },
   video: { icon: 'movie', bg: 'var(--p-surface-container-high)', fg: 'var(--p-on-surface)' },
   other: { icon: 'attach_file', bg: 'var(--p-surface-container-high)', fg: 'var(--p-on-surface)' },

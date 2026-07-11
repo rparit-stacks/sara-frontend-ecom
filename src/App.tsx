@@ -84,6 +84,7 @@ import PortalAdminProjectDetail from "./pages/portal/admin/AdminProjectDetail";
 import PortalAdminInquiries from "./pages/portal/admin/AdminInquiries";
 import PortalAdminQuotations from "./pages/portal/admin/AdminQuotations";
 import PortalAdminPaymentLinks from "./pages/portal/admin/AdminPaymentLinks";
+import PortalAdminPaymentHistory from "./pages/portal/admin/AdminPaymentHistory";
 import PortalAdminInvoices from "./pages/portal/admin/AdminInvoices";
 import PortalAdminTechPacks from "./pages/portal/admin/AdminTechPacks";
 import PortalAdminClients from "./pages/portal/admin/AdminClients";
@@ -182,6 +183,7 @@ const App = () =>
           <Route path="/portal-admin/inquiry-content" element={<ProtectedAdminRoute><PortalAdminInquiryContent /></ProtectedAdminRoute>} />
           <Route path="/portal-admin/quotations" element={<ProtectedAdminRoute><PortalAdminQuotations /></ProtectedAdminRoute>} />
           <Route path="/portal-admin/payment-links" element={<ProtectedAdminRoute><PortalAdminPaymentLinks /></ProtectedAdminRoute>} />
+          <Route path="/portal-admin/payment-history" element={<ProtectedAdminRoute><PortalAdminPaymentHistory /></ProtectedAdminRoute>} />
           <Route path="/portal-admin/quote-editor/new" element={<ProtectedAdminRoute><PortalAdminQuoteBuilder /></ProtectedAdminRoute>} />
           <Route path="/portal-admin/quote-editor/:reference" element={<ProtectedAdminRoute><PortalAdminQuoteBuilder /></ProtectedAdminRoute>} />
           <Route path="/portal-admin/quotations/:project" element={<ProtectedAdminRoute><Navigate to="/portal-admin/quotations" replace /></ProtectedAdminRoute>} />

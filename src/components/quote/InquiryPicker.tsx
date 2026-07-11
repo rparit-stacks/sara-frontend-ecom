@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { manufacturingApi } from '@/lib/api';
 
-const ACCENT = '#924623';
+const ACCENT = '#00676a';
 
 /**
  * For a standalone quote (opened without ?inquiry): let the admin optionally
@@ -41,7 +41,7 @@ export default function InquiryPicker({ onPick }: { onPick: (inquiryId: number) 
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search by reference, client, brand…"
-            className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#924623]/20"
+            className="w-full h-9 px-2.5 rounded-lg border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#00676a]/20"
           />
           <div className="max-h-56 overflow-y-auto rounded-lg border border-gray-100 divide-y divide-gray-100">
             {isLoading ? (

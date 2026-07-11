@@ -24,7 +24,7 @@ export default function PortalPins() {
           <div className="max-w-3xl space-y-3">
             {PINS.map((p) => (
               <div key={p.id} className="border rounded-xl p-4 flex gap-4" style={{ borderColor: 'var(--p-outline-variant)' }}>
-                <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(146,70,35,0.1)', color: 'var(--p-primary)' }}>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(0,103,106,0.1)', color: 'var(--p-primary)' }}>
                   <Sym name="push_pin" className="text-[18px]" />
                 </div>
                 <div className="flex-1 min-w-0">

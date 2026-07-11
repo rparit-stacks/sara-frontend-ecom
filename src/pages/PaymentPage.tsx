@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { paymentApi, paymentLinkApi, type ResolvedPayTarget } from '@/lib/api';
 
-const ACCENT = '#924623';
+const ACCENT = '#00676a';
 const ACCENT_DARK = '#6f351a';
 const SYMBOL: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
 
@@ -27,8 +27,11 @@ function loadRazorpay(): Promise<boolean> {
 type Phase = 'form' | 'processing' | 'success' | 'failed';
 
 export default function PaymentPage() {
-  const { code } = useParams();
+  const { code: codeParam } = useParams();
   const [params] = useSearchParams();
+  // CLIENT-mode links (no quote attached) are built as /pay?code=xxx (query
+  // string) while invoice/quote links use /pay/xxx (path param) — accept both.
+  const code = codeParam || params.get('code') || undefined;
   const quote = params.get('quote') || undefined;
 
   const { data: target, isLoading, error, refetch } = useQuery({
@@ -120,11 +123,17 @@ export default function PaymentPage() {
   };
 
   return (
-    <div className="min-h-screen py-8 px-4" style={{ background: 'linear-gradient(160deg,#f7f2e9 0%,#f0e7d7 100%)' }}>
+    <div className="relative min-h-screen py-8 px-4 overflow-hidden" style={{ background: 'linear-gradient(160deg,#f7f2e9 0%,#f0e7d7 100%)' }}>
       <style>{`@keyframes pp-pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
         @keyframes pp-spin{to{transform:rotate(360deg)}}
         @keyframes pp-fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
         .pp-fade{animation:pp-fade .4s ease both}`}</style>
+
+      {/* abstract background — same watercolor/floral art as the quotation PDF */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.06]"
+        style={{ backgroundImage: 'url(/bg_images/watercolor-wallpaper-with-hand-drawn-elements.png)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }}
+      />
 
       {/* Brand header */}
       <div className="max-w-4xl mx-auto text-center mb-6 pp-fade">
@@ -162,7 +171,7 @@ export default function PaymentPage() {
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#8a7f6d] mb-1">Amount to pay</label>
                 {amountEditable ? (
-                  <div className="flex items-center rounded-xl border border-gray-200 focus-within:ring-2 focus-within:ring-[#924623]/25 overflow-hidden">
+                  <div className="flex items-center rounded-xl border border-gray-200 focus-within:ring-2 focus-within:ring-[#00676a]/25 overflow-hidden">
                     <span className="px-3 text-gray-400 text-[18px]">{SYMBOL[currency] ?? ''}</span>
                     <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="flex-1 h-12 px-1 outline-none text-[18px] font-semibold" />
                   </div>
@@ -197,7 +206,7 @@ export default function PaymentPage() {
   );
 }
 
-const inputCls = 'w-full h-11 px-3 rounded-xl border border-gray-200 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#924623]/25';
+const inputCls = 'w-full h-11 px-3 rounded-xl border border-gray-200 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#00676a]/25';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -322,7 +331,7 @@ function ContactSection({ contact }: { contact: NonNullable<ResolvedPayTarget['c
       <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
         {rows.map(([icon, label, val, href]) => (
           href
-            ? <a key={label} href={href} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[12px] text-[#6b6357] hover:text-[#924623]"><i className={`fa-${icon.startsWith('fa-whatsapp') ? 'brands' : 'solid'} ${icon}`} style={{ color: ACCENT }} /> {val}</a>
+            ? <a key={label} href={href} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[12px] text-[#6b6357] hover:text-[#00676a]"><i className={`fa-${icon.startsWith('fa-whatsapp') ? 'brands' : 'solid'} ${icon}`} style={{ color: ACCENT }} /> {val}</a>
             : <span key={label} className="flex items-center gap-1.5 text-[12px] text-[#6b6357]"><i className={`fa-solid ${icon}`} style={{ color: ACCENT }} /> {val}</span>
         ))}
       </div>
@@ -380,7 +389,7 @@ function FailedCard({ message, onRetry, contact }: { message: string; onRetry: (
         <button onClick={onRetry} className="mt-6 w-full h-12 rounded-xl text-white font-semibold text-[15px] flex items-center justify-center gap-2" style={{ background: `linear-gradient(180deg,${ACCENT},${ACCENT_DARK})` }}>
           <i className="fa-solid fa-rotate-right text-[13px]" /> Retry payment
         </button>
-        {contact?.email && <a href={`mailto:${contact.email}`} className="inline-block mt-3 text-[12px] text-[#8a7f6d] hover:text-[#924623]">Still stuck? Contact support</a>}
+        {contact?.email && <a href={`mailto:${contact.email}`} className="inline-block mt-3 text-[12px] text-[#8a7f6d] hover:text-[#00676a]">Still stuck? Contact support</a>}
       </div>
     </div>
   );

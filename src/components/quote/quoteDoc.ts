@@ -114,6 +114,7 @@ export interface QuoteMeta {
   validityDays: number;
   clientName: string;
   clientEmail: string;
+  clientPhone: string;
   clientAddress: string;
 }
 
@@ -278,6 +279,7 @@ export function defaultQuoteDoc(profile: CompanyProfile | null): QuoteDoc {
       validityDays: 15,
       clientName: '',
       clientEmail: '',
+      clientPhone: '',
       clientAddress: '',
     },
     pages: [
@@ -308,7 +310,7 @@ export function defaultQuoteDoc(profile: CompanyProfile | null): QuoteDoc {
       },
     ],
     footerText: 'Thank you for choosing Studio Sara · This quotation is confidential.',
-    accent: '#924623',
+    accent: '#00676a',
     calc: { gstPercent: 18, discount: 0 },
   };
 }

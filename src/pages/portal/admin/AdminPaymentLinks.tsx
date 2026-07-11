@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import AdminShell, { AdminBtn } from '@/components/portal/AdminShell';
 import { Sym } from '@/components/portal/Sym';
 import { manufacturingApi, paymentLinkApi, type PaymentLinkDto, type PaymentLinkMode } from '@/lib/api';
+import { useMarkNavRead } from '@/hooks/useAdminNotificationCounts';
 
 const MODES: { key: PaymentLinkMode; label: string; hint: string; icon: string }[] = [
   { key: 'OPEN', label: 'Open amount', hint: 'Payer enters any amount.', icon: 'edit' },
@@ -19,6 +20,9 @@ const payUrl = (code: string) => `${window.location.origin}/pay/${code}`;
 export default function PortalAdminPaymentLinks() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const markRead = useMarkNavRead('payment_links');
+
+  useEffect(() => { markRead(); }, []);
 
   const { data: links = [], isLoading } = useQuery({
     queryKey: ['payment-links'],

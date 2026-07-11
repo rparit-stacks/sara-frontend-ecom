@@ -49,7 +49,7 @@ export default function MaintenanceStatusBanner() {
       {/* Banner */}
       <div
         className="relative overflow-hidden rounded-2xl p-6 sm:p-7 text-white"
-        style={{ background: 'linear-gradient(135deg,#924623 0%,#b5602f 55%,#c9743b 100%)' }}
+        style={{ background: 'linear-gradient(135deg,#00676a 0%,#0d8a8d 55%,#2fa5a8 100%)' }}
       >
         <div className="absolute -right-8 -top-8 opacity-10">
           <FontAwesomeIcon icon={faWrench} className="text-[140px]" />
@@ -91,7 +91,7 @@ export default function MaintenanceStatusBanner() {
 
           <button
             onClick={() => setLogOpen(true)}
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white text-[#924623] px-4 py-2.5 text-[13px] font-bold hover:bg-white/90 transition-colors"
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white text-[#00676a] px-4 py-2.5 text-[13px] font-bold hover:bg-white/90 transition-colors"
           >
             <FontAwesomeIcon icon={faListCheck} /> What we've done in maintenance
           </button>
@@ -150,7 +150,7 @@ function MaintenanceLogModal({ onClose }: { onClose: () => void }) {
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h3 className="text-[16px] font-bold text-gray-900 flex items-center gap-2">
-              <FontAwesomeIcon icon={faListCheck} className="text-[#924623]" /> Maintenance log
+              <FontAwesomeIcon icon={faListCheck} className="text-[#00676a]" /> Maintenance log
             </h3>
             <p className="text-[12px] text-gray-500 mt-0.5">
               {logs.length} {logs.length === 1 ? 'entry' : 'entries'}
@@ -160,7 +160,7 @@ function MaintenanceLogModal({ onClose }: { onClose: () => void }) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setAdding((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#924623] text-white px-3 py-1.5 text-[13px] font-semibold hover:bg-[#7d3c1e]"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#00676a] text-white px-3 py-1.5 text-[13px] font-semibold hover:bg-[#004d50]"
             >
               <FontAwesomeIcon icon={faPlus} /> Add entry
             </button>
@@ -178,12 +178,12 @@ function MaintenanceLogModal({ onClose }: { onClose: () => void }) {
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 placeholder="Title (e.g. Server crash resolved)"
-                className="col-span-2 px-3 py-2 rounded-lg border border-gray-200 text-[14px] outline-none focus:border-[#924623]"
+                className="col-span-2 px-3 py-2 rounded-lg border border-gray-200 text-[14px] outline-none focus:border-[#00676a]"
               />
               <select
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className="px-3 py-2 rounded-lg border border-gray-200 text-[14px] outline-none focus:border-[#924623] bg-white"
+                className="px-3 py-2 rounded-lg border border-gray-200 text-[14px] outline-none focus:border-[#00676a] bg-white"
               >
                 {Object.entries(CATEGORY).map(([k, v]) => (
                   <option key={k} value={k}>{v.label}</option>
@@ -193,14 +193,14 @@ function MaintenanceLogModal({ onClose }: { onClose: () => void }) {
                 type="datetime-local"
                 value={form.occurredAt}
                 onChange={(e) => setForm({ ...form, occurredAt: e.target.value })}
-                className="px-3 py-2 rounded-lg border border-gray-200 text-[14px] outline-none focus:border-[#924623]"
+                className="px-3 py-2 rounded-lg border border-gray-200 text-[14px] outline-none focus:border-[#00676a]"
               />
               <textarea
                 value={form.detail}
                 onChange={(e) => setForm({ ...form, detail: e.target.value })}
                 placeholder="Details (what happened + how it was solved)"
                 rows={2}
-                className="col-span-2 px-3 py-2 rounded-lg border border-gray-200 text-[14px] outline-none focus:border-[#924623]"
+                className="col-span-2 px-3 py-2 rounded-lg border border-gray-200 text-[14px] outline-none focus:border-[#00676a]"
               />
             </div>
             <div className="flex justify-end gap-2">
@@ -208,7 +208,7 @@ function MaintenanceLogModal({ onClose }: { onClose: () => void }) {
               <button
                 onClick={() => form.title.trim() ? createMut.mutate() : toast.error('Enter a title')}
                 disabled={createMut.isPending}
-                className="px-4 py-1.5 rounded-lg bg-[#924623] text-white text-[13px] font-semibold disabled:opacity-50"
+                className="px-4 py-1.5 rounded-lg bg-[#00676a] text-white text-[13px] font-semibold disabled:opacity-50"
               >
                 {createMut.isPending ? 'Saving…' : 'Save entry'}
               </button>

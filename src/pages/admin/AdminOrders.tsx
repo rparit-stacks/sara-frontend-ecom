@@ -11,6 +11,7 @@ import { motion } from 'framer-motion';
 import { orderApi } from '@/lib/api';
 import { formatPrice } from '@/lib/currency';
 import { getPaymentStatusDisplay } from '@/lib/orderUtils';
+import { useMarkNavRead } from '@/hooks/useAdminNotificationCounts';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -29,7 +30,10 @@ const AdminOrders = () => {
   const [pageSize, setPageSize] = useState(parseInt(searchParams.get('size') || '10'));
   const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>((searchParams.get('sortDir') as 'asc' | 'desc') || 'desc');
-  
+  const markRead = useMarkNavRead('orders');
+
+  useEffect(() => { markRead(); }, []);
+
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {

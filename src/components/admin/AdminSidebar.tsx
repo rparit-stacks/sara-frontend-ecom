@@ -27,6 +27,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
+import { useAdminNotificationCounts } from '@/hooks/useAdminNotificationCounts';
 
 // Sidebar grouped into sections, each with a heading.
 const adminMenuSections = [
@@ -96,6 +97,10 @@ export const AdminSidebar = () => {
   const [collapsed, , toggleCollapsed] = useSidebarCollapsed();
   // Collapse only applies on desktop; mobile drawer is always full-width.
   const isCollapsed = collapsed && isDesktop;
+  const notifCounts = useAdminNotificationCounts();
+  const badgeForPath: Record<string, number> = {
+    '/admin-sara/orders': notifCounts.orders,
+  };
 
   // Which section is the active route in — that one stays open by default.
   const activeSectionTitle = adminMenuSections.find((s) =>
@@ -245,6 +250,7 @@ export const AdminSidebar = () => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.path ||
                     (item.path !== '/admin-sara' && location.pathname.startsWith(item.path));
+                  const badge = badgeForPath[item.path] || 0;
 
                   return (
                     <motion.div
@@ -280,7 +286,18 @@ export const AdminSidebar = () => {
                         >
                           <Icon className="w-5 h-5" />
                         </motion.div>
-                        {!isCollapsed && <span className="font-medium relative z-10">{item.label}</span>}
+                        {!isCollapsed && <span className="font-medium relative z-10 flex-1">{item.label}</span>}
+                        {badge > 0 && (
+                          <span
+                            className={cn(
+                              "relative z-10 text-[10px] font-bold rounded-full",
+                              isCollapsed ? "absolute top-1 right-1 w-2 h-2 p-0" : "px-1.5 py-0.5 min-w-[18px] text-center",
+                              isActive ? "bg-white text-primary" : "bg-primary text-white"
+                            )}
+                          >
+                            {isCollapsed ? '' : (badge > 99 ? '99+' : badge)}
+                          </span>
+                        )}
                       </Link>
                     </motion.div>
                   );

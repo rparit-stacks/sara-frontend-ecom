@@ -336,7 +336,7 @@ function CreateInvoiceModal({ onClose, onCreate, saving }: {
           </div>
 
           <label className="flex items-center gap-2 text-[13px] text-gray-600 cursor-pointer">
-            <input type="checkbox" checked={send} onChange={(e) => setSend(e.target.checked)} className="accent-[#924623]" />
+            <input type="checkbox" checked={send} onChange={(e) => setSend(e.target.checked)} className="accent-[#00676a]" />
             Email the invoice to the client now (with a Pay button)
           </label>
         </div>

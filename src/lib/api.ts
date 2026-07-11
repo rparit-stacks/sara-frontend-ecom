@@ -674,7 +674,7 @@ export interface ManufacturingInquiryDto {
   source?: string;         // INQUIRY_FORM | CUSTOM_DESIGN
   adminNote?: string;
   status: 'NEW' | 'REVIEWING' | 'QUOTED' | 'DECLINED';
-  currentStage?: string;   // INQUIRY | QUOTATION | SAMPLING | PRODUCTION | INVOICING | COMPLETED
+  currentStage?: string;   // INQUIRY | QUOTATION | INVOICING | DESIGNING | SAMPLING | PRODUCTION | DELIVERED
   currentStatus?: string;  // stage-specific status
   accountEmail?: string;   // signed-in user (id=email) at submit time
   accountName?: string;
@@ -708,6 +708,7 @@ export interface ManufacturingQuoteDto {
   title: string;
   clientName?: string;
   clientEmail?: string;
+  clientPhone?: string;
   currency: string;
   total: number;
   status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'DECLINED';
@@ -723,6 +724,7 @@ export interface ManufacturingQuoteSaveRequest {
   title?: string;
   clientName?: string;
   clientEmail?: string;
+  clientPhone?: string;
   currency?: string;
   total?: number;
   status?: string;
@@ -805,7 +807,7 @@ export const manufacturingApi = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
-  duplicateQuote: (id: number, opts?: { title?: string; inquiryId?: number; clientName?: string; clientEmail?: string }) =>
+  duplicateQuote: (id: number, opts?: { title?: string; inquiryId?: number; clientName?: string; clientEmail?: string; clientPhone?: string }) =>
     fetchApi<ManufacturingQuoteDto>(`/api/admin/manufacturing/quotes/${id}/duplicate`, {
       method: 'POST',
       body: JSON.stringify(opts ?? {}),
@@ -1673,6 +1675,23 @@ export interface PaymentLinkDto {
   createdAt?: string;
 }
 
+export interface PaymentLinkPaymentDto {
+  id: number;
+  linkCode?: string;
+  quoteReference?: string;
+  invoiceReference?: string;
+  projectCode?: string;
+  amount: number;
+  currency: string;
+  gateway?: string;
+  status: 'PENDING' | 'PAID' | 'FAILED';
+  payerEmail?: string;
+  payerName?: string;
+  payerPhone?: string;
+  paidAt?: string;
+  createdAt?: string;
+}
+
 export interface PayLineItem { description: string; qty: number; rate: number; amount: number; }
 export interface PayContact { name?: string; email?: string; phone?: string; address?: string; gstin?: string; }
 
@@ -1879,10 +1898,10 @@ export const projectApi = {
     fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/messages/${messageId}`, {
       method: 'DELETE',
     }),
-  requestPayment: (code: string, amount: number, opts?: { currency?: string; label?: string }) =>
+  requestPayment: (code: string, amount: number, opts?: { currency?: string; label?: string; description?: string }) =>
     fetchApi<ProjectMessageDto>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/request-payment`, {
       method: 'POST',
-      body: JSON.stringify({ amount, currency: opts?.currency || 'INR', label: opts?.label }),
+      body: JSON.stringify({ amount, currency: opts?.currency || 'INR', label: opts?.label, description: opts?.description }),
     }),
   listThreads: (code: string) =>
     fetchApi<ProjectThreadSummaryDto[]>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/threads`),
@@ -2089,6 +2108,23 @@ export const paymentLinkApi = {
     fetchApi<PaymentLinkDto>('/api/admin/payment-links', { method: 'POST', body: JSON.stringify(data) }),
   setActive: (id: number, active: boolean) =>
     fetchApi<PaymentLinkDto>(`/api/admin/payment-links/${id}/active`, { method: 'PATCH', body: JSON.stringify({ active }) }),
+  listAllPayments: () => fetchApi<PaymentLinkPaymentDto[]>('/api/admin/payment-links/payments/all'),
+};
+
+// ===============================
+// Admin sidebar notification badges
+// ===============================
+export interface AdminNotificationCounts {
+  inquiries: number;
+  orders: number;
+  paymentLinks: number;
+  paymentHistory: number;
+}
+
+export const notificationApi = {
+  counts: () => fetchApi<AdminNotificationCounts>('/api/admin/notifications/counts'),
+  markRead: (section: 'inquiries' | 'orders' | 'payment_links' | 'payment_history') =>
+    fetchApi<{ readAt: string }>(`/api/admin/notifications/${section}/read`, { method: 'POST' }),
 };
 
 // ===============================

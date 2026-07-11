@@ -64,7 +64,7 @@ export default function PortalAdminDashboard() {
 
   return (
     <AdminShell title="Dashboard" actions={<AdminBtn icon="add" onClick={() => navigate('/portal-admin/inquiries')}>View inquiries</AdminBtn>}>
-      <div className="p-5 sm:p-8 max-w-6xl">
+      <div className="p-5 sm:p-8 max-w-6xl chat-feed-bg">
         {projectsLoading ? (
           <div className="flex justify-center py-20"><Sym name="progress_activity" className="text-[28px] animate-spin" /></div>
         ) : (

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { businessConfigApi, manufacturingApi, mediaApi } from '@/lib/api';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import {
   businessConfigToProfile,
   createBlock,
@@ -68,6 +69,7 @@ export default function PortalAdminQuoteBuilder() {
   // Block whose form should auto-open in the left panel (set by double-clicking
   // a section on the page). Cleared shortly after so it can re-trigger.
   const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
+  const [focusClientInfo, setFocusClientInfo] = useState(false);
   const seeded = useRef(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -155,8 +157,15 @@ export default function PortalAdminQuoteBuilder() {
   const removePage = (pageId: string) => doc && doc.pages.length > 1 && update({ ...doc, pages: doc.pages.filter((p) => p.id !== pageId) });
 
   /* ---------- save ---------- */
-  const save = async (nextStatus?: string) => {
+  // Save only ever persists — it never emails or WhatsApps the client (that's
+  // exclusively sendToClient's job). Used for both the manual Save button and
+  // the debounced auto-save below (silent: true suppresses the success toast).
+  const save = async (nextStatus?: string, opts?: { silent?: boolean }) => {
     if (!doc) return;
+    if (!doc.meta.quoteTitle?.trim()) {
+      if (!opts?.silent) toast.error('Add a quote title before saving');
+      return;
+    }
     setSaving(true);
     try {
       const total = computeTotals(doc).grandTotal;
@@ -168,6 +177,7 @@ export default function PortalAdminQuoteBuilder() {
         title: docToSave.meta.quoteTitle || 'Quotation',
         clientName: docToSave.meta.clientName || undefined,
         clientEmail: docToSave.meta.clientEmail || undefined,
+        clientPhone: docToSave.meta.clientPhone || undefined,
         currency,
         total,
         status: st,
@@ -181,19 +191,47 @@ export default function PortalAdminQuoteBuilder() {
       setStatus(saved.status);
       setDirty(false);
       if (nextStatus) setStatus(nextStatus);
-      toast.success(quoteId ? 'Quote saved' : `Quote created · ${saved.reference}`);
+      if (!opts?.silent) toast.success(quoteId ? 'Quote saved' : `Quote created · ${saved.reference}`);
       if (!quoteId) navigate(`/portal-admin/quote-editor/${saved.reference}`, { replace: true });
     } catch (e) {
-      toast.error((e as Error).message || 'Failed to save');
+      if (!opts?.silent) toast.error((e as Error).message || 'Failed to save');
     } finally {
       setSaving(false);
     }
   };
 
-  // Save (creating if needed), then mark SENT + email the client.
+  // Auto-save: after a pause in editing, silently persist an already-created
+  // quote (never a still-untitled brand-new one — nothing meaningful to save
+  // yet). Reuses save()'s title guard and silent mode, so it never toasts or
+  // notifies the client, matching manual Save exactly.
+  useEffect(() => {
+    if (!dirty || !quoteId) return;
+    const timer = window.setTimeout(() => {
+      save(undefined, { silent: true });
+    }, 2500);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc, dirty, quoteId]);
+
+  // Save (creating if needed), then mark SENT + notify the client. Branches on
+  // whichever of email/phone are actually on file — email if present, WhatsApp
+  // if present, both if both. Blocks entirely (and surfaces the Client
+  // Information form) only when neither is available.
   const sendToClient = async () => {
     if (!doc) return;
-    if (!doc.meta.clientEmail) { toast.error('Add a client email first'); return; }
+    if (!doc.meta.quoteTitle?.trim()) { toast.error('Add a quote title before sending'); return; }
+
+    const hasEmail = !!doc.meta.clientEmail?.trim();
+    const hasPhone = !!doc.meta.clientPhone?.trim();
+
+    if (!hasEmail && !hasPhone) {
+      toast.error('Add a client email or phone number before sending');
+      setView('split');
+      setFocusClientInfo(true);
+      window.setTimeout(() => setFocusClientInfo(false), 1500);
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -201,6 +239,7 @@ export default function PortalAdminQuoteBuilder() {
         title: doc.meta.quoteTitle || 'Quotation',
         clientName: doc.meta.clientName || undefined,
         clientEmail: doc.meta.clientEmail || undefined,
+        clientPhone: doc.meta.clientPhone || undefined,
         currency,
         total: computeTotals(doc).grandTotal,
         status: status,
@@ -232,7 +271,16 @@ export default function PortalAdminQuoteBuilder() {
       setRef(sent.reference);
       setStatus(sent.status);
       setDirty(false);
-      toast.success(pdfBase64 ? `Quote + PDF sent to ${doc.meta.clientEmail}` : `Quote sent to ${doc.meta.clientEmail}`);
+
+      if (hasEmail && hasPhone) {
+        toast.success(pdfBase64 ? `Quote + PDF sent to ${doc.meta.clientEmail}` : `Quote sent to ${doc.meta.clientEmail}`);
+      } else if (hasEmail) {
+        toast.success(`Quote emailed to ${doc.meta.clientEmail}`);
+        toast('No phone on file — WhatsApp notification skipped.');
+      } else {
+        toast.success(`Quote sent via WhatsApp to ${doc.meta.clientPhone}`);
+        toast('No email on file — email skipped.');
+      }
       if (!quoteId) navigate(`/portal-admin/quote-editor/${sent.reference}`, { replace: true });
     } catch (e) {
       toast.error((e as Error).message || 'Failed to send');
@@ -313,7 +361,7 @@ export default function PortalAdminQuoteBuilder() {
     );
   }
 
-  const accent = doc.accent || '#924623';
+  const accent = doc.accent || '#00676a';
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
@@ -407,49 +455,58 @@ export default function PortalAdminQuoteBuilder() {
           />
         </div>
       ) : (
-        <div className="flex-1 flex min-h-0">
-          <aside className="no-print w-[400px] shrink-0 border-r border-gray-200 min-h-0 overflow-y-auto bg-gray-50">
-            {linkedInquiry ? (
-              <div className="p-3 pb-0">
-                <InquiryImport inquiry={linkedInquiry} doc={doc} accent={accent} onPatchMeta={patchMeta} onAddBlockFull={addBlockFull} />
-              </div>
-            ) : isNew ? (
-              <div className="p-3 pb-0">
-                <InquiryPicker onPick={pickInquiry} />
-              </div>
-            ) : null}
-            <QuoteFormPanel
-              doc={doc}
-              currency={currency}
-              accent={accent}
-              focusBlockId={focusBlockId}
-              onPatchMeta={patchMeta}
-              onPatchBranding={patchBranding}
-              onPatchCalc={patchCalc}
-              onPatchBlock={patchBlock}
-              onAddBlock={addBlock}
-              onRemoveBlock={removeBlock}
-              onReorder={reorderBlocks}
-              onToggle={toggleBlock}
-              onAddPage={addPage}
-              onRemovePage={removePage}
-              onPatchFooter={patchFooter}
-            />
-          </aside>
+        <div className="flex-1 min-h-0">
+          <ResizablePanelGroup direction="horizontal" autoSaveId="quote-builder-split">
+            <ResizablePanel defaultSize={28} minSize={20} maxSize={45} className="no-print">
+              <aside className="h-full border-r border-gray-200 overflow-y-auto bg-gray-50">
+                {linkedInquiry ? (
+                  <div className="p-3 pb-0">
+                    <InquiryImport inquiry={linkedInquiry} doc={doc} accent={accent} onPatchMeta={patchMeta} onAddBlockFull={addBlockFull} />
+                  </div>
+                ) : isNew ? (
+                  <div className="p-3 pb-0">
+                    <InquiryPicker onPick={pickInquiry} />
+                  </div>
+                ) : null}
+                <QuoteFormPanel
+                  doc={doc}
+                  currency={currency}
+                  accent={accent}
+                  focusBlockId={focusBlockId}
+                  focusClientInfo={focusClientInfo}
+                  onPatchMeta={patchMeta}
+                  onPatchBranding={patchBranding}
+                  onPatchCalc={patchCalc}
+                  onPatchBlock={patchBlock}
+                  onAddBlock={addBlock}
+                  onRemoveBlock={removeBlock}
+                  onReorder={reorderBlocks}
+                  onToggle={toggleBlock}
+                  onAddPage={addPage}
+                  onRemovePage={removePage}
+                  onPatchFooter={patchFooter}
+                />
+              </aside>
+            </ResizablePanel>
 
-          <div ref={canvasRef} className="flex-1 overflow-auto py-6 sm:py-10 px-2 flex flex-col items-center gap-8">
-            <QuotePreview
-              doc={doc}
-              accent={accent}
-              currency={currency}
-              reference={ref}
-              onPatchMeta={patchMeta}
-              onPatchBranding={patchBranding}
-              onPatchBlock={patchBlock}
-              onUpdate={update}
-              onEditBlock={editBlock}
-            />
-          </div>
+            <ResizableHandle withHandle className="no-print" />
+
+            <ResizablePanel defaultSize={72} minSize={40}>
+              <div ref={canvasRef} className="h-full overflow-auto py-6 sm:py-10 px-2 flex flex-col items-center gap-8">
+                <QuotePreview
+                  doc={doc}
+                  accent={accent}
+                  currency={currency}
+                  reference={ref}
+                  onPatchMeta={patchMeta}
+                  onPatchBranding={patchBranding}
+                  onPatchBlock={patchBlock}
+                  onUpdate={update}
+                  onEditBlock={editBlock}
+                />
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </div>
       )}
     </div>

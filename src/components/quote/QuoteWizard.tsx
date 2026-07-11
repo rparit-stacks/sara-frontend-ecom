@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { ManufacturingInquiryDto } from '@/lib/api';
 import { computeTotals } from './computeTotals';
 import {
-  BrandingForm, MetaForm, CalcForm, SectionsEditor, BLOCK_META,
+  BrandingForm, QuoteDetailsForm, ClientInfoForm, CalcForm, SectionsEditor, BLOCK_META,
 } from './quoteFormParts';
 import InquiryImport from './InquiryImport';
 import InquiryPicker from './InquiryPicker';
@@ -100,7 +100,11 @@ export default function QuoteWizard({
                   <InquiryPicker onPick={onPickInquiry} />
                 </div>
               ) : null}
-              <MetaForm doc={doc} onPatchMeta={onPatchMeta} />
+              <QuoteDetailsForm doc={doc} onPatchMeta={onPatchMeta} />
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <p className="text-[13px] font-bold mb-2.5" style={{ color: accent }}>Client information</p>
+                <ClientInfoForm doc={doc} onPatchMeta={onPatchMeta} />
+              </div>
             </>
           )}
 
@@ -124,7 +128,7 @@ export default function QuoteWizard({
                     onRemovePage={() => onRemovePage(page.id)}
                   />
                 ))}
-                <button onClick={onAddPage} className="w-full py-2.5 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-[#924623] hover:text-[#924623] font-semibold text-[13px] flex items-center justify-center gap-2">
+                <button onClick={onAddPage} className="w-full py-2.5 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-[#00676a] hover:text-[#00676a] font-semibold text-[13px] flex items-center justify-center gap-2">
                   <i className="fa-solid fa-file-circle-plus" /> Add page
                 </button>
               </div>

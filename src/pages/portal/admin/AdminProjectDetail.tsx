@@ -72,6 +72,7 @@ export default function PortalAdminProjectDetail() {
   const [payModal, setPayModal] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payLabel, setPayLabel] = useState('');
+  const [payDescription, setPayDescription] = useState('');
   const [threadTab, setThreadTab] = useState<'all' | 'unread'>('all');
   const [pendingMessages, setPendingMessages] = useState<DisplayMessage[]>([]);
   const skipSseRef = useRef(0);
@@ -295,14 +296,15 @@ export default function PortalAdminProjectDetail() {
   });
 
   const requestPaymentMutation = useMutation({
-    mutationFn: ({ amount, label }: { amount: number; label?: string }) =>
-      projectApi.requestPayment(code!, amount, { label }),
+    mutationFn: ({ amount, label, description }: { amount: number; label?: string; description?: string }) =>
+      projectApi.requestPayment(code!, amount, { label, description }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-project-shell', code] });
       qc.invalidateQueries({ queryKey: ['admin-project-messages', code] });
       setPayModal(false);
       setPayAmount('');
       setPayLabel('');
+      setPayDescription('');
       toast.success('Payment requested — card posted to Announcements');
     },
     onError: (e: Error) => toast.error(e.message || 'Failed to request payment'),
@@ -431,7 +433,7 @@ export default function PortalAdminProjectDetail() {
         id={!inThread ? `msg-${post.id}` : undefined}
         key={post.id}
         className={`group flex gap-3 items-start -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 transition-all duration-500 relative rounded ${isSystem ? 'opacity-85' : ''}`}
-        style={highlighted ? { background: 'rgba(146,70,35,0.15)', boxShadow: 'inset 0 0 0 2px var(--p-primary)' } : undefined}
+        style={highlighted ? { background: 'rgba(0,103,106,0.15)', boxShadow: 'inset 0 0 0 2px var(--p-primary)' } : undefined}
         onMouseEnter={(e) => { if (!inThread && !highlighted) e.currentTarget.style.background = 'var(--p-surface-container-low)'; }}
         onMouseLeave={(e) => { if (!highlighted) e.currentTarget.style.background = 'transparent'; }}
       >
@@ -644,6 +646,8 @@ export default function PortalAdminProjectDetail() {
                   type="button"
                   onClick={() => {
                     setPayAmount(outstandingBalance && outstandingBalance.amount > 0 ? String(outstandingBalance.amount) : '');
+                    setPayLabel('');
+                    setPayDescription('');
                     setPayModal(true);
                   }}
                   className="shrink-0 px-3 py-1.5 rounded-lg text-[13px] font-semibold border flex items-center gap-1.5"
@@ -669,7 +673,7 @@ export default function PortalAdminProjectDetail() {
               </div>
             </div>
 
-            <div ref={feedRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+            <div ref={feedRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 chat-feed-bg">
               <div className="pb-6 border-b mb-6" style={{ borderColor: 'var(--p-outline-variant)' }}>
                 <h1 className="font-display text-[24px] sm:text-[28px] mb-2" style={{ color: 'var(--p-primary)' }}># {channelName}</h1>
                 {activeDesign?.description && (
@@ -856,7 +860,7 @@ export default function PortalAdminProjectDetail() {
               value={payAmount}
               onChange={(e) => setPayAmount(e.target.value)}
               placeholder="e.g. 9060"
-              className="w-full h-10 px-3 rounded-lg border text-[14px] mb-4 outline-none focus:ring-2 focus:ring-[#924623]/20"
+              className="w-full h-10 px-3 rounded-lg border text-[14px] mb-4 outline-none focus:ring-2 focus:ring-[#00676a]/20"
               style={{ borderColor: 'var(--p-outline-variant)' }}
             />
             <label className="block text-[11px] font-bold uppercase mb-1" style={{ color: 'var(--p-on-surface-variant)' }}>Label (optional)</label>
@@ -864,7 +868,16 @@ export default function PortalAdminProjectDetail() {
               value={payLabel}
               onChange={(e) => setPayLabel(e.target.value)}
               placeholder="e.g. Advance for Linen Wrap Dress"
-              className="w-full h-10 px-3 rounded-lg border text-[14px] mb-4 outline-none focus:ring-2 focus:ring-[#924623]/20"
+              className="w-full h-10 px-3 rounded-lg border text-[14px] mb-4 outline-none focus:ring-2 focus:ring-[#00676a]/20"
+              style={{ borderColor: 'var(--p-outline-variant)' }}
+            />
+            <label className="block text-[11px] font-bold uppercase mb-1" style={{ color: 'var(--p-on-surface-variant)' }}>Description (optional)</label>
+            <textarea
+              value={payDescription}
+              onChange={(e) => setPayDescription(e.target.value)}
+              placeholder="What this payment is for — shown to the client on the pay page"
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg border text-[14px] mb-4 outline-none resize-none focus:ring-2 focus:ring-[#00676a]/20"
               style={{ borderColor: 'var(--p-outline-variant)' }}
             />
             <div className="flex gap-2 justify-end">
@@ -872,7 +885,7 @@ export default function PortalAdminProjectDetail() {
               <button
                 type="button"
                 disabled={requestPaymentMutation.isPending || !(Number(payAmount) > 0)}
-                onClick={() => requestPaymentMutation.mutate({ amount: Number(payAmount), label: payLabel.trim() || undefined })}
+                onClick={() => requestPaymentMutation.mutate({ amount: Number(payAmount), label: payLabel.trim() || undefined, description: payDescription.trim() || undefined })}
                 className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50"
                 style={{ background: 'var(--p-primary)' }}
               >
