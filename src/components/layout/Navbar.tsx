@@ -170,14 +170,17 @@ export const Navbar = () => {
 
           {/* Right Actions - Compact */}
           <div className="flex items-center gap-2 xs:gap-3">
-            {/* Get a Quote CTA - desktop */}
-            <Link to="/inquiry" className="hidden lg:block">
-              <Button
-                size="sm"
-                className="rounded-full px-5 h-10 font-medium bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                Get a Quote
-              </Button>
+            {/* Get a Quote - desktop */}
+            <Link
+              to="/inquiry"
+              className={cn(
+                'hidden lg:block text-sm font-medium transition-colors duration-200 link-underline py-1',
+                location.pathname === '/inquiry'
+                  ? 'text-primary'
+                  : 'text-foreground hover:text-primary'
+              )}
+            >
+              Get a Quote
             </Link>
 
             {/* Search - desktop */}
@@ -358,7 +361,7 @@ export const Navbar = () => {
                   </div>
                 </motion.div>
                 
-                {/* Get a Quote (highlighted) */}
+                {/* Get a Quote */}
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -367,7 +370,12 @@ export const Navbar = () => {
                   <Link
                     to="/inquiry"
                     onClick={() => setIsOpen(false)}
-                    className="block py-3 px-4 rounded-lg text-sm font-semibold transition-colors bg-primary/10 text-primary hover:bg-primary/15"
+                    className={cn(
+                      'block py-3 px-4 rounded-lg text-sm font-medium transition-colors',
+                      location.pathname === '/inquiry'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-foreground hover:bg-secondary'
+                    )}
                   >
                     Get a Quote
                   </Link>
