@@ -6,13 +6,39 @@ import AdminShell, { AdminBtn } from '@/components/portal/AdminShell';
 import { Pill } from '@/components/portal/Pill';
 import { Sym } from '@/components/portal/Sym';
 import { manufacturingApi, type ManufacturingQuoteDto } from '@/lib/api';
-import { formatInquiryDate } from '@/components/inquiry/inquiryUtils';
+import { formatInquiryDate, portalDateKey, portalDateSearchText } from '@/components/inquiry/inquiryUtils';
 
 const CUR: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
 const money = (n: number, c: string) => `${CUR[c] ?? ''}${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 type Tab = 'quotes' | 'templates';
 type ForKind = 'inquiry' | 'external';
+
+function quoteMatchesSearch(q: ManufacturingQuoteDto, term: string, dateFilter: string): boolean {
+  if (dateFilter) {
+    const created = portalDateKey(q.createdAt);
+    const updated = portalDateKey(q.updatedAt);
+    if (created !== dateFilter && updated !== dateFilter) return false;
+  }
+  if (!term) return true;
+  const hay = [
+    q.reference,
+    String(q.id),
+    q.title,
+    q.clientName,
+    q.clientEmail,
+    q.clientPhone,
+    q.status,
+    q.inquiryId != null ? String(q.inquiryId) : '',
+    portalDateSearchText(q.createdAt),
+    portalDateSearchText(q.updatedAt),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  // Allow multi-word search: every token must match somewhere.
+  return term.split(/\s+/).filter(Boolean).every((tok) => hay.includes(tok));
+}
 
 /**
  * "Use template" asks who the new quotation is for, then either links an
@@ -49,7 +75,7 @@ function UseTemplateModal({
     const term = q.trim().toLowerCase();
     if (!term) return inquiries;
     return inquiries.filter((i) =>
-      [i.reference, i.clientName, i.brand, i.clientEmail].filter(Boolean).some((s) => String(s).toLowerCase().includes(term)),
+      [i.reference, i.clientName, i.brand, i.clientEmail, i.clientPhone].filter(Boolean).some((s) => String(s).toLowerCase().includes(term)),
     );
   }, [inquiries, q]);
 
@@ -218,11 +244,13 @@ function NewQuotationChooserModal({
 export default function PortalAdminQuotations() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const inquiryFilter = params.get('inquiry');
   const [tab, setTab] = useState<Tab>('quotes');
   const [templateModal, setTemplateModal] = useState<ManufacturingQuoteDto | null>(null);
   const [showEntryChooser, setShowEntryChooser] = useState(false);
+  const [query, setQuery] = useState(params.get('q') ?? '');
+  const [dateFilter, setDateFilter] = useState(params.get('date') ?? '');
 
   const { data: quotes = [], isLoading: loadingQuotes } = useQuery({
     queryKey: ['admin-quotes', 'quotes'],
@@ -245,14 +273,62 @@ export default function PortalAdminQuotations() {
     onError: (e) => toast.error((e as Error).message || 'Failed to use template'),
   });
 
+  const deleteQuote = useMutation({
+    mutationFn: (id: number) => manufacturingApi.deleteQuote(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-project-financials'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-project-shell'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-project-messages'] });
+      queryClient.invalidateQueries({ queryKey: ['client-project-financials'] });
+      queryClient.invalidateQueries({ queryKey: ['client-project-shell'] });
+      queryClient.invalidateQueries({ queryKey: ['client-portal-aggregate'] });
+      toast.success(tab === 'templates' ? 'Template deleted' : 'Quotation deleted');
+    },
+    onError: (e) => toast.error((e as Error).message || 'Failed to delete'),
+  });
+
+  const convertToProject = useMutation({
+    mutationFn: (id: number) => manufacturingApi.convertQuoteToProject(id),
+    onSuccess: (project) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-projects'] });
+      toast.success(`Project created · ${project.code}`);
+      navigate(`/portal-admin/projects/${project.code}`);
+    },
+    onError: (e) => toast.error((e as Error).message || 'Failed to convert to project'),
+  });
+
+  const confirmDelete = (q: ManufacturingQuoteDto) => {
+    const kind = tab === 'templates' ? 'template' : 'quotation';
+    const linked = q.inquiryId
+      ? ' It will also be removed from the linked project (and from the client portal if it was already sent).'
+      : '';
+    if (!window.confirm(`Delete ${kind} "${q.reference}" permanently?${linked} This cannot be undone.`)) return;
+    deleteQuote.mutate(q.id);
+  };
+
+  const syncParams = (nextQ: string, nextDate: string) => {
+    const next = new URLSearchParams(params);
+    if (nextQ) next.set('q', nextQ); else next.delete('q');
+    if (nextDate) next.set('date', nextDate); else next.delete('date');
+    setParams(next, { replace: true });
+  };
+
   const isLoading = tab === 'quotes' ? loadingQuotes : loadingTemplates;
   const list = tab === 'quotes' ? quotes : templates;
+  const term = query.trim().toLowerCase();
 
   const shown = useMemo(() => {
-    if (!inquiryFilter || tab !== 'quotes') return list;
-    const id = Number(inquiryFilter);
-    return list.filter((q) => q.inquiryId === id);
-  }, [list, inquiryFilter, tab]);
+    let rows = list;
+    if (inquiryFilter && tab === 'quotes') {
+      const id = Number(inquiryFilter);
+      rows = rows.filter((q) => q.inquiryId === id);
+    }
+    return rows.filter((q) => quoteMatchesSearch(q, term, dateFilter));
+  }, [list, inquiryFilter, tab, term, dateFilter]);
+
+  const hasFilters = !!term || !!dateFilter;
 
   return (
     <AdminShell
@@ -267,18 +343,69 @@ export default function PortalAdminQuotations() {
           </p>
         )}
 
-        <div className="flex items-center bg-black/[0.04] rounded-lg p-1 w-fit mb-5">
-          {([['quotes', 'Quotations'], ['templates', 'Templates']] as const).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-colors ${tab === key ? 'bg-white shadow-sm' : ''}`}
-              style={{ color: tab === key ? 'var(--p-primary)' : 'var(--p-on-surface-variant)' }}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-3 mb-5">
+          <div className="flex items-center bg-black/[0.04] rounded-lg p-1 w-fit">
+            {([['quotes', 'Quotations'], ['templates', 'Templates']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-colors ${tab === key ? 'bg-white shadow-sm' : ''}`}
+                style={{ color: tab === key ? 'var(--p-primary)' : 'var(--p-on-surface-variant)' }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Sym name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+              <input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  syncParams(e.target.value, dateFilter);
+                }}
+                placeholder="Search name, phone, quote ID, date…"
+                className="pl-8 pr-3 py-1.5 rounded-lg text-[13px] w-64 sm:w-72 outline-none border"
+                style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
+              />
+            </div>
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => {
+                setDateFilter(e.target.value);
+                syncParams(query, e.target.value);
+              }}
+              title="Filter by date"
+              className="px-3 py-1.5 rounded-lg text-[13px] outline-none border"
+              style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface)' }}
+            />
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('');
+                  setDateFilter('');
+                  syncParams('', '');
+                }}
+                className="text-[12px] font-bold underline"
+                style={{ color: 'var(--p-primary)' }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
+
+        {hasFilters && shown.length > 0 && (
+          <p className="text-[12px] mb-3" style={{ color: 'var(--p-on-surface-variant)' }}>
+            {shown.length} result{shown.length !== 1 ? 's' : ''}
+            {term ? <> for “{query}”</> : null}
+            {dateFilter ? <> on {formatInquiryDate(dateFilter).replace(/,.*/, '')}</> : null}
+          </p>
+        )}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-20" style={{ color: 'var(--p-on-surface-variant)' }}>
@@ -286,25 +413,46 @@ export default function PortalAdminQuotations() {
           </div>
         ) : shown.length === 0 ? (
           <div className="border-2 border-dashed rounded-xl p-12 text-center" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>
-            <Sym name="request_quote" className="text-[40px]" />
-            <p className="mt-2 text-[15px] font-semibold">{tab === 'templates' ? 'No templates yet' : 'No quotations yet'}</p>
-            <p className="text-[13px]">
-              {tab === 'templates'
-                ? 'Open a quotation and choose "Save as template" to reuse it later.'
-                : 'Create one from an inquiry or start a blank quotation.'}
+            <Sym name={hasFilters ? 'search_off' : 'request_quote'} className="text-[40px]" />
+            <p className="mt-2 text-[15px] font-semibold">
+              {hasFilters
+                ? 'No matches'
+                : tab === 'templates'
+                  ? 'No templates yet'
+                  : 'No quotations yet'}
             </p>
-            {tab === 'quotes' && (
+            <p className="text-[13px]">
+              {hasFilters
+                ? 'Try another name, phone, quote ID, or date.'
+                : tab === 'templates'
+                  ? 'Open a quotation and choose "Save as template" to reuse it later.'
+                  : 'Create one from an inquiry or start a blank quotation.'}
+            </p>
+            {hasFilters ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('');
+                  setDateFilter('');
+                  syncParams('', '');
+                }}
+                className="mt-4 px-4 py-2 rounded-lg text-[13px] font-semibold border"
+                style={{ borderColor: 'var(--p-outline)' }}
+              >
+                Clear search
+              </button>
+            ) : tab === 'quotes' ? (
               <button onClick={() => setShowEntryChooser(true)} className="mt-4 px-4 py-2 rounded-lg text-[13px] font-semibold text-white inline-flex items-center gap-1.5" style={{ background: 'var(--p-primary)' }}>
                 <Sym name="add" className="text-[16px]" /> New quotation
               </button>
-            )}
+            ) : null}
           </div>
         ) : (
           <div className="border rounded-xl overflow-hidden overflow-x-auto" style={{ borderColor: 'var(--p-outline-variant)' }}>
-            <table className="w-full text-left border-collapse min-w-[720px]">
+            <table className="w-full text-left border-collapse min-w-[820px]">
               <thead>
                 <tr style={{ background: 'var(--p-surface-container-low)' }}>
-                  {[tab === 'templates' ? 'Template' : 'Quote', 'Title', 'Client', 'Amount', tab === 'templates' ? 'Updated' : 'Status', tab === 'templates' ? '' : 'Updated', ''].map((h, i) => (
+                  {[tab === 'templates' ? 'Template' : 'Quote', 'Title', 'Client', 'Amount', tab === 'templates' ? 'Updated' : 'Status', 'Created', ''].map((h, i) => (
                     <th key={i} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>{h}</th>
                   ))}
                 </tr>
@@ -319,28 +467,57 @@ export default function PortalAdminQuotations() {
                   >
                     <td className="px-4 py-3 font-semibold text-[13px]">{q.reference}</td>
                     <td className="px-4 py-3 text-[13px]">{q.title}</td>
-                    <td className="px-4 py-3 text-[13px]">{q.clientName || '—'}</td>
+                    <td className="px-4 py-3 text-[13px]">
+                      <div>{q.clientName || '—'}</div>
+                      {(q.clientPhone || q.clientEmail) && (
+                        <div className="text-[11px] mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>
+                          {[q.clientPhone, q.clientEmail].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-bold text-[13px]">{money(q.total, q.currency)}</td>
                     {tab === 'templates' ? (
                       <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{q.updatedAt ? formatInquiryDate(q.updatedAt) : '—'}</td>
                     ) : (
-                      <>
-                        <td className="px-4 py-3"><Pill label={q.status} /></td>
-                        <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{q.updatedAt ? formatInquiryDate(q.updatedAt) : '—'}</td>
-                      </>
+                      <td className="px-4 py-3"><Pill label={q.status} /></td>
                     )}
+                    <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{q.createdAt ? formatInquiryDate(q.createdAt) : '—'}</td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      {tab === 'templates' ? (
+                      <div className="inline-flex items-center gap-3">
+                        {tab === 'templates' ? (
+                          <button
+                            onClick={() => setTemplateModal(q)}
+                            className="text-[13px] font-bold"
+                            style={{ color: 'var(--p-primary)' }}
+                          >
+                            Use template
+                          </button>
+                        ) : (
+                          <span className="text-[13px] font-bold cursor-pointer" style={{ color: 'var(--p-primary)' }} onClick={() => navigate(`/portal-admin/quote-editor/${q.reference}`)}>Edit</span>
+                        )}
+                        {tab === 'quotes' && q.inquiryId == null && (
+                          <button
+                            type="button"
+                            title="Create a project for this quotation (e.g. a WhatsApp lead)"
+                            disabled={convertToProject.isPending}
+                            onClick={() => convertToProject.mutate(q.id)}
+                            className="text-[13px] font-bold disabled:opacity-50"
+                            style={{ color: 'var(--p-primary)' }}
+                          >
+                            {convertToProject.isPending && convertToProject.variables === q.id ? 'Creating…' : 'Convert to project'}
+                          </button>
+                        )}
                         <button
-                          onClick={() => setTemplateModal(q)}
-                          className="text-[13px] font-bold"
-                          style={{ color: 'var(--p-primary)' }}
+                          type="button"
+                          title={tab === 'templates' ? 'Delete template' : 'Delete quotation'}
+                          disabled={deleteQuote.isPending}
+                          onClick={() => confirmDelete(q)}
+                          className="text-[13px] font-bold disabled:opacity-50"
+                          style={{ color: '#b42318' }}
                         >
-                          Use template
+                          Delete
                         </button>
-                      ) : (
-                        <span className="text-[13px] font-bold cursor-pointer" style={{ color: 'var(--p-primary)' }} onClick={() => navigate(`/portal-admin/quote-editor/${q.reference}`)}>Edit</span>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}

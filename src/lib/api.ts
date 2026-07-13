@@ -812,10 +812,19 @@ export const manufacturingApi = {
       method: 'POST',
       body: JSON.stringify(opts ?? {}),
     }),
+  deleteQuote: (id: number) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/quotes/${id}`, {
+      method: 'DELETE',
+    }),
   sendQuote: (id: number, opts?: { message?: string; pdfBase64?: string }) =>
     fetchApi<ManufacturingQuoteDto>(`/api/admin/manufacturing/quotes/${id}/send`, {
       method: 'POST',
       body: JSON.stringify({ message: opts?.message, pdfBase64: opts?.pdfBase64 }),
+    }),
+  /** Convert a standalone quote (no linked inquiry — e.g. a WhatsApp lead) into a project. */
+  convertQuoteToProject: (id: number) =>
+    fetchApi<ManufacturingProjectDto>(`/api/admin/manufacturing/quotes/${id}/convert-to-project`, {
+      method: 'POST',
     }),
 };
 

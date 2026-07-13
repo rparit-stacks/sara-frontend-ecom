@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Sym } from '@/components/portal/Sym';
 import { Pill } from '@/components/portal/Pill';
 import QuoteViewerModal from '@/components/portal/QuoteViewerModal';
@@ -18,11 +19,27 @@ export default function AdminProjectQuotationPanel({
   projectCode: string;
 }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [viewQuoteId, setViewQuoteId] = useState<number | null>(null);
 
   const { data: quotes = [], isLoading } = useQuery({
     queryKey: ['admin-quotes'],
     queryFn: () => manufacturingApi.listQuotes(),
+  });
+
+  const deleteQuote = useMutation({
+    mutationFn: (id: number) => manufacturingApi.deleteQuote(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-project-financials', projectCode] });
+      queryClient.invalidateQueries({ queryKey: ['admin-project-shell', projectCode] });
+      queryClient.invalidateQueries({ queryKey: ['admin-project-messages', projectCode] });
+      queryClient.invalidateQueries({ queryKey: ['client-project-financials'] });
+      queryClient.invalidateQueries({ queryKey: ['client-project-shell'] });
+      queryClient.invalidateQueries({ queryKey: ['client-portal-aggregate'] });
+      toast.success('Quotation deleted — removed from this project');
+    },
+    onError: (e) => toast.error((e as Error).message || 'Failed to delete'),
   });
 
   const projectQuotes = useMemo(
@@ -48,6 +65,11 @@ export default function AdminProjectQuotationPanel({
     }
     return rows.sort((a, b) => (b.rev.savedAt || '').localeCompare(a.rev.savedAt || ''));
   }, [projectQuotes]);
+
+  const confirmDelete = (quoteId: number, quoteRef: string) => {
+    if (!window.confirm(`Delete quotation "${quoteRef}" permanently? It will also disappear from the client portal. This cannot be undone.`)) return;
+    deleteQuote.mutate(quoteId);
+  };
 
   return (
     <>
@@ -124,6 +146,17 @@ export default function AdminProjectQuotationPanel({
                     >
                       {row.latest ? 'Edit' : 'View & edit'}
                     </button>
+                    {row.latest && (
+                      <button
+                        type="button"
+                        disabled={deleteQuote.isPending}
+                        onClick={() => confirmDelete(row.quoteId, row.quoteRef)}
+                        className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border flex items-center gap-1 disabled:opacity-50"
+                        style={{ borderColor: '#fecdca', color: '#b42318' }}
+                      >
+                        <Sym name="delete" className="text-[16px]" /> Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

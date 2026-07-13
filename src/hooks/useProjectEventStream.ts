@@ -98,7 +98,11 @@ export function useProjectEventStream(
             if (eventName === 'error') return;
             if (eventName === 'design' || eventName === 'project') {
               void qc.invalidateQueries({ queryKey: [shellKey, projectCode] });
-              if (mode === 'client') void qc.invalidateQueries({ queryKey: ['client-projects'] });
+              void qc.invalidateQueries({ queryKey: [mode === 'admin' ? 'admin-project-financials' : 'client-project-financials', projectCode] });
+              if (mode === 'client') {
+                void qc.invalidateQueries({ queryKey: ['client-projects'] });
+                void qc.invalidateQueries({ queryKey: ['client-portal-aggregate'] });
+              }
             } else if (eventName === 'message') {
               let designId: number | undefined;
               if (data) {
