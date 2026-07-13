@@ -1,13 +1,10 @@
-import { normalizeQuoteDoc, type QuoteDoc, type ItemsBlock, type TextBlock } from './quoteDoc';
+import { normalizeQuoteDoc, type QuoteDoc, type ItemsBlock } from './quoteDoc';
 import { computeTotals } from './computeTotals';
 import type { ManufacturingInvoiceDto } from '@/lib/api';
 
 const CURRENCIES: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
 const money = (n: number, c = 'INR') =>
   `${CURRENCIES[c] ?? ''}${(isFinite(n) ? n : 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-/** Strip HTML to readable text for the notes/terms lines. */
-const stripHtml = (html: string) => html.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
 
 /**
  * A self-contained, printable, branded invoice document (single A4 page,
@@ -34,12 +31,6 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
     .flatMap((b) => (b as ItemsBlock).items || []);
 
   const totals = computeTotals(doc);
-
-  // First text block → notes/terms.
-  const notes = doc.pages.flatMap((p) => p.blocks)
-    .filter((b) => b.type === 'text' && !b.hidden)
-    .map((b) => ({ title: b.title, text: stripHtml((b as TextBlock).text || '') }))
-    .filter((n) => n.text);
 
   const addressLines = (branding.addressLines || []).filter(Boolean);
 
@@ -116,7 +107,7 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
           </table>
         </div>
 
-        {/* Breakdown */}
+        {/* Breakdown — this invoice's own line items only. */}
         <div className="mt-5 flex justify-end">
           <div className="w-72 text-[13px]">
             {items.length > 0 && (
@@ -124,18 +115,29 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
                 <Row label="Subtotal" value={money(totals.subtotal, cur)} />
                 {totals.discount > 0 && <Row label="Discount" value={`− ${money(totals.discount, cur)}`} />}
                 {totals.gstPercent > 0 && <Row label={`GST (${totals.gstPercent}%)`} value={money(totals.gstAmount, cur)} />}
-                <div className="flex items-center justify-between py-2 mt-1 border-t-2" style={{ borderColor: accent }}>
-                  <span className="font-bold text-[14px]">Invoice total</span>
-                  <span className="font-bold text-[15px] text-gray-800">{money(totals.grandTotal, cur)}</span>
-                </div>
               </>
             )}
-            <div className="flex items-center justify-between px-3 py-3 mt-2 rounded-lg" style={{ background: `${accent}12` }}>
-              <span className="font-bold text-[15px]" style={{ color: accent }}>{paid ? 'Amount paid' : 'Amount due'}</span>
+            <div className="flex items-center justify-between px-3 py-3 mt-3 rounded-lg" style={{ background: `${accent}12` }}>
+              <span className="font-bold text-[15px]" style={{ color: accent }}>{paid ? 'Amount paid' : 'Amount due (this invoice)'}</span>
               <span className="font-bold text-[22px]" style={{ color: accent }}>{money(invoice.amount, cur)}</span>
             </div>
           </div>
         </div>
+
+        {/* Quote context — only shown when this invoice is a partial/advance
+            against a larger quote, so "this invoice" is never confused with
+            the full project value. */}
+        {invoice.quoteTotal != null && invoice.quoteTotal > invoice.amount && (
+          <div className="mt-4 rounded-lg p-4 text-[13px]" style={{ background: '#faf7f1', border: '1px solid #eee' }}>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-2">Against quote {invoice.quoteReference}</p>
+            <Row label="Quote total" value={money(invoice.quoteTotal, cur)} />
+            <Row label="Paid till date" value={money(invoice.paidTillDate ?? 0, cur)} />
+            <div className="flex items-center justify-between py-1.5">
+              <span className="font-bold text-gray-700">Balance remaining</span>
+              <span className="font-bold text-gray-800">{money(Math.max(0, invoice.quoteTotal - (invoice.paidTillDate ?? 0)), cur)}</span>
+            </div>
+          </div>
+        )}
 
         {/* Payment meta */}
         <div className="mt-5 rounded-lg p-4 text-[12px] grid grid-cols-2 gap-y-1.5 gap-x-6" style={{ background: '#faf7f1' }}>
@@ -146,22 +148,25 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
           {invoice.quoteReference && <Meta label="Quotation" value={invoice.quoteReference} />}
         </div>
 
-        {/* Notes / terms */}
-        {notes.length > 0 && (
-          <div className="mt-6 space-y-3">
-            {notes.map((n, i) => (
-              <div key={i}>
-                {n.title && <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: accent }}>{n.title}</p>}
-                <p className="text-[12px] text-gray-600 whitespace-pre-line leading-relaxed">{n.text}</p>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Terms — generic invoice terms, independent of the quote's own
+            Introduction/Terms text (which is quotation-specific copy and
+            doesn't belong on the invoice/receipt). */}
+        <div className="mt-6">
+          <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: accent }}>Terms</p>
+          <ul className="mt-1.5 space-y-1 text-[11px] text-gray-500 leading-relaxed list-disc pl-4">
+            <li>This is a computer-generated invoice and does not require a signature.</li>
+            <li>{paid ? 'Payment received is non-refundable except as agreed in writing.' : 'Payment is due upon receipt of this invoice.'}</li>
+            {branding.gstin && <li>GST is charged as applicable under Indian tax law.</li>}
+            <li>For any billing queries, please contact us using the details below.</li>
+          </ul>
+        </div>
 
-        {/* Footer */}
+        {/* Footer — always invoice-appropriate copy, never the quote doc's own
+            footerText (which defaults to "This quotation is confidential" and
+            would be wrong/confusing on an invoice/receipt). */}
         <div className="mt-auto pt-8 text-center">
           <p className="text-[11px] text-gray-400 border-t pt-3" style={{ borderColor: '#eee' }}>
-            {doc.footerText || `Thank you for choosing ${branding.name || 'Studio Sara'}.`}
+            Thank you for choosing {branding.name || 'Studio Sara'}.
           </p>
           {(branding.email || branding.phone) && (
             <p className="text-[10px] text-gray-400 mt-1">

@@ -2059,6 +2059,10 @@ export interface ManufacturingInvoiceDto {
   pdfUrl?: string;
   createdAt?: string;
   updatedAt?: string;
+  /** Full value of the quote this invoice was raised against (advance/balance context). */
+  quoteTotal?: number;
+  /** Sum of all PAID invoices against the same quote, including this one. */
+  paidTillDate?: number;
 }
 
 export const invoiceApi = {
