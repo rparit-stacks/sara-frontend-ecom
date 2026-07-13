@@ -14,8 +14,12 @@ export function useClientPortalAggregate() {
   const aggregateQuery = useQuery({
     queryKey: ['client-portal-aggregate'],
     queryFn: loadClientPortalAggregate,
-    staleTime: 60_000,
+    // Short-poll so a new invoice/quote/payment from the admin shows up on the
+    // dashboard within ~30s without the user needing to refocus or reload.
+    staleTime: 20_000,
     gcTime: 5 * 60_000,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 
   const data = aggregateQuery.data;

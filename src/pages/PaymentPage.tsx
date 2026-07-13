@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { paymentApi, paymentLinkApi, type ResolvedPayTarget } from '@/lib/api';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { paymentApi, paymentLinkApi, mediaApi, type ResolvedPayTarget, type ManufacturingInvoiceDto } from '@/lib/api';
+import InvoiceDocument from '@/components/quote/InvoiceDocument';
 
 const ACCENT = '#00676a';
 const ACCENT_DARK = '#6f351a';
@@ -47,6 +50,45 @@ export default function PaymentPage() {
   const [phase, setPhase] = useState<Phase>('form');
   const [failMsg, setFailMsg] = useState('');
   const [txnId, setTxnId] = useState('');
+  // Off-screen invoice used to re-render a PAID-stamped PDF right after payment.
+  const [pdfInvoice, setPdfInvoice] = useState<ManufacturingInvoiceDto | null>(null);
+  const pdfRenderRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * After a successful payment, re-render the invoice document (now PAID, with
+   * a paid-on date) and upload it so the payment-received email/WhatsApp — and
+   * the invoice's saved pdfUrl — carry the updated PDF, not the old pending one.
+   * Best-effort: a failure here doesn't affect the payment itself, which has
+   * already gone through.
+   */
+  const regenerateAndUploadPaidPdf = async (linkCode: string, paymentId: string) => {
+    try {
+      const invoice = await paymentLinkApi.getPaidInvoice(linkCode);
+      setPdfInvoice(invoice);
+      await new Promise((r) => setTimeout(r, 450)); // let it mount + images load
+      const root = pdfRenderRef.current;
+      const nodes = root ? Array.from(root.querySelectorAll<HTMLElement>('.quote-page')) : [];
+      if (!nodes.length) return;
+      const pdf = new jsPDF('p', 'pt', 'a4');
+      const pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight();
+      for (let i = 0; i < nodes.length; i++) {
+        const canvas = await html2canvas(nodes[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+        const img = canvas.toDataURL('image/jpeg', 0.96);
+        let w = pw, h = (canvas.height * pw) / canvas.width;
+        if (h > ph) { h = ph; w = (canvas.width * ph) / canvas.height; }
+        if (i > 0) pdf.addPage();
+        pdf.addImage(img, 'JPEG', (pw - w) / 2, 0, w, h);
+      }
+      const blob = pdf.output('blob');
+      const file = new File([blob], `${invoice.reference}-paid.pdf`, { type: 'application/pdf' });
+      const url = await mediaApi.upload(file, 'invoices');
+      await paymentLinkApi.savePaidPdf(linkCode, url);
+    } catch (e) {
+      console.error('Paid-PDF regeneration failed:', e);
+    } finally {
+      setPdfInvoice(null);
+    }
+  };
 
   useEffect(() => {
     if (!target) return;
@@ -108,8 +150,11 @@ export default function PaymentPage() {
                 razorpay_signature: resp.razorpay_signature,
               },
             });
-            if (v.status === 'SUCCESS') { setTxnId(resp.razorpay_payment_id); setPhase('success'); }
-            else { setFailMsg(v.message || 'We could not verify your payment.'); setPhase('failed'); }
+            if (v.status === 'SUCCESS') {
+              setTxnId(resp.razorpay_payment_id);
+              setPhase('success');
+              if (code) regenerateAndUploadPaidPdf(code, resp.razorpay_payment_id);
+            } else { setFailMsg(v.message || 'We could not verify your payment.'); setPhase('failed'); }
           } catch (e) { setFailMsg((e as Error).message || 'Verification failed.'); setPhase('failed'); }
         },
         modal: { ondismiss: () => { setPhase('form'); toast.info('Payment cancelled'); } },
@@ -151,6 +196,8 @@ export default function PaymentPage() {
         </div>
       ) : error ? (
         <ErrorCard message={(error as Error).message || 'This payment link is invalid or inactive.'} onRetry={() => refetch()} contact={undefined} />
+      ) : target?.alreadyPaid ? (
+        <AlreadyPaidCard target={target} />
       ) : phase === 'success' ? (
         <SuccessCard amount={numericAmount} currency={currency} txnId={txnId} email={email} target={target!} />
       ) : phase === 'failed' ? (
@@ -202,6 +249,13 @@ export default function PaymentPage() {
       <p className="text-center text-[11px] text-[#a99f8c] mt-8">© {new Date().getFullYear()} Studio Sara · All rights reserved</p>
 
       {phase === 'processing' && <ProcessingOverlay />}
+
+      {/* Off-screen invoice render used to capture the post-payment PAID PDF */}
+      {pdfInvoice && (
+        <div style={{ position: 'fixed', left: -10000, top: 0, pointerEvents: 'none' }} aria-hidden>
+          <div ref={pdfRenderRef}><InvoiceDocument invoice={pdfInvoice} txnId={txnId} /></div>
+        </div>
+      )}
     </div>
   );
 }
@@ -390,6 +444,37 @@ function FailedCard({ message, onRetry, contact }: { message: string; onRetry: (
           <i className="fa-solid fa-rotate-right text-[13px]" /> Retry payment
         </button>
         {contact?.email && <a href={`mailto:${contact.email}`} className="inline-block mt-3 text-[12px] text-[#8a7f6d] hover:text-[#00676a]">Still stuck? Contact support</a>}
+      </div>
+    </div>
+  );
+}
+
+function AlreadyPaidCard({ target }: { target: ResolvedPayTarget }) {
+  return (
+    <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl border border-[#e6ddcd] overflow-hidden pp-fade">
+      <div className="p-8 text-center">
+        <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center" style={{ background: '#e7f3e7' }}>
+          <i className="fa-solid fa-check text-[30px]" style={{ color: '#2e7d32' }} />
+        </div>
+        <h2 className="text-[20px] font-bold text-[#2b2620] mt-4">Already paid</h2>
+        <p className="text-[13px] text-[#6b6357] mt-1">This invoice has already been paid — nothing more to do here.</p>
+        {target.amount != null && (
+          <div className="text-[34px] font-bold mt-4" style={{ color: ACCENT }}>{money(target.amount, target.currency || 'INR')}</div>
+        )}
+        <div className="mt-5 rounded-xl p-4 text-left text-[13px] space-y-1.5" style={{ background: '#faf7f1' }}>
+          {target.invoiceReference && <Row label="Invoice" value={target.invoiceReference} />}
+          {target.quoteReference && <Row label="Quotation" value={target.quoteReference} />}
+          {target.transactionId && <Row label="Transaction ID" value={target.transactionId} />}
+          {target.paidAt && <Row label="Paid on" value={new Date(target.paidAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} />}
+        </div>
+        {target.pdfUrl && (
+          <a href={target.pdfUrl} target="_blank" rel="noreferrer" className="inline-block mt-4 text-[13px] font-semibold" style={{ color: ACCENT }}>
+            Download invoice
+          </a>
+        )}
+      </div>
+      <div className="px-6 py-4 border-t border-[#efe8db] text-center">
+        <TrustRow />
       </div>
     </div>
   );

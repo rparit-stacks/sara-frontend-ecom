@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import PortalShell from '@/components/portal/PortalShell';
@@ -52,11 +52,22 @@ function MessageAvatar({ type }: { type: string }) {
   );
 }
 
+const WORKSPACE_VIEWS: WorkspaceView[] = ['channels', 'threads', 'quotation', 'brief', 'invoices', 'files'];
+
 export default function ClientProjectDetail() {
   const { code } = useParams();
   const qc = useQueryClient();
   const feedRef = useRef<HTMLDivElement>(null);
-  const [view, setView] = useState<WorkspaceView>('channels');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const view: WorkspaceView = (WORKSPACE_VIEWS as string[]).includes(tabParam || '') ? (tabParam as WorkspaceView) : 'channels';
+  const setView = useCallback((v: WorkspaceView) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (v === 'channels') next.delete('tab'); else next.set('tab', v);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
   const [activeDesignId, setActiveDesignId] = useState<number | undefined>();
   const [openThreadId, setOpenThreadId] = useState<number | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);

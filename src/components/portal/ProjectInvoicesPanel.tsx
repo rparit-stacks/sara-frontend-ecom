@@ -83,9 +83,21 @@ export default function ProjectInvoicesPanel({ project, clientMode }: { project:
                     </button>
                   )}
                   {clientMode && inv.status?.toUpperCase() === 'PENDING' && (
-                    <span className="text-[12px] font-semibold" style={{ color: 'var(--p-on-surface-variant)' }}>
-                      Pay via link in Announcements
-                    </span>
+                    inv.paymentLinkCode ? (
+                      <a
+                        href={`/pay/${encodeURIComponent(inv.paymentLinkCode)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white flex items-center gap-1.5"
+                        style={{ background: 'var(--p-primary)' }}
+                      >
+                        <Sym name="payments" className="text-[16px]" /> Pay now
+                      </a>
+                    ) : (
+                      <span className="text-[12px] font-semibold" style={{ color: 'var(--p-on-surface-variant)' }}>
+                        Payment link not available yet
+                      </span>
+                    )
                   )}
                 </div>
               );

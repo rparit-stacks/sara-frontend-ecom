@@ -152,6 +152,7 @@ function buildFromAggregate(data: PortalAggregateDto): {
   }));
 
   const activities: PortalActivityItem[] = [];
+  const readIds = new Set(data.readActivityIds || []);
 
   threads.forEach((t) => {
     if (!t.unread) return;
@@ -165,7 +166,7 @@ function buildFromAggregate(data: PortalAggregateDto): {
       time: relTime(t.lastReplyAt || t.createdAt),
       sortAt: new Date(t.lastReplyAt || t.createdAt || 0).getTime(),
       unread: true,
-      to: `/portal/projects/${encodeURIComponent(t.projectCode)}`,
+      to: `/portal/projects/${encodeURIComponent(t.projectCode)}?tab=threads`,
     });
   });
 
@@ -182,8 +183,8 @@ function buildFromAggregate(data: PortalAggregateDto): {
       projectTitle: q.projectTitle,
       time: relTime(project?.updatedAt),
       sortAt: new Date(project?.updatedAt || 0).getTime(),
-      unread: st.includes('AWAITING'),
-      to: `/portal/projects/${encodeURIComponent(q.projectCode)}`,
+      unread: st.includes('AWAITING') && !readIds.has(`quote-${q.id}`),
+      to: `/portal/projects/${encodeURIComponent(q.projectCode)}?tab=quotation`,
     });
   });
 
@@ -199,8 +200,8 @@ function buildFromAggregate(data: PortalAggregateDto): {
       projectTitle: inv.projectTitle,
       time: relTime(project?.updatedAt),
       sortAt: new Date(project?.updatedAt || 0).getTime(),
-      unread: true,
-      to: `/portal/projects/${encodeURIComponent(inv.projectCode)}`,
+      unread: !readIds.has(`inv-${inv.id}`),
+      to: `/portal/projects/${encodeURIComponent(inv.projectCode)}?tab=invoices`,
     });
   });
 
@@ -214,8 +215,24 @@ function buildFromAggregate(data: PortalAggregateDto): {
       projectTitle: f.projectTitle,
       time: relTime(f.createdAt),
       sortAt: new Date(f.createdAt || 0).getTime(),
-      unread: false,
-      to: `/portal/projects/${encodeURIComponent(f.projectCode)}`,
+      unread: !readIds.has(f.id),
+      to: `/portal/projects/${encodeURIComponent(f.projectCode)}?tab=files`,
+    });
+  });
+
+  (data.payments || []).forEach((pay) => {
+    const id = `payment-${pay.invoiceId}`;
+    activities.push({
+      id,
+      tone: 'payment',
+      title: 'Payment received',
+      body: `${pay.reference} — thank you!`,
+      projectCode: pay.projectCode,
+      projectTitle: pay.projectTitle,
+      time: relTime(pay.paidAt),
+      sortAt: new Date(pay.paidAt || 0).getTime(),
+      unread: !readIds.has(id),
+      to: `/portal/projects/${encodeURIComponent(pay.projectCode)}?tab=invoices`,
     });
   });
 

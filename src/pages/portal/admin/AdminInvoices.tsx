@@ -55,7 +55,10 @@ export default function PortalAdminInvoices() {
   }, [shown]);
 
   // Build a PDF from the off-screen InvoiceDocument for the given invoice.
-  const renderInvoicePdfBase64 = async (inv: ManufacturingInvoiceDto): Promise<string | undefined> => {
+  // Returns both a data-URI (for the email attachment) and a Blob (to upload
+  // and save as invoice.pdfUrl) so payment-success receipts always have a PDF
+  // to reference, not just the manually-triggered "View / PDF" flow.
+  const renderInvoicePdf = async (inv: ManufacturingInvoiceDto): Promise<{ dataUri: string; blob: Blob } | undefined> => {
     setPdfInvoice(inv);
     await new Promise((r) => setTimeout(r, 450)); // let it mount + images load
     try {
@@ -72,13 +75,15 @@ export default function PortalAdminInvoices() {
         if (i > 0) pdf.addPage();
         pdf.addImage(img, 'JPEG', (pw - w) / 2, 0, w, h);
       }
-      return pdf.output('datauristring');
+      return { dataUri: pdf.output('datauristring'), blob: pdf.output('blob') };
     } finally {
       setPdfInvoice(null);
     }
   };
 
-  // Create invoice, then generate its PDF and email it with the PDF attached.
+  // Create invoice, then generate its PDF, save it (pdfUrl) and email it with
+  // the PDF attached. PDF generation is mandatory on send — without a saved
+  // pdfUrl, the payment-received receipt has nothing to attach later.
   const createAndSend = async (d: { quoteId: number; title?: string; amount: number; send?: boolean }) => {
     setCreating(true);
     try {
@@ -88,10 +93,17 @@ export default function PortalAdminInvoices() {
       setOpen(false);
       if (d.send && inv.clientEmail) {
         toast.info('Generating invoice PDF…');
-        let pdfBase64: string | undefined;
-        try { pdfBase64 = await renderInvoicePdfBase64(inv); } catch { /* send without attach */ }
-        await invoiceApi.send(inv.id, pdfBase64);
-        toast.success(pdfBase64 ? `Invoice ${inv.reference} sent with PDF` : `Invoice ${inv.reference} emailed`);
+        const pdf = await renderInvoicePdf(inv);
+        if (!pdf) {
+          toast.error('Could not generate the invoice PDF — invoice created but not sent. Open it from the list and try "Generate & save PDF", then send.');
+          return;
+        }
+        const file = new File([pdf.blob], `${inv.reference}.pdf`, { type: 'application/pdf' });
+        const url = await mediaApi.upload(file, 'invoices');
+        await invoiceApi.savePdf(inv.id, url);
+        await invoiceApi.send(inv.id, pdf.dataUri);
+        qc.invalidateQueries({ queryKey: ['admin-invoices'] });
+        toast.success(`Invoice ${inv.reference} sent with PDF`);
       } else {
         toast.success(`Invoice ${inv.reference} created`);
       }

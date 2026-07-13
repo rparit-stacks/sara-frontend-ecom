@@ -1727,6 +1727,11 @@ export interface ResolvedPayTarget {
   gstPercent?: number;
   gstAmount?: number;
   contact?: PayContact;
+  alreadyPaid?: boolean;
+  invoiceReference?: string;
+  paidAt?: string;
+  transactionId?: string;
+  pdfUrl?: string;
 }
 
 // ===============================
@@ -1817,6 +1822,7 @@ export interface ManufacturingProjectDetailDto extends ManufacturingProjectDto {
     amount?: number;
     currency?: string;
     status: string;
+    paymentLinkCode?: string;
   }[];
 }
 
@@ -1924,6 +1930,11 @@ export const projectApi = {
 export const clientProjectApi = {
   list: () => fetchApi<ManufacturingProjectDto[]>('/api/portal/projects'),
   aggregate: () => fetchApi<PortalAggregateDto>('/api/portal/projects/aggregate'),
+  markActivityRead: (activityId: string) =>
+    fetchApi<{ ok: boolean }>(`/api/portal/projects/activity/${encodeURIComponent(activityId)}/read`, {
+      method: 'POST',
+    }),
+  paymentHistory: () => fetchApi<PaymentLinkPaymentDto[]>('/api/portal/projects/payment-history'),
   getByCode: (code: string, designId?: number, opts?: { includeMessages?: boolean; includeFinancials?: boolean }) => {
     const p = new URLSearchParams();
     if (designId != null) p.set('designId', String(designId));
@@ -2019,6 +2030,16 @@ export interface PortalAggregateDto {
     currency?: string;
     status: string;
   }[];
+  payments: {
+    invoiceId: number;
+    projectCode: string;
+    projectTitle: string;
+    reference: string;
+    amount?: number;
+    currency?: string;
+    paidAt?: string;
+  }[];
+  readActivityIds: string[];
 }
 
 export interface ManufacturingInvoiceDto {
@@ -2110,6 +2131,11 @@ export const paymentLinkApi = {
     '/api/pay/create-order', { method: 'POST', body: JSON.stringify(data) }),
   verify: (data: any) => fetchApi<{ status: string; paymentId?: string; message?: string }>(
     '/api/pay/verify', { method: 'POST', body: JSON.stringify(data) }),
+  /** Full invoice data for a link — only resolves once that invoice is PAID. */
+  getPaidInvoice: (code: string) => fetchApi<ManufacturingInvoiceDto>(`/api/pay/${encodeURIComponent(code)}/paid-invoice`),
+  /** Upload a freshly-rendered PAID-stamped PDF right after payment; triggers the receipt email/WhatsApp. */
+  savePaidPdf: (code: string, pdfUrl: string) =>
+    fetchApi<{ ok: boolean }>(`/api/pay/${encodeURIComponent(code)}/paid-pdf`, { method: 'POST', body: JSON.stringify({ pdfUrl }) }),
 
   // admin
   list: () => fetchApi<PaymentLinkDto[]>('/api/admin/payment-links'),

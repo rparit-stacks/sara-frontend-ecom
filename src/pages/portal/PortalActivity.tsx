@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import PortalShell from '@/components/portal/PortalShell';
 import PortalEmptyInquiry from '@/components/portal/PortalEmptyInquiry';
 import { Sym } from '@/components/portal/Sym';
 import { useClientPortalAggregate } from '@/hooks/useClientPortalAggregate';
 import type { ActivityTone } from '@/lib/clientPortalAggregate';
+import { clientProjectApi } from '@/lib/api';
 
 const TONE: Record<ActivityTone, { icon: string; bg: string; fg: string }> = {
   approval: { icon: 'priority_high', bg: 'var(--p-error-container)', fg: 'var(--p-on-error-container)' },
@@ -18,13 +20,16 @@ const FILTERS = ['All', 'Approvals', 'Messages', 'Updates'] as const;
 
 export default function PortalActivity() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [filter, setFilter] = useState<typeof FILTERS[number]>('All');
   const { projects, activities, isLoading } = useClientPortalAggregate();
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  // Optimistic overlay so a click reads instantly; the real source of truth is
+  // the persisted `readActivityIds` baked into `activities` by the aggregate query.
+  const [optimisticRead, setOptimisticRead] = useState<Set<string>>(new Set());
 
   const alerts = useMemo(
-    () => activities.map((a) => ({ ...a, unread: a.unread && !readIds.has(a.id) })),
-    [activities, readIds],
+    () => activities.map((a) => ({ ...a, unread: a.unread && !optimisticRead.has(a.id) })),
+    [activities, optimisticRead],
   );
 
   const shown = alerts.filter((a) => {
@@ -34,7 +39,19 @@ export default function PortalActivity() {
     return a.tone === 'stage' || a.tone === 'file';
   });
 
-  const markAllRead = () => setReadIds(new Set(alerts.map((a) => a.id)));
+  const markRead = (id: string) => {
+    setOptimisticRead((s) => new Set(s).add(id));
+    clientProjectApi.markActivityRead(id)
+      .then(() => qc.invalidateQueries({ queryKey: ['client-portal-aggregate'] }))
+      .catch(() => {});
+  };
+
+  const markAllRead = () => {
+    const ids = alerts.filter((a) => a.unread).map((a) => a.id);
+    setOptimisticRead((s) => new Set([...s, ...ids]));
+    Promise.all(ids.map((id) => clientProjectApi.markActivityRead(id).catch(() => {})))
+      .then(() => qc.invalidateQueries({ queryKey: ['client-portal-aggregate'] }));
+  };
 
   return (
     <PortalShell active="activity">
@@ -88,7 +105,7 @@ export default function PortalActivity() {
                   return (
                     <button
                       key={a.id}
-                      onClick={() => { setReadIds((s) => new Set(s).add(a.id)); navigate(a.to); }}
+                      onClick={() => { markRead(a.id); navigate(a.to); }}
                       className="w-full text-left border rounded-xl p-4 flex items-start gap-4 transition-all hover:shadow-sm"
                       style={{ background: a.unread ? 'var(--p-surface-container-low)' : 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
                     >

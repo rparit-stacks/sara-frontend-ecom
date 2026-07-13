@@ -24,6 +24,9 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
   const dateStr = invoice.createdAt
     ? new Date(invoice.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
     : '';
+  const paidAtStr = paid && invoice.updatedAt
+    ? new Date(invoice.updatedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '';
 
   // Line items across all pages.
   const items = doc.pages.flatMap((p) => p.blocks)
@@ -122,7 +125,7 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
                 {totals.discount > 0 && <Row label="Discount" value={`− ${money(totals.discount, cur)}`} />}
                 {totals.gstPercent > 0 && <Row label={`GST (${totals.gstPercent}%)`} value={money(totals.gstAmount, cur)} />}
                 <div className="flex items-center justify-between py-2 mt-1 border-t-2" style={{ borderColor: accent }}>
-                  <span className="font-bold text-[14px]">Quote total</span>
+                  <span className="font-bold text-[14px]">Invoice total</span>
                   <span className="font-bold text-[15px] text-gray-800">{money(totals.grandTotal, cur)}</span>
                 </div>
               </>
@@ -138,6 +141,7 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
         <div className="mt-5 rounded-lg p-4 text-[12px] grid grid-cols-2 gap-y-1.5 gap-x-6" style={{ background: '#faf7f1' }}>
           <Meta label="Payment status" value={paid ? 'Paid' : 'Pending'} />
           <Meta label="Payment method" value={paid ? 'Razorpay' : '—'} />
+          {paidAtStr && <Meta label="Paid on" value={paidAtStr} />}
           {txnId && <Meta label="Transaction ID" value={txnId} />}
           {invoice.quoteReference && <Meta label="Quotation" value={invoice.quoteReference} />}
         </div>

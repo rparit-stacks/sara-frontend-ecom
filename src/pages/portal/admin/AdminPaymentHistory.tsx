@@ -68,7 +68,7 @@ export default function PortalAdminPaymentHistory() {
             <table className="w-full text-left">
               <thead>
                 <tr style={{ background: 'var(--p-surface-container-low)' }}>
-                  {['Payer', 'Reference', 'Amount', 'Gateway', 'Status', 'Paid at'].map((h) => (
+                  {['Customer', 'Project', 'Invoice', 'Amount', 'Gateway', 'Status', 'Paid at', 'Transaction ref'].map((h) => (
                     <th key={h} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>{h}</th>
                   ))}
                 </tr>
@@ -76,14 +76,15 @@ export default function PortalAdminPaymentHistory() {
               <tbody>
                 {shown.map((p: PaymentLinkPaymentDto, i) => {
                   const status = STATUS_STYLE[p.status] ?? STATUS_STYLE.PENDING;
-                  const ref = p.quoteReference || p.invoiceReference || p.linkCode || p.projectCode || '—';
+                  const invoiceRef = p.invoiceReference || p.quoteReference || '—';
                   return (
                     <tr key={p.id} style={{ borderTop: i ? '1px solid var(--p-outline-variant)' : undefined }}>
                       <td className="px-4 py-3 text-[13px] font-semibold">
                         {p.payerName || '—'}
                         {p.payerEmail && <span className="text-[11px] font-normal text-gray-400"> · {p.payerEmail}</span>}
                       </td>
-                      <td className="px-4 py-3 text-[12px] font-mono">{ref}</td>
+                      <td className="px-4 py-3 text-[12px] font-mono">{p.projectCode || '—'}</td>
+                      <td className="px-4 py-3 text-[12px] font-mono">{invoiceRef}</td>
                       <td className="px-4 py-3 text-[13px] font-medium">{money(p.amount, p.currency)}</td>
                       <td className="px-4 py-3 text-[12px]">{p.gateway || '—'}</td>
                       <td className="px-4 py-3">
@@ -93,6 +94,9 @@ export default function PortalAdminPaymentHistory() {
                       </td>
                       <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>
                         {formatDate(p.paidAt || p.createdAt)}
+                      </td>
+                      <td className="px-4 py-3 text-[12px] font-mono" style={{ color: 'var(--p-on-surface-variant)' }}>
+                        {p.linkCode || '—'}
                       </td>
                     </tr>
                   );

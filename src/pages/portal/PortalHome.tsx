@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import PortalShell from '@/components/portal/PortalShell';
 import PortalEmptyInquiry from '@/components/portal/PortalEmptyInquiry';
 import { Sym } from '@/components/portal/Sym';
 import { STAGES, stageDef, statusLabelFor, type StageKey } from '@/components/manufacturing/stages';
-import { getUserEmailFromToken } from '@/lib/api';
+import { getUserEmailFromToken, clientProjectApi } from '@/lib/api';
 import { useClientPortalAggregate } from '@/hooks/useClientPortalAggregate';
 import type { ActivityTone } from '@/lib/clientPortalAggregate';
 
@@ -113,6 +114,12 @@ function QuickAction({ icon, label, desc, onClick }: { icon: string; label: stri
 
 export default function PortalHome() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const markActivityRead = (id: string) => {
+    clientProjectApi.markActivityRead(id)
+      .then(() => qc.invalidateQueries({ queryKey: ['client-portal-aggregate'] }))
+      .catch(() => {});
+  };
   const [search, setSearch] = useState('');
   const email = getUserEmailFromToken();
   const displayName = email?.split('@')[0].replace(/[._]/g, ' ') || 'there';
@@ -243,11 +250,12 @@ export default function PortalHome() {
                   <h3 className="text-[13px] font-bold uppercase tracking-wider mb-3 opacity-60" style={{ color: 'var(--p-on-surface-variant)' }}>
                     Quick actions
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                     <QuickAction icon="add_circle" label="New inquiry" desc="Start a manufacturing project" onClick={() => navigate('/inquiry')} />
                     <QuickAction icon="notifications" label="Activity" desc="Updates across all projects" onClick={() => navigate('/portal/activity')} />
                     <QuickAction icon="folder" label="All files" desc={`${files.length} shared attachment${files.length === 1 ? '' : 's'}`} onClick={() => navigate('/portal/files')} />
                     <QuickAction icon="payments" label="Invoices" desc="Payments & billing" onClick={() => navigate('/portal/invoices')} />
+                    <QuickAction icon="history" label="Payment history" desc="All past payments" onClick={() => navigate('/portal/payment-history')} />
                   </div>
                 </section>
 
@@ -272,7 +280,7 @@ export default function PortalHome() {
                               <button
                                 key={a.id}
                                 type="button"
-                                onClick={() => navigate(a.to)}
+                                onClick={() => { markActivityRead(a.id); navigate(a.to); }}
                                 className="w-full flex items-start gap-3 px-5 py-3 text-left hover:bg-black/[0.02] transition-colors"
                               >
                                 <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: t.bg, color: t.fg }}>
@@ -397,7 +405,7 @@ export default function PortalHome() {
                               <button
                                 key={a.id}
                                 type="button"
-                                onClick={() => navigate(a.to)}
+                                onClick={() => { markActivityRead(a.id); navigate(a.to); }}
                                 className="w-full flex items-start gap-3 px-5 py-3 text-left hover:bg-black/[0.02]"
                               >
                                 <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: t.bg, color: t.fg }}>

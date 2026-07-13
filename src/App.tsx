@@ -78,6 +78,7 @@ import PortalProfile from "./pages/portal/PortalProfile";
 import PortalSettings from "./pages/portal/PortalSettings";
 import PortalThreads from "./pages/portal/PortalThreads";
 import PortalInvoices from "./pages/portal/PortalInvoices";
+import PortalPaymentHistory from "./pages/portal/PortalPaymentHistory";
 import PortalAdminDashboard from "./pages/portal/admin/AdminDashboard";
 import PortalAdminProjects from "./pages/portal/admin/AdminProjects";
 import PortalAdminProjectDetail from "./pages/portal/admin/AdminProjectDetail";
@@ -172,6 +173,7 @@ const App = () =>
           <Route path="/portal/moodboards" element={<PortalGuard><Navigate to="/portal" replace /></PortalGuard>} />
           <Route path="/portal/pins" element={<PortalGuard><Navigate to="/portal" replace /></PortalGuard>} />
           <Route path="/portal/invoices" element={<PortalGuard><PortalInvoices /></PortalGuard>} />
+          <Route path="/portal/payment-history" element={<PortalGuard><PortalPaymentHistory /></PortalGuard>} />
 
           {/* Manufacturing Portal — ADMIN side (guarded by existing store-admin auth) */}
           <Route path="/portal-admin" element={<ProtectedAdminRoute><PortalAdminDashboard /></ProtectedAdminRoute>} />
