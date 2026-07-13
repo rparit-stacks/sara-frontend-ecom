@@ -251,6 +251,7 @@ export default function PortalAdminQuotations() {
   const [showEntryChooser, setShowEntryChooser] = useState(false);
   const [query, setQuery] = useState(params.get('q') ?? '');
   const [dateFilter, setDateFilter] = useState(params.get('date') ?? '');
+  const [menu, setMenu] = useState<number | null>(null);
 
   const { data: quotes = [], isLoading: loadingQuotes } = useQuery({
     queryKey: ['admin-quotes', 'quotes'],
@@ -483,40 +484,65 @@ export default function PortalAdminQuotations() {
                     )}
                     <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{q.createdAt ? formatInquiryDate(q.createdAt) : '—'}</td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="inline-flex items-center gap-3">
+                      <div className="inline-flex items-center gap-1">
                         {tab === 'templates' ? (
                           <button
                             onClick={() => setTemplateModal(q)}
-                            className="text-[13px] font-bold"
+                            className="text-[13px] font-bold px-2 py-1"
                             style={{ color: 'var(--p-primary)' }}
                           >
                             Use template
                           </button>
                         ) : (
-                          <span className="text-[13px] font-bold cursor-pointer" style={{ color: 'var(--p-primary)' }} onClick={() => navigate(`/portal-admin/quote-editor/${q.reference}`)}>Edit</span>
-                        )}
-                        {tab === 'quotes' && q.inquiryId == null && (
                           <button
-                            type="button"
-                            title="Create a project for this quotation (e.g. a WhatsApp lead)"
-                            disabled={convertToProject.isPending}
-                            onClick={() => convertToProject.mutate(q.id)}
-                            className="text-[13px] font-bold disabled:opacity-50"
+                            onClick={() => navigate(`/portal-admin/quote-editor/${q.reference}`)}
+                            className="text-[13px] font-bold px-2 py-1"
                             style={{ color: 'var(--p-primary)' }}
                           >
-                            {convertToProject.isPending && convertToProject.variables === q.id ? 'Creating…' : 'Convert to project'}
+                            Edit
                           </button>
                         )}
-                        <button
-                          type="button"
-                          title={tab === 'templates' ? 'Delete template' : 'Delete quotation'}
-                          disabled={deleteQuote.isPending}
-                          onClick={() => confirmDelete(q)}
-                          className="text-[13px] font-bold disabled:opacity-50"
-                          style={{ color: '#b42318' }}
-                        >
-                          Delete
-                        </button>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setMenu(menu === q.id ? null : q.id)}
+                            className="p-1.5 rounded hover:bg-black/5"
+                          >
+                            <Sym name="more_vert" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+                          </button>
+                          {menu === q.id && (
+                            <>
+                              <div className="fixed inset-0 z-10" onClick={() => setMenu(null)} />
+                              <div
+                                className="absolute right-0 top-9 w-52 border rounded-lg py-1 z-20 shadow-lg"
+                                style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
+                              >
+                                {tab === 'quotes' && q.inquiryId == null && (
+                                  <button
+                                    type="button"
+                                    disabled={convertToProject.isPending}
+                                    onClick={() => { setMenu(null); convertToProject.mutate(q.id); }}
+                                    className="w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 hover:bg-black/5 disabled:opacity-50"
+                                    style={{ color: 'var(--p-on-surface)' }}
+                                  >
+                                    <Sym name="folder_open" className="text-[16px]" />
+                                    {convertToProject.isPending && convertToProject.variables === q.id ? 'Creating…' : 'Convert to project'}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  disabled={deleteQuote.isPending}
+                                  onClick={() => { setMenu(null); confirmDelete(q); }}
+                                  className="w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 hover:bg-black/5 disabled:opacity-50"
+                                  style={{ color: '#b42318' }}
+                                >
+                                  <Sym name="delete" className="text-[16px]" />
+                                  {tab === 'templates' ? 'Delete template' : 'Delete quotation'}
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>
