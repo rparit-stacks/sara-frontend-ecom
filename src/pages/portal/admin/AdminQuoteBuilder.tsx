@@ -213,6 +213,26 @@ export default function PortalAdminQuoteBuilder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc, dirty, quoteId]);
 
+  // Flush any still-pending auto-save when the editor actually unmounts
+  // (navigating away before the 2.5s pause elapses) — otherwise edits made
+  // just before navigating away (e.g. typing a client email then clicking
+  // straight to "Convert to project" in the list view) are silently
+  // dropped, and downstream actions run against the stale, already-persisted
+  // value. Kept in its own effect with an empty dependency array so the
+  // cleanup only runs on true unmount, not on every keystroke.
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  const quoteIdRef = useRef(quoteId);
+  quoteIdRef.current = quoteId;
+  useEffect(() => {
+    return () => {
+      if (dirtyRef.current && quoteIdRef.current) {
+        save(undefined, { silent: true });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Save (creating if needed), then mark SENT + notify the client. Branches on
   // whichever of email/phone are actually on file — email if present, WhatsApp
   // if present, both if both. Blocks entirely (and surfaces the Client
