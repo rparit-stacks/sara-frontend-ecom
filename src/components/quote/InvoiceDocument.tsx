@@ -18,6 +18,7 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
   const cur = invoice.currency || 'INR';
   const branding = doc.branding;
   const paid = invoice.status === 'PAID';
+  const cancelled = invoice.status === 'CANCELLED';
   const dateStr = invoice.createdAt
     ? new Date(invoice.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
     : '';
@@ -61,8 +62,8 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
             {invoice.quoteReference && <p className="text-[12px] text-gray-500">Against quote {invoice.quoteReference}</p>}
             {dateStr && <p className="text-[12px] text-gray-500">Date: {dateStr}</p>}
             <span className="inline-block mt-2 px-3 py-1 rounded-full text-[11px] font-bold"
-              style={{ background: paid ? '#e7f3e7' : '#fbeee0', color: paid ? '#2e7d32' : accent }}>
-              {paid ? 'PAID' : 'PAYMENT DUE'}
+              style={{ background: paid ? '#e7f3e7' : cancelled ? '#fde8e8' : '#fbeee0', color: paid ? '#2e7d32' : cancelled ? '#b42318' : accent }}>
+              {paid ? 'PAID' : cancelled ? 'CANCELLED' : 'PAYMENT DUE'}
             </span>
           </div>
         </div>
@@ -118,7 +119,9 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
               </>
             )}
             <div className="flex items-center justify-between px-3 py-3 mt-3 rounded-lg" style={{ background: `${accent}12` }}>
-              <span className="font-bold text-[15px]" style={{ color: accent }}>{paid ? 'Amount paid' : 'Amount due (this invoice)'}</span>
+              <span className="font-bold text-[15px]" style={{ color: accent }}>
+                {paid ? 'Amount paid' : cancelled ? 'Cancelled amount' : 'Amount due (this invoice)'}
+              </span>
               <span className="font-bold text-[22px]" style={{ color: accent }}>{money(invoice.amount, cur)}</span>
             </div>
           </div>
@@ -141,7 +144,7 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
 
         {/* Payment meta */}
         <div className="mt-5 rounded-lg p-4 text-[12px] grid grid-cols-2 gap-y-1.5 gap-x-6" style={{ background: '#faf7f1' }}>
-          <Meta label="Payment status" value={paid ? 'Paid' : 'Pending'} />
+          <Meta label="Payment status" value={paid ? 'Paid' : cancelled ? 'Cancelled' : 'Pending'} />
           <Meta label="Payment method" value={paid ? 'Razorpay' : '—'} />
           {paidAtStr && <Meta label="Paid on" value={paidAtStr} />}
           {txnId && <Meta label="Transaction ID" value={txnId} />}
@@ -155,7 +158,11 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
           <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: accent }}>Terms</p>
           <ul className="mt-1.5 space-y-1 text-[11px] text-gray-500 leading-relaxed list-disc pl-4">
             <li>This is a computer-generated invoice and does not require a signature.</li>
-            <li>{paid ? 'Payment received is non-refundable except as agreed in writing.' : 'Payment is due upon receipt of this invoice.'}</li>
+            <li>{paid
+              ? 'Payment received is non-refundable except as agreed in writing.'
+              : cancelled
+                ? 'This invoice has been cancelled and is no longer payable.'
+                : 'Payment is due upon receipt of this invoice.'}</li>
             {branding.gstin && <li>GST is charged as applicable under Indian tax law.</li>}
             <li>For any billing queries, please contact us using the details below.</li>
           </ul>

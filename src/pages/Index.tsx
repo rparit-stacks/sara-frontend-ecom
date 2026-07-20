@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import ProductCard, { Product } from '@/components/products/ProductCard';
 import { cmsApi, productsApi, categoriesApi, subscribeEmail } from '@/lib/api';
+import { storefrontQueryOptions } from '@/lib/storefrontCache';
 import { toast } from 'sonner';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
@@ -172,6 +173,7 @@ const Index = () => {
       })() : null;
       return productsApi.getAll({ userEmail: userEmail || undefined });
     },
+    ...storefrontQueryOptions,
   });
   
   // Fetch categories with user email if logged in
@@ -190,6 +192,7 @@ const Index = () => {
       })() : null;
       return categoriesApi.getAll(true, userEmail || undefined);
     },
+    ...storefrontQueryOptions,
   });
   
   // Email subscription mutation

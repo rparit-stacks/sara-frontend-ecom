@@ -13,6 +13,7 @@ const statusTone = (s: string): { bg: string; fg: string } => {
   const k = s.toUpperCase();
   if (k === 'PAID') return { bg: 'var(--p-secondary-container)', fg: 'var(--p-on-secondary-container)' };
   if (k === 'PENDING') return { bg: 'var(--p-primary-fixed)', fg: 'var(--p-on-primary-fixed-variant)' };
+  if (k === 'CANCELLED') return { bg: 'var(--p-error-container)', fg: 'var(--p-on-error-container)' };
   return { bg: 'var(--p-surface-container-high)', fg: 'var(--p-on-surface-variant)' };
 };
 
@@ -89,7 +90,7 @@ export default function PortalInvoices() {
                               <td className="px-4 py-3 text-right">
                                 <button
                                   type="button"
-                                  onClick={() => navigate(`/portal/projects/${encodeURIComponent(inv.projectCode)}`)}
+                                  onClick={() => navigate(`/portal/projects/${encodeURIComponent(inv.projectCode)}?tab=invoices`)}
                                   className="text-[13px] font-bold hover:underline"
                                   style={{ color: 'var(--p-primary)' }}
                                 >

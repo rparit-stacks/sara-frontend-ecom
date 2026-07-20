@@ -5,14 +5,16 @@ import { toast } from 'sonner';
 import AdminShell from '@/components/portal/AdminShell';
 import { Pill } from '@/components/portal/Pill';
 import { Sym } from '@/components/portal/Sym';
+import ProjectAssignModal from '@/components/portal/ProjectAssignModal';
 import { STAGE_TONE, type Stage } from '@/components/portal/adminData';
 import { STAGES, stageDef, type StageKey } from '@/components/manufacturing/stages';
 import { projectApi } from '@/lib/api';
+import { getStoredAdminUser, isSuperAdmin } from '@/lib/adminAccess';
+import { highlightText } from '@/lib/highlightText';
 import { parseServerDate, formatServerDate } from '@/lib/serverTime';
 
 const stageLabel = (key?: string) => stageDef((key as StageKey) || 'INQUIRY').label;
 
-// A project is "new" for 48h after it's created (so fresh inquiries stand out).
 const NEW_WINDOW_MS = 48 * 60 * 60 * 1000;
 const isNew = (createdAt?: string) => {
   const d = parseServerDate(createdAt);
@@ -39,8 +41,11 @@ function formatUpdated(iso?: string) {
 export default function PortalAdminProjects() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const superAdmin = isSuperAdmin(getStoredAdminUser());
   const [q, setQ] = useState('');
   const [stage, setStage] = useState<StageKey | 'All'>('All');
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [assignOpen, setAssignOpen] = useState(false);
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['admin-projects', q, stage],
@@ -68,6 +73,23 @@ export default function PortalAdminProjects() {
 
   const stageFilters = useMemo(() => ['All' as const, ...STAGES.map((s) => s.key)], []);
 
+  const selectedProjects = projects.filter((p) => selected.has(p.id));
+  const allSelected = projects.length > 0 && projects.every((p) => selected.has(p.id));
+
+  const toggleAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(projects.map((p) => p.id)));
+  };
+
+  const toggleOne = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <AdminShell title="Projects">
       <div className="p-5 sm:p-8">
@@ -90,10 +112,30 @@ export default function PortalAdminProjects() {
           </div>
         </div>
 
+        {superAdmin && selected.size > 0 && (
+          <div className="mb-4 flex items-center gap-3 px-4 py-2.5 rounded-xl border" style={{ borderColor: 'var(--p-outline-variant)', background: 'rgba(0,103,106,0.06)' }}>
+            <span className="text-[13px] font-semibold" style={{ color: 'var(--p-primary)' }}>{selected.size} selected</span>
+            <button
+              type="button"
+              onClick={() => setAssignOpen(true)}
+              className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white flex items-center gap-1.5"
+              style={{ background: 'var(--p-primary)' }}
+            >
+              <Sym name="person_add" className="text-[16px]" /> Assign to admin
+            </button>
+            <button type="button" onClick={() => setSelected(new Set())} className="text-[13px] underline" style={{ color: 'var(--p-on-surface-variant)' }}>Clear</button>
+          </div>
+        )}
+
         <div className="border rounded-xl overflow-hidden overflow-x-auto" style={{ borderColor: 'var(--p-outline-variant)' }}>
-          <table className="w-full text-left border-collapse min-w-[760px]">
+          <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr style={{ background: 'var(--p-surface-container-low)' }}>
+                {superAdmin && (
+                  <th className="px-3 py-3 w-10">
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all projects" />
+                  </th>
+                )}
                 {['Project', 'Client', 'Designs', 'Stage', 'Progress', 'Value', 'Updated'].map((h) => (
                   <th key={h} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>{h}</th>
                 ))}
@@ -103,7 +145,7 @@ export default function PortalAdminProjects() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-16">
+                  <td colSpan={superAdmin ? 9 : 8} className="text-center py-16">
                     <Sym name="progress_activity" className="text-[24px] animate-spin inline-block" style={{ color: 'var(--p-on-surface-variant)' }} />
                   </td>
                 </tr>
@@ -114,25 +156,27 @@ export default function PortalAdminProjects() {
                   className="cursor-pointer hover:bg-black/[0.02]"
                   style={{
                     borderTop: i ? '1px solid var(--p-outline-variant)' : undefined,
-                    // subtle highlight for brand-new projects
-                    background: isNew(p.createdAt) ? 'color-mix(in srgb, var(--p-primary) 6%, transparent)' : undefined,
+                    background: isNew(p.createdAt) ? 'color-mix(in srgb, var(--p-primary) 6%, transparent)' : selected.has(p.id) ? 'rgba(0,103,106,0.04)' : undefined,
                   }}
                 >
+                  {superAdmin && (
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleOne(p.id)} aria-label={`Select ${p.code}`} />
+                    </td>
+                  )}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold text-[13px]">{p.title?.trim() || 'Untitled project'}</p>
+                      <p className="font-semibold text-[13px]">{highlightText(p.title?.trim() || 'Untitled project', q)}</p>
                       {isNew(p.createdAt) && (
-                        <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full text-white" style={{ background: 'var(--p-primary)' }}>
-                          New
-                        </span>
+                        <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full text-white" style={{ background: 'var(--p-primary)' }}>New</span>
                       )}
                     </div>
                     <p className="text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}>
-                      {p.code} · {p.inquiryReference}
+                      {highlightText(p.code, q)} · {highlightText(p.inquiryReference || '', q)}
                       {p.createdAt && <> · Created {fmtDate(p.createdAt)}</>}
                     </p>
                   </td>
-                  <td className="px-4 py-3 text-[13px]">{p.clientName || p.brand || '—'}</td>
+                  <td className="px-4 py-3 text-[13px]">{highlightText(p.clientName || p.brand || '—', q)}</td>
                   <td className="px-4 py-3 text-[13px]">{p.designCount ?? 1}</td>
                   <td className="px-4 py-3"><Pill label={stageLabel(p.currentStage)} tone={stageTone(p.currentStage)} /></td>
                   <td className="px-4 py-3 w-32">
@@ -165,6 +209,18 @@ export default function PortalAdminProjects() {
           )}
         </div>
       </div>
+
+      <ProjectAssignModal
+        open={assignOpen}
+        projectIds={selectedProjects.map((p) => p.id)}
+        projectLabels={selectedProjects.map((p) => p.title?.trim() || p.code)}
+        onClose={() => setAssignOpen(false)}
+        onAssigned={() => {
+          qc.invalidateQueries({ queryKey: ['admin-projects'] });
+          toast.success('Projects assigned — notification email sent');
+          setSelected(new Set());
+        }}
+      />
     </AdminShell>
   );
 }

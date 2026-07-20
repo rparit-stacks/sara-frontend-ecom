@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PortalShell from '@/components/portal/PortalShell';
 import PortalEmptyInquiry from '@/components/portal/PortalEmptyInquiry';
+import ThreadListItem from '@/components/portal/ThreadListItem';
 import { Sym } from '@/components/portal/Sym';
-import { formatMessagePreview } from '@/components/portal/PaymentCard';
 import { relTime } from '@/lib/clientPortalAggregate';
 import { useClientPortalAggregate } from '@/hooks/useClientPortalAggregate';
 
@@ -30,8 +30,8 @@ export default function PortalThreads() {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          <div className="max-w-3xl">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5">
+          <div className="max-w-2xl mx-auto">
             {isLoading ? (
               <div className="flex justify-center py-20"><Sym name="progress_activity" className="text-[28px] animate-spin" /></div>
             ) : projects.length === 0 ? (
@@ -44,31 +44,13 @@ export default function PortalThreads() {
             ) : (
               <div className="space-y-3">
                 {shown.map((t) => (
-                  <button
+                  <ThreadListItem
                     key={`${t.projectCode}-${t.messageId}`}
-                    type="button"
+                    thread={t}
+                    showProject
+                    timeLabel={relTime(t.lastReplyAt || t.createdAt)}
                     onClick={() => navigate(`/portal/projects/${encodeURIComponent(t.projectCode)}`)}
-                    className="w-full text-left border rounded-xl p-4 transition-all hover:shadow-sm"
-                    style={{ background: t.unread ? 'var(--p-surface-container-low)' : 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Sym name="tag" className="text-[15px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
-                        <span className="font-bold text-[14px] truncate">{t.designName}</span>
-                        <span className="text-[10px] shrink-0 opacity-60">{t.projectCode}</span>
-                        {t.unread && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: 'var(--p-primary)' }} />}
-                      </div>
-                      <span className="text-[11px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }}>{relTime(t.lastReplyAt || t.createdAt)}</span>
-                    </div>
-                    <p className="text-[14px] mb-2 break-words" style={{ color: 'var(--p-on-surface)' }}>
-                      <span className="font-semibold">{t.rootAuthorName || 'User'}:</span> {formatMessagePreview(t.snippet)}
-                    </p>
-                    <div className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--p-primary)' }}>
-                      <Sym name="forum" className="text-[14px]" />
-                      <span className="font-semibold">{t.replyCount} replies</span>
-                      {t.lastReplyBy && <span style={{ color: 'var(--p-on-surface-variant)' }}>· last by {t.lastReplyBy}</span>}
-                    </div>
-                  </button>
+                  />
                 ))}
               </div>
             )}

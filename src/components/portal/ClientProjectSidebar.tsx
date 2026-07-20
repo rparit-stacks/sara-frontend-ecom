@@ -14,6 +14,7 @@ export interface ClientProjectDesign {
   name: string;
   imageUrl?: string | null;
   system?: boolean;
+  general?: boolean;
   unreadCount?: number;
 }
 
@@ -33,6 +34,7 @@ export default function ClientProjectSidebar({
   mobileHidden = false,
   projectTitle,
   projectCode,
+  assignedAgentName,
   designs,
   activeDesignId,
   onSelectDesign,
@@ -47,6 +49,7 @@ export default function ClientProjectSidebar({
   mobileHidden?: boolean;
   projectTitle: string;
   projectCode: string;
+  assignedAgentName?: string;
   designs: ClientProjectDesign[];
   activeDesignId?: number;
   onSelectDesign: (id: number) => void;
@@ -58,6 +61,15 @@ export default function ClientProjectSidebar({
   threadsUnread?: number;
 }) {
   const navigate = useNavigate();
+  // Sort: Announcements (system) first, General Chat (general) second
+  const commChannels = designs
+    .filter((d) => d.system || d.general)
+    .sort((a, b) => {
+      if (a.system && !b.system) return -1;
+      if (!a.system && b.system) return 1;
+      return 0;
+    });
+  const chatChannels = designs.filter((d) => !d.system && !d.general);
   const chatsUnread = designs.reduce((n, d) => n + (d.unreadCount ?? 0), 0);
 
   const goResource = (key: string) => {
@@ -93,6 +105,11 @@ export default function ClientProjectSidebar({
           <div className="min-w-0">
             <h3 className="font-bold text-[15px] truncate">{projectTitle}</h3>
             <p className="text-[11px] truncate" style={{ color: 'var(--p-on-surface-variant)' }}>{projectCode}</p>
+            {assignedAgentName ? (
+              <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--p-primary)' }}>
+                Your agent: {assignedAgentName}
+              </p>
+            ) : null}
           </div>
         </button>
         {onRenameProject ? (
@@ -123,10 +140,24 @@ export default function ClientProjectSidebar({
         </div>
 
         <div>
+          <p className="px-3 mb-1 text-[12px] font-bold uppercase tracking-wider" style={{ color: 'var(--p-on-surface-variant)' }}>Communication</p>
+          <nav className="space-y-1 mb-4">
+            {commChannels.map((d) => {
+              const on = d.id === activeDesignId && view === 'channels';
+              const unread = !on ? (d.unreadCount ?? 0) : 0;
+              return (
+                <button key={d.id} onClick={() => { onSelectDesign(d.id); onViewChange('channels'); }} className="w-full flex items-center gap-3 px-3 py-2 rounded text-left" style={on ? { background: 'rgba(0,103,106,0.1)', color: 'var(--p-primary)', fontWeight: 700 } : { color: 'var(--p-on-surface-variant)' }}>
+                  <Sym name={d.system ? 'campaign' : 'chat_bubble'} className="text-[18px]" />
+                  <span className="flex-1 truncate">{d.system ? `#${d.name}` : d.name}</span>
+                  <UnreadBadge count={unread} />
+                </button>
+              );
+            })}
+          </nav>
           <div className="px-3 mb-1 flex items-center justify-between">
             <p className="text-[12px] font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: 'var(--p-on-surface-variant)' }}>
-              Chats
-              {chatsUnread > 0 ? <UnreadBadge count={chatsUnread} /> : null}
+              Designs
+              {chatChannels.reduce((n, d) => n + (d.unreadCount ?? 0), 0) > 0 ? <UnreadBadge count={chatChannels.reduce((n, d) => n + (d.unreadCount ?? 0), 0)} /> : null}
             </p>
             {onAddDesign ? (
               <button type="button" onClick={onAddDesign} className="p-0.5 rounded hover:bg-black/5" title="New chat">
@@ -135,7 +166,7 @@ export default function ClientProjectSidebar({
             ) : null}
           </div>
           <nav className="space-y-1">
-            {designs.map((d) => {
+            {chatChannels.map((d) => {
               const on = d.id === activeDesignId && view === 'channels';
               const unread = !on ? (d.unreadCount ?? 0) : 0;
               const hasUnread = unread > 0;
@@ -163,7 +194,7 @@ export default function ClientProjectSidebar({
                   </span>
                   <UnreadBadge count={unread} />
                 </button>
-                {onRenameDesign && !d.system && (
+                {onRenameDesign && !d.system && !d.general && (
                   <button
                     type="button"
                     title="Rename chat"

@@ -17,6 +17,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { categoriesApi, productsApi } from '@/lib/api';
+import { storefrontQueryOptions } from '@/lib/storefrontCache';
 import { ProductCardSkeleton } from '@/components/skeletons';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -52,6 +53,7 @@ const CategoryProducts = () => {
     queryKey: ['categoryProducts', id, userEmail],
     queryFn: () => productsApi.getAll({ categoryId: Number(id!), status: 'ACTIVE', userEmail: userEmail || undefined }),
     enabled: !!id,
+    ...storefrontQueryOptions,
   });
   
   // Transform products (slug || id for /product links; ProductDetail supports both)

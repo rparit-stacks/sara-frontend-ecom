@@ -778,37 +778,6 @@ const ProductDetail = () => {
     }
     const unitPrice = effectivePricePerMeter + baseDesignPrice + printVariantModifier;
     const totalPrice = unitPrice * quantity;
-    const fabricTotalPrice = effectivePricePerMeter * quantity;
-
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'post-fix-v2',
-          hypothesisId: 'H2',
-          location: 'ProductDetail.tsx:handleAddToCart',
-          message: 'DESIGNED pricing - print variant NOT multiplied by meters',
-          data: {
-            productType: product.type,
-            fabricMeters: quantity,
-            fabricPricePerMeter: effectivePricePerMeter,
-            fabricTotalPrice,
-            baseDesignPrice,
-            printVariantModifier,
-            unitPrice,
-            quantity,
-            totalPrice,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-    } catch {
-      // ignore
-    }
-    // #endregion
 
     // Prepare structured variant selections (new format with both IDs and frontendIds)
     const variantSelections: Record<string, any> = {};

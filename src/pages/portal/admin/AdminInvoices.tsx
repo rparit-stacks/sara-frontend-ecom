@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -53,6 +53,27 @@ export default function PortalAdminInvoices() {
     }
     return { paid, pending };
   }, [shown]);
+
+  const cancelInvoice = useMutation({
+    mutationFn: (id: number) => invoiceApi.cancel(id),
+    onSuccess: (cancelled) => {
+      setViewing(null);
+      qc.invalidateQueries({ queryKey: ['admin-invoices'] });
+      qc.invalidateQueries({ queryKey: ['payment-links'] });
+      qc.invalidateQueries({ queryKey: ['admin-project-financials'] });
+      qc.invalidateQueries({ queryKey: ['client-project-financials'] });
+      qc.invalidateQueries({ queryKey: ['client-portal-aggregate'] });
+      toast.success(`Invoice ${cancelled.reference} cancelled`);
+    },
+    onError: (error) => toast.error((error as Error).message || 'Could not cancel invoice'),
+  });
+
+  const confirmCancel = (invoice: ManufacturingInvoiceDto) => {
+    if (!window.confirm(
+      `Cancel invoice ${invoice.reference}? Its payment link will stop working and the amount can be invoiced again.`,
+    )) return;
+    cancelInvoice.mutate(invoice.id);
+  };
 
   // Build a PDF from the off-screen InvoiceDocument for the given invoice.
   // Returns both a data-URI (for the email attachment) and a Blob (to upload
@@ -163,11 +184,22 @@ export default function PortalAdminInvoices() {
                     <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{inv.createdAt ? formatInquiryDate(inv.createdAt) : '—'}</td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <button onClick={() => setViewing(inv)} className="text-[13px] font-bold hover:underline mr-3" style={{ color: 'var(--p-primary)' }}>View / PDF</button>
-                      {inv.paymentLinkCode && inv.status !== 'PAID' && (
+                      {inv.paymentLinkCode && inv.status === 'PENDING' && (
                         <button
                           onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/pay/${inv.paymentLinkCode}`); toast.success('Pay link copied'); }}
-                          className="text-[13px] font-bold hover:underline" style={{ color: 'var(--p-primary)' }}
+                          className="text-[13px] font-bold hover:underline mr-3" style={{ color: 'var(--p-primary)' }}
                         >Copy pay link</button>
+                      )}
+                      {inv.status === 'PENDING' && (
+                        <button
+                          type="button"
+                          disabled={cancelInvoice.isPending}
+                          onClick={() => confirmCancel(inv)}
+                          className="text-[13px] font-bold hover:underline disabled:opacity-50"
+                          style={{ color: 'var(--p-error)' }}
+                        >
+                          {cancelInvoice.isPending && cancelInvoice.variables === inv.id ? 'Cancelling…' : 'Cancel'}
+                        </button>
                       )}
                       {inv.status === 'PAID' && <Sym name="check_circle" className="text-[18px] inline align-middle" style={{ color: 'var(--p-secondary)' }} />}
                     </td>

@@ -22,38 +22,55 @@ const OrderConfirmation = () => {
   const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
   const stripeVerifyAttempted = useRef(false);
 
-  // Get order ID from URL params or location state
-  const orderId = id || (location.state as any)?.orderId;
+  // Get order ID from URL params or location state.
+  // Path `:id` may be numeric order id (logged-in) or opaque confirmationToken (guest).
+  const pathParam = id || '';
   const state = (location.state || {}) as {
     paymentIntentId?: string;
     orderId?: number;
+    confirmationToken?: string;
     isPayRemaining?: boolean;
     remainingAmount?: number;
   };
+  const confirmationToken =
+    state.confirmationToken ||
+    (!/^\d+$/.test(pathParam) ? pathParam : undefined);
+  const orderId =
+    (/^\d+$/.test(pathParam) ? Number(pathParam) : undefined) ||
+    state.orderId;
 
   const isLoggedIn = !!localStorage.getItem('authToken');
   const queryClient = useQueryClient();
 
   const { data: order, isLoading, refetch } = useQuery({
-    queryKey: ['order', orderId],
-    queryFn: () => orderApi.getOrderById(Number(orderId)),
-    enabled: !!orderId,
+    queryKey: ['order', confirmationToken || orderId],
+    queryFn: () => {
+      if (confirmationToken) {
+        return orderApi.getOrderByConfirmationToken(confirmationToken);
+      }
+      if (orderId != null && isLoggedIn) {
+        return orderApi.getOrderById(Number(orderId));
+      }
+      throw new Error('Missing order confirmation token');
+    },
+    enabled: !!(confirmationToken || (orderId != null && isLoggedIn)),
     staleTime: 0,
   });
 
   // When arriving from Stripe with paymentIntentId, verify and then refetch order so status becomes PAID
   useEffect(() => {
-    if (!orderId || !order || stripeVerifyAttempted.current) return;
+    const resolvedOrderId = order?.id ?? orderId;
+    if (!resolvedOrderId || !order || stripeVerifyAttempted.current) return;
     const paymentIntentId = state.paymentIntentId;
     if (!paymentIntentId) return;
     const status = (order.paymentStatus || '').toUpperCase();
     if (status !== 'PENDING') return;
     stripeVerifyAttempted.current = true;
     const verifyPayload: any = {
-      orderId: String(orderId),
+      orderId: String(resolvedOrderId),
       paymentId: paymentIntentId,
       gateway: 'STRIPE',
-      verificationData: {},
+      verificationData: { payment_intent_id: paymentIntentId },
     };
     if (state.isPayRemaining && state.remainingAmount != null) {
       verifyPayload.amount = state.remainingAmount;
@@ -61,7 +78,7 @@ const OrderConfirmation = () => {
     paymentApi
       .verify(verifyPayload)
       .then(() => {
-        queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+        queryClient.invalidateQueries({ queryKey: ['order', confirmationToken || orderId] });
         queryClient.invalidateQueries({ queryKey: ['cart'] });
         if (!localStorage.getItem('authToken')) {
           guestCart.clear();
@@ -70,7 +87,7 @@ const OrderConfirmation = () => {
         refetch();
       })
       .catch(() => {});
-  }, [order, orderId, state.paymentIntentId, refetch, queryClient]);
+  }, [order, orderId, confirmationToken, state.paymentIntentId, state.isPayRemaining, state.remainingAmount, refetch, queryClient]);
 
   const { exchangeRates, multipliers, ratesToInr } = useCurrency();
   const currency = order?.paymentCurrency || 'INR';
@@ -103,10 +120,19 @@ const OrderConfirmation = () => {
       toast.error('Product ID not available');
       return;
     }
+    const resolvedOrderId = order?.id ?? orderId;
+    if (!resolvedOrderId) {
+      toast.error('Order not available');
+      return;
+    }
 
     setDownloadingIds(prev => new Set(prev).add(item.productId));
     try {
-      const downloadUrl = await orderApi.getDigitalDownloadUrl(Number(orderId), item.productId);
+      const downloadUrl = await orderApi.getDigitalDownloadUrl(
+        Number(resolvedOrderId),
+        item.productId,
+        confirmationToken || order?.confirmationToken,
+      );
       window.open(downloadUrl, '_blank');
     } catch (error: any) {
       console.error('Download error:', error);

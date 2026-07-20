@@ -13,13 +13,21 @@ import ProjectFilesPanel from '@/components/portal/ProjectFilesPanel';
 import Composer, { Attachment } from '@/components/portal/Composer';
 import Lightbox from '@/components/portal/Lightbox';
 import RichMessageBody from '@/components/portal/RichMessageBody';
-import PaymentCard, { parsePaymentCard, formatMessagePreview } from '@/components/portal/PaymentCard';
+import PaymentCard, { parsePaymentCard } from '@/components/portal/PaymentCard';
+import ProductCard, { parseProductCard, stripProductMarker } from '@/components/portal/ProductCard';
+import ThreadListItem from '@/components/portal/ThreadListItem';
+import ThreadPanel from '@/components/portal/ThreadPanel';
+import AnnouncementCategoryBadge from '@/components/portal/AnnouncementCategoryBadge';
+import ChatSearchBar from '@/components/portal/ChatSearchBar';
 import MessageHoverActions from '@/components/portal/MessageHoverActions';
 import DesignStagePicker from '@/components/portal/DesignStagePicker';
 import { Sym } from '@/components/portal/Sym';
-import { STAGES, STAGE_INDEX, defaultStatusFor, statusLabelFor, type StageKey } from '@/components/manufacturing/stages';
+import { STAGES, STAGE_INDEX, defaultStatusFor, type StageKey } from '@/components/manufacturing/stages';
 import { useProjectEventStream, useProjectMessagePolling } from '@/hooks/useProjectEventStream';
+import { usePrefetchProductPicker } from '@/hooks/usePrefetchProductPicker';
 import { mediaApi, projectApi, manufacturingApi, type ProjectMessageDto, type WorkspaceView, type ManufacturingProjectDetailDto } from '@/lib/api';
+import { getAdminChatDisplayName } from '@/lib/adminAccess';
+import { defaultActiveDesignId } from '@/lib/portalChatConstants';
 import { formatServerTime, formatServerDate } from '@/lib/serverTime';
 
 type DisplayMessage = ProjectMessageDto & { pending?: boolean };
@@ -65,7 +73,7 @@ export default function PortalAdminProjectDetail() {
   const [menuOpen, setMenuOpen] = useState<number | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [designModal, setDesignModal] = useState(false);
-  const [renameTarget, setRenameTarget] = useState<{ id: number; name: string } | null>(null);
+  const [renameTarget, setRenameTarget] = useState<{ id: number; name: string; imageUrl?: string | null } | null>(null);
   const [renameProjectOpen, setRenameProjectOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
@@ -79,6 +87,7 @@ export default function PortalAdminProjectDetail() {
 
   useProjectEventStream(code, 'admin', () => skipSseRef.current);
   useProjectMessagePolling(code, activeDesignId, view === 'channels', 'admin');
+  usePrefetchProductPicker();
 
   const { data: shell, isLoading: shellLoading, isError } = useQuery({
     queryKey: ['admin-project-shell', code],
@@ -89,8 +98,8 @@ export default function PortalAdminProjectDetail() {
 
   useEffect(() => {
     if (!shell?.designs?.length || activeDesignId != null) return;
-    const first = shell.designs.find((d) => !d.system) ?? shell.designs[0];
-    setActiveDesignId(first.id);
+    const id = defaultActiveDesignId(shell.designs);
+    if (id != null) setActiveDesignId(id);
   }, [shell?.designs, activeDesignId]);
 
   const { data: financials } = useQuery({
@@ -187,6 +196,8 @@ export default function PortalAdminProjectDetail() {
 
   const activeDesign = shell?.designs?.find((d) => d.id === activeDesignId) || shell?.designs?.find((d) => !d.system) || shell?.designs?.[0];
   const channelName = activeDesign?.name || shell?.title || 'Chat';
+  const isDesignChannel = !!(activeDesign && !activeDesign.system && !activeDesign.general);
+  const isAnnouncementsChannel = !!activeDesign?.system;
 
   const serverPosts = useMemo(
     () => (project?.messages || []).filter((m) => !m.parentMessageId),
@@ -230,8 +241,8 @@ export default function PortalAdminProjectDetail() {
   });
 
   const renameMutation = useMutation({
-    mutationFn: ({ designId, name }: { designId: number; name: string }) =>
-      projectApi.renameDesign(code!, designId, name),
+    mutationFn: ({ designId, name, imageUrl }: { designId: number; name: string; imageUrl?: string }) =>
+      projectApi.renameDesign(code!, designId, name, imageUrl),
     onSuccess: (d) => {
       qc.invalidateQueries({ queryKey: ['admin-project-shell', code] });
       toast.success(`Renamed to "${d.name}"`);
@@ -269,11 +280,12 @@ export default function PortalAdminProjectDetail() {
   });
 
   const postMutation = useMutation({
-    mutationFn: (data: { body: string; attachmentUrl?: string; parentMessageId?: number; tempId: number }) =>
+    mutationFn: (data: { body: string; attachmentUrl?: string; parentMessageId?: number; tempId: number; announcementCategory?: string }) =>
       projectApi.postMessage(code!, data.body, {
         attachmentUrl: data.attachmentUrl,
         designId: activeDesignId,
         parentMessageId: data.parentMessageId,
+        announcementCategory: data.announcementCategory,
       }),
     onSuccess: (res, vars) => {
       setPendingMessages((xs) => xs.filter((p) => p.id !== vars.tempId));
@@ -337,15 +349,16 @@ export default function PortalAdminProjectDetail() {
     }
   }, [posts.length, activeDesignId, view]);
 
-  const uploadAndSend = async (text: string, atts: Attachment[], parentMessageId?: number) => {
+  const uploadAndSend = async (text: string, atts: Attachment[], parentMessageId?: number, opts?: { announcementCategory?: string }) => {
     if (!code || !activeDesignId) return;
+    const chatName = getAdminChatDisplayName();
     const tempId = -Date.now();
     const optimistic: DisplayMessage = {
       id: tempId,
       projectId: shell?.id || 0,
       designId: activeDesignId,
       authorType: 'ADMIN',
-      authorName: 'Admin Team',
+      authorName: chatName,
       body: text.trim() || (atts.length ? 'Uploading attachment…' : ''),
       createdAt: new Date().toISOString(),
       pending: true,
@@ -371,7 +384,7 @@ export default function PortalAdminProjectDetail() {
       }
       skipSseRef.current = Date.now() + 2500;
       postMutation.mutate(
-        { body, attachmentUrl, parentMessageId, tempId },
+        { body, attachmentUrl, parentMessageId, tempId, announcementCategory: opts?.announcementCategory },
         { onError: () => setPendingMessages((xs) => xs.filter((p) => p.id !== tempId)) },
       );
       if (parentMessageId) {
@@ -444,6 +457,9 @@ export default function PortalAdminProjectDetail() {
               {post.authorName || (isSystem ? 'System' : 'Client')}
             </span>
             <span className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{formatMsgTime(post.createdAt)}</span>
+            {isSystem && post.announcementCategory ? (
+              <AnnouncementCategoryBadge category={post.announcementCategory} />
+            ) : null}
             {post.pending && (
               <span className="text-[11px] font-semibold flex items-center gap-1" style={{ color: 'var(--p-primary)' }}>
                 <Sym name="cloud_upload" className="text-[14px] animate-pulse" /> Sending…
@@ -452,11 +468,14 @@ export default function PortalAdminProjectDetail() {
           </div>
           {(() => {
             const pay = parsePaymentCard(post.body);
+            const product = parseProductCard(post.body);
             if (pay) return <PaymentCard data={pay} />;
-            if (post.body && post.body !== '(attachment)') {
+            if (product) return <ProductCard data={product} />;
+            const textBody = stripProductMarker(post.body);
+            if (textBody && textBody !== '(attachment)') {
               return isSystem
-                ? <p className="text-[14px] leading-relaxed mb-2 break-words">{post.body}</p>
-                : <RichMessageBody text={post.body} className="mb-2" />;
+                ? <p className="text-[14px] leading-relaxed mb-2 break-words whitespace-pre-wrap">{textBody}</p>
+                : <RichMessageBody text={textBody} className="mb-2" />;
             }
             return null;
           })()}
@@ -473,7 +492,7 @@ export default function PortalAdminProjectDetail() {
               <span className="font-bold text-[14px] truncate flex-1">{att.split('/').pop()}</span>
             </a>
           )}
-          {!inThread && !isSystem && !post.pending && (post.replyCount ?? 0) > 0 && (
+          {!inThread && !isSystem && !isAnnouncementsChannel && !post.pending && (post.replyCount ?? 0) > 0 && (
             <button
               type="button"
               onClick={() => openThread(post.id)}
@@ -489,6 +508,7 @@ export default function PortalAdminProjectDetail() {
           inThread={inThread}
           isSystem={isSystem}
           pending={post.pending}
+          disableReply={isAnnouncementsChannel}
           menuOpen={menuOpen === post.id}
           onMenuToggle={() => setMenuOpen(menuOpen === post.id ? null : post.id)}
           onReply={() => openThread(post.id)}
@@ -532,7 +552,7 @@ export default function PortalAdminProjectDetail() {
         onSelectDesign={setActiveDesignId}
         onAddDesign={() => setDesignModal(true)}
         onDeleteDesign={handleDeleteDesign}
-        onRenameDesign={(id, name) => setRenameTarget({ id, name })}
+        onRenameDesign={(id, name, imageUrl) => setRenameTarget({ id, name, imageUrl })}
         onRenameProject={() => setRenameProjectOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         view={view}
@@ -554,37 +574,15 @@ export default function PortalAdminProjectDetail() {
               ))}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto px-6 py-5">
-            <div className="max-w-3xl space-y-3">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5">
+            <div className="max-w-2xl mx-auto space-y-3">
               {shownThreads.map((t) => (
-                <button
+                <ThreadListItem
                   key={t.messageId}
-                  type="button"
+                  thread={t}
+                  timeLabel={formatMsgTime(t.lastReplyAt || t.createdAt)}
                   onClick={() => jumpToMessage(t.messageId, t.designId)}
-                  className="w-full text-left border rounded-xl p-4 transition-all hover:shadow-sm"
-                  style={{ background: t.unread ? 'var(--p-surface-container-low)' : 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Sym name="tag" className="text-[15px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
-                      <span className="font-bold text-[14px] truncate">{t.designName}</span>
-                      {t.unread ? (
-                        <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-white shrink-0" style={{ background: 'var(--p-primary)' }}>Unread</span>
-                      ) : (
-                        <span className="text-[10px] font-semibold uppercase shrink-0" style={{ color: 'var(--p-on-surface-variant)' }}>Seen</span>
-                      )}
-                    </div>
-                    <span className="text-[11px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }}>{formatMsgTime(t.lastReplyAt || t.createdAt)}</span>
-                  </div>
-                  <p className="text-[14px] mb-2 break-words" style={{ color: 'var(--p-on-surface)' }}>
-                    <span className="font-semibold">{t.rootAuthorName || 'User'}:</span> {formatMessagePreview(t.snippet)}
-                  </p>
-                  <div className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--p-primary)' }}>
-                    <Sym name="forum" className="text-[14px]" />
-                    <span className="font-semibold">{t.replyCount} {t.replyCount === 1 ? 'reply' : 'replies'}</span>
-                    {t.lastReplyBy && <span style={{ color: 'var(--p-on-surface-variant)' }}>· last by {t.lastReplyBy}</span>}
-                  </div>
-                </button>
+                />
               ))}
               {shownThreads.length === 0 && (
                 <div className="text-center py-20" style={{ color: 'var(--p-on-surface-variant)' }}>
@@ -627,50 +625,61 @@ export default function PortalAdminProjectDetail() {
         <>
           <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative" style={{ background: 'var(--p-surface-container-lowest)' }}>
             <div className="border-b shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
-              <div className="h-14 px-4 sm:px-6 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
+              <div className="h-14 px-4 sm:px-6 flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   <Sym name="tag" className="text-[18px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
                   <h2 className="font-display text-[16px] sm:text-[18px] truncate">{channelName}</h2>
                 </div>
-                {activeDesign && !activeDesign.system && (
-                  <DesignStagePicker
-                    stage={activeDesign.stage}
-                    disabled={designStageMutation.isPending}
-                    onChange={(stage) => designStageMutation.mutate({ designId: activeDesign.id, stage })}
+                <div className="flex items-center gap-1 shrink-0">
+                  <ChatSearchBar
+                    onSearch={(q) => projectApi.searchMessages(code!, q)}
+                    onJumpTo={(messageId, designId) => jumpToMessage(messageId, designId ?? undefined)}
                   />
-                )}
-                {messagesFetching && (
-                  <Sym name="progress_activity" className="text-[18px] animate-spin shrink-0" style={{ color: 'var(--p-primary)' }} />
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPayAmount(outstandingBalance && outstandingBalance.amount > 0 ? String(outstandingBalance.amount) : '');
-                    setPayLabel('');
-                    setPayDescription('');
-                    setPayModal(true);
-                  }}
-                  className="shrink-0 px-3 py-1.5 rounded-lg text-[13px] font-semibold border flex items-center gap-1.5"
-                  style={{ borderColor: 'var(--p-outline)', color: 'var(--p-primary)' }}
-                >
-                  <Sym name="payments" className="text-[16px]" /> <span className="hidden sm:inline">Request payment</span>
-                </button>
+                  {messagesFetching && (
+                    <Sym name="progress_activity" className="text-[18px] animate-spin shrink-0" style={{ color: 'var(--p-primary)' }} />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPayAmount(outstandingBalance && outstandingBalance.amount > 0 ? String(outstandingBalance.amount) : '');
+                      setPayLabel('');
+                      setPayDescription('');
+                      setPayModal(true);
+                    }}
+                    className="shrink-0 px-3 py-1.5 rounded-lg text-[13px] font-semibold border flex items-center gap-1.5"
+                    style={{ borderColor: 'var(--p-outline)', color: 'var(--p-primary)' }}
+                  >
+                    <Sym name="payments" className="text-[16px]" /> <span className="hidden sm:inline">Request payment</span>
+                  </button>
+                </div>
               </div>
-              <div className="px-4 sm:px-6 pb-3 flex items-center gap-1 overflow-x-auto">
-                {STAGES.map((st, i) => {
-                  const done = i < curIdx;
-                  const cur = i === curIdx;
-                  return (
-                    <div key={st.key} className="flex items-center gap-1 shrink-0">
-                      <button type="button" onClick={() => stageMutation.mutate({ stage: st.key, status: defaultStatusFor(st.key) })} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap" style={cur ? { background: 'var(--p-primary)', color: '#fff' } : done ? { background: 'var(--p-secondary-container)', color: 'var(--p-on-secondary-container)' } : { background: 'var(--p-surface-container)', color: 'var(--p-on-surface-variant)' }}>
-                        {done && <Sym name="check" className="text-[12px]" />}{st.label}
-                      </button>
-                      {i < STAGES.length - 1 && <div className="w-4 h-px shrink-0" style={{ background: 'var(--p-outline-variant)' }} />}
+              {(isDesignChannel || isAnnouncementsChannel) && (
+                <div className="px-4 sm:px-6 pb-3 flex items-center gap-2 overflow-x-auto min-w-0">
+                  {isDesignChannel && activeDesign && (
+                    <DesignStagePicker
+                      stage={activeDesign.stage}
+                      disabled={designStageMutation.isPending}
+                      onChange={(stage) => designStageMutation.mutate({ designId: activeDesign.id, stage })}
+                    />
+                  )}
+                  {isAnnouncementsChannel && (
+                    <div className="flex items-center gap-1 min-w-0">
+                      {STAGES.map((st, i) => {
+                        const done = i < curIdx;
+                        const cur = i === curIdx;
+                        return (
+                          <div key={st.key} className="flex items-center gap-1 shrink-0">
+                            <button type="button" onClick={() => stageMutation.mutate({ stage: st.key, status: defaultStatusFor(st.key) })} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap" style={cur ? { background: 'var(--p-primary)', color: '#fff' } : done ? { background: 'var(--p-secondary-container)', color: 'var(--p-on-secondary-container)' } : { background: 'var(--p-surface-container)', color: 'var(--p-on-surface-variant)' }}>
+                              {done && <Sym name="check" className="text-[12px]" />}{st.label}
+                            </button>
+                            {i < STAGES.length - 1 && <div className="w-4 h-px shrink-0" style={{ background: 'var(--p-outline-variant)' }} />}
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-                <span className="text-[10px] ml-1 opacity-60" style={{ color: 'var(--p-on-surface-variant)' }}>{statusLabelFor(currentStage, shell.currentStatus)}</span>
-              </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div ref={feedRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 chat-feed-bg">
@@ -683,7 +692,11 @@ export default function PortalAdminProjectDetail() {
                   </div>
                 )}
                 <p className="text-[14px] max-w-xl" style={{ color: 'var(--p-on-surface-variant)' }}>
-                  Coordinate production, sampling and tech-pack approvals here. Use the formatting toolbar to style messages and threads for every update.
+                  {isAnnouncementsChannel
+                    ? 'Announcements is update-only. Use General Chat for all team discussions and day-to-day conversation.'
+                    : activeDesign?.general
+                      ? 'General Chat is your all-in-one discussion space for this project.'
+                      : 'Coordinate production, sampling and tech-pack approvals here.'}
                 </p>
               </div>
               {posts.length > 0 && (
@@ -696,52 +709,28 @@ export default function PortalAdminProjectDetail() {
               <div className="space-y-1">{posts.map((post) => renderMessage(post))}</div>
             </div>
 
-            <div className="px-4 sm:px-6 pb-4 pt-2">
-              <Composer placeholder={`Message #${channelName.replace(/\s+/g, '-')}`} onSend={(t, a) => uploadAndSend(t, a)} />
-            </div>
+            {!isAnnouncementsChannel && (
+              <div className="px-4 sm:px-6 pb-4 pt-2">
+                <Composer
+                  placeholder={`Message #${channelName.replace(/\s+/g, '-')}`}
+                  showProductAttach
+                  onSend={(t, a, opts) => uploadAndSend(t, a, undefined, opts)}
+                />
+              </div>
+            )}
           </main>
 
-          <aside
-            className={`${openThreadId ? 'flex' : 'hidden'} flex-col w-full sm:w-96 lg:w-[340px] border-l shrink-0 absolute lg:relative right-0 top-0 bottom-0 z-20 lg:z-auto thread-panel-bg transition-transform duration-200 ${openThreadId ? 'translate-x-0' : 'translate-x-full'}`}
-            style={{ borderColor: 'var(--p-outline-variant)', boxShadow: openThreadId ? '0 0 40px rgba(0,0,0,0.08)' : undefined }}
-          >
-            <div className="h-14 px-4 border-b flex items-center justify-between shrink-0 backdrop-blur-sm" style={{ borderColor: 'var(--p-outline-variant)', background: 'rgba(255,255,255,0.7)' }}>
-              <div>
-                <h3 className="font-bold text-[16px] flex items-center gap-2">
-                  <Sym name="forum" className="text-[18px]" style={{ color: 'var(--p-primary)' }} />
-                  Thread
-                </h3>
-                <p className="text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}># {channelName}</p>
-              </div>
-              <button type="button" onClick={() => setOpenThreadId(null)} className="p-2 rounded-lg hover:bg-black/5 transition-colors">
-                <Sym name="close" style={{ color: 'var(--p-on-surface-variant)' }} />
-              </button>
-            </div>
-            {threadRoot && (
-              <>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                  <div className="rounded-xl border p-3" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}>
-                    {renderMessage(threadRoot, true)}
-                  </div>
-                  <div className="flex items-center gap-2 py-1">
-                    <div className="flex-1 h-px" style={{ background: 'var(--p-outline-variant)' }} />
-                    <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>
-                      {threadReplies.length} {threadReplies.length === 1 ? 'reply' : 'replies'}
-                    </span>
-                    <div className="flex-1 h-px" style={{ background: 'var(--p-outline-variant)' }} />
-                  </div>
-                  {threadReplies.map((r) => (
-                    <div key={r.id} className="rounded-lg px-1 -mx-1 hover:bg-black/[0.02] transition-colors">
-                      {renderMessage(r, true)}
-                    </div>
-                  ))}
-                </div>
-                <div className="p-3 border-t backdrop-blur-sm" style={{ borderColor: 'var(--p-outline-variant)', background: 'rgba(255,255,255,0.85)' }}>
-                  <Composer placeholder="Reply in thread…" compact onSend={(t, a) => uploadAndSend(t, a, threadRoot.id)} />
-                </div>
-              </>
-            )}
-          </aside>
+          <ThreadPanel
+            open={!!openThreadId}
+            channelName={channelName}
+            threadRoot={threadRoot}
+            threadReplies={threadReplies}
+            showComposer={!isAnnouncementsChannel}
+            onClose={() => setOpenThreadId(null)}
+            onSend={(t, a) => uploadAndSend(t, a, threadRoot!.id)}
+            formatTime={formatMsgTime}
+            className={`${openThreadId ? 'flex' : 'hidden'} w-full sm:w-96 lg:w-[380px] absolute lg:relative right-0 top-0 bottom-0 z-20 lg:z-auto transition-transform duration-200 ${openThreadId ? 'translate-x-0' : 'translate-x-full'}`}
+          />
         </>
       )}
 
@@ -753,9 +742,13 @@ export default function PortalAdminProjectDetail() {
       <RenameDesignModal
         open={renameTarget != null}
         currentName={renameTarget?.name || ''}
+        currentImageUrl={renameTarget?.imageUrl}
+        showImageUpload
+        heading="Edit design"
+        placeholder="Design name"
         onClose={() => setRenameTarget(null)}
-        onSave={async (name) => {
-          if (renameTarget) await renameMutation.mutateAsync({ designId: renameTarget.id, name });
+        onSave={async (name, imageUrl) => {
+          if (renameTarget) await renameMutation.mutateAsync({ designId: renameTarget.id, name, imageUrl });
         }}
       />
       <RenameDesignModal

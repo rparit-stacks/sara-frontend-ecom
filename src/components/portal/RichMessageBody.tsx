@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react';
+import { parseProductCard, stripProductMarker } from './ProductCard';
 
-/** Lightweight markdown: **bold**, *italic*, `code`, [links](url), bullet lines (- or •). */
+/** Lightweight markdown: **bold**, *italic*, `code`, [links](url), bullets, numbered lists. */
 export function RichMessageBody({ text, className = '' }: { text: string; className?: string }) {
-  const lines = text.split('\n');
+  const cleaned = stripProductMarker(text);
+  const lines = cleaned.split('\n');
   const blocks: ReactNode[] = [];
   let bulletRun: string[] = [];
+  let numberRun: { n: number; text: string }[] = [];
 
   const flushBullets = (key: string) => {
     if (!bulletRun.length) return;
@@ -18,16 +21,36 @@ export function RichMessageBody({ text, className = '' }: { text: string; classN
     bulletRun = [];
   };
 
+  const flushNumbers = (key: string) => {
+    if (!numberRun.length) return;
+    blocks.push(
+      <ol key={key} className="list-decimal pl-5 my-1 space-y-0.5">
+        {numberRun.map((item, i) => (
+          <li key={i} className="text-[15px] leading-relaxed" value={item.n}>{inlineFormat(item.text)}</li>
+        ))}
+      </ol>,
+    );
+    numberRun = [];
+  };
+
   lines.forEach((line, idx) => {
     const bullet = line.match(/^\s*[-•]\s+(.*)$/);
+    const numbered = line.match(/^\s*(\d+)\.\s+(.*)$/);
     if (bullet) {
+      flushNumbers(`n-${idx}`);
       bulletRun.push(bullet[1]);
       return;
     }
+    if (numbered) {
+      flushBullets(`b-${idx}`);
+      numberRun.push({ n: parseInt(numbered[1], 10), text: numbered[2] });
+      return;
+    }
     flushBullets(`b-${idx}`);
+    flushNumbers(`n-${idx}`);
     if (line.trim()) {
       blocks.push(
-        <p key={`p-${idx}`} className="text-[15px] leading-relaxed mb-1 last:mb-0">
+        <p key={`p-${idx}`} className="text-[15px] leading-relaxed mb-1 last:mb-0 whitespace-pre-wrap">
           {inlineFormat(line)}
         </p>,
       );
@@ -36,6 +59,7 @@ export function RichMessageBody({ text, className = '' }: { text: string; classN
     }
   });
   flushBullets('b-end');
+  flushNumbers('n-end');
 
   return <div className={className}>{blocks}</div>;
 }
@@ -53,7 +77,7 @@ function inlineFormat(text: string): ReactNode[] {
       const link = tok.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       if (link) {
         parts.push(
-          <a key={k++} href={link[2]} target="_blank" rel="noreferrer" className="underline font-medium" style={{ color: 'var(--p-primary)' }}>
+          <a key={k++} href={link[2]} target="_blank" rel="noreferrer" className="underline font-medium break-all" style={{ color: 'var(--p-primary)' }}>
             {link[1]}
           </a>,
         );
@@ -75,6 +99,19 @@ function inlineFormat(text: string): ReactNode[] {
   }
   if (last < text.length) parts.push(text.slice(last));
   return parts.length ? parts : [text];
+}
+
+/** Render body with optional embedded product card above text. */
+export function MessageBodyContent({ body, className }: { body?: string; className?: string }) {
+  if (!body || body === '(attachment)') return null;
+  const product = parseProductCard(body);
+  const text = stripProductMarker(body);
+  return (
+    <>
+      {product ? <div className="mb-2">{/* ProductCard rendered by parent */}</div> : null}
+      {text ? <RichMessageBody text={text} className={className} /> : null}
+    </>
+  );
 }
 
 export default RichMessageBody;

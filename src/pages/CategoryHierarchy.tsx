@@ -17,6 +17,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { categoriesApi, productsApi } from '@/lib/api';
+import { storefrontQueryOptions } from '@/lib/storefrontCache';
 
 const CategoryHierarchy = () => {
   const params = useParams<{ '*': string }>();
@@ -54,11 +55,6 @@ const CategoryHierarchy = () => {
           'Content-Type': 'application/json',
         },
       });
-      // #region agent log
-      if (!response.ok) {
-        fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'CategoryHierarchy.tsx:fetch-fail', message: 'Category fetch failed', data: { slugPath, status: response.status }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1,H4' }) }).catch(() => {});
-      }
-      // #endregion
       if (!response.ok) throw new Error('Failed to fetch category');
       return response.json();
     },
@@ -70,6 +66,7 @@ const CategoryHierarchy = () => {
     queryKey: ['categoryProducts', category?.id, userEmail],
     queryFn: () => productsApi.getAll({ categoryId: category?.id, status: 'ACTIVE', userEmail: userEmail || undefined }),
     enabled: !!category?.id,
+    ...storefrontQueryOptions,
   });
   
   // Transform products (slug || id for /product links; ProductDetail supports both)
@@ -146,9 +143,6 @@ const CategoryHierarchy = () => {
   }
 
   if (!category) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'CategoryHierarchy.tsx:not-found', message: 'Category not found', data: { slugPath, userEmail: !!userEmail }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H4' }) }).catch(() => {});
-    // #endregion
     return (
       <Layout>
         <div className="text-center py-12">

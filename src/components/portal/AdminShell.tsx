@@ -1,14 +1,23 @@
 import { useEffect, useState, ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Sym } from './Sym';
-import { getUserEmailFromToken } from '@/lib/api';
+import { adminAuthApi, getUserEmailFromToken } from '@/lib/api';
+import { getAdminChatDisplayName, getStoredAdminUser, isSuperAdmin } from '@/lib/adminAccess';
 import { useAdminNotificationCounts } from '@/hooks/useAdminNotificationCounts';
 import '@/pages/portal/portal.css';
 
 type NavItem = { icon: string; label: string; to: string; badge?: number };
 type NavGroup = { title?: string; items: NavItem[] };
 
-function buildNavGroups(counts: { inquiries: number; paymentLinks: number; paymentHistory: number }): NavGroup[] {
+function buildNavGroups(counts: { inquiries: number; paymentLinks: number; paymentHistory: number }, superAdmin: boolean): NavGroup[] {
+  const workItems: NavItem[] = [
+    { icon: 'folder_open', label: 'Projects', to: '/portal-admin/projects' },
+    { icon: 'description', label: 'Tech Packs', to: '/portal-admin/tech-packs' },
+    { icon: 'group', label: 'Clients', to: '/portal-admin/clients' },
+  ];
+  if (superAdmin) {
+    workItems.push({ icon: 'assignment_ind', label: 'Assignments', to: '/portal-admin/assignments' });
+  }
   return [
     {
       items: [{ icon: 'grid_view', label: 'Dashboard', to: '/portal-admin' }],
@@ -32,11 +41,7 @@ function buildNavGroups(counts: { inquiries: number; paymentLinks: number; payme
     },
     {
       title: 'Work',
-      items: [
-        { icon: 'folder_open', label: 'Projects', to: '/portal-admin/projects' },
-        { icon: 'description', label: 'Tech Packs', to: '/portal-admin/tech-packs' },
-        { icon: 'group', label: 'Clients', to: '/portal-admin/clients' },
-      ],
+      items: workItems,
     },
     {
       title: 'Tools',
@@ -84,18 +89,28 @@ export default function AdminShell({
       return next;
     });
   const email = getUserEmailFromToken() || 'admin@studiosara.com';
-  const initials = email.slice(0, 2).toUpperCase();
-  const displayName = email.split('@')[0].replace(/[._]/g, ' ');
+  const [displayName, setDisplayName] = useState(() => getAdminChatDisplayName());
+  const initials = (displayName || email).slice(0, 2).toUpperCase();
   const searchValue = search ?? localSearch;
   const setSearch = onSearchChange ?? setLocalSearch;
   const notifCounts = useAdminNotificationCounts();
-  const navGroups = buildNavGroups(notifCounts);
+  const superAdmin = isSuperAdmin(getStoredAdminUser());
+  const navGroups = buildNavGroups(notifCounts, superAdmin);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prev; };
   }, []);
+
+  useEffect(() => {
+    adminAuthApi.getCurrentAdmin()
+      .then((admin) => {
+        localStorage.setItem('adminUser', JSON.stringify(admin));
+        setDisplayName(admin.name?.trim() || admin.username?.trim() || getAdminChatDisplayName());
+      })
+      .catch(() => setDisplayName(getAdminChatDisplayName()));
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!workspace) return;
@@ -184,7 +199,8 @@ export default function AdminShell({
 
       <div className="flex flex-1 overflow-hidden">
         {/* sidebar */}
-        <aside className={`${navCollapsed ? 'w-16' : 'w-60'} border-r flex-col shrink-0 hidden md:flex transition-[width]`} style={{ background: 'var(--p-surface-container-low)', borderColor: 'var(--p-outline-variant)' }}>
+        <aside className={`${navCollapsed ? 'w-16' : 'w-60'} border-r flex-col shrink-0 hidden md:flex transition-[width] overflow-hidden`} style={{ background: 'var(--p-surface-container-low)', borderColor: 'var(--p-outline-variant)' }}>
+          {!workspace && (
           <button
             onClick={toggleNav}
             className={`h-10 flex items-center ${navCollapsed ? 'justify-center' : 'justify-end px-3'} border-b shrink-0`}
@@ -193,6 +209,7 @@ export default function AdminShell({
           >
             <Sym name={navCollapsed ? 'menu' : 'menu_open'} />
           </button>
+          )}
           <nav className="flex-1 overflow-y-auto p-3 space-y-3">
             {navGroups.map((group, gi) => (
               <div key={group.title ?? `grp-${gi}`} className="space-y-1">

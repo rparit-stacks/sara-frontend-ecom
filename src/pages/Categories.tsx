@@ -7,6 +7,7 @@ import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Loader2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { categoriesApi } from '@/lib/api';
+import { storefrontQueryOptions } from '@/lib/storefrontCache';
 
 const Categories = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,6 +28,7 @@ const Categories = () => {
       })() : null;
       return categoriesApi.getAll(true, userEmail || undefined);
     },
+    ...storefrontQueryOptions,
   });
   
   // Transform categories - only parent categories, sorted by display order (1, 2, 3...)

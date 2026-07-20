@@ -8,6 +8,7 @@ export default function MessageHoverActions({
   inThread,
   isSystem,
   pending,
+  disableReply = false,
   menuOpen,
   onMenuToggle,
   onReply,
@@ -19,6 +20,7 @@ export default function MessageHoverActions({
   inThread?: boolean;
   isSystem?: boolean;
   pending?: boolean;
+  disableReply?: boolean;
   menuOpen: boolean;
   onMenuToggle: () => void;
   onReply: () => void;
@@ -65,7 +67,7 @@ export default function MessageHoverActions({
           </>
         )}
       </div>
-      {!inThread && (
+      {!inThread && !disableReply && (
         <button type="button" title="Reply in thread" onClick={onReply} className={btn}>
           <Sym name="forum" className="text-[17px]" style={{ color: 'var(--p-on-surface-variant)' }} />
         </button>
@@ -81,7 +83,7 @@ export default function MessageHoverActions({
               className="absolute right-0 top-9 w-44 border rounded-lg py-1 z-40 shadow-lg animate-in fade-in slide-in-from-top-1 duration-150"
               style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
             >
-              {!inThread && (
+              {!inThread && !disableReply && (
                 <button type="button" onClick={() => { onReply(); onMenuToggle(); }} className="w-full text-left px-3 py-2 text-[13px] flex items-center gap-2 hover:bg-black/5">
                   <Sym name="forum" className="text-[16px]" /> Open thread
                 </button>

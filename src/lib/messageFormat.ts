@@ -28,11 +28,17 @@ function walkNodes(node: Node): string {
       return `${Array.from(el.children)
         .map((li) => `- ${walkNodes(li).trim()}`)
         .join('\n')}\n`;
+    case 'OL': {
+      let n = 1;
+      return `${Array.from(el.children)
+        .map((li) => `${n++}. ${walkNodes(li).trim()}`)
+        .join('\n')}\n`;
+    }
     case 'LI':
       return children;
     case 'A': {
       const href = el.getAttribute('href') || 'url';
-      return `[${children}](${href})`;
+      return `[${children || href}](${href})`;
     }
     default:
       return children;
@@ -43,4 +49,14 @@ export function isEditorEmpty(el: HTMLElement | null): boolean {
   if (!el) return true;
   const text = el.textContent?.replace(/\u00a0/g, ' ').trim();
   return !text;
+}
+
+/** Strip product/payment markers for plain-text previews. */
+export function stripMessageMarkers(text?: string | null): string {
+  if (!text) return '';
+  return text
+    .replace(/\[\[(?:product|payment):[^\]]+\]\]/g, '')
+    .replace(/\*\*|__/g, '')
+    .replace(/\*|_/g, '')
+    .trim();
 }

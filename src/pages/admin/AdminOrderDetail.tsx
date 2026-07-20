@@ -1129,9 +1129,6 @@ const AdminOrderDetail = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      // #region agent log
-                      fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AdminOrderDetail.tsx:ViewInDetail-click',message:'View in Detail clicked',data:{viewInDetailOpenBefore:viewInDetailOpen},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-                      // #endregion
                       setViewInDetailOpen(true);
                     }}
                   >

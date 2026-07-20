@@ -481,7 +481,9 @@ const Checkout = () => {
         queryClient.invalidateQueries({ queryKey: ['user-addresses'] });
       }
       queryClient.invalidateQueries({ queryKey: ['cart'] });
-      navigate(`/order-confirmation/${data.id}`, { state: { orderId: data.id } });
+      navigate(`/order-confirmation/${data.confirmationToken || data.id}`, {
+        state: { orderId: data.id, confirmationToken: data.confirmationToken },
+      });
     },
     onError: (error: Error) => {
       console.error('[Order Creation Error]', error);
@@ -932,7 +934,7 @@ const Checkout = () => {
           customerEmail: formData.email,
           customerName: `${formData.firstName} ${formData.lastName}`,
           customerPhone: formData.phone,
-          returnUrl: `${window.location.origin}/order-confirmation/${order.id}`,
+          returnUrl: `${window.location.origin}/order-confirmation/${order.confirmationToken || order.id}`,
           cancelUrl: `${window.location.origin}/checkout`,
         };
 
@@ -940,9 +942,9 @@ const Checkout = () => {
         const selectedGateway = paymentRequest.paymentGateway;
 
         if (selectedGateway === 'STRIPE') {
-          await handleStripePayment(paymentResponse, order.id);
+          await handleStripePayment(paymentResponse, order.id, order.confirmationToken);
         } else if (selectedGateway === 'RAZORPAY') {
-          await handleRazorpayPayment(paymentResponse, order.id, order.orderNumber);
+          await handleRazorpayPayment(paymentResponse, order.id, order.orderNumber, order.confirmationToken);
         }
       } catch (error: any) {
         toast.error(error.message || 'Failed to process advance payment');
@@ -1005,7 +1007,7 @@ const Checkout = () => {
         customerEmail: formData.email,
         customerName: `${formData.firstName} ${formData.lastName}`,
         customerPhone: formData.phone,
-        returnUrl: `${window.location.origin}/order-confirmation/${order.id}`,
+        returnUrl: `${window.location.origin}/order-confirmation/${order.confirmationToken || order.id}`,
         cancelUrl: `${window.location.origin}/checkout`,
       };
 
@@ -1013,9 +1015,9 @@ const Checkout = () => {
 
       // Handle payment based on gateway
       if (paymentGateway === 'STRIPE') {
-        await handleStripePayment(paymentResponse, order.id);
+        await handleStripePayment(paymentResponse, order.id, order.confirmationToken);
       } else if (paymentGateway === 'RAZORPAY') {
-        await handleRazorpayPayment(paymentResponse, order.id, order.orderNumber);
+        await handleRazorpayPayment(paymentResponse, order.id, order.orderNumber, order.confirmationToken);
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to process payment');
@@ -1023,13 +1025,13 @@ const Checkout = () => {
     }
   };
 
-  const handleStripePayment = async (paymentResponse: any, orderId: number) => {
+  const handleStripePayment = async (paymentResponse: any, orderId: number, confirmationToken?: string) => {
     // Load Stripe.js dynamically
     return new Promise((resolve, reject) => {
       // Check if Stripe is already loaded
       // @ts-ignore
       if (window.Stripe) {
-        processStripePayment(paymentResponse, orderId).then(resolve).catch(reject);
+        processStripePayment(paymentResponse, orderId, confirmationToken).then(resolve).catch(reject);
         return;
       }
 
@@ -1037,7 +1039,7 @@ const Checkout = () => {
       stripeScript.src = 'https://js.stripe.com/v3/';
       stripeScript.async = true;
       stripeScript.onload = () => {
-        processStripePayment(paymentResponse, orderId).then(resolve).catch(reject);
+        processStripePayment(paymentResponse, orderId, confirmationToken).then(resolve).catch(reject);
       };
       stripeScript.onerror = () => {
         reject(new Error('Failed to load Stripe.js'));
@@ -1046,7 +1048,7 @@ const Checkout = () => {
     });
   };
 
-  const processStripePayment = async (paymentResponse: any, orderId: number) => {
+  const processStripePayment = async (paymentResponse: any, orderId: number, confirmationToken?: string) => {
     try {
       // @ts-ignore
       const stripe = window.Stripe(paymentResponse.orderData.key_id || '');
@@ -1063,9 +1065,10 @@ const Checkout = () => {
       setIsProcessingPayment(false);
       // Do not clear cart here—user may cancel or fail; cart is cleared only after successful payment (OrderConfirmation verify or backend updatePaymentStatus).
       const paymentIntentId = paymentResponse.orderData.payment_intent_id ?? paymentResponse.paymentId;
-      navigate(`/order-confirmation/${orderId}`, { 
+      navigate(`/order-confirmation/${confirmationToken || orderId}`, { 
         state: { 
-          orderId, 
+          orderId,
+          confirmationToken,
           paymentIntent: clientSecret,
           paymentIntentId,
           stripeKey: paymentResponse.orderData.key_id 
@@ -1077,12 +1080,12 @@ const Checkout = () => {
     }
   };
 
-  const handleRazorpayPayment = async (paymentResponse: any, orderId: number, orderNumber?: string) => {
+  const handleRazorpayPayment = async (paymentResponse: any, orderId: number, orderNumber?: string, confirmationToken?: string) => {
     return new Promise((resolve, reject) => {
       // Check if Razorpay is already loaded
       // @ts-ignore
       if (window.Razorpay) {
-        processRazorpayPayment(paymentResponse, orderId, orderNumber ?? '').then(resolve).catch(reject);
+        processRazorpayPayment(paymentResponse, orderId, orderNumber ?? '', confirmationToken).then(resolve).catch(reject);
         return;
       }
 
@@ -1090,7 +1093,7 @@ const Checkout = () => {
       razorpayScript.src = 'https://checkout.razorpay.com/v1/checkout.js';
       razorpayScript.async = true;
       razorpayScript.onload = () => {
-        processRazorpayPayment(paymentResponse, orderId, orderNumber ?? '').then(resolve).catch(reject);
+        processRazorpayPayment(paymentResponse, orderId, orderNumber ?? '', confirmationToken).then(resolve).catch(reject);
       };
       razorpayScript.onerror = () => {
         reject(new Error('Failed to load Razorpay script'));
@@ -1099,7 +1102,7 @@ const Checkout = () => {
     });
   };
 
-  const processRazorpayPayment = async (paymentResponse: any, orderId: number, orderNumber: string) => {
+  const processRazorpayPayment = async (paymentResponse: any, orderId: number, orderNumber: string, confirmationToken?: string) => {
     try {
       // @ts-ignore
       const options = {
@@ -1129,7 +1132,9 @@ const Checkout = () => {
               window.dispatchEvent(new Event('guestCartUpdated'));
             }
             queryClient.invalidateQueries({ queryKey: ['cart'] });
-            navigate(`/order-confirmation/${orderId}`);
+            navigate(`/order-confirmation/${confirmationToken || orderId}`, {
+              state: { orderId, confirmationToken },
+            });
             setIsProcessingPayment(false);
           } catch (error: any) {
             toast.error(error.message || 'Payment verification failed');

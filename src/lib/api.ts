@@ -95,12 +95,6 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     
     if (!response.ok) {
       const error = await response.text();
-      // #region agent log
-      if (method === 'GET' && endpoint.includes('/api/products') && !endpoint.includes('/api/products/')) {
-        const payload = { location: 'api.ts:fetchApi-products-error', message: 'Products API error', data: { endpoint, status: response.status, errorPreview: error != null && error.length > 100 ? error.slice(0, 100) : error }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1,H2' };
-        fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => {});
-      }
-      // #endregion
       console.error(`[API Error] ${method} ${endpoint}`, {
         status: response.status,
         error,
@@ -142,13 +136,7 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     // Handle empty responses
     const text = await response.text();
     const data = text ? JSON.parse(text) : null;
-    
-    // #region agent log
-    if (method === 'GET' && endpoint.includes('/api/products') && !endpoint.includes('/api/products/')) {
-      const payload = { location: 'api.ts:fetchApi-products', message: 'Products API response', data: { endpoint, status: response.status, bodyLength: text.length, dataIsNull: data == null, isArray: Array.isArray(data), arrayLength: Array.isArray(data) ? data.length : undefined }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1,H2,H3' };
-      fetch('http://127.0.0.1:7242/ingest/c85bf050-6243-4194-976e-3e54a6a21ac3', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => {});
-    }
-    // #endregion
+
     console.log(`[API Success] ${method} ${endpoint}`, {
       status: response.status,
       duration: `${duration}ms`,
@@ -209,6 +197,8 @@ export const productsApi = {
     const query = searchParams.toString();
     return fetchApi<any[]>(`/api/admin/products${query ? `?${query}` : ''}`);
   },
+  /** Admin: lightweight cached list for project chat product picker */
+  getPicker: () => fetchApi<Array<{ id: number; name: string; slug?: string; price?: number; imageUrl?: string }>>('/api/products/picker'),
   /** Admin: get full product details (including custom fields, detail sections, variants) */
   getByIdAdmin: (id: number) => {
     return fetchApi<any>(`/api/admin/products/${id}`);
@@ -701,6 +691,15 @@ export interface CompanyProfile {
   gstin?: string;
 }
 
+export interface PortalAdminSettings {
+  projectCodePrefix: string;
+  defaultCurrency: string;
+  autoGenerateProjectCodes: boolean;
+  notifyNewInquiries: boolean;
+  notifyClientApprovals: boolean;
+  notifyPaymentsReceived: boolean;
+}
+
 export interface ManufacturingQuoteDto {
   id: number;
   reference: string;
@@ -786,6 +785,13 @@ export const manufacturingApi = {
     fetchApi<CompanyProfile>('/api/admin/manufacturing/company-profile', {
       method: 'PUT',
       body: JSON.stringify(profile),
+    }),
+  getPortalSettings: () =>
+    fetchApi<PortalAdminSettings>('/api/admin/manufacturing/portal-settings'),
+  savePortalSettings: (settings: PortalAdminSettings) =>
+    fetchApi<PortalAdminSettings>('/api/admin/manufacturing/portal-settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
     }),
 
   // Admin — quotations
@@ -1058,10 +1064,13 @@ export const orderApi = {
   },
   getUserOrders: () => fetchApi<any[]>('/api/orders'),
   getOrderById: (id: number) => fetchApi<any>(`/api/orders/${id}`),
+  getOrderByConfirmationToken: (token: string) =>
+    fetchApi<any>(`/api/orders/confirm/${encodeURIComponent(token)}`),
   /** Get S3 download URL for a digital order item. Backend validates order is PAID. Returns URL — open in browser to download from S3 (no ZIP). */
-  getDigitalDownloadUrl: async (orderId: number, productId: number): Promise<string> => {
+  getDigitalDownloadUrl: async (orderId: number, productId: number, confirmationToken?: string): Promise<string> => {
     const token = localStorage.getItem('authToken');
-    const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/digital-download/${productId}`, {
+    const qs = confirmationToken ? `?token=${encodeURIComponent(confirmationToken)}` : '';
+    const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/digital-download/${productId}${qs}`, {
       method: 'GET',
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     });
@@ -1458,12 +1467,22 @@ export const adminManagementApi = {
   updateStatus: (id: number, status: string) => 
     fetchApi<any>(`/api/admin/admins/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
   delete: (id: number) => fetchApi<void>(`/api/admin/admins/${id}`, { method: 'DELETE' }),
-  sendInvite: (email: string) => 
-    fetchApi<any>('/api/admin/admins/invite', { method: 'POST', body: JSON.stringify({ email }) }),
+  sendInvite: (email: string, portalAdminAccess = false) =>
+    fetchApi<any>('/api/admin/admins/invite', {
+      method: 'POST',
+      body: JSON.stringify({ email, portalAdminAccess }),
+    }),
   getInviteByToken: (token: string) => 
     fetchApi<any>(`/api/admin/admins/invite/${token}`),
   acceptInvite: (data: { token: string; name: string; password: string; confirmPassword: string }) =>
     fetchApi<any>('/api/admin/admins/invite/accept', { method: 'POST', body: JSON.stringify(data) }),
+  getProjectAssignments: (adminId: number) =>
+    fetchApi<{ projectIds: number[] }>(`/api/admin/admins/${adminId}/project-assignments`),
+  setProjectAssignments: (adminId: number, projectIds: number[]) =>
+    fetchApi<{ projectIds: number[] }>(`/api/admin/admins/${adminId}/project-assignments`, {
+      method: 'PUT',
+      body: JSON.stringify({ projectIds }),
+    }),
 };
 
 // ===============================
@@ -1747,6 +1766,7 @@ export interface ProjectMessageDto {
   authorName?: string;
   body?: string;
   attachmentUrl?: string;
+  announcementCategory?: string;
   createdAt?: string;
 }
 
@@ -1775,6 +1795,7 @@ export interface ProjectDesignDto {
   description?: string | null;
   sortOrder?: number;
   system?: boolean;
+  general?: boolean;
   stage?: string;
   createdAt?: string;
   unreadCount?: number;
@@ -1796,6 +1817,9 @@ export interface ManufacturingProjectDto {
   valueDisplay?: string;
   createdAt?: string;
   updatedAt?: string;
+  assignedAgentName?: string;
+  assignedAgentEmail?: string;
+  assignedAgents?: { adminId: number; name: string; email: string }[];
 }
 
 export interface ManufacturingProjectDetailDto extends ManufacturingProjectDto {
@@ -1814,16 +1838,7 @@ export interface ManufacturingProjectDetailDto extends ManufacturingProjectDto {
     currency?: string;
     status: string;
   }[];
-  invoices: {
-    id: number;
-    reference: string;
-    quoteReference?: string;
-    title?: string;
-    amount?: number;
-    currency?: string;
-    status: string;
-    paymentLinkCode?: string;
-  }[];
+  invoices: ManufacturingInvoiceDto[];
 }
 
 export const projectApi = {
@@ -1834,6 +1849,13 @@ export const projectApi = {
     const q = p.toString();
     return fetchApi<ManufacturingProjectDto[]>(`/api/admin/manufacturing/projects${q ? `?${q}` : ''}`);
   },
+  listPortalAdmins: () =>
+    fetchApi<{ adminId: number; name: string; email: string }[]>('/api/admin/manufacturing/projects/portal-admins'),
+  bulkAssign: (adminId: number, projectIds: number[]) =>
+    fetchApi<{ projectIds: number[] }>('/api/admin/manufacturing/projects/bulk-assign', {
+      method: 'POST',
+      body: JSON.stringify({ adminId, projectIds }),
+    }),
   getByCode: (code: string, designId?: number, opts?: { includeMessages?: boolean; includeFinancials?: boolean }) => {
     const p = new URLSearchParams();
     if (designId != null) p.set('designId', String(designId));
@@ -1850,16 +1872,20 @@ export const projectApi = {
       `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/messages${q}`,
     );
   },
+  searchMessages: (code: string, q: string) =>
+    fetchApi<ProjectMessageDto[]>(
+      `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/messages/search?q=${encodeURIComponent(q)}`,
+    ),
   listAttachments: (code: string) =>
     fetchApi<ProjectMessageDto[]>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/attachments`),
   getQuote: (code: string, quoteId: number) =>
     fetchApi<ManufacturingQuoteDto>(
       `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/quotes/${quoteId}`,
     ),
-  renameDesign: (code: string, designId: number, name: string) =>
+  renameDesign: (code: string, designId: number, name: string, imageUrl?: string) =>
     fetchApi<ProjectDesignDto>(
       `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/designs/${designId}`,
-      { method: 'PATCH', body: JSON.stringify({ name }) },
+      { method: 'PATCH', body: JSON.stringify({ name, ...(imageUrl != null ? { imageUrl } : {}) }) },
     ),
   updateDesignStage: (code: string, designId: number, stage: string) =>
     fetchApi<ProjectDesignDto>(
@@ -1897,7 +1923,7 @@ export const projectApi = {
   postMessage: (
     code: string,
     body: string,
-    opts?: { attachmentUrl?: string; authorName?: string; designId?: number; parentMessageId?: number },
+    opts?: { attachmentUrl?: string; authorName?: string; designId?: number; parentMessageId?: number; announcementCategory?: string },
   ) =>
     fetchApi<ProjectMessageDto>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/messages`, {
       method: 'POST',
@@ -1907,6 +1933,7 @@ export const projectApi = {
         ...(opts?.authorName != null ? { authorName: opts.authorName } : {}),
         ...(opts?.designId != null ? { designId: opts.designId } : {}),
         ...(opts?.parentMessageId != null ? { parentMessageId: opts.parentMessageId } : {}),
+        ...(opts?.announcementCategory != null ? { announcementCategory: opts.announcementCategory } : {}),
       }),
     }),
   deleteMessage: (code: string, messageId: number) =>
@@ -1924,6 +1951,41 @@ export const projectApi = {
     fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/threads/${messageId}/read`, {
       method: 'POST',
     }),
+};
+
+export interface AdminPortalAssignmentDto {
+  adminId: number;
+  fullProjectIds: number[];
+  designAssignments: {
+    projectId: number;
+    designId: number;
+    projectCode?: string;
+    projectTitle?: string;
+    designName?: string;
+  }[];
+}
+
+export interface ProjectDesignCatalogDto {
+  projectId: number;
+  code: string;
+  title: string;
+  clientName?: string;
+  designs: { id: number; name: string }[];
+}
+
+/** Super-admin portal assignment management (full project or per-design). */
+export const portalAssignmentApi = {
+  listPortalAdmins: () =>
+    fetchApi<{ adminId: number; name: string; email: string }[]>('/api/admin/manufacturing/assignments/portal-admins'),
+  getAssignments: (adminId: number) =>
+    fetchApi<AdminPortalAssignmentDto>(`/api/admin/manufacturing/assignments/${adminId}`),
+  setAssignments: (adminId: number, body: Pick<AdminPortalAssignmentDto, 'fullProjectIds' | 'designAssignments'>) =>
+    fetchApi<AdminPortalAssignmentDto>(`/api/admin/manufacturing/assignments/${adminId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  projectsCatalog: () =>
+    fetchApi<ProjectDesignCatalogDto[]>('/api/admin/manufacturing/assignments/projects-catalog'),
 };
 
 /** Client manufacturing project workspace — scoped to logged-in user's projects. */
@@ -1951,6 +2013,10 @@ export const clientProjectApi = {
       `/api/portal/projects/${encodeURIComponent(code)}/messages${q}`,
     );
   },
+  searchMessages: (code: string, q: string) =>
+    fetchApi<ProjectMessageDto[]>(
+      `/api/portal/projects/${encodeURIComponent(code)}/messages/search?q=${encodeURIComponent(q)}`,
+    ),
   listAttachments: (code: string) =>
     fetchApi<ProjectMessageDto[]>(`/api/portal/projects/${encodeURIComponent(code)}/attachments`),
   postMessage: (
@@ -1982,10 +2048,10 @@ export const clientProjectApi = {
       method: 'POST',
       body: JSON.stringify({ name, imageUrl, description }),
     }),
-  renameDesign: (code: string, designId: number, name: string) =>
+  renameDesign: (code: string, designId: number, name: string, imageUrl?: string) =>
     fetchApi<ProjectDesignDto>(
       `/api/portal/projects/${encodeURIComponent(code)}/designs/${designId}`,
-      { method: 'PATCH', body: JSON.stringify({ name }) },
+      { method: 'PATCH', body: JSON.stringify({ name, ...(imageUrl != null ? { imageUrl } : {}) }) },
     ),
   renameProject: (code: string, title: string) =>
     fetchApi<ManufacturingProjectDto>(
@@ -2075,6 +2141,8 @@ export const invoiceApi = {
     fetchApi<ManufacturingInvoiceDto>(`/api/admin/manufacturing/invoices/${id}/pdf`, { method: 'PATCH', body: JSON.stringify({ pdfUrl }) }),
   send: (id: number, pdfBase64?: string) =>
     fetchApi<ManufacturingInvoiceDto>(`/api/admin/manufacturing/invoices/${id}/send`, { method: 'POST', body: JSON.stringify({ pdfBase64 }) }),
+  cancel: (id: number) =>
+    fetchApi<ManufacturingInvoiceDto>(`/api/admin/manufacturing/invoices/${id}/cancel`, { method: 'POST' }),
 };
 
 // ---- Tech Pack documents (shared with the standalone Tech Pack Studio) ----

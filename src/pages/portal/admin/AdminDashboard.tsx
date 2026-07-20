@@ -7,6 +7,7 @@ import { Sym } from '@/components/portal/Sym';
 import { STAGE_TONE, type Stage } from '@/components/portal/adminData';
 import { STAGES, stageDef, statusLabelFor, type StageKey } from '@/components/manufacturing/stages';
 import { manufacturingApi, projectApi } from '@/lib/api';
+import { getStoredAdminUser, isSuperAdmin } from '@/lib/adminAccess';
 
 const stageLabel = (key?: string) => stageDef((key as StageKey) || 'INQUIRY').label;
 const stageTone = (key?: string) => STAGE_TONE[stageLabel(key) as Stage];
@@ -27,6 +28,7 @@ function formatUpdated(iso?: string) {
 
 export default function PortalAdminDashboard() {
   const navigate = useNavigate();
+  const superAdmin = isSuperAdmin(getStoredAdminUser());
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ['admin-projects'],
@@ -140,7 +142,11 @@ export default function PortalAdminDashboard() {
                 </button>
               ))}
               {projects.length === 0 && (
-                <p className="px-5 py-8 text-[13px]" style={{ color: 'var(--p-on-surface-variant)' }}>No projects yet — inquiries auto-create projects when submitted.</p>
+                <p className="px-5 py-8 text-[13px]" style={{ color: 'var(--p-on-surface-variant)' }}>
+                  {superAdmin
+                    ? 'No projects yet — inquiries auto-create projects when submitted.'
+                    : 'No projects assigned to you yet. Your dashboard will show projects once a super admin assigns them to you.'}
+                </p>
               )}
             </div>
           </>

@@ -13,11 +13,18 @@ import ProjectFilesPanel from '@/components/portal/ProjectFilesPanel';
 import Composer, { Attachment } from '@/components/portal/Composer';
 import Lightbox from '@/components/portal/Lightbox';
 import RichMessageBody from '@/components/portal/RichMessageBody';
-import PaymentCard, { parsePaymentCard, formatMessagePreview } from '@/components/portal/PaymentCard';
+import PaymentCard, { parsePaymentCard } from '@/components/portal/PaymentCard';
+import ProductCard, { parseProductCard, stripProductMarker } from '@/components/portal/ProductCard';
+import ThreadListItem from '@/components/portal/ThreadListItem';
+import ThreadPanel from '@/components/portal/ThreadPanel';
+import AnnouncementCategoryBadge from '@/components/portal/AnnouncementCategoryBadge';
+import ChatSearchBar from '@/components/portal/ChatSearchBar';
 import MessageHoverActions from '@/components/portal/MessageHoverActions';
 import { Sym } from '@/components/portal/Sym';
-import { STAGES, STAGE_INDEX, statusLabelFor, type StageKey } from '@/components/manufacturing/stages';
+import { STAGES, STAGE_INDEX, type StageKey } from '@/components/manufacturing/stages';
+import { defaultActiveDesignId, designStageLabel } from '@/lib/portalChatConstants';
 import { useProjectEventStream, useProjectMessagePolling } from '@/hooks/useProjectEventStream';
+import { usePrefetchProductPicker } from '@/hooks/usePrefetchProductPicker';
 import { clientProjectApi, getUserEmailFromToken, mediaApi, type ProjectMessageDto, type WorkspaceView, type ManufacturingProjectDetailDto } from '@/lib/api';
 import { formatServerTime, formatServerDate } from '@/lib/serverTime';
 
@@ -90,6 +97,7 @@ export default function ClientProjectDetail() {
 
   useProjectEventStream(code, 'client', () => skipSseRef.current);
   useProjectMessagePolling(code, activeDesignId, view === 'channels', 'client');
+  usePrefetchProductPicker();
 
   const { data: shell, isLoading: shellLoading, isError } = useQuery({
     queryKey: ['client-project-shell', code],
@@ -100,8 +108,8 @@ export default function ClientProjectDetail() {
 
   useEffect(() => {
     if (!shell?.designs?.length || activeDesignId != null) return;
-    const first = shell.designs.find((d) => !d.system) ?? shell.designs[0];
-    setActiveDesignId(first.id);
+    const id = defaultActiveDesignId(shell.designs);
+    if (id != null) setActiveDesignId(id);
   }, [shell?.designs, activeDesignId]);
 
   const needsFinancials = view === 'quotation' || view === 'invoices' || view === 'brief';
@@ -149,6 +157,7 @@ export default function ClientProjectDetail() {
 
   const activeDesign = shell?.designs?.find((d) => d.id === activeDesignId) || shell?.designs?.find((d) => !d.system) || shell?.designs?.[0];
   const isAnnouncements = !!activeDesign?.system;
+  const isDesignChannel = !!(activeDesign && !activeDesign.system && !activeDesign.general);
   const channelName = activeDesign?.name || 'Chat';
   const projectTitle = shell?.title?.trim() || 'Untitled project';
   const clientDisplayName = shell?.clientName || getUserEmailFromToken()?.split('@')[0] || 'You';
@@ -344,9 +353,10 @@ export default function ClientProjectDetail() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
             <span className={`font-bold text-[15px] ${isSystem ? 'italic' : ''}`} style={isAdmin ? { color: 'var(--p-secondary)' } : isSystem ? { color: 'var(--p-on-surface-variant)' } : undefined}>
-              {post.authorName || (isSystem ? 'System' : isAdmin ? 'Studio Sara' : 'You')}
+              {post.authorName || (isSystem ? 'System' : isAdmin ? post.authorName || 'Studio Sara' : 'You')}
             </span>
             <span className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{formatMsgTime(post.createdAt)}</span>
+            {isSystem && post.announcementCategory ? <AnnouncementCategoryBadge category={post.announcementCategory} /> : null}
             {post.pending && (
               <span className="text-[11px] font-semibold flex items-center gap-1" style={{ color: 'var(--p-primary)' }}>
                 <Sym name="cloud_upload" className="text-[14px] animate-pulse" /> Sending…
@@ -355,11 +365,14 @@ export default function ClientProjectDetail() {
           </div>
           {(() => {
             const pay = parsePaymentCard(post.body);
+            const product = parseProductCard(post.body);
             if (pay) return <PaymentCard data={pay} actionable />;
-            if (post.body && post.body !== '(attachment)') {
+            if (product) return <ProductCard data={product} />;
+            const textBody = stripProductMarker(post.body);
+            if (textBody && textBody !== '(attachment)') {
               return isSystem
-                ? <p className="text-[14px] leading-relaxed mb-2 break-words">{post.body}</p>
-                : <RichMessageBody text={post.body} className="mb-2" />;
+                ? <p className="text-[14px] leading-relaxed mb-2 break-words whitespace-pre-wrap">{textBody}</p>
+                : <RichMessageBody text={textBody} className="mb-2" />;
             }
             return null;
           })()}
@@ -429,6 +442,7 @@ export default function ClientProjectDetail() {
         mobileHidden={mobilePanelOpen}
         projectTitle={projectTitle}
         projectCode={shell.code}
+        assignedAgentName={shell.assignedAgentName}
         designs={shell.designs || []}
         activeDesignId={activeDesignId}
         onSelectDesign={(id) => { setActiveDesignId(id); setMobilePanelOpen(true); }}
@@ -457,37 +471,15 @@ export default function ClientProjectDetail() {
               ))}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto px-6 py-5">
-            <div className="max-w-3xl space-y-3">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5">
+            <div className="max-w-2xl mx-auto space-y-3">
               {shownThreads.map((t) => (
-                <button
+                <ThreadListItem
                   key={t.messageId}
-                  type="button"
+                  thread={t}
+                  timeLabel={formatMsgTime(t.lastReplyAt || t.createdAt)}
                   onClick={() => jumpToMessage(t.messageId, t.designId)}
-                  className="w-full text-left border rounded-xl p-4 transition-all hover:shadow-sm"
-                  style={{ background: t.unread ? 'var(--p-surface-container-low)' : 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Sym name="tag" className="text-[15px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
-                      <span className="font-bold text-[14px] truncate">{t.designName}</span>
-                      {t.unread ? (
-                        <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-white shrink-0" style={{ background: 'var(--p-primary)' }}>Unread</span>
-                      ) : (
-                        <span className="text-[10px] font-semibold uppercase shrink-0" style={{ color: 'var(--p-on-surface-variant)' }}>Seen</span>
-                      )}
-                    </div>
-                    <span className="text-[11px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }}>{formatMsgTime(t.lastReplyAt || t.createdAt)}</span>
-                  </div>
-                  <p className="text-[14px] mb-2 break-words" style={{ color: 'var(--p-on-surface)' }}>
-                    <span className="font-semibold">{t.rootAuthorName || 'User'}:</span> {formatMessagePreview(t.snippet)}
-                  </p>
-                  <div className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--p-primary)' }}>
-                    <Sym name="forum" className="text-[14px]" />
-                    <span className="font-semibold">{t.replyCount} {t.replyCount === 1 ? 'reply' : 'replies'}</span>
-                    {t.lastReplyBy && <span style={{ color: 'var(--p-on-surface-variant)' }}>· last by {t.lastReplyBy}</span>}
-                  </div>
-                </button>
+                />
               ))}
               {shownThreads.length === 0 && (
                 <div className="text-center py-20" style={{ color: 'var(--p-on-surface-variant)' }}>
@@ -550,17 +542,19 @@ export default function ClientProjectDetail() {
                 <button type="button" onClick={() => setMobilePanelOpen(false)} className="md:hidden p-1.5 -ml-1.5 rounded-lg hover:bg-black/5 shrink-0" aria-label="Back">
                   <Sym name="arrow_back" className="text-[20px]" style={{ color: 'var(--p-on-surface-variant)' }} />
                 </button>
-                <Sym name="tag" className="text-[18px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
-                <h2 className="font-display text-[16px] sm:text-[18px] truncate">{channelName}</h2>
-                {activeDesign && !activeDesign.system && (
-                  <span className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap border" style={{ borderColor: 'var(--p-outline)', color: 'var(--p-primary)' }}>
-                    <Sym name="flag" className="text-[13px]" /> {STAGES.find((s) => s.key === activeDesign.stage)?.label ?? activeDesign.stage ?? 'Inquiry'}
-                  </span>
-                )}
-                {messagesFetching && (
-                  <Sym name="progress_activity" className="text-[18px] animate-spin shrink-0" style={{ color: 'var(--p-primary)' }} />
-                )}
-                <div className="flex-1" />
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Sym name="tag" className="text-[18px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
+                  <h2 className="font-display text-[16px] sm:text-[18px] truncate">{channelName}</h2>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <ChatSearchBar
+                    onSearch={(q) => clientProjectApi.searchMessages(code!, q)}
+                    onJumpTo={(messageId, designId) => jumpToMessage(messageId, designId ?? undefined)}
+                  />
+                  {messagesFetching && (
+                    <Sym name="progress_activity" className="text-[18px] animate-spin shrink-0" style={{ color: 'var(--p-primary)' }} />
+                  )}
+                </div>
                 <div className="relative shrink-0">
                   <button
                     type="button"
@@ -619,21 +613,31 @@ export default function ClientProjectDetail() {
                   )}
                 </div>
               </div>
-              <div className="px-4 sm:px-6 pb-3 flex items-center gap-1 overflow-x-auto">
-                {STAGES.map((st, i) => {
-                  const done = i < curIdx;
-                  const cur = i === curIdx;
-                  return (
-                    <div key={st.key} className="flex items-center gap-1 shrink-0">
-                      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap" style={cur ? { background: 'var(--p-primary)', color: '#fff' } : done ? { background: 'var(--p-secondary-container)', color: 'var(--p-on-secondary-container)' } : { background: 'var(--p-surface-container)', color: 'var(--p-on-surface-variant)' }}>
-                        {done && <Sym name="check" className="text-[12px]" />}{st.label}
-                      </span>
-                      {i < STAGES.length - 1 && <div className="w-4 h-px shrink-0" style={{ background: 'var(--p-outline-variant)' }} />}
+              {(isDesignChannel || isAnnouncements) && (
+                <div className="px-4 sm:px-6 pb-3 flex items-center gap-2 overflow-x-auto min-w-0">
+                  {isDesignChannel && activeDesign && (
+                    <span className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap border" style={{ borderColor: 'var(--p-outline)', color: 'var(--p-primary)' }}>
+                      <Sym name="flag" className="text-[13px]" /> {designStageLabel(activeDesign.stage)}
+                    </span>
+                  )}
+                  {isAnnouncements && (
+                    <div className="flex items-center gap-1 min-w-0">
+                      {STAGES.map((st, i) => {
+                        const done = i < curIdx;
+                        const cur = i === curIdx;
+                        return (
+                          <div key={st.key} className="flex items-center gap-1 shrink-0">
+                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap" style={cur ? { background: 'var(--p-primary)', color: '#fff' } : done ? { background: 'var(--p-secondary-container)', color: 'var(--p-on-secondary-container)' } : { background: 'var(--p-surface-container)', color: 'var(--p-on-surface-variant)' }}>
+                              {done && <Sym name="check" className="text-[12px]" />}{st.label}
+                            </span>
+                            {i < STAGES.length - 1 && <div className="w-4 h-px shrink-0" style={{ background: 'var(--p-outline-variant)' }} />}
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-                <span className="text-[10px] ml-1 opacity-60" style={{ color: 'var(--p-on-surface-variant)' }}>{statusLabelFor(currentStage, shell.currentStatus)}</span>
-              </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div ref={feedRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 chat-feed-bg">
@@ -663,54 +667,22 @@ export default function ClientProjectDetail() {
 
             {!isAnnouncements && (
               <div className="px-4 sm:px-6 pb-4 pt-2">
-                <Composer placeholder={`Message #${channelName.replace(/\s+/g, '-')}`} onSend={(t, a) => uploadAndSend(t, a)} />
+                <Composer placeholder={`Message #${channelName.replace(/\s+/g, '-')}`} showProductAttach onSend={(t, a) => uploadAndSend(t, a)} />
               </div>
             )}
           </main>
 
-          <aside
-            className={`above-bottom-nav ${openThreadId ? 'flex' : 'hidden'} flex-col w-full sm:w-96 lg:w-[340px] border-l shrink-0 fixed md:absolute lg:relative right-0 top-12 md:top-0 z-20 lg:z-auto thread-panel-bg transition-transform duration-200 ${openThreadId ? 'translate-x-0' : 'translate-x-full'}`}
-            style={{ borderColor: 'var(--p-outline-variant)', boxShadow: openThreadId ? '0 0 40px rgba(0,0,0,0.08)' : undefined }}
-          >
-            <div className="h-14 px-4 border-b flex items-center justify-between shrink-0 backdrop-blur-sm" style={{ borderColor: 'var(--p-outline-variant)', background: 'rgba(255,255,255,0.7)' }}>
-              <div>
-                <h3 className="font-bold text-[16px] flex items-center gap-2">
-                  <Sym name="forum" className="text-[18px]" style={{ color: 'var(--p-primary)' }} />
-                  Thread
-                </h3>
-                <p className="text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}># {channelName}</p>
-              </div>
-              <button type="button" onClick={() => setOpenThreadId(null)} className="p-2 rounded-lg hover:bg-black/5 transition-colors">
-                <Sym name="close" style={{ color: 'var(--p-on-surface-variant)' }} />
-              </button>
-            </div>
-            {threadRoot && (
-              <>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                  <div className="rounded-xl border p-3" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}>
-                    {renderMessage(threadRoot, true)}
-                  </div>
-                  <div className="flex items-center gap-2 py-1">
-                    <div className="flex-1 h-px" style={{ background: 'var(--p-outline-variant)' }} />
-                    <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>
-                      {threadReplies.length} {threadReplies.length === 1 ? 'reply' : 'replies'}
-                    </span>
-                    <div className="flex-1 h-px" style={{ background: 'var(--p-outline-variant)' }} />
-                  </div>
-                  {threadReplies.map((r) => (
-                    <div key={r.id} className="rounded-lg px-1 -mx-1 hover:bg-black/[0.02] transition-colors">
-                      {renderMessage(r, true)}
-                    </div>
-                  ))}
-                </div>
-                {!isAnnouncements && (
-                  <div className="p-3 border-t backdrop-blur-sm" style={{ borderColor: 'var(--p-outline-variant)', background: 'rgba(255,255,255,0.85)' }}>
-                    <Composer placeholder="Reply in thread…" compact onSend={(t, a) => uploadAndSend(t, a, threadRoot.id)} />
-                  </div>
-                )}
-              </>
-            )}
-          </aside>
+          <ThreadPanel
+            open={!!openThreadId}
+            channelName={channelName}
+            threadRoot={threadRoot}
+            threadReplies={threadReplies}
+            showComposer={!isAnnouncements}
+            onClose={() => setOpenThreadId(null)}
+            onSend={(t, a) => uploadAndSend(t, a, threadRoot!.id)}
+            formatTime={formatMsgTime}
+            className={`above-bottom-nav ${openThreadId ? 'flex' : 'hidden'} w-full sm:w-[min(420px,100vw)] lg:w-[380px] fixed md:absolute lg:relative right-0 top-12 md:top-0 z-20 lg:z-auto transition-transform duration-200 ${openThreadId ? 'translate-x-0' : 'translate-x-full'}`}
+          />
         </>
       )}
 

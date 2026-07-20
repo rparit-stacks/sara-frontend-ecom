@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { productsApi, categoriesApi, cmsApi } from '@/lib/api';
+import { storefrontQueryOptions } from '@/lib/storefrontCache';
 import { ProductCardSkeleton } from '@/components/skeletons';
 
 interface Category {
@@ -93,6 +94,7 @@ const Products = () => {
       })() : null;
       return productsApi.getAll({ userEmail: userEmail || undefined });
     },
+    ...storefrontQueryOptions,
   });
   
   const { data: cmsData } = useQuery({
@@ -117,6 +119,7 @@ const Products = () => {
       })() : null;
       return categoriesApi.getAll(true, userEmail || undefined);
     },
+    ...storefrontQueryOptions,
   });
 
   // Build a flat map of all categories for easy lookup

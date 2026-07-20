@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { productsApi, categoriesApi } from '@/lib/api';
+import { storefrontQueryOptions } from '@/lib/storefrontCache';
 
 interface Product {
   id: string;
@@ -36,11 +37,13 @@ export const SearchPopup = ({ open, onOpenChange }: SearchPopupProps) => {
   const { data: productsData = [] } = useQuery({
     queryKey: ['search-products'],
     queryFn: () => productsApi.getAll({ status: 'ACTIVE' } as any),
+    ...storefrontQueryOptions,
   });
 
   const { data: categoriesData = [] } = useQuery({
-    queryKey: ['search-categories'],
+    queryKey: ['categoriesActive'],
     queryFn: () => categoriesApi.getAll(true),
+    ...storefrontQueryOptions,
   });
 
   // Normalize products into a unified shape for searching

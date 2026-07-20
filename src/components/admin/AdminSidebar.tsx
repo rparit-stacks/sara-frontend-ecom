@@ -28,6 +28,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
 import { useAdminNotificationCounts } from '@/hooks/useAdminNotificationCounts';
+import { adminAuthApi } from '@/lib/api';
+import { isSuperAdmin } from '@/lib/adminAccess';
 
 // Sidebar grouped into sections, each with a heading.
 const adminMenuSections = [
@@ -98,6 +100,8 @@ export const AdminSidebar = () => {
   // Collapse only applies on desktop; mobile drawer is always full-width.
   const isCollapsed = collapsed && isDesktop;
   const notifCounts = useAdminNotificationCounts();
+  const [hasPortalAccess, setHasPortalAccess] = useState(true);
+  const [isSuperAdminUser, setIsSuperAdminUser] = useState(false);
   const badgeForPath: Record<string, number> = {
     '/admin-sara/orders': notifCounts.orders,
   };
@@ -145,6 +149,44 @@ export const AdminSidebar = () => {
     window.addEventListener('resize', checkDesktop);
     return () => window.removeEventListener('resize', checkDesktop);
   }, []);
+
+  useEffect(() => {
+    const loadPortalAccess = async () => {
+      if (!localStorage.getItem('adminToken')) {
+        setHasPortalAccess(false);
+        return;
+      }
+      try {
+        const admin = await adminAuthApi.getCurrentAdmin();
+        localStorage.setItem('adminUser', JSON.stringify(admin));
+        setHasPortalAccess(admin.portalAdminAccess === true);
+        setIsSuperAdminUser(isSuperAdmin(admin));
+      } catch {
+        try {
+          const stored = JSON.parse(localStorage.getItem('adminUser') || '{}');
+          setHasPortalAccess(stored.portalAdminAccess === true);
+          setIsSuperAdminUser(isSuperAdmin(stored));
+        } catch {
+          setHasPortalAccess(false);
+          setIsSuperAdminUser(false);
+        }
+      }
+    };
+    loadPortalAccess();
+  }, [location.pathname]);
+
+  const visibleMenuSections = adminMenuSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (item.path === '/admin-sara/admins') return isSuperAdminUser;
+        return true;
+      }),
+    }))
+    .filter((section) => {
+      if (section.title === 'Manufacturing') return hasPortalAccess;
+      return section.items.length > 0;
+    });
 
   return (
     <>
@@ -230,7 +272,7 @@ export const AdminSidebar = () => {
 
           {/* Menu Items — grouped into sections */}
           <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
-            {adminMenuSections.map((section, sectionIndex) => {
+            {visibleMenuSections.map((section, sectionIndex) => {
               const open = isCollapsed || isSectionOpen(section.title);
               return (
               <div key={section.title} className="space-y-1">

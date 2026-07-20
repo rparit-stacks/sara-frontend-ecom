@@ -32,6 +32,8 @@ export const STATUS_TONE: Record<string, { bg: string; fg: string }> = {
   PAID: { bg: 'var(--p-secondary-container)', fg: 'var(--p-on-secondary-container)' },
   Pending: { bg: 'var(--p-primary-fixed)', fg: 'var(--p-on-primary-fixed-variant)' },
   PENDING: { bg: 'var(--p-primary-fixed)', fg: 'var(--p-on-primary-fixed-variant)' },
+  Cancelled: { bg: 'var(--p-error-container)', fg: 'var(--p-on-error-container)' },
+  CANCELLED: { bg: 'var(--p-error-container)', fg: 'var(--p-on-error-container)' },
   Overdue: { bg: 'var(--p-error-container)', fg: 'var(--p-on-error-container)' },
   published: { bg: 'var(--p-secondary-container)', fg: 'var(--p-on-secondary-container)' },
   draft: { bg: 'var(--p-surface-container-high)', fg: 'var(--p-on-surface-variant)' },

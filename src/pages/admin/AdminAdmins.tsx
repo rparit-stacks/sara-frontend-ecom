@@ -1,76 +1,94 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Edit, Trash2, Eye, EyeOff, User, Mail, Calendar, Loader2, X, Mail as MailIcon } from 'lucide-react';
+import { Search, Edit, Trash2, User, Mail, Calendar, Loader2, Mail as MailIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { adminManagementApi } from '@/lib/api';
+import { adminManagementApi, projectApi } from '@/lib/api';
 
 const AdminAdmins = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState<any>(null);
-  const [showPassword, setShowPassword] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [invitePortalAccess, setInvitePortalAccess] = useState(false);
+  const [assignedProjectIds, setAssignedProjectIds] = useState<number[]>([]);
   const queryClient = useQueryClient();
   
-  // Form state
   const [formData, setFormData] = useState({
     username: '',
-    password: '',
     name: '',
     email: '',
     status: 'ACTIVE',
+    portalAdminAccess: false,
   });
   
-  // Fetch admins from API
   const { data: admins = [], isLoading, error } = useQuery({
     queryKey: ['adminAdmins'],
     queryFn: () => adminManagementApi.getAll(),
   });
   
-  // Create admin mutation
-  const createMutation = useMutation({
-    mutationFn: adminManagementApi.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['adminAdmins'] });
-      toast.success('Admin created successfully!');
-      setIsCreateDialogOpen(false);
-      resetForm();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Failed to create admin');
-    },
+  const { data: allProjects = [] } = useQuery({
+    queryKey: ['admin-projects-all'],
+    queryFn: () => projectApi.list(),
+    enabled: isEditDialogOpen && !!editingAdmin && editingAdmin.username !== 'admin' && formData.portalAdminAccess,
   });
+
+  useEffect(() => {
+    if (!isEditDialogOpen || !editingAdmin?.id || editingAdmin.username === 'admin') {
+      setAssignedProjectIds([]);
+      return;
+    }
+    adminManagementApi.getProjectAssignments(editingAdmin.id)
+      .then((r) => setAssignedProjectIds(r.projectIds || []))
+      .catch(() => setAssignedProjectIds([]));
+  }, [isEditDialogOpen, editingAdmin?.id, editingAdmin?.username]);
   
-  // Send invite mutation
   const sendInviteMutation = useMutation({
-    mutationFn: (email: string) => adminManagementApi.sendInvite(email),
+    mutationFn: ({ email, portalAdminAccess }: { email: string; portalAdminAccess: boolean }) =>
+      adminManagementApi.sendInvite(email, portalAdminAccess),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminAdmins'] });
       toast.success('Invitation sent successfully!');
       setIsInviteDialogOpen(false);
       setInviteEmail('');
+      setInvitePortalAccess(false);
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to send invitation');
     },
   });
   
-  // Update admin mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => 
       adminManagementApi.update(id, data),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['adminAdmins'] });
       toast.success('Admin updated successfully!');
+      if (editingAdmin?.username !== 'admin' && formData.portalAdminAccess) {
+        try {
+          await adminManagementApi.setProjectAssignments(editingAdmin.id, assignedProjectIds);
+        } catch (e: any) {
+          toast.error(e?.message || 'Admin saved but project assignments failed');
+        }
+      }
+      try {
+        const stored = JSON.parse(localStorage.getItem('adminUser') || '{}');
+        if (editingAdmin?.id === stored.id) {
+          localStorage.setItem(
+            'adminUser',
+            JSON.stringify({ ...stored, portalAdminAccess: formData.portalAdminAccess }),
+          );
+        }
+      } catch { /* ignore */ }
       setIsEditDialogOpen(false);
       setEditingAdmin(null);
       resetForm();
@@ -80,7 +98,6 @@ const AdminAdmins = () => {
     },
   });
   
-  // Update status mutation
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) => 
       adminManagementApi.updateStatus(id, status),
@@ -93,7 +110,6 @@ const AdminAdmins = () => {
     },
   });
   
-  // Delete admin mutation
   const deleteMutation = useMutation({
     mutationFn: adminManagementApi.delete,
     onSuccess: () => {
@@ -108,10 +124,10 @@ const AdminAdmins = () => {
   const resetForm = () => {
     setFormData({
       username: '',
-      password: '',
       name: '',
       email: '',
       status: 'ACTIVE',
+      portalAdminAccess: false,
     });
   };
   
@@ -120,24 +136,23 @@ const AdminAdmins = () => {
       toast.error('Please enter an email address');
       return;
     }
-    sendInviteMutation.mutate(inviteEmail.trim());
-  };
-  
-  const handleCreate = () => {
-    createMutation.mutate(formData);
+    sendInviteMutation.mutate({
+      email: inviteEmail.trim(),
+      portalAdminAccess: invitePortalAccess,
+    });
   };
   
   const handleUpdate = () => {
     if (editingAdmin) {
-      const updateData: any = {
-        name: formData.name,
-        email: formData.email,
-        status: formData.status,
-      };
-      if (formData.password) {
-        updateData.password = formData.password;
-      }
-      updateMutation.mutate({ id: editingAdmin.id, data: updateData });
+      updateMutation.mutate({
+        id: editingAdmin.id,
+        data: {
+          name: formData.name,
+          email: formData.email,
+          status: formData.status,
+          portalAdminAccess: formData.portalAdminAccess,
+        },
+      });
     }
   };
   
@@ -145,10 +160,10 @@ const AdminAdmins = () => {
     setEditingAdmin(admin);
     setFormData({
       username: admin.username,
-      password: '',
       name: admin.name || '',
       email: admin.email || '',
       status: admin.status || 'ACTIVE',
+      portalAdminAccess: admin.portalAdminAccess === true,
     });
     setIsEditDialogOpen(true);
   };
@@ -164,7 +179,6 @@ const AdminAdmins = () => {
     updateStatusMutation.mutate({ id: admin.id, status: newStatus });
   };
   
-  // Filter admins
   const filteredAdmins = admins.filter((admin: any) =>
     admin.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     admin.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -194,13 +208,21 @@ const AdminAdmins = () => {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="font-cursive text-3xl sm:text-4xl">Admin Users</h1>
             <p className="text-muted-foreground mt-1">Manage admin accounts and permissions</p>
           </div>
-          <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+          <Dialog
+            open={isInviteDialogOpen}
+            onOpenChange={(open) => {
+              setIsInviteDialogOpen(open);
+              if (!open) {
+                setInviteEmail('');
+                setInvitePortalAccess(false);
+              }
+            }}
+          >
             <DialogTrigger asChild>
               <Button className="btn-primary gap-2">
                 <MailIcon className="w-4 h-4" />
@@ -211,7 +233,7 @@ const AdminAdmins = () => {
               <DialogHeader>
                 <DialogTitle>Send Admin Invitation</DialogTitle>
                 <DialogDescription>
-                  Enter the email address to send an admin invitation. The recipient will receive a secure link to create their admin account.
+                  Enter the email address to send an admin invitation. The recipient will set their own password when accepting the invite.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-4">
@@ -224,6 +246,20 @@ const AdminAdmins = () => {
                     onChange={(e) => setInviteEmail(e.target.value)}
                     className="mt-1"
                     required
+                    disabled={sendInviteMutation.isPending}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <Label htmlFor="invite-portal-access">Manufacturing Portal access</Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Grant access to /portal-admin when they accept the invite.
+                    </p>
+                  </div>
+                  <Switch
+                    id="invite-portal-access"
+                    checked={invitePortalAccess}
+                    onCheckedChange={setInvitePortalAccess}
                     disabled={sendInviteMutation.isPending}
                   />
                 </div>
@@ -248,6 +284,7 @@ const AdminAdmins = () => {
                     onClick={() => {
                       setIsInviteDialogOpen(false);
                       setInviteEmail('');
+                      setInvitePortalAccess(false);
                     }}
                     disabled={sendInviteMutation.isPending}
                   >
@@ -259,7 +296,6 @@ const AdminAdmins = () => {
           </Dialog>
         </div>
         
-        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -270,7 +306,6 @@ const AdminAdmins = () => {
           />
         </div>
         
-        {/* Admins List */}
         <div className="grid gap-4">
           {filteredAdmins.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
@@ -315,6 +350,9 @@ const AdminAdmins = () => {
                     <Badge variant={admin.status === 'ACTIVE' ? 'default' : 'secondary'}>
                       {admin.status}
                     </Badge>
+                    <Badge variant={admin.portalAdminAccess ? 'outline' : 'secondary'}>
+                      {admin.portalAdminAccess ? 'Portal access' : 'Store only'}
+                    </Badge>
                     <Button
                       variant="outline"
                       size="sm"
@@ -346,7 +384,6 @@ const AdminAdmins = () => {
           )}
         </div>
         
-        {/* Edit Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -355,29 +392,7 @@ const AdminAdmins = () => {
             <div className="space-y-4 mt-4">
               <div>
                 <Label>Username</Label>
-                <Input
-                  value={formData.username}
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
-              <div>
-                <Label>New Password (leave blank to keep current)</Label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Enter new password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+                <Input value={formData.username} disabled className="bg-muted" />
               </div>
               <div>
                 <Label>Name *</Label>
@@ -412,12 +427,48 @@ const AdminAdmins = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div>
+                  <Label htmlFor="portal-admin-access">Manufacturing Portal access</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Allow this admin to open /portal-admin (inquiries, quotes, projects).
+                  </p>
+                </div>
+                <Switch
+                  id="portal-admin-access"
+                  checked={formData.portalAdminAccess}
+                  onCheckedChange={(checked) => setFormData({ ...formData, portalAdminAccess: checked })}
+                  disabled={editingAdmin?.username === 'admin'}
+                />
+              </div>
+              {editingAdmin?.username !== 'admin' && formData.portalAdminAccess && (
+                <div className="rounded-lg border border-border p-3 space-y-2 max-h-48 overflow-y-auto">
+                  <Label>Assigned manufacturing projects</Label>
+                  <p className="text-xs text-muted-foreground">
+                    This admin will only see inquiries, quotes, and data for the selected projects.
+                  </p>
+                  {allProjects.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No projects available</p>
+                  ) : (
+                    allProjects.map((p) => (
+                      <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={assignedProjectIds.includes(p.id)}
+                          onChange={(e) => {
+                            setAssignedProjectIds((ids) =>
+                              e.target.checked ? [...ids, p.id] : ids.filter((id) => id !== p.id),
+                            );
+                          }}
+                        />
+                        <span className="truncate">{p.code} — {p.title || p.clientName || 'Project'}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              )}
               <div className="flex gap-2 pt-2">
-                <Button
-                  onClick={handleUpdate}
-                  disabled={updateMutation.isPending}
-                  className="flex-1"
-                >
+                <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="flex-1">
                   {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update'}
                 </Button>
                 <Button

@@ -1,4 +1,7 @@
 import { Sym } from './Sym';
+import { formatMessagePreview } from '@/lib/messagePreview';
+
+export { formatMessagePreview };
 
 export interface ParsedPayment {
   amount: string;
@@ -30,26 +33,6 @@ export function parsePaymentCard(body?: string): ParsedPayment | null {
     url: extractField(trimmed, 'url') || '',
     code: extractField(trimmed, 'code') || '',
   };
-}
-
-/** Human-readable preview for threads, activity feeds and sidebars. */
-export function formatMessagePreview(body?: string, attachmentUrl?: string | null): string {
-  const pay = parsePaymentCard(body);
-  if (pay) {
-    const title = pay.title && pay.title !== 'Payment' ? `: ${pay.title}` : '';
-    return `💳 Payment requested — ${pay.amount}${title}`;
-  }
-  if (body != null && body.includes(PAYMENT_MARKER)) {
-    return '💳 Payment requested';
-  }
-  if (body != null && body.trim() && body.trim() !== '(attachment)') {
-    const s = body.replace(/\*\*|__/g, '').replace(/\*|_/g, '').trim();
-    return s.length > 120 ? `${s.slice(0, 117)}…` : s;
-  }
-  if (attachmentUrl) {
-    return /\.(png|jpe?g|gif|webp)/i.test(attachmentUrl) ? '📷 Image attachment' : '📎 File attachment';
-  }
-  return '—';
 }
 
 /**

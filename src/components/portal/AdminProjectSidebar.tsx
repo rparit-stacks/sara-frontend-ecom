@@ -15,6 +15,7 @@ export interface AdminProjectDesign {
   name: string;
   imageUrl?: string | null;
   system?: boolean;
+  general?: boolean;
   unreadCount?: number;
 }
 
@@ -56,7 +57,7 @@ export default function AdminProjectSidebar({
   onSelectDesign: (id: number) => void;
   onAddDesign: () => void;
   onDeleteDesign: (id: number) => void;
-  onRenameDesign?: (designId: number, currentName: string) => void;
+  onRenameDesign?: (designId: number, currentName: string, imageUrl?: string | null) => void;
   onRenameProject?: () => void;
   onOpenSettings?: () => void;
   view: WorkspaceView;
@@ -64,7 +65,38 @@ export default function AdminProjectSidebar({
   threadsUnread?: number;
 }) {
   const navigate = useNavigate();
+  // Sort comm channels: Announcements (system) first, General Chat second
+  const commChannels = designs
+    .filter((d) => d.system || d.general)
+    .sort((a, b) => {
+      if (a.system && !b.system) return -1;
+      if (!a.system && b.system) return 1;
+      return 0;
+    });
+  const designChannels = designs.filter((d) => !d.system && !d.general);
   const chatsUnread = designs.reduce((n, d) => n + (d.unreadCount ?? 0), 0);
+
+  const renderChannelBtn = (d: AdminProjectDesign, icon: string) => {
+    const on = d.id === activeDesignId && view === 'channels';
+    const unread = !on ? (d.unreadCount ?? 0) : 0;
+    const hasUnread = unread > 0;
+    return (
+      <button
+        key={d.id}
+        onClick={() => { onSelectDesign(d.id); onViewChange('channels'); }}
+        className="w-full flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors text-left"
+        style={on ? { background: 'rgba(0,103,106,0.1)', color: 'var(--p-primary)' } : hasUnread ? { background: 'var(--p-surface-container-lowest)' } : { color: 'var(--p-on-surface-variant)' }}
+      >
+        <div className="w-8 h-8 rounded overflow-hidden shrink-0 border flex items-center justify-center" style={{ borderColor: on ? 'var(--p-primary)' : 'var(--p-outline-variant)', background: 'rgba(0,103,106,0.12)' }}>
+          <Sym name={icon} className="text-[17px]" style={{ color: 'var(--p-primary)' }} />
+        </div>
+        <span className={`text-[14px] truncate flex-1 min-w-0 font-bold`}>
+          {d.system ? `#${d.name}` : d.name}
+        </span>
+        <UnreadBadge count={unread} />
+      </button>
+    );
+  };
 
   const goResource = (key: string) => {
     if (key === 'channels') onViewChange('channels');
@@ -90,7 +122,7 @@ export default function AdminProjectSidebar({
   );
 
   return (
-    <aside className="w-60 sm:w-64 border-r flex-col shrink-0 hidden md:flex" style={{ background: 'var(--p-surface-container-low)', borderColor: 'var(--p-outline-variant)' }}>
+    <aside className="w-[240px] min-w-[240px] max-w-[240px] border-r flex-col shrink-0 hidden md:flex overflow-hidden" style={{ background: 'var(--p-surface-container-low)', borderColor: 'var(--p-outline-variant)' }}>
       <div className="p-4 border-b flex items-center justify-between gap-2 min-w-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
         <button onClick={() => navigate('/portal-admin/projects')} className="flex items-center gap-2 min-w-0 text-left flex-1">
           <Sym name="arrow_back_ios" className="text-[14px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
@@ -134,22 +166,28 @@ export default function AdminProjectSidebar({
         </div>
 
         <div>
+          <p className="px-3 mb-1 text-[12px] font-bold uppercase tracking-wider" style={{ color: 'var(--p-on-surface-variant)' }}>Communication</p>
+          <nav className="space-y-1 mb-4">
+            {commChannels.map((d) => renderChannelBtn(d, d.system ? 'campaign' : 'chat_bubble'))}
+          </nav>
           <div className="px-3 mb-1 flex justify-between items-center">
             <p className="text-[12px] font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: 'var(--p-on-surface-variant)' }}>
               Designs
-              {chatsUnread > 0 ? <UnreadBadge count={chatsUnread} /> : null}
+              {designChannels.reduce((n, d) => n + (d.unreadCount ?? 0), 0) > 0 ? (
+                <UnreadBadge count={designChannels.reduce((n, d) => n + (d.unreadCount ?? 0), 0)} />
+              ) : null}
             </p>
             <button type="button" onClick={onAddDesign} className="p-0.5 rounded hover:bg-black/5" title="Add design channel">
               <Sym name="add" className="text-[16px]" style={{ color: 'var(--p-primary)' }} />
             </button>
           </div>
           <nav className="space-y-1">
-            {designs.map((d) => {
+            {designChannels.map((d) => {
               const on = d.id === activeDesignId && view === 'channels';
               const unread = !on ? (d.unreadCount ?? 0) : 0;
               const hasUnread = unread > 0;
-              const realDesigns = designs.filter((x) => !x.system).length;
-              const canDelete = !d.system && realDesigns > 1;
+              const realDesigns = designChannels.length;
+              const canDelete = realDesigns > 1;
               return (
                 <div key={d.id} className="group/design relative">
                   <button
@@ -174,11 +212,11 @@ export default function AdminProjectSidebar({
                     </span>
                     <UnreadBadge count={unread} />
                   </button>
-                  {onRenameDesign && !d.system && (
+                  {onRenameDesign && (
                     <button
                       type="button"
                       title="Rename design"
-                      onClick={(e) => { e.stopPropagation(); onRenameDesign(d.id, d.name); }}
+                      onClick={(e) => { e.stopPropagation(); onRenameDesign(d.id, d.name, d.imageUrl); }}
                       className={`absolute top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover/design:opacity-100 hover:bg-black/5 transition-all ${canDelete ? 'right-8' : 'right-2'}`}
                     >
                       <Sym name="edit" className="text-[16px]" style={{ color: 'var(--p-on-surface-variant)' }} />

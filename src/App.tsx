@@ -67,6 +67,8 @@ import AdminCurrencyMultipliers from "./pages/admin/AdminCurrencyMultipliers";
 import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
 import AdminLogs from "./pages/admin/AdminLogs";
 import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
+import ProtectedPortalAdminRoute from "./components/admin/ProtectedPortalAdminRoute";
+import ProtectedSuperAdminRoute from "./components/admin/ProtectedSuperAdminRoute";
 import MaintenancePlan from "./pages/admin/MaintenancePlan";
 import PortalGuard from "./components/portal/PortalGuard";
 import PortalHome from "./pages/portal/PortalHome";
@@ -96,6 +98,7 @@ import PortalAdminForms from "./pages/portal/admin/AdminForms";
 import PortalAdminFormBuilder from "./pages/portal/admin/AdminFormBuilder";
 import PortalAdminQuoteBuilder from "./pages/portal/admin/AdminQuoteBuilder";
 import PortalAdminInquiryDetail from "./pages/portal/admin/AdminInquiryDetail";
+import PortalAdminAssignments from "./pages/portal/admin/AdminAssignments";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -175,26 +178,27 @@ const App = () =>
           <Route path="/portal/invoices" element={<PortalGuard><PortalInvoices /></PortalGuard>} />
           <Route path="/portal/payment-history" element={<PortalGuard><PortalPaymentHistory /></PortalGuard>} />
 
-          {/* Manufacturing Portal — ADMIN side (guarded by existing store-admin auth) */}
-          <Route path="/portal-admin" element={<ProtectedAdminRoute><PortalAdminDashboard /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/projects" element={<ProtectedAdminRoute><PortalAdminProjects /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/projects/:code" element={<ProtectedAdminRoute><PortalAdminProjectDetail /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/inquiries" element={<ProtectedAdminRoute><PortalAdminInquiries /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/inquiries/:id" element={<ProtectedAdminRoute><PortalAdminInquiryDetail /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/inquiry-form" element={<ProtectedAdminRoute><PortalAdminInquiryForm /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/inquiry-content" element={<ProtectedAdminRoute><PortalAdminInquiryContent /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/quotations" element={<ProtectedAdminRoute><PortalAdminQuotations /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/payment-links" element={<ProtectedAdminRoute><PortalAdminPaymentLinks /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/payment-history" element={<ProtectedAdminRoute><PortalAdminPaymentHistory /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/quote-editor/new" element={<ProtectedAdminRoute><PortalAdminQuoteBuilder /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/quote-editor/:reference" element={<ProtectedAdminRoute><PortalAdminQuoteBuilder /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/quotations/:project" element={<ProtectedAdminRoute><Navigate to="/portal-admin/quotations" replace /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/forms" element={<ProtectedAdminRoute><PortalAdminForms /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/forms/:id" element={<ProtectedAdminRoute><PortalAdminFormBuilder /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/invoices" element={<ProtectedAdminRoute><PortalAdminInvoices /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/tech-packs" element={<ProtectedAdminRoute><PortalAdminTechPacks /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/clients" element={<ProtectedAdminRoute><PortalAdminClients /></ProtectedAdminRoute>} />
-          <Route path="/portal-admin/settings" element={<ProtectedAdminRoute><PortalAdminSettings /></ProtectedAdminRoute>} />
+          {/* Manufacturing Portal — ADMIN side (store admin auth + portal access flag) */}
+          <Route path="/portal-admin" element={<ProtectedPortalAdminRoute><PortalAdminDashboard /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/projects" element={<ProtectedPortalAdminRoute><PortalAdminProjects /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/assignments" element={<ProtectedPortalAdminRoute><ProtectedSuperAdminRoute><PortalAdminAssignments /></ProtectedSuperAdminRoute></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/projects/:code" element={<ProtectedPortalAdminRoute><PortalAdminProjectDetail /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/inquiries" element={<ProtectedPortalAdminRoute><PortalAdminInquiries /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/inquiries/:id" element={<ProtectedPortalAdminRoute><PortalAdminInquiryDetail /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/inquiry-form" element={<ProtectedPortalAdminRoute><PortalAdminInquiryForm /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/inquiry-content" element={<ProtectedPortalAdminRoute><PortalAdminInquiryContent /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/quotations" element={<ProtectedPortalAdminRoute><PortalAdminQuotations /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/payment-links" element={<ProtectedPortalAdminRoute><PortalAdminPaymentLinks /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/payment-history" element={<ProtectedPortalAdminRoute><PortalAdminPaymentHistory /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/quote-editor/new" element={<ProtectedPortalAdminRoute><PortalAdminQuoteBuilder /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/quote-editor/:reference" element={<ProtectedPortalAdminRoute><PortalAdminQuoteBuilder /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/quotations/:project" element={<ProtectedPortalAdminRoute><Navigate to="/portal-admin/quotations" replace /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/forms" element={<ProtectedPortalAdminRoute><PortalAdminForms /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/forms/:id" element={<ProtectedPortalAdminRoute><PortalAdminFormBuilder /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/invoices" element={<ProtectedPortalAdminRoute><PortalAdminInvoices /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/tech-packs" element={<ProtectedPortalAdminRoute><PortalAdminTechPacks /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/clients" element={<ProtectedPortalAdminRoute><PortalAdminClients /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/settings" element={<ProtectedPortalAdminRoute><PortalAdminSettings /></ProtectedPortalAdminRoute>} />
 
           {/* Admin Routes */}
           <Route path="/admin-sara/login" element={<AdminLogin />} />
@@ -330,9 +334,9 @@ const App = () =>
           <Route 
             path="/admin-sara/admins" 
             element={
-              <ProtectedAdminRoute>
+              <ProtectedSuperAdminRoute>
                 <AdminAdmins />
-              </ProtectedAdminRoute>
+              </ProtectedSuperAdminRoute>
             } 
           />
           <Route 

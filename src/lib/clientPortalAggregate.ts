@@ -1,5 +1,5 @@
 import { clientProjectApi, type PortalAggregateDto } from '@/lib/api';
-import { formatMessagePreview } from '@/components/portal/PaymentCard';
+import { formatMessagePreview } from '@/lib/messagePreview';
 
 export interface ThreadWithProject {
   messageId: number;

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { categoriesApi } from '@/lib/api';
+import { storefrontQueryOptions } from '@/lib/storefrontCache';
 import { ChevronDown } from 'lucide-react';
 
 interface Category {
@@ -22,7 +23,7 @@ export const CategoryDropdown = () => {
 
   // Fetch active categories with user email if logged in
   const { data: categories = [] } = useQuery({
-    queryKey: ['categories', 'active'],
+    queryKey: ['categoriesActive'],
     queryFn: () => {
       const userEmail = typeof window !== 'undefined' ? (() => {
         const token = localStorage.getItem('authToken');
@@ -36,6 +37,7 @@ export const CategoryDropdown = () => {
       })() : null;
       return categoriesApi.getAll(true, userEmail || undefined);
     },
+    ...storefrontQueryOptions,
   });
 
   // Close dropdown when clicking outside

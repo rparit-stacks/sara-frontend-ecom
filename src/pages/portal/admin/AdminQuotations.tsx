@@ -251,6 +251,9 @@ export default function PortalAdminQuotations() {
   const [showEntryChooser, setShowEntryChooser] = useState(false);
   const [query, setQuery] = useState(params.get('q') ?? '');
   const [dateFilter, setDateFilter] = useState(params.get('date') ?? '');
+  const [statusFilter, setStatusFilter] = useState(params.get('status') ?? '');
+  const [minAmount, setMinAmount] = useState(params.get('minAmount') ?? '');
+  const [maxAmount, setMaxAmount] = useState(params.get('maxAmount') ?? '');
   const [menu, setMenu] = useState<number | null>(null);
 
   const { data: quotes = [], isLoading: loadingQuotes } = useQuery({
@@ -309,16 +312,23 @@ export default function PortalAdminQuotations() {
     deleteQuote.mutate(q.id);
   };
 
-  const syncParams = (nextQ: string, nextDate: string) => {
+  const syncParams = (nextQ: string, nextDate: string, nextStatus: string, nextMinAmount: string, nextMaxAmount: string) => {
     const next = new URLSearchParams(params);
     if (nextQ) next.set('q', nextQ); else next.delete('q');
     if (nextDate) next.set('date', nextDate); else next.delete('date');
+    if (nextStatus) next.set('status', nextStatus); else next.delete('status');
+    if (nextMinAmount) next.set('minAmount', nextMinAmount); else next.delete('minAmount');
+    if (nextMaxAmount) next.set('maxAmount', nextMaxAmount); else next.delete('maxAmount');
     setParams(next, { replace: true });
   };
 
   const isLoading = tab === 'quotes' ? loadingQuotes : loadingTemplates;
   const list = tab === 'quotes' ? quotes : templates;
   const term = query.trim().toLowerCase();
+  const statuses = useMemo(
+    () => Array.from(new Set(quotes.map((q) => q.status).filter(Boolean))).sort(),
+    [quotes],
+  );
 
   const shown = useMemo(() => {
     let rows = list;
@@ -326,10 +336,25 @@ export default function PortalAdminQuotations() {
       const id = Number(inquiryFilter);
       rows = rows.filter((q) => q.inquiryId === id);
     }
-    return rows.filter((q) => quoteMatchesSearch(q, term, dateFilter));
-  }, [list, inquiryFilter, tab, term, dateFilter]);
+    const minimum = minAmount === '' ? null : Number(minAmount);
+    const maximum = maxAmount === '' ? null : Number(maxAmount);
+    return rows.filter((q) =>
+      quoteMatchesSearch(q, term, dateFilter)
+      && (!statusFilter || tab === 'templates' || q.status === statusFilter)
+      && (minimum == null || Number.isNaN(minimum) || q.total >= minimum)
+      && (maximum == null || Number.isNaN(maximum) || q.total <= maximum),
+    );
+  }, [list, inquiryFilter, tab, term, dateFilter, statusFilter, minAmount, maxAmount]);
 
-  const hasFilters = !!term || !!dateFilter;
+  const hasFilters = !!term || !!dateFilter || !!statusFilter || !!minAmount || !!maxAmount;
+  const clearFilters = () => {
+    setQuery('');
+    setDateFilter('');
+    setStatusFilter('');
+    setMinAmount('');
+    setMaxAmount('');
+    syncParams('', '', '', '', '');
+  };
 
   return (
     <AdminShell
@@ -365,11 +390,53 @@ export default function PortalAdminQuotations() {
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
-                  syncParams(e.target.value, dateFilter);
+                  syncParams(e.target.value, dateFilter, statusFilter, minAmount, maxAmount);
                 }}
                 placeholder="Search name, phone, quote ID, date…"
                 className="pl-8 pr-3 py-1.5 rounded-lg text-[13px] w-64 sm:w-72 outline-none border"
                 style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
+              />
+            </div>
+            {tab === 'quotes' && (
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  syncParams(query, dateFilter, e.target.value, minAmount, maxAmount);
+                }}
+                aria-label="Filter by status"
+                className="px-3 py-1.5 rounded-lg text-[13px] outline-none border"
+                style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface)' }}
+              >
+                <option value="">All statuses</option>
+                {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+              </select>
+            )}
+            <div className="flex items-center rounded-lg border overflow-hidden" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}>
+              <input
+                type="number"
+                min="0"
+                value={minAmount}
+                onChange={(e) => {
+                  setMinAmount(e.target.value);
+                  syncParams(query, dateFilter, statusFilter, e.target.value, maxAmount);
+                }}
+                placeholder="Min amount"
+                aria-label="Minimum amount"
+                className="w-24 px-2.5 py-1.5 text-[13px] outline-none bg-transparent"
+              />
+              <span className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>–</span>
+              <input
+                type="number"
+                min="0"
+                value={maxAmount}
+                onChange={(e) => {
+                  setMaxAmount(e.target.value);
+                  syncParams(query, dateFilter, statusFilter, minAmount, e.target.value);
+                }}
+                placeholder="Max amount"
+                aria-label="Maximum amount"
+                className="w-24 px-2.5 py-1.5 text-[13px] outline-none bg-transparent"
               />
             </div>
             <input
@@ -377,20 +444,17 @@ export default function PortalAdminQuotations() {
               value={dateFilter}
               onChange={(e) => {
                 setDateFilter(e.target.value);
-                syncParams(query, e.target.value);
+                syncParams(query, e.target.value, statusFilter, minAmount, maxAmount);
               }}
-              title="Filter by date"
+              title="Filter by created or updated date"
+              aria-label="Filter by created or updated date"
               className="px-3 py-1.5 rounded-lg text-[13px] outline-none border"
               style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface)' }}
             />
             {hasFilters && (
               <button
                 type="button"
-                onClick={() => {
-                  setQuery('');
-                  setDateFilter('');
-                  syncParams('', '');
-                }}
+                onClick={clearFilters}
                 className="text-[12px] font-bold underline"
                 style={{ color: 'var(--p-primary)' }}
               >
@@ -424,7 +488,7 @@ export default function PortalAdminQuotations() {
             </p>
             <p className="text-[13px]">
               {hasFilters
-                ? 'Try another name, phone, quote ID, or date.'
+                ? 'Try changing or clearing the active filters.'
                 : tab === 'templates'
                   ? 'Open a quotation and choose "Save as template" to reuse it later.'
                   : 'Create one from an inquiry or start a blank quotation.'}
@@ -432,15 +496,11 @@ export default function PortalAdminQuotations() {
             {hasFilters ? (
               <button
                 type="button"
-                onClick={() => {
-                  setQuery('');
-                  setDateFilter('');
-                  syncParams('', '');
-                }}
+                onClick={clearFilters}
                 className="mt-4 px-4 py-2 rounded-lg text-[13px] font-semibold border"
                 style={{ borderColor: 'var(--p-outline)' }}
               >
-                Clear search
+                Clear filters
               </button>
             ) : tab === 'quotes' ? (
               <button onClick={() => setShowEntryChooser(true)} className="mt-4 px-4 py-2 rounded-lg text-[13px] font-semibold text-white inline-flex items-center gap-1.5" style={{ background: 'var(--p-primary)' }}>
