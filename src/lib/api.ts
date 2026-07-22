@@ -1486,6 +1486,24 @@ export const adminManagementApi = {
 };
 
 // ===============================
+// Admin presence (online/offline) API
+// ===============================
+export const presenceApi = {
+  /** Snapshot of currently-online admin ids (seeds initial render; live updates via STOMP). */
+  getOnline: () => fetchApi<{ onlineAdminIds: number[] }>('/api/admin/presence'),
+  /** The current admin's own effective online status. */
+  getMyStatus: () => fetchApi<{ adminId: number; online: boolean }>('/api/admin/presence/me'),
+  /** Set the current admin's manual online/offline intent. */
+  setMyStatus: (online: boolean) =>
+    fetchApi<{ adminId: number; online: boolean }>('/api/admin/presence/me', {
+      method: 'PUT',
+      body: JSON.stringify({ online }),
+    }),
+  /** Keep-alive so the safety-net sweep doesn't drop a still-open admin. */
+  heartbeat: () => fetchApi<void>('/api/admin/presence/heartbeat', { method: 'POST' }),
+};
+
+// ===============================
 // User API
 // ===============================
 export const userApi = {
@@ -1976,7 +1994,13 @@ export interface ProjectDesignCatalogDto {
 /** Super-admin portal assignment management (full project or per-design). */
 export const portalAssignmentApi = {
   listPortalAdmins: () =>
-    fetchApi<{ adminId: number; name: string; email: string }[]>('/api/admin/manufacturing/assignments/portal-admins'),
+    fetchApi<{
+      adminId: number;
+      name: string;
+      email: string;
+      fullProjectCount: number;
+      partialProjectCount: number;
+    }[]>('/api/admin/manufacturing/assignments/portal-admins'),
   getAssignments: (adminId: number) =>
     fetchApi<AdminPortalAssignmentDto>(`/api/admin/manufacturing/assignments/${adminId}`),
   setAssignments: (adminId: number, body: Pick<AdminPortalAssignmentDto, 'fullProjectIds' | 'designAssignments'>) =>

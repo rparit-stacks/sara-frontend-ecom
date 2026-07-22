@@ -4,6 +4,8 @@ import { Sym } from './Sym';
 import { adminAuthApi, getUserEmailFromToken } from '@/lib/api';
 import { getAdminChatDisplayName, getStoredAdminUser, isSuperAdmin } from '@/lib/adminAccess';
 import { useAdminNotificationCounts } from '@/hooks/useAdminNotificationCounts';
+import { AdminPresenceProvider } from '@/context/AdminPresenceContext';
+import PresenceToggle from '@/components/admin/PresenceToggle';
 import '@/pages/portal/portal.css';
 
 type NavItem = { icon: string; label: string; to: string; badge?: number };
@@ -150,6 +152,7 @@ export default function AdminShell({
   };
 
   return (
+    <AdminPresenceProvider>
     <div className="portal-root">
       {/* top bar */}
       <header className="h-12 flex items-center justify-between px-4 shrink-0 z-40" style={{ background: 'var(--p-primary)' }}>
@@ -164,6 +167,7 @@ export default function AdminShell({
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <PresenceToggle />
           <button onClick={() => navigate('/portal-admin/inquiries')} className="msym text-white/70 hover:text-white relative">
             inbox
             {notifCounts.inquiries > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white" />}
@@ -250,6 +254,7 @@ export default function AdminShell({
         </main>
       </div>
     </div>
+    </AdminPresenceProvider>
   );
 }
 

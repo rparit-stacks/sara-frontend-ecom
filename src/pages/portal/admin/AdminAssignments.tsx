@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import AdminShell, { AdminBtn } from '@/components/portal/AdminShell';
 import { Sym } from '@/components/portal/Sym';
 import { portalAssignmentApi } from '@/lib/api';
+import { useAdminPresence } from '@/hooks/useAdminPresence';
+import PresenceDot from '@/components/admin/PresenceDot';
 
 type DesignMap = Record<number, Set<number>>;
 
@@ -19,6 +21,7 @@ export default function PortalAdminAssignments() {
   const [partialDesigns, setPartialDesigns] = useState<DesignMap>({});
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [dirty, setDirty] = useState(false);
+  const onlineAdminIds = useAdminPresence();
 
   const { data: portalAdmins = [], isLoading: adminsLoading } = useQuery({
     queryKey: ['portal-assignment-admins'],
@@ -106,6 +109,8 @@ export default function PortalAdminAssignments() {
     },
     onSuccess: (data) => {
       qc.setQueryData(['portal-assignment', adminId], data);
+      // Refresh the left-column summary counts for this admin.
+      void qc.invalidateQueries({ queryKey: ['portal-assignment-admins'] });
       setDirty(false);
       toast.success('Assignments saved');
     },
@@ -143,41 +148,78 @@ export default function PortalAdminAssignments() {
           </ul>
         </div>
 
-        <div className="grid sm:grid-cols-[280px_1fr] gap-5">
+        <div className="grid sm:grid-cols-[320px_1fr] gap-5">
           <div
-            className="rounded-xl border p-4 space-y-3 h-fit"
+            className="rounded-xl border p-3 space-y-2 h-fit"
             style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}
           >
-            <label className="text-[11px] font-bold uppercase block" style={{ color: 'var(--p-on-surface-variant)' }}>
-              Portal admin
-            </label>
+            <div className="flex items-center justify-between px-1 pt-1">
+              <label className="text-[11px] font-bold uppercase" style={{ color: 'var(--p-on-surface-variant)' }}>
+                Portal admins
+              </label>
+              <span className="text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}>
+                {portalAdmins.filter((a) => onlineAdminIds.has(a.adminId)).length} online
+              </span>
+            </div>
+
             {adminsLoading ? (
-              <p className="text-sm" style={{ color: 'var(--p-on-surface-variant)' }}>Loading…</p>
+              <p className="text-sm px-1 py-2" style={{ color: 'var(--p-on-surface-variant)' }}>Loading…</p>
             ) : portalAdmins.length === 0 ? (
-              <p className="text-sm" style={{ color: 'var(--p-on-surface-variant)' }}>
+              <p className="text-sm px-1 py-2" style={{ color: 'var(--p-on-surface-variant)' }}>
                 No portal admins yet. Enable manufacturing portal access on an admin account first.
               </p>
             ) : (
-              <select
-                value={adminId}
-                onChange={(e) => {
-                  setAdminId(e.target.value ? Number(e.target.value) : '');
-                  setDirty(false);
-                }}
-                className="w-full h-10 px-3 rounded-lg border text-[14px]"
-                style={{ borderColor: 'var(--p-outline-variant)' }}
-              >
-                <option value="">Select admin…</option>
-                {portalAdmins.map((a) => (
-                  <option key={a.adminId} value={a.adminId}>{a.name} ({a.email})</option>
-                ))}
-              </select>
+              <div className="space-y-1.5 max-h-[70vh] overflow-y-auto pr-0.5">
+                {portalAdmins.map((a) => {
+                  const isSelected = a.adminId === adminId;
+                  const isOnline = onlineAdminIds.has(a.adminId);
+                  const total = a.fullProjectCount + a.partialProjectCount;
+                  return (
+                    <button
+                      key={a.adminId}
+                      type="button"
+                      onClick={() => {
+                        setAdminId(a.adminId);
+                        setDirty(false);
+                      }}
+                      className="w-full text-left rounded-lg border px-3 py-2.5 transition-colors"
+                      style={{
+                        borderColor: isSelected ? 'var(--p-primary)' : 'var(--p-outline-variant)',
+                        background: isSelected ? 'rgba(0,103,106,0.08)' : 'var(--p-surface-container-low)',
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <PresenceDot online={isOnline} />
+                        <span className="font-semibold text-[13px] truncate flex-1 min-w-0">{a.name}</span>
+                        {total > 0 && (
+                          <span
+                            className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                            style={{ background: 'rgba(0,103,106,0.12)', color: 'var(--p-primary)' }}
+                          >
+                            {total} project{total === 1 ? '' : 's'}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>
+                        {a.email}
+                      </p>
+                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>
+                        {total === 0
+                          ? 'No projects assigned'
+                          : `${a.fullProjectCount} full · ${a.partialProjectCount} partial`}
+                        {' · '}
+                        <span style={{ color: isOnline ? 'var(--p-primary)' : undefined }}>
+                          {isOnline ? 'Online' : 'Offline'}
+                        </span>
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
             )}
-            {selectedAdmin && (
-              <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>
-                Assign projects or individual design channels for {selectedAdmin.name}.
-              </p>
-            )}
+            <p className="text-[11px] px-1 pt-1" style={{ color: 'var(--p-on-surface-variant)' }}>
+              You can assign any admin regardless of online status.
+            </p>
           </div>
 
           <div className="space-y-3">

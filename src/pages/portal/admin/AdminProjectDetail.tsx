@@ -23,7 +23,8 @@ import MessageHoverActions from '@/components/portal/MessageHoverActions';
 import DesignStagePicker from '@/components/portal/DesignStagePicker';
 import { Sym } from '@/components/portal/Sym';
 import { STAGES, STAGE_INDEX, defaultStatusFor, type StageKey } from '@/components/manufacturing/stages';
-import { useProjectEventStream, useProjectMessagePolling } from '@/hooks/useProjectEventStream';
+import { useProjectMessagePolling } from '@/hooks/useProjectEventStream';
+import { useProjectStomp } from '@/hooks/useProjectStomp';
 import { usePrefetchProductPicker } from '@/hooks/usePrefetchProductPicker';
 import { mediaApi, projectApi, manufacturingApi, type ProjectMessageDto, type WorkspaceView, type ManufacturingProjectDetailDto } from '@/lib/api';
 import { getAdminChatDisplayName } from '@/lib/adminAccess';
@@ -85,7 +86,7 @@ export default function PortalAdminProjectDetail() {
   const [pendingMessages, setPendingMessages] = useState<DisplayMessage[]>([]);
   const skipSseRef = useRef(0);
 
-  useProjectEventStream(code, 'admin', () => skipSseRef.current);
+  useProjectStomp(code, 'admin', () => skipSseRef.current);
   useProjectMessagePolling(code, activeDesignId, view === 'channels', 'admin');
   usePrefetchProductPicker();
 

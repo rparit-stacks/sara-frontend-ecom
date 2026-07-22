@@ -23,7 +23,8 @@ import MessageHoverActions from '@/components/portal/MessageHoverActions';
 import { Sym } from '@/components/portal/Sym';
 import { STAGES, STAGE_INDEX, type StageKey } from '@/components/manufacturing/stages';
 import { defaultActiveDesignId, designStageLabel } from '@/lib/portalChatConstants';
-import { useProjectEventStream, useProjectMessagePolling } from '@/hooks/useProjectEventStream';
+import { useProjectMessagePolling } from '@/hooks/useProjectEventStream';
+import { useProjectStomp } from '@/hooks/useProjectStomp';
 import { usePrefetchProductPicker } from '@/hooks/usePrefetchProductPicker';
 import { clientProjectApi, getUserEmailFromToken, mediaApi, type ProjectMessageDto, type WorkspaceView, type ManufacturingProjectDetailDto } from '@/lib/api';
 import { formatServerTime, formatServerDate } from '@/lib/serverTime';
@@ -95,7 +96,7 @@ export default function ClientProjectDetail() {
   const [chatMenuOpen, setChatMenuOpen] = useState(false);
   const skipSseRef = useRef(0);
 
-  useProjectEventStream(code, 'client', () => skipSseRef.current);
+  useProjectStomp(code, 'client', () => skipSseRef.current);
   useProjectMessagePolling(code, activeDesignId, view === 'channels', 'client');
   usePrefetchProductPicker();
 

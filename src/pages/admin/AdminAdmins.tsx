@@ -12,6 +12,8 @@ import { Switch } from '@/components/ui/switch';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { adminManagementApi, projectApi } from '@/lib/api';
+import { useAdminPresence } from '@/hooks/useAdminPresence';
+import PresenceDot from '@/components/admin/PresenceDot';
 
 const AdminAdmins = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,6 +24,7 @@ const AdminAdmins = () => {
   const [invitePortalAccess, setInvitePortalAccess] = useState(false);
   const [assignedProjectIds, setAssignedProjectIds] = useState<number[]>([]);
   const queryClient = useQueryClient();
+  const onlineAdminIds = useAdminPresence();
   
   const [formData, setFormData] = useState({
     username: '',
@@ -323,8 +326,11 @@ const AdminAdmins = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <div className="relative w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <User className="w-5 h-5 text-primary" />
+                        <span className="absolute -bottom-0.5 -right-0.5 ring-2 ring-card rounded-full">
+                          <PresenceDot online={onlineAdminIds.has(admin.id)} />
+                        </span>
                       </div>
                       <div>
                         <h3 className="font-semibold text-lg">{admin.name || admin.username}</h3>
@@ -347,6 +353,7 @@ const AdminAdmins = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <PresenceDot online={onlineAdminIds.has(admin.id)} withLabel />
                     <Badge variant={admin.status === 'ACTIVE' ? 'default' : 'secondary'}>
                       {admin.status}
                     </Badge>
