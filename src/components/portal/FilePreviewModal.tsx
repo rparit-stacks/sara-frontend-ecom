@@ -22,7 +22,9 @@ export default function FilePreviewModal({
 
   if (!open || !url) return null;
 
-  const kind = fileKind(url);
+  // Prefer detecting the type from the filename (blob: URLs and …/preview URLs have no
+  // usable extension in the path); fall back to the URL for classic extension-bearing URLs.
+  const kind = fileKind(fileName || url);
   const name = fileName || url.split('/').pop() || 'file';
 
   return (

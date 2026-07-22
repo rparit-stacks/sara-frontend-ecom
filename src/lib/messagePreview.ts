@@ -3,6 +3,22 @@ import { parseProductCard, stripProductMarker } from '@/components/portal/Produc
 
 export type MessagePreviewKind = 'payment' | 'product' | 'image' | 'file' | 'text' | 'empty';
 
+// Cloud storage preview URLs carry the original filename in ?name= (the path has no
+// extension). Test that name for image detection; fall back to the raw URL for Cloudinary.
+function looksLikeImage(url: string): boolean {
+  let target = url;
+  try {
+    const q = url.indexOf('?');
+    if (q >= 0) {
+      const name = new URLSearchParams(url.slice(q + 1)).get('name');
+      if (name) target = name;
+    }
+  } catch {
+    /* ignore */
+  }
+  return /\.(png|jpe?g|gif|webp|svg|avif)/i.test(target);
+}
+
 function plainPreviewText(body?: string | null): string {
   if (!body) return '';
   let s = stripProductMarker(body);
@@ -20,7 +36,7 @@ export function getMessagePreviewKind(body?: string | null, attachmentUrl?: stri
   if (body?.includes('[[product:')) return 'product';
   const text = plainPreviewText(body);
   if (text && text !== '(attachment)') return 'text';
-  if (attachmentUrl) return /\.(png|jpe?g|gif|webp|svg)/i.test(attachmentUrl) ? 'image' : 'file';
+  if (attachmentUrl) return looksLikeImage(attachmentUrl) ? 'image' : 'file';
   return 'empty';
 }
 
@@ -48,7 +64,7 @@ export function formatMessagePreview(body?: string | null, attachmentUrl?: strin
     return text.length > 120 ? `${text.slice(0, 117)}…` : text;
   }
   if (attachmentUrl) {
-    return /\.(png|jpe?g|gif|webp|svg)/i.test(attachmentUrl) ? 'Image attachment' : 'File attachment';
+    return looksLikeImage(attachmentUrl) ? 'Image attachment' : 'File attachment';
   }
   return '—';
 }

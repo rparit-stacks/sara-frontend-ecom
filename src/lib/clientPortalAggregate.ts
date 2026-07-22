@@ -78,8 +78,28 @@ function relTime(iso?: string): string {
   return d.toLocaleDateString();
 }
 
+// Cloud storage preview URLs have no filename in the path (…/files/{id}/preview) and
+// carry the original name in a ?name= query param. Extract it so both the display name
+// and the type detection keep working. Falls back to the last path segment for
+// Cloudinary-style URLs that DO have a filename.
+function originalNameFromUrl(url: string): string | null {
+  try {
+    const q = url.indexOf('?');
+    if (q >= 0) {
+      const params = new URLSearchParams(url.slice(q + 1));
+      const name = params.get('name');
+      if (name) return name;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 function fileNameFromUrl(url: string) {
   try {
+    const named = originalNameFromUrl(url);
+    if (named) return named;
     const part = url.split('/').pop() || 'file';
     return decodeURIComponent(part.split('?')[0]);
   } catch {
@@ -88,7 +108,8 @@ function fileNameFromUrl(url: string) {
 }
 
 function fileKind(url: string): 'pdf' | 'image' | 'doc' | 'video' | 'other' {
-  const lower = url.toLowerCase();
+  // Prefer the real filename (from ?name=) so extension-less preview URLs detect correctly.
+  const lower = (originalNameFromUrl(url) || url).toLowerCase();
   if (/\.(png|jpe?g|gif|webp|svg|avif)(\?|#|$)/i.test(lower)) return 'image';
   if (/\.pdf(\?|#|$)/i.test(lower)) return 'pdf';
   if (/\.(mp4|mov|webm)(\?|#|$)/i.test(lower)) return 'video';

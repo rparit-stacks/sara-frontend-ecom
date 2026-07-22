@@ -3,6 +3,7 @@ import { Sym } from './Sym';
 import { htmlToMarkdown, isEditorEmpty } from '@/lib/messageFormat';
 import EmojiPicker from './EmojiPicker';
 import ProductPickerModal, { type ProductPickerItem } from './ProductPickerModal';
+import FilePreviewModal from './FilePreviewModal';
 import { buildProductMarker } from './ProductCard';
 import { ANNOUNCEMENT_CATEGORIES } from '@/lib/portalChatConstants';
 import { applyFormat, handleListEnter, readFormatState, wrapSelectionInCode, type FormatState } from '@/lib/richEditor';
@@ -55,6 +56,7 @@ export default function Composer({
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductPickerItem | null>(null);
+  const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
   const [announcementCategory, setAnnouncementCategory] = useState(ANNOUNCEMENT_CATEGORIES[0].key);
   const [fmt, setFmt] = useState<FormatState>({ bold: false, italic: false, underline: false, unorderedList: false, orderedList: false });
   const editorRef = useRef<HTMLDivElement>(null);
@@ -234,7 +236,13 @@ export default function Composer({
           {atts.map((a) =>
             a.kind === 'image' ? (
               <div key={a.id} className="relative w-16 h-16 rounded-lg overflow-hidden border group" style={{ borderColor: 'var(--p-outline-variant)' }}>
-                <img src={a.url} className="w-full h-full object-cover" alt={a.name} />
+                <img
+                  src={a.url}
+                  className="w-full h-full object-cover cursor-zoom-in"
+                  alt={a.name}
+                  onClick={() => setPreview({ url: a.url, name: a.name })}
+                  title="Click to preview"
+                />
                 {!sending && (
                   <button type="button" onClick={() => removeAtt(a.id)} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100">
                     <Sym name="close" className="text-[14px]" />
@@ -243,8 +251,10 @@ export default function Composer({
               </div>
             ) : (
               <div key={a.id} className="flex items-center gap-2 pl-2 pr-1 py-1.5 rounded-lg border" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-low)' }}>
-                <Sym name="description" className="text-[18px]" style={{ color: 'var(--p-primary)' }} />
-                <div className="text-[12px] max-w-[120px]"><p className="truncate font-semibold">{a.name}</p><p style={{ color: 'var(--p-on-surface-variant)' }}>{a.size}</p></div>
+                <button type="button" onClick={() => setPreview({ url: a.url, name: a.name })} title="Click to preview" className="flex items-center gap-2 min-w-0 text-left hover:opacity-80">
+                  <Sym name="description" className="text-[18px]" style={{ color: 'var(--p-primary)' }} />
+                  <div className="text-[12px] max-w-[120px]"><p className="truncate font-semibold">{a.name}</p><p style={{ color: 'var(--p-on-surface-variant)' }}>{a.size}</p></div>
+                </button>
                 {!sending && <button type="button" onClick={() => removeAtt(a.id)} className="p-0.5 rounded hover:bg-black/10"><Sym name="close" className="text-[14px]" /></button>}
               </div>
             ),
@@ -308,6 +318,7 @@ export default function Composer({
         </div>
       </div>
       <ProductPickerModal open={productOpen} onClose={() => setProductOpen(false)} onSelect={setSelectedProduct} />
+      <FilePreviewModal open={!!preview} url={preview?.url ?? null} fileName={preview?.name} onClose={() => setPreview(null)} />
     </div>
   );
 }

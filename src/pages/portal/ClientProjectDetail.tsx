@@ -253,52 +253,77 @@ export default function ClientProjectDetail() {
 
   const uploadAndSend = async (text: string, atts: Attachment[], parentMessageId?: number) => {
     if (!code || !activeDesignId || isAnnouncements) return;
-    const tempId = -Date.now();
-    const optimistic: DisplayMessage = {
-      id: tempId,
-      projectId: project?.id || 0,
-      designId: activeDesignId,
-      authorType: 'CLIENT',
-      authorName: clientDisplayName,
-      body: text.trim() || (atts.length ? 'Uploading attachment…' : ''),
-      createdAt: new Date().toISOString(),
-      pending: true,
-      replyCount: 0,
-    };
-    if (!parentMessageId) setPendingMessages((xs) => [...xs, optimistic]);
 
-    try {
-      let attachmentUrl: string | undefined;
-      if (atts.length > 0) {
-        const f = atts[0].file;
-        const file = f || await (async () => {
-          const fileRes = await fetch(atts[0].url);
-          const blob = await fileRes.blob();
-          return new File([blob], atts[0].name, { type: blob.type });
-        })();
-        attachmentUrl = await mediaApi.upload(file, 'projects');
-      }
-      const body = text.trim() || (attachmentUrl ? '(attachment)' : '');
-      if (!body && !attachmentUrl) {
-        setPendingMessages((xs) => xs.filter((p) => p.id !== tempId));
-        return;
-      }
-      skipSseRef.current = Date.now() + 2500;
-      postMutation.mutate(
-        { body, attachmentUrl, parentMessageId, tempId },
-        {
-          onError: () => {
-            setPendingMessages((xs) => xs.filter((p) => p.id !== tempId));
-          },
-        },
-      );
-      if (parentMessageId) {
-        setOpenThreadId(parentMessageId);
-        clientProjectApi.markThreadRead(code, parentMessageId).catch(() => {});
-      }
-    } catch (e) {
-      setPendingMessages((xs) => xs.filter((p) => p.id !== tempId));
-      toast.error(e instanceof Error ? e.message : 'Failed to send');
+    const toFile = async (a: Attachment): Promise<File> => {
+      if (a.file) return a.file;
+      const blob = await (await fetch(a.url)).blob();
+      return new File([blob], a.name, { type: blob.type });
+    };
+
+    // Each attachment is sent as its own message. If there's text, it rides along with
+    // the first attachment; the rest go as attachment-only messages. No attachments ->
+    // a single text message.
+    const plans: { body: string; att?: Attachment; tempId: number }[] = [];
+    if (atts.length === 0) {
+      const body = text.trim();
+      if (!body) return;
+      plans.push({ body, tempId: -Date.now() });
+    } else {
+      atts.forEach((att, i) => {
+        plans.push({
+          body: i === 0 ? (text.trim() || '(attachment)') : '(attachment)',
+          att,
+          tempId: -(Date.now() + i),
+        });
+      });
+    }
+
+    if (!parentMessageId) {
+      setPendingMessages((xs) => [
+        ...xs,
+        ...plans.map((p) => ({
+          id: p.tempId,
+          projectId: project?.id || 0,
+          designId: activeDesignId,
+          authorType: 'CLIENT' as const,
+          authorName: clientDisplayName,
+          body: p.att ? 'Uploading attachment…' : p.body,
+          createdAt: new Date().toISOString(),
+          pending: true,
+          replyCount: 0,
+        })),
+      ]);
+    }
+
+    skipSseRef.current = Date.now() + 2500 + plans.length * 500;
+
+    // Upload + post each plan independently so one failure doesn't block the others.
+    await Promise.all(
+      plans.map(async (p) => {
+        try {
+          const attachmentUrl = p.att ? await mediaApi.upload(await toFile(p.att), 'projects') : undefined;
+          await new Promise<void>((resolve) => {
+            postMutation.mutate(
+              { body: p.body, attachmentUrl, parentMessageId, tempId: p.tempId },
+              {
+                onError: () => {
+                  setPendingMessages((xs) => xs.filter((x) => x.id !== p.tempId));
+                  resolve();
+                },
+                onSuccess: () => resolve(),
+              },
+            );
+          });
+        } catch (e) {
+          setPendingMessages((xs) => xs.filter((x) => x.id !== p.tempId));
+          toast.error(e instanceof Error ? e.message : `Failed to send ${p.att?.name ?? 'message'}`);
+        }
+      }),
+    );
+
+    if (parentMessageId) {
+      setOpenThreadId(parentMessageId);
+      clientProjectApi.markThreadRead(code, parentMessageId).catch(() => {});
     }
   };
 
