@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Edit, Trash2, User, Mail, Calendar, Loader2, Mail as MailIcon } from 'lucide-react';
+import { Search, Edit, Trash2, User, Mail, Calendar, Loader2, Mail as MailIcon, Phone } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -30,6 +30,7 @@ const AdminAdmins = () => {
     username: '',
     name: '',
     email: '',
+    whatsappNumber: '',
     status: 'ACTIVE',
     portalAdminAccess: false,
   });
@@ -129,6 +130,7 @@ const AdminAdmins = () => {
       username: '',
       name: '',
       email: '',
+      whatsappNumber: '',
       status: 'ACTIVE',
       portalAdminAccess: false,
     });
@@ -152,6 +154,7 @@ const AdminAdmins = () => {
         data: {
           name: formData.name,
           email: formData.email,
+          whatsappNumber: formData.whatsappNumber.trim(),
           status: formData.status,
           portalAdminAccess: formData.portalAdminAccess,
         },
@@ -165,6 +168,7 @@ const AdminAdmins = () => {
       username: admin.username,
       name: admin.name || '',
       email: admin.email || '',
+      whatsappNumber: admin.whatsappNumber || '',
       status: admin.status || 'ACTIVE',
       portalAdminAccess: admin.portalAdminAccess === true,
     });
@@ -344,6 +348,12 @@ const AdminAdmins = () => {
                           <span>{admin.email}</span>
                         </div>
                       )}
+                      {admin.whatsappNumber && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Phone className="w-4 h-4" />
+                          <span>{admin.whatsappNumber}</span>
+                        </div>
+                      )}
                       {admin.lastLogin && (
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <Calendar className="w-4 h-4" />
@@ -417,6 +427,18 @@ const AdminAdmins = () => {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="Enter email"
                 />
+              </div>
+              <div>
+                <Label>WhatsApp number</Label>
+                <Input
+                  type="tel"
+                  value={formData.whatsappNumber}
+                  onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
+                  placeholder="e.g. 919810167696"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Used for admin WhatsApp alerts. Leave blank to clear.
+                </p>
               </div>
               <div>
                 <Label>Status</Label>
