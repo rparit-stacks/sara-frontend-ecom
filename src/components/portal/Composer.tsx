@@ -7,6 +7,7 @@ import FilePreviewModal from './FilePreviewModal';
 import { buildProductMarker } from './ProductCard';
 import { ANNOUNCEMENT_CATEGORIES } from '@/lib/portalChatConstants';
 import { applyFormat, handleListEnter, readFormatState, wrapSelectionInCode, type FormatState } from '@/lib/richEditor';
+import { handleInlineAutoFormat, handleListShortcut, handleAutoLink } from '@/lib/autoFormat';
 
 export interface Attachment {
   id: string;
@@ -211,10 +212,28 @@ export default function Composer({
       submit();
       return;
     }
+    // Slack/WhatsApp-style: "- " / "* " / "1. " + Space starts a list.
+    if (e.key === ' ' && handleListShortcut(e, editorRef.current)) {
+      syncEmpty();
+      syncFmt();
+      return;
+    }
+    // Space also finalizes a bare URL into a clickable link.
+    if (e.key === ' ') {
+      // Let the space land first, then linkify on the next tick.
+      setTimeout(() => { handleAutoLink(editorRef.current); syncFmt(); }, 0);
+    }
     if (handleListEnter(e, editorRef.current)) {
       syncEmpty();
       syncFmt();
     }
+  };
+
+  const onInput = () => {
+    // Inline markdown (**bold**, *italic*, `code`) formats the moment the closing char lands.
+    handleInlineAutoFormat(editorRef.current);
+    syncEmpty();
+    syncFmt();
   };
 
   const toolbar = (
@@ -335,7 +354,7 @@ export default function Composer({
           ref={editorRef}
           contentEditable={!sending}
           suppressContentEditableWarning
-          onInput={() => { syncEmpty(); syncFmt(); }}
+          onInput={onInput}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
           onClick={syncFmt}
