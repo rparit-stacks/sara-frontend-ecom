@@ -837,6 +837,15 @@ export const manufacturingApi = {
 // ===============================
 // Media API
 // ===============================
+export interface LinkPreview {
+  url: string;
+  title?: string | null;
+  description?: string | null;
+  image?: string | null;
+  siteName?: string | null;
+  favicon?: string | null;
+}
+
 export const mediaApi = {
   upload: async (file: File, folder: string = 'banners'): Promise<string> => {
     // Client-side file size validation (10MB)
@@ -884,6 +893,27 @@ export const mediaApi = {
   },
   
   delete: (imageUrl: string) => fetchApi<{ message: string }>(`/api/admin/media/delete?url=${encodeURIComponent(imageUrl)}`, { method: 'DELETE' }),
+
+  /**
+   * Fetch Open Graph / SEO metadata for a URL (chat link-preview cards).
+   * Returns null if the server has no usable preview (204) or the request fails —
+   * callers should treat null as "no card, just show the link".
+   */
+  linkPreview: async (url: string): Promise<LinkPreview | null> => {
+    try {
+      const adminToken = localStorage.getItem('adminToken');
+      const authToken = localStorage.getItem('authToken');
+      const token = authToken || adminToken;
+      const res = await fetch(`${API_BASE_URL}/api/link-preview?url=${encodeURIComponent(url)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok || res.status === 204) return null;
+      const data = (await res.json()) as LinkPreview;
+      return data && (data.title || data.description || data.image) ? data : null;
+    } catch {
+      return null;
+    }
+  },
   
   bulkDelete: async (urls: string[]): Promise<{ success: string[]; failed: Array<{ url: string; error: string }> }> => {
     const token = localStorage.getItem('adminToken');

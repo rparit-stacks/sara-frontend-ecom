@@ -12,6 +12,7 @@ import RenameDesignModal from '@/components/portal/RenameDesignModal';
 import ProjectFilesPanel from '@/components/portal/ProjectFilesPanel';
 import Composer, { Attachment } from '@/components/portal/Composer';
 import Lightbox from '@/components/portal/Lightbox';
+import FilePreviewModal from '@/components/portal/FilePreviewModal';
 import RichMessageBody from '@/components/portal/RichMessageBody';
 import PaymentCard, { parsePaymentCard } from '@/components/portal/PaymentCard';
 import ProductCard, { parseProductCard, stripProductMarker } from '@/components/portal/ProductCard';
@@ -73,6 +74,7 @@ export default function PortalAdminProjectDetail() {
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState<number | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
   const [designModal, setDesignModal] = useState(false);
   const [renameTarget, setRenameTarget] = useState<{ id: number; name: string; imageUrl?: string | null } | null>(null);
   const [renameProjectOpen, setRenameProjectOpen] = useState(false);
@@ -515,10 +517,11 @@ export default function PortalAdminProjectDetail() {
             </div>
           )}
           {att && !attIsImg && (
-            <a href={att} target="_blank" rel="noreferrer" className="mt-1 max-w-sm border rounded-lg p-3 flex items-center gap-3 hover:border-current transition-colors" style={{ borderColor: 'var(--p-outline-variant)' }}>
+            <button type="button" onClick={() => setFilePreview(att!)} className="mt-1 max-w-sm w-full border rounded-lg p-3 flex items-center gap-3 hover:border-current transition-colors text-left" style={{ borderColor: 'var(--p-outline-variant)' }}>
               <Sym name="attach_file" style={{ color: 'var(--p-primary)' }} />
-              <span className="font-bold text-[14px] truncate flex-1">{att.split('/').pop()}</span>
-            </a>
+              <span className="font-bold text-[14px] truncate flex-1">{decodeURIComponent(att.split('/').pop() || 'file')}</span>
+              <Sym name="visibility" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+            </button>
           )}
           {!inThread && !isSystem && !isAnnouncementsChannel && !post.pending && (post.replyCount ?? 0) > 0 && (
             <button
@@ -917,6 +920,7 @@ export default function PortalAdminProjectDetail() {
         </>
       )}
       {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
+      <FilePreviewModal open={!!filePreview} url={filePreview} onClose={() => setFilePreview(null)} />
     </AdminShell>
   );
 }

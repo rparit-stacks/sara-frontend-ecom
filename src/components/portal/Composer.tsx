@@ -57,6 +57,7 @@ export default function Composer({
   const [productOpen, setProductOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductPickerItem | null>(null);
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const [announcementCategory, setAnnouncementCategory] = useState(ANNOUNCEMENT_CATEGORIES[0].key);
   const [fmt, setFmt] = useState<FormatState>({ bold: false, italic: false, underline: false, unorderedList: false, orderedList: false });
   const editorRef = useRef<HTMLDivElement>(null);
@@ -129,12 +130,46 @@ export default function Composer({
     syncFmt();
   };
 
-  const addFiles = (files: FileList | null, kind: 'image' | 'file') => {
+  const addFiles = (files: FileList | File[] | null, kind?: 'image' | 'file') => {
     if (!files) return;
-    const next: Attachment[] = Array.from(files).map((f) => ({
-      id: `a${uid++}`, kind, name: f.name, size: fmtSize(f.size), url: URL.createObjectURL(f), file: f,
-    }));
+    const arr = Array.from(files);
+    if (arr.length === 0) return;
+    const next: Attachment[] = arr.map((f) => {
+      const k = kind ?? (f.type.startsWith('image/') ? 'image' : 'file');
+      // Pasted screenshots often have no filename — give them a sensible one.
+      const name = f.name && f.name.trim() ? f.name : `pasted-${Date.now()}.${(f.type.split('/')[1] || 'png')}`;
+      return { id: `a${uid++}`, kind: k, name, size: fmtSize(f.size), url: URL.createObjectURL(f), file: f };
+    });
     setAtts((xs) => [...xs, ...next]);
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    if (sending) return;
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      e.preventDefault();
+      setDragOver(false);
+      addFiles(files);
+    }
+  };
+
+  const onPaste = (e: React.ClipboardEvent) => {
+    if (sending) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const pasted: File[] = [];
+    for (const it of Array.from(items)) {
+      if (it.kind === 'file') {
+        const f = it.getAsFile();
+        if (f) pasted.push(f);
+      }
+    }
+    if (pasted.length > 0) {
+      // Files present (e.g. a screenshot) — attach them and let text paste proceed as normal.
+      e.preventDefault();
+      addFiles(pasted);
+    }
+    // No files: do nothing, let the browser paste text into the contentEditable.
   };
 
   const removeAtt = (id: string) =>
@@ -207,9 +242,19 @@ export default function Composer({
 
   return (
     <div
-      className={`border rounded-xl slack-input-shadow focus-within:ring-2 focus-within:ring-offset-0 transition-all relative ${sending ? 'opacity-90' : ''}`}
-      style={{ borderColor: 'var(--p-outline)', background: 'var(--p-surface-container-lowest)', ['--tw-ring-color' as string]: 'rgba(0,103,106,0.25)' }}
+      className={`border rounded-xl slack-input-shadow focus-within:ring-2 focus-within:ring-offset-0 transition-all relative ${sending ? 'opacity-90' : ''} ${dragOver ? 'ring-2' : ''}`}
+      style={{ borderColor: dragOver ? 'var(--p-primary)' : 'var(--p-outline)', background: 'var(--p-surface-container-lowest)', ['--tw-ring-color' as string]: 'rgba(0,103,106,0.25)' }}
+      onDragOver={(e) => { if (!sending && e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); setDragOver(true); } }}
+      onDragLeave={(e) => { if (e.currentTarget === e.target) setDragOver(false); }}
+      onDrop={onDrop}
     >
+      {dragOver && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-xl pointer-events-none" style={{ background: 'rgba(0,103,106,0.08)', border: '2px dashed var(--p-primary)' }}>
+          <div className="flex items-center gap-2 text-[13px] font-bold px-3 py-1.5 rounded-lg" style={{ background: 'var(--p-surface-container-lowest)', color: 'var(--p-primary)' }}>
+            <Sym name="upload_file" className="text-[18px]" />Drop to attach
+          </div>
+        </div>
+      )}
       {toolbar}
       {showAnnouncementCategory && (
         <div className="px-3 py-2 border-b flex items-center gap-2 flex-wrap" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-low)' }}>
@@ -292,6 +337,7 @@ export default function Composer({
           suppressContentEditableWarning
           onInput={() => { syncEmpty(); syncFmt(); }}
           onKeyDown={onKeyDown}
+          onPaste={onPaste}
           onClick={syncFmt}
           onKeyUp={syncFmt}
           className={`w-full px-4 py-2.5 bg-transparent border-none outline-none text-[15px] block ${compact ? 'min-h-[38px] max-h-[120px]' : 'min-h-[44px] max-h-[200px]'} overflow-y-auto composer-editor`}

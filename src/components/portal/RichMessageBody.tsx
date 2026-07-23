@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import { parseProductCard, stripProductMarker } from './ProductCard';
+import LinkPreviewCard, { firstUrl } from './LinkPreviewCard';
 
-/** Lightweight markdown: **bold**, *italic*, `code`, [links](url), bullets, numbered lists. */
-export function RichMessageBody({ text, className = '' }: { text: string; className?: string }) {
+/** Lightweight markdown: **bold**, *italic*, `code`, [links](url), bare URLs, bullets, numbered lists. */
+export function RichMessageBody({ text, className = '', showLinkPreview = true }: { text: string; className?: string; showLinkPreview?: boolean }) {
   const cleaned = stripProductMarker(text);
+  const previewUrl = showLinkPreview ? firstUrl(cleaned) : null;
   const lines = cleaned.split('\n');
   const blocks: ReactNode[] = [];
   let bulletRun: string[] = [];
@@ -61,19 +63,35 @@ export function RichMessageBody({ text, className = '' }: { text: string; classN
   flushBullets('b-end');
   flushNumbers('n-end');
 
-  return <div className={className}>{blocks}</div>;
+  return (
+    <div className={className}>
+      {blocks}
+      {previewUrl && <LinkPreviewCard url={previewUrl} />}
+    </div>
+  );
 }
 
 function inlineFormat(text: string): ReactNode[] {
   const parts: ReactNode[] = [];
-  const re = /(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_)/g;
+  // Added a bare-URL token (http/https) so raw links become clickable too.
+  const re = /(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_|https?:\/\/[^\s<]+)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let k = 0;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index));
     const tok = m[0];
-    if (tok.startsWith('[')) {
+    if (tok.startsWith('http://') || tok.startsWith('https://')) {
+      // Trim trailing punctuation that's likely sentence punctuation, not part of the URL.
+      const trail = tok.match(/[.,;:!?)\]]+$/);
+      const href = trail ? tok.slice(0, -trail[0].length) : tok;
+      parts.push(
+        <a key={k++} href={href} target="_blank" rel="noreferrer" className="underline font-medium break-all" style={{ color: 'var(--p-primary)' }}>
+          {href}
+        </a>,
+      );
+      if (trail) parts.push(trail[0]);
+    } else if (tok.startsWith('[')) {
       const link = tok.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       if (link) {
         parts.push(
