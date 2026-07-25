@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
@@ -359,8 +359,12 @@ export const PriceBreakdownPopup = ({
 
         const printPerMeter = designPrice + printVariantModifier;
         const fabricTotalPrice = effectiveFabricPerMeter * meters;
-        const unitPrice = item.unitPrice != null ? Number(item.unitPrice) : effectiveFabricPerMeter + printPerMeter;
-        const totalPrice = item.totalPrice != null ? Number(item.totalPrice) : unitPrice * meters;
+        // Prefer the live-computed sum so this total always agrees with the fabric/print rows
+        // shown above it — item.unitPrice can be stale (e.g. cached from before a quantity
+        // discount was applied/changed), which produced an internally inconsistent breakdown
+        // (rows summing to ₹218/m while the total showed a stale ₹221.33/m).
+        const unitPrice = effectiveFabricPerMeter + printPerMeter;
+        const totalPrice = unitPrice * meters;
 
         const designed: DesignedBreakdown = {
           basePrice: designPrice,
@@ -481,8 +485,11 @@ export const PriceBreakdownPopup = ({
         const fabricBasePriceRaw =
           fabricVariantLines.length > 0 ? Math.max(0, fabricPerMeter - fabricVariantModifier) : undefined;
 
-        const unitPrice = storedUnitPrice || fabricPerMeter + printPerMeter;
-        const totalPrice = storedTotalPrice || unitPrice * quantity;
+        // Always the live-computed sum (fabricPerMeter already reconciles against
+        // storedUnitPrice above when they disagree) so this total never contradicts the
+        // fabric/print rows shown alongside it — storedUnitPrice alone can be stale.
+        const unitPrice = fabricPerMeter + printPerMeter;
+        const totalPrice = unitPrice * quantity;
 
         const baseFabPm =
           item.baseFabricPerMeter != null ? Number(item.baseFabricPerMeter) : undefined;
@@ -605,6 +612,9 @@ export const PriceBreakdownPopup = ({
             <Calculator className="w-5 h-5 text-primary" />
             <span>Price Breakdown</span>
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Detailed breakdown of the selected product, fabric, variants, and total price.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

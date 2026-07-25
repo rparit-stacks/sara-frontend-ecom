@@ -20,6 +20,7 @@ import { categoriesApi, productsApi } from '@/lib/api';
 import { storefrontQueryOptions } from '@/lib/storefrontCache';
 import { ProductCardSkeleton } from '@/components/skeletons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useSetChatPageContext } from '@/context/ChatPageContext';
 
 const CategoryProducts = () => {
   const { id } = useParams<{ id: string }>();
@@ -93,6 +94,21 @@ const CategoryProducts = () => {
     }
   });
   
+  // Tells the site-wide chat assistant which category page is open.
+  useSetChatPageContext(
+    category
+      ? {
+          pageType: 'CATEGORY',
+          category: {
+            categoryName: category.name ?? null,
+            path: `/category/${category.slug ?? id}`,
+            activeFilters: searchQuery ? [{ key: 'search', value: searchQuery }] : [],
+            resultCount: filteredProducts.length,
+          },
+        }
+      : null
+  );
+
   // Check if category has subcategories
   const hasSubcategories = category?.subcategories && category.subcategories.length > 0;
   const subcategories = category?.subcategories || [];

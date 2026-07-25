@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import SearchPopup from '@/components/search/SearchPopup';
 import { cartApi, wishlistApi, cmsApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
+import { dispatchLoggedOut } from '@/lib/authEvents';
 import { CategoryDropdown } from '@/components/categories/CategoryDropdown';
 import { CurrencySelector } from '@/components/currency/CurrencySelector';
 import { Package, LayoutDashboard, Settings, LogOut, Factory } from 'lucide-react';
@@ -109,6 +110,7 @@ export const Navbar = () => {
     setIsProfileMenuOpen(false);
     localStorage.removeItem('authToken');
     localStorage.removeItem('authEmail');
+    dispatchLoggedOut();
     navigate('/', { replace: true });
   };
 

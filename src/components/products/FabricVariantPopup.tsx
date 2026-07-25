@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -151,6 +151,9 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
               </p>
             </div>
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Select fabric variants and provide any required fabric details.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 md:space-y-5">

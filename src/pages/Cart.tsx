@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, Calculator, ChevronDown, ChevronUp, Pencil, Heart } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, Calculator, ChevronDown, ChevronUp, Pencil, Heart, Sparkles } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,8 @@ import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import CartItemDetails from '@/components/cart/CartItemDetails';
 import { QuantityStepper } from '@/components/common/QuantityStepper';
 import { usePrice } from '@/lib/currency';
+import { useSetChatPageContext } from '@/context/ChatPageContext';
+import { buildCartItemBreakdownPrompt, openAiChatAsk } from '@/lib/aiChatBridge';
 
 // Separate component for cart item to allow hooks usage; compact with expandable variants/details
 const CartItem = ({
@@ -106,14 +108,31 @@ const CartItem = ({
             </CollapsibleContent>
           </Collapsible>
 
-          <div className="flex items-center justify-between mt-2 xs:mt-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mt-2 xs:mt-3">
             <p className="font-semibold text-primary text-base xs:text-lg sm:text-xl">
               {format(item.totalPrice || item.unitPrice || 0)}
             </p>
-            <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => { setSelectedItemForBreakdown(item); setShowPriceBreakdown(true); }}>
-              <Calculator className="w-3.5 h-3.5" />
-              Breakdown
-            </Button>
+            <div className="flex flex-wrap items-center gap-1">
+              <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => { setSelectedItemForBreakdown(item); setShowPriceBreakdown(true); }}>
+                <Calculator className="w-3.5 h-3.5" />
+                Breakdown
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-xs text-primary hover:text-primary"
+                onClick={() =>
+                  openAiChatAsk(buildCartItemBreakdownPrompt(item), {
+                    expand: true,
+                    displayText: `Explain price breakdown for “${item.productName || 'this item'}”`,
+                  })
+                }
+                title="Explain this price with AI"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Breakdown with AI
+              </Button>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 xs:gap-3 sm:gap-4 mt-3 xs:mt-4">
             <QuantityStepper
@@ -313,10 +332,41 @@ const Cart = () => {
   const gst = isLoggedIn 
     ? (cartData?.gst ? Number(cartData.gst) : 0)
     : 0; // GST calculated at checkout for guests
-  const shipping = isLoggedIn 
+  const shipping = isLoggedIn
     ? (cartData?.shipping ? Number(cartData.shipping) : 0)
     : 0; // Guest shipping calculated at checkout
   const total = subtotal + gst + shipping;
+
+  // Tells the site-wide chat assistant this exact cart breakdown — the assistant must never
+  // invent or recompute cart totals, only relay what this page already shows.
+  useSetChatPageContext(
+    items.length > 0
+      ? {
+          pageType: 'CART',
+          cart: {
+            lines: items.map((item: any) => ({
+              name: item.productName || 'Item',
+              productType: item.productType ?? null,
+              quantity: item.quantity || 1,
+              unitPrice: Number(item.unitPrice || 0),
+              lineTotal: Number(item.totalPrice ?? item.unitPrice ?? 0),
+              baseFabricPerMeter:
+                item.baseFabricPerMeter != null ? Number(item.baseFabricPerMeter) : null,
+              fabricDiscountPerMeter:
+                item.fabricSlabDiscountPerMeter != null ? Number(item.fabricSlabDiscountPerMeter) : null,
+              effectiveFabricPerMeter:
+                item.effectiveFabricPerMeter != null ? Number(item.effectiveFabricPerMeter) : null,
+              printPerMeter: item.designPrice != null ? Number(item.designPrice) : null,
+            })),
+            subtotal,
+            discounts: [],
+            tax: isLoggedIn ? gst : null,
+            shipping: isLoggedIn ? shipping : null,
+            grandTotal: total,
+          },
+        }
+      : null
+  );
 
   const handleQuantityChange = (itemId: number | string, newQuantity: number) => {
     if (newQuantity > 0) {

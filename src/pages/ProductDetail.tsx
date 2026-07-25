@@ -29,6 +29,7 @@ import { QuantityStepper } from '@/components/common/QuantityStepper';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { productsApi, cartApi, wishlistApi, customConfigApi, customProductsApi } from '@/lib/api';
+import { useSetChatPageContext } from '@/context/ChatPageContext';
 import { guestCart } from '@/lib/guestCart';
 import DynamicForm from '@/components/products/DynamicForm';
 import { FormField } from '@/components/admin/FormBuilder';
@@ -222,6 +223,43 @@ const ProductDetail = () => {
   const MAX_CUSTOM_FILE_MB = 10;
   const MAX_CUSTOM_FILE_BYTES = MAX_CUSTOM_FILE_MB * 1024 * 1024;
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({}); // variantId -> optionId
+
+  const selectedVariantLabels = useMemo(() => {
+    if (!product?.variants) return [];
+    return product.variants
+      .map((variant: any) => {
+        const selectedOptionId = selectedVariants[String(variant.id)];
+        const option = selectedOptionId
+          ? variant.options?.find((opt: any) => String(opt.id) === selectedOptionId)
+          : null;
+        return option ? `${variant.name}: ${option.name}` : null;
+      })
+      .filter((label): label is string => !!label);
+  }, [product, selectedVariants]);
+
+  // Tells the site-wide chat assistant what product page is open, so it can answer questions
+  // about this exact product/price/category instead of guessing or apologizing.
+  useSetChatPageContext(
+    product
+      ? {
+          pageType: 'PRODUCT_DETAIL',
+          product: {
+            productId: product.id ? Number(product.id) : null,
+            slug: slugOrId ?? null,
+            name: product.name,
+            type: product.type,
+            descriptionSummary: product.description ? product.description.slice(0, 500) : null,
+            price: typeof product.price === 'number' ? product.price : null,
+            salePrice:
+              product.isSale && typeof product.price === 'number' ? product.price : null,
+            fabric: null,
+            gsm: null,
+            selectedVariantLabels,
+            categoryName: product.category || null,
+          },
+        }
+      : null
+  );
   
   // Design Product States
   const [showPlainProductSelection, setShowPlainProductSelection] = useState(false);
@@ -778,6 +816,7 @@ const ProductDetail = () => {
     }
     const unitPrice = effectivePricePerMeter + baseDesignPrice + printVariantModifier;
     const totalPrice = unitPrice * quantity;
+    const fabricTotalPrice = effectivePricePerMeter * quantity;
 
     // Prepare structured variant selections (new format with both IDs and frontendIds)
     const variantSelections: Record<string, any> = {};
