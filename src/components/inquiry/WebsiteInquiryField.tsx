@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -366,9 +366,19 @@ function PhoneField({
   placeholder?: string;
   onChange: (value: string) => void;
 }) {
-  const { code, digits } = splitPhone(value);
+  // An empty field submits as "", which carries no country code, so the picked code is kept
+  // in state instead of being re-parsed out of the submitted value on every render.
+  const [code, setCode] = useState(() => splitPhone(value).code);
+  const digits = value.startsWith(code)
+    ? value.slice(code.length).replace(/\D/g, '')
+    : splitPhone(value).digits;
+
+  useEffect(() => {
+    if (value && !value.startsWith(code)) setCode(splitPhone(value).code);
+  }, [value, code]);
 
   const commit = (nextCode: string, nextDigits: string) => {
+    setCode(nextCode);
     onChange(nextDigits ? `${nextCode}${nextDigits}` : '');
   };
 
@@ -376,7 +386,7 @@ function PhoneField({
     <div className="flex gap-2">
       <Select value={code} onValueChange={(v) => commit(v, digits)}>
         <SelectTrigger className="w-[110px] shrink-0">
-          <SelectValue placeholder="Code" />
+          <SelectValue placeholder="Code">{code}</SelectValue>
         </SelectTrigger>
         <SelectContent className="max-h-[280px] overflow-y-auto">
           {COUNTRY_CODES.map((c) => (
