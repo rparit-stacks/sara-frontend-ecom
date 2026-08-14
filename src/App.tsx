@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ChatWidget } from "@/components/ai-chat";
+import { AdminAiChatWidget } from "@/components/admin-ai-chat";
 import { SITE_UNDER_MAINTENANCE } from "@/siteMaintenance";
 import Maintenance from "@/pages/Maintenance";
 import { CurrencyProvider } from "@/context/CurrencyContext";
@@ -132,6 +133,18 @@ const SiteWideChatWidget = () => {
   return <ChatWidget />;
 };
 
+/** Admin Ops AI — only on /admin-sara (not login/invite). Outside AdminLayout so nav keeps the thread. */
+const AdminSiteWideChatWidget = () => {
+  const location = useLocation();
+  const path = location.pathname;
+  const onAdminSara = path === '/admin-sara' || path.startsWith('/admin-sara/');
+  const isAuthSurface =
+    path === '/admin-sara/login' || path.startsWith('/admin-sara/invite');
+  if (!onAdminSara || isAuthSurface) return null;
+  if (!localStorage.getItem('adminToken')) return null;
+  return <AdminAiChatWidget />;
+};
+
 const App = () =>
   SITE_UNDER_MAINTENANCE ? (
     <Maintenance />
@@ -148,6 +161,7 @@ const App = () =>
         <AuthSessionListener />
         <VisitTracker />
         <SiteWideChatWidget />
+        <AdminSiteWideChatWidget />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/categories" element={<Categories />} />

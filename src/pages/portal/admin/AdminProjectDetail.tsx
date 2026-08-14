@@ -50,15 +50,22 @@ function isImageUrl(url: string) {
 function MessageAvatar({ type }: { type: string }) {
   const isSystem = type === 'SYSTEM';
   const isAdmin = type === 'ADMIN';
+  const isAi = type === 'AI';
   return (
     <div
       className="w-9 h-9 rounded shrink-0 flex items-center justify-center text-white"
       style={{
-        background: isSystem ? 'var(--p-surface-container-high)' : isAdmin ? 'var(--p-secondary)' : 'var(--p-primary)',
+        background: isSystem
+          ? 'var(--p-surface-container-high)'
+          : isAi
+            ? 'var(--p-tertiary)'
+            : isAdmin
+              ? 'var(--p-secondary)'
+              : 'var(--p-primary)',
         color: isSystem ? 'var(--p-on-surface-variant)' : '#fff',
       }}
     >
-      <Sym name={isSystem ? 'info' : 'person'} className="text-[18px]" />
+      <Sym name={isSystem ? 'info' : isAi ? 'smart_toy' : 'person'} className="text-[18px]" />
     </div>
   );
 }
@@ -156,6 +163,13 @@ export default function PortalAdminProjectDetail() {
     staleTime: 30_000,
   });
 
+  const { data: aiHandovers = [] } = useQuery({
+    queryKey: ['admin-ai-handovers', code],
+    queryFn: () => projectApi.listAiHandovers(code!),
+    enabled: !!code,
+    refetchInterval: 15_000,
+  });
+
   // Files the client uploaded on the original inquiry form live in the inquiry's
   // answers, not as chat attachments. Surface them in the Files tab too.
   const { data: briefInquiry } = useQuery({
@@ -201,6 +215,34 @@ export default function PortalAdminProjectDetail() {
   const channelName = activeDesign?.name || shell?.title || 'Chat';
   const isDesignChannel = !!(activeDesign && !activeDesign.system && !activeDesign.general);
   const isAnnouncementsChannel = !!activeDesign?.system;
+
+  const channelHandovers = useMemo(() => {
+    if (!aiHandovers.length) return [];
+    return aiHandovers.filter((h) => {
+      if (h.designId == null) return !!activeDesign?.general || activeDesignId == null;
+      return h.designId === activeDesignId;
+    });
+  }, [aiHandovers, activeDesignId, activeDesign?.general]);
+
+  const claimHandoverMutation = useMutation({
+    mutationFn: (id: number) => projectApi.claimAiHandover(code!, id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-ai-handovers', code] });
+      qc.invalidateQueries({ queryKey: ['admin-project-messages', code] });
+      toast.success('Handover claimed — reply as yourself in this channel');
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to claim handover'),
+  });
+
+  const closeHandoverMutation = useMutation({
+    mutationFn: (id: number) => projectApi.closeAiHandover(code!, id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-ai-handovers', code] });
+      qc.invalidateQueries({ queryKey: ['admin-project-messages', code] });
+      toast.success('Handover closed — Sara AI can answer again');
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to close handover'),
+  });
 
   const serverPosts = useMemo(
     () => (project?.messages || []).filter((m) => !m.parentMessageId),
@@ -468,6 +510,7 @@ export default function PortalAdminProjectDetail() {
   const renderMessage = (post: DisplayMessage, inThread = false) => {
     const isSystem = post.authorType === 'SYSTEM';
     const isAdmin = post.authorType === 'ADMIN';
+    const isAi = post.authorType === 'AI';
     const att = post.attachmentUrl;
     const attIsImg = att && isImageUrl(att);
     const highlighted = highlightId === post.id;
@@ -483,9 +526,17 @@ export default function PortalAdminProjectDetail() {
         <MessageAvatar type={post.authorType} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-            <span className={`font-bold text-[15px] ${isSystem ? 'italic' : ''}`} style={isAdmin ? { color: 'var(--p-secondary)' } : isSystem ? { color: 'var(--p-on-surface-variant)' } : undefined}>
-              {post.authorName || (isSystem ? 'System' : 'Client')}
+            <span className={`font-bold text-[15px] ${isSystem ? 'italic' : ''}`} style={isAi ? { color: 'var(--p-tertiary)' } : isAdmin ? { color: 'var(--p-secondary)' } : isSystem ? { color: 'var(--p-on-surface-variant)' } : undefined}>
+              {isAi ? 'Sara AI' : post.authorName || (isSystem ? 'System' : 'Client')}
             </span>
+            {isAi && (
+              <span
+                className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white shrink-0"
+                style={{ background: 'var(--p-tertiary)' }}
+              >
+                AI
+              </span>
+            )}
             <span className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{formatMsgTime(post.createdAt)}</span>
             {isSystem && post.announcementCategory ? (
               <AnnouncementCategoryBadge category={post.announcementCategory} />
@@ -714,6 +765,54 @@ export default function PortalAdminProjectDetail() {
             </div>
 
             <div ref={feedRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 chat-feed-bg">
+              {channelHandovers.length > 0 && (
+                <div className="mb-4 space-y-2">
+                  {channelHandovers.map((h) => (
+                    <div
+                      key={h.id}
+                      className="rounded-xl border px-3 py-2.5 flex flex-wrap items-center gap-2 justify-between"
+                      style={{ borderColor: 'var(--p-tertiary)', background: 'rgba(0,103,106,0.06)' }}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-bold flex items-center gap-1.5" style={{ color: 'var(--p-tertiary)' }}>
+                          <Sym name="support_agent" className="text-[16px]" />
+                          Customer asked for a human · Sara AI paused
+                        </p>
+                        {h.reason && (
+                          <p className="text-[12px] mt-0.5 truncate" style={{ color: 'var(--p-on-surface-variant)' }}>
+                            {h.reason}
+                          </p>
+                        )}
+                        <p className="text-[11px] mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>
+                          {h.status}{h.clientEmail ? ` · ${h.clientEmail}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {h.status === 'REQUESTED' && (
+                          <button
+                            type="button"
+                            disabled={claimHandoverMutation.isPending}
+                            onClick={() => claimHandoverMutation.mutate(h.id)}
+                            className="px-3 py-1.5 rounded-lg text-[12px] font-bold text-white"
+                            style={{ background: 'var(--p-primary)' }}
+                          >
+                            Claim
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={closeHandoverMutation.isPending}
+                          onClick={() => closeHandoverMutation.mutate(h.id)}
+                          className="px-3 py-1.5 rounded-lg text-[12px] font-bold border"
+                          style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface)' }}
+                        >
+                          Close & resume AI
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="pb-6 border-b mb-6" style={{ borderColor: 'var(--p-outline-variant)' }}>
                 <h1 className="font-display text-[24px] sm:text-[28px] mb-2" style={{ color: 'var(--p-primary)' }}># {channelName}</h1>
                 {activeDesign?.description && (

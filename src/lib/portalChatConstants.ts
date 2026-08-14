@@ -44,3 +44,34 @@ export function defaultActiveDesignId(
     ?? designs[0]?.id
   );
 }
+
+/** Feature 3 — Portal AI activates when the customer mentions @sara in a channel message. */
+const SARA_MENTION_RE = /(?:^|\s)@sara\b/i;
+
+export function mentionsSara(text: string): boolean {
+  return SARA_MENTION_RE.test(text);
+}
+
+function portalAiThreadStorageKey(projectCode: string, designId: number | null | undefined): string {
+  return `portalAiThread:${projectCode}:${designId ?? 'general'}`;
+}
+
+/** Stable per-channel AI thread id so PORTAL_AI conversation memory survives across @sara turns.
+ *  The portal AI endpoint returns ProjectMessageDto (not AiChatTurnResponse), so the client mints
+ *  and persists the UUID — the orchestrator openOrAttach-s it on first use. */
+export function ensurePortalAiThreadId(projectCode: string, designId: number | null | undefined): string {
+  const key = portalAiThreadStorageKey(projectCode, designId);
+  try {
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+  } catch {
+    /* ignore */
+  }
+  const id = crypto.randomUUID();
+  try {
+    localStorage.setItem(key, id);
+  } catch {
+    /* ignore */
+  }
+  return id;
+}

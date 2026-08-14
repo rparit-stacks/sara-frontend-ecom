@@ -5,7 +5,7 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle2, Package, ArrowRight, LogIn, Download } from 'lucide-react';
+import { Loader2, CheckCircle2, Package, ArrowRight, LogIn, Download, Calculator } from 'lucide-react';
 import { orderApi, paymentApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import { getPaymentStatusDisplay } from '@/lib/orderUtils';
@@ -14,12 +14,16 @@ import ScrollReveal from '@/components/animations/ScrollReveal';
 import { toast } from 'sonner';
 import { formatPrice } from '@/lib/currency';
 import { useCurrency } from '@/context/CurrencyContext';
+import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
+import OrderPriceLedger, { orderItemMetaLine } from '@/components/order/OrderPriceLedger';
 
 const OrderConfirmation = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
+  const [breakdownItem, setBreakdownItem] = useState<any>(null);
+  const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
   const stripeVerifyAttempted = useRef(false);
 
   // Get order ID from URL params or location state.
@@ -234,8 +238,21 @@ const OrderConfirmation = () => {
                             <div className="flex-1">
                               <p className="font-medium">{item.name || item.productName}</p>
                               <p className="text-sm text-muted-foreground">
-                                Quantity: {item.quantity} × {formatPrice(toDisplayAmount(Number(item.price ?? item.unitPrice ?? 0)), currency)}
+                                {orderItemMetaLine(item, (n) => formatPrice(toDisplayAmount(n), currency)).join(' · ')}
                               </p>
+                              {item.breakdown && (
+                                <button
+                                  type="button"
+                                  className="text-xs text-primary hover:underline mt-0.5 inline-flex items-center gap-1"
+                                  onClick={() => {
+                                    setBreakdownItem(item);
+                                    setShowPriceBreakdown(true);
+                                  }}
+                                >
+                                  <Calculator className="w-3 h-3" />
+                                  Why this price?
+                                </button>
+                              )}
                               {(item.productType === 'DESIGNED' || item.productType === 'CUSTOM') && item.fabricName && (
                                 <p className="text-xs text-muted-foreground mt-1">
                                   Fabric: {item.fabricName}
@@ -325,7 +342,14 @@ const OrderConfirmation = () => {
                                 </div>
                               )}
                             </div>
-                            <p className="font-semibold">{formatPrice(toDisplayAmount(Number(item.totalPrice ?? 0)), currency)}</p>
+                            <div className="text-right shrink-0">
+                              <p className="font-semibold">{formatPrice(toDisplayAmount(Number(item.totalPrice ?? 0)), currency)}</p>
+                              {item.gstAmount != null && Number(item.gstAmount) > 0 && (
+                                <p className="text-[11px] text-muted-foreground">
+                                  + GST {formatPrice(toDisplayAmount(Number(item.gstAmount)), currency)}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -334,28 +358,17 @@ const OrderConfirmation = () => {
                     {/* Order Summary */}
                     <div className="border-t pt-4 space-y-2">
                       <p className="text-xs text-muted-foreground pb-1">Amounts in {currency}</p>
-                      <div className="flex justify-between">
-                        <span>Subtotal</span>
-                        <span>{formatPrice(toDisplayAmount(Number(order.subtotal ?? 0)), currency)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Shipping</span>
-                        <span>
-                          {order.shipping === 0
-                            ? (isNonIndiaOrNonINR ? 'Our executive will contact you soon for shipping rates' : 'Free')
-                            : formatPrice(toDisplayAmount(Number(order.shipping ?? 0)), currency)}
-                        </span>
-                      </div>
-                      {order.couponDiscount && order.couponDiscount > 0 && (
-                        <div className="flex justify-between text-primary">
-                          <span>Coupon Discount</span>
-                          <span>-{formatPrice(toDisplayAmount(Number(order.couponDiscount)), currency)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between font-semibold text-lg pt-2 border-t">
-                        <span>Total</span>
-                        <span>{formatPrice(toDisplayAmount(Number(order.total ?? 0)), currency)}</span>
-                      </div>
+                      <OrderPriceLedger
+                        order={order}
+                        format={(n) => formatPrice(toDisplayAmount(n), currency)}
+                        shippingValue={
+                          order.shipping === 0
+                            ? (isNonIndiaOrNonINR
+                                ? 'Our executive will contact you soon for shipping rates'
+                                : 'Free')
+                            : undefined
+                        }
+                      />
                     </div>
                   </div>
                 </CardContent>
@@ -431,6 +444,12 @@ const OrderConfirmation = () => {
           </div>
         </div>
       </section>
+      <PriceBreakdownPopup
+        open={showPriceBreakdown}
+        onOpenChange={setShowPriceBreakdown}
+        productName={breakdownItem?.name || breakdownItem?.productName}
+        breakdown={breakdownItem?.breakdown ?? null}
+      />
     </Layout>
   );
 };

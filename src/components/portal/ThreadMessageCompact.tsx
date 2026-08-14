@@ -30,6 +30,7 @@ export default function ThreadMessageCompact({
 }) {
   const isSystem = message.authorType === 'SYSTEM';
   const isAdmin = message.authorType === 'ADMIN';
+  const isAi = message.authorType === 'AI';
   const att = message.attachmentUrl;
   const pay = parsePaymentCard(message.body);
   const product = parseProductCard(message.body);
@@ -41,16 +42,29 @@ export default function ThreadMessageCompact({
       style={
         variant === 'root'
           ? { borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }
-          : { background: 'var(--p-surface-container-low)', borderLeft: '3px solid var(--p-primary)' }
+          : { background: 'var(--p-surface-container-low)', borderLeft: `3px solid ${isAi ? 'var(--p-tertiary)' : 'var(--p-primary)'}` }
       }
     >
       <header className="flex items-center gap-2 mb-1.5 min-w-0">
         <span
           className={`text-[13px] font-bold truncate ${isSystem ? 'italic' : ''}`}
-          style={isAdmin ? { color: 'var(--p-secondary)' } : isSystem ? { color: 'var(--p-on-surface-variant)' } : { color: 'var(--p-on-surface)' }}
+          style={
+            isAi
+              ? { color: 'var(--p-tertiary)' }
+              : isAdmin
+                ? { color: 'var(--p-secondary)' }
+                : isSystem
+                  ? { color: 'var(--p-on-surface-variant)' }
+                  : { color: 'var(--p-on-surface)' }
+          }
         >
-          {message.authorName || (isSystem ? 'System' : 'User')}
+          {isAi ? 'Sara AI' : message.authorName || (isSystem ? 'System' : 'User')}
         </span>
+        {isAi && (
+          <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: 'var(--p-tertiary)', color: '#fff' }}>
+            AI
+          </span>
+        )}
         <span className="text-[11px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }}>
           {formatTime(message.createdAt)}
         </span>

@@ -15,7 +15,7 @@ const inr = (n: number) => `₹${(n || 0).toLocaleString('en-IN')}`;
  * Master lock: when true, every widget is blurred behind the upgrade overlay.
  * Flip to false (or drive from a subscription/entitlement flag) to reveal.
  */
-const LOCKED = true;
+const LOCKED = false;
 
 function ChangeBadge({ value }: { value: number }) {
   const up = value >= 0;

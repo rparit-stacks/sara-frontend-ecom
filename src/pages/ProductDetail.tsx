@@ -73,11 +73,11 @@ const ProductDetail = () => {
   const cartItemIdParam = searchParams.get('cartItemId');
   const isLoggedIn = typeof window !== 'undefined' && !!localStorage.getItem('authToken');
   
-  // Fetch cart data if cartItemId is provided
+  // Fetch cart for preload + for pricing-preview (fabric slabs aggregate across all lines).
   const { data: cartData } = useQuery({
-    queryKey: ['cart-preload', cartItemIdParam],
+    queryKey: ['cart', isLoggedIn],
     queryFn: () => cartApi.getCart(),
-    enabled: !!cartItemIdParam && isLoggedIn,
+    enabled: isLoggedIn,
   });
   
   // Find the specific cart item for pre-loading
@@ -490,8 +490,8 @@ const ProductDetail = () => {
     return finalFabricPrice - discountValue;
   };
 
-  // Update combined price for DESIGNED products: per-meter total (fabric/m + print/m)
-  // Page quantity = meters; slab discount uses page quantity (meters)
+  // Update combined price for DESIGNED products from local seed (used for add-to-cart request).
+  // Authoritative display numbers come from pricing-preview breakdown below.
   useEffect(() => {
     if (product && product.type === 'DESIGNED' && selectedFabricId) {
       const baseDesignPrice = product.designPrice || 0;
@@ -514,6 +514,179 @@ const ProductDetail = () => {
       setCombinedPrice(effectivePricePerMeter + baseDesignPrice + printVariantModifier);
     }
   }, [product, selectedFabricId, fabricPricePerMeter, quantity, selectedVariants]);
+
+  /** Seed line for /api/cart/pricing-preview — server returns authoritative breakdown. */
+  const pricingPreviewItem = useMemo(() => {
+    if (!product) return null;
+
+    if (product.type === 'DESIGNED') {
+      if (!selectedFabricId) return null;
+      const baseDesignPrice = product.designPrice || 0;
+      let printVariantModifier = 0;
+      const variantSelections: Record<string, any> = {};
+      if (product.variants?.length) {
+        product.variants.forEach((variant: any) => {
+          const selectedOptionId = selectedVariants[String(variant.id)];
+          if (!selectedOptionId || !variant.options) return;
+          const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+          if (!selectedOption) return;
+          printVariantModifier += Number(selectedOption.priceModifier) || 0;
+          const variantKey = variant.frontendId || String(variant.id);
+          variantSelections[variantKey] = {
+            variantId: variant.id,
+            variantFrontendId: variant.frontendId || null,
+            variantName: variant.name,
+            variantType: variant.type,
+            variantUnit: variant.unit || null,
+            optionId: selectedOption.id,
+            optionFrontendId: selectedOption.frontendId || null,
+            optionValue: selectedOption.value,
+            priceModifier: selectedOption.priceModifier || 0,
+          };
+        });
+      }
+      const fabricPerMeter = fabricPricePerMeter;
+      const unitPrice = fabricPerMeter + baseDesignPrice + printVariantModifier;
+      return {
+        productType: 'DESIGNED',
+        productId: Number(product.id),
+        productName: product.name,
+        productImage: product.images?.[0] || '',
+        designId: Number(product.id),
+        fabricId: Number(selectedFabricId),
+        designPrice: baseDesignPrice,
+        fabricPrice: fabricPerMeter * quantity,
+        quantity,
+        unitPrice,
+        variantSelections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
+        variants: Object.keys(selectedFabricVariants).length > 0 ? selectedFabricVariants : undefined,
+      };
+    }
+
+    if (product.type === 'PLAIN') {
+      const basePrice = product.pricePerMeter || product.plainProduct?.pricePerMeter || product.price || 0;
+      let variantModifier = 0;
+      const variantSelections: Record<string, any> = {};
+      if (product.variants?.length) {
+        product.variants.forEach((variant: any) => {
+          const selectedOptionId = selectedVariants[String(variant.id)];
+          if (!selectedOptionId || !variant.options) return;
+          const selectedOption = variant.options.find((opt: any) => String(opt.id) === selectedOptionId);
+          if (!selectedOption) return;
+          variantModifier += Number(selectedOption.priceModifier) || 0;
+          const variantKey = variant.frontendId || String(variant.id);
+          variantSelections[variantKey] = {
+            variantId: variant.id,
+            variantFrontendId: variant.frontendId || null,
+            variantName: variant.name,
+            optionId: selectedOption.id,
+            optionValue: selectedOption.value,
+            priceModifier: selectedOption.priceModifier || 0,
+          };
+        });
+      }
+      const unitPrice = basePrice + variantModifier;
+      return {
+        productType: 'PLAIN',
+        productId: Number(product.id),
+        productName: product.name,
+        productImage: product.images?.[0] || '',
+        quantity,
+        unitPrice,
+        fabricPrice: unitPrice * quantity,
+        variantSelections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
+      };
+    }
+
+    if (product.type === 'DIGITAL') {
+      const unitPrice = Number(product.price || 0);
+      return {
+        productType: 'DIGITAL',
+        productId: Number(product.id),
+        productName: product.name,
+        productImage: product.images?.[0] || '',
+        quantity,
+        unitPrice,
+        totalPrice: unitPrice * quantity,
+      };
+    }
+
+    return null;
+  }, [
+    product,
+    selectedFabricId,
+    fabricPricePerMeter,
+    quantity,
+    selectedVariants,
+    selectedFabricVariants,
+  ]);
+
+  const {
+    data: pricingPreview,
+    isFetching: pricingPreviewLoading,
+    isError: pricingPreviewError,
+  } = useQuery({
+    queryKey: ['pricing-preview', pricingPreviewItem, isLoggedIn, cartData?.items, guestCart.getItems?.()?.length],
+    queryFn: () => {
+      // Full cart snapshot for this user: existing lines + the product being configured.
+      // Fabric slabs aggregate across the whole list.
+      const existing: any[] = isLoggedIn
+        ? (cartData?.items || []).map((i: any) => ({
+            productType: i.productType,
+            productId: Number(i.productId),
+            productName: i.productName,
+            productImage: i.productImage,
+            fabricId: i.fabricId != null ? Number(i.fabricId) : undefined,
+            designId: i.designId != null ? Number(i.designId) : undefined,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            fabricPrice: i.fabricPrice,
+            designPrice: i.designPrice,
+            variants: i.variants,
+            variantSelections: i.variantSelections,
+            customFormData: i.customFormData,
+          }))
+        : guestCart.getItems().map((i: any) => ({
+            productType: i.productType,
+            productId: Number(i.productId),
+            productName: i.productName,
+            productImage: i.productImage,
+            fabricId: i.fabricId != null ? Number(i.fabricId) : undefined,
+            designId: i.designId != null ? Number(i.designId) : undefined,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            fabricPrice: i.fabricPrice,
+            designPrice: i.designPrice,
+            variants: i.variants,
+            variantSelections: i.variantSelections,
+            customFormData: i.customFormData,
+          }));
+
+      let userEmail: string | null = null;
+      try {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          userEmail = payload.sub || payload.email || null;
+        }
+      } catch {
+        userEmail = null;
+      }
+
+      return cartApi.previewPricing({
+        userEmail,
+        items: [...existing, pricingPreviewItem!],
+      });
+    },
+    enabled: !!pricingPreviewItem,
+    staleTime: 5_000,
+  });
+
+  // Breakdown for the line we just appended (last item in the priced list).
+  const serverBreakdown =
+    pricingPreview?.items?.length
+      ? pricingPreview.items[pricingPreview.items.length - 1]?.breakdown ?? null
+      : null;
 
   // Calculate price for plain products (shown directly on page, no popup)
   const plainProductPrice = useMemo(() => {
@@ -816,7 +989,6 @@ const ProductDetail = () => {
     }
     const unitPrice = effectivePricePerMeter + baseDesignPrice + printVariantModifier;
     const totalPrice = unitPrice * quantity;
-    const fabricTotalPrice = effectivePricePerMeter * quantity;
 
     // Prepare structured variant selections (new format with both IDs and frontendIds)
     const variantSelections: Record<string, any> = {};
@@ -857,7 +1029,7 @@ const ProductDetail = () => {
       designId: Number(product.id),
       designPrice: baseDesignPrice,
       fabricId: Number(selectedFabricId),
-      fabricPrice: fabricTotalPrice,
+      fabricPrice: effectivePricePerMeter * quantity,
       quantity: quantity,
       unitPrice: unitPrice,
       totalPrice: totalPrice,
@@ -1973,42 +2145,15 @@ const ProductDetail = () => {
         </Dialog>
       )}
 
-      {/* Price Breakdown Popup */}
+      {/* Price Breakdown Popup — server JSON only */}
       {product && (
         <PriceBreakdownPopup
           open={showPriceBreakdown}
           onOpenChange={setShowPriceBreakdown}
-          item={{
-            productType: product.type,
-            productName: product.name,
-            productId: Number(product.id),
-            fabricId: selectedFabricId ? Number(selectedFabricId) : undefined,
-            designPrice: product.designPrice,
-            fabricPrice: selectedFabricId ? (() => {
-              const effectivePrice = effectivePricingSlabs && effectivePricingSlabs.length > 0
-                ? calculatePricePerMeter(quantity, fabricPricePerMeter, effectivePricingSlabs)
-                : fabricPricePerMeter;
-              return effectivePrice * quantity;
-            })() : undefined,
-            unitPrice: product.type === 'DESIGNED' ? (combinedPrice ?? undefined) : (product.pricePerMeter || product.price),
-            totalPrice: product.type === 'DESIGNED' ? (combinedPrice != null ? combinedPrice * quantity : undefined) : finalPrice,
-            quantity: quantity,
-            pricePerMeter: product.pricePerMeter || product.price,
-            basePrice: product.pricePerMeter || product.price || product.designPrice,
-          }}
-          productData={product}
-          selectedVariants={selectedVariants}
-          fabricQuantity={quantity}
-          fabricPricePerMeter={fabricPricePerMeter}
-          selectedFabricVariants={selectedFabricVariants}
-          discountAmount={selectedFabricId && effectivePricingSlabs && effectivePricingSlabs.length > 0 ? (() => {
-            const effectivePrice = calculatePricePerMeter(quantity, fabricPricePerMeter, effectivePricingSlabs);
-            const discount = fabricPricePerMeter - effectivePrice;
-            return discount > 0 ? discount * quantity : 0;
-          })() : undefined}
-          finalFabricPricePerMeter={selectedFabricId && effectivePricingSlabs && effectivePricingSlabs.length > 0
-            ? calculatePricePerMeter(quantity, fabricPricePerMeter, effectivePricingSlabs)
-            : fabricPricePerMeter}
+          productName={product.name}
+          breakdown={serverBreakdown}
+          loading={pricingPreviewLoading && !serverBreakdown}
+          error={pricingPreviewError ? 'Could not load price breakdown. Please try again.' : null}
         />
       )}
 

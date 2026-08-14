@@ -7,10 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import ScrollReveal from '@/components/animations/ScrollReveal';
-import { Loader2, Truck, CreditCard, ShoppingBag, Lock, ChevronDown, Plus, Package, Info } from 'lucide-react';
+import { Loader2, Truck, CreditCard, ShoppingBag, Lock, ChevronDown, Plus, Package, Info, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
-import { cartApi, orderApi, userApi, shippingApi, paymentApi, paymentConfigApi, couponApi } from '@/lib/api';
+import { cartApi, checkoutApi, orderApi, userApi, shippingApi, paymentApi, paymentConfigApi, couponApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
+import { mergeGuestPricedItems, toGuestOrderItems } from '@/lib/mergeGuestPricedItems';
+import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import { usePrice } from '@/lib/currency';
 import { useCurrency } from '@/context/CurrencyContext';
 import { CurrencySelector } from '@/components/currency/CurrencySelector';
@@ -243,32 +245,47 @@ const Checkout = () => {
   const subtotalFromLocalStorage = guestCartItems.reduce((sum: number, item: any) =>
     sum + (item.totalPrice || (item.unitPrice || 0) * (item.quantity || 1)), 0);
 
-  // Guest pricing preview (server-authoritative; surfaces fabric-slab breakdown for guests).
+  // Guest pricing preview (server-authoritative). Key excludes money so sync does not loop.
   const guestPreviewKey = JSON.stringify(
     guestCartItems.map((i: any) => ({
-      pid: i.productId, pt: i.productType, fid: i.fabricId,
-      q: i.quantity, up: i.unitPrice, fp: i.fabricPrice, dp: i.designPrice,
+      pid: i.productId, pt: i.productType, fid: i.fabricId, did: i.designId,
+      q: i.quantity,
+      vs: i.variantSelections || i.variants || null,
+      cf: i.customFormData || null,
     }))
   );
-  const { data: guestPreview } = useQuery({
+  const { data: guestPreview, isFetching: guestPreviewLoading } = useQuery({
     queryKey: ['cart', 'guest-preview', 'checkout', guestPreviewKey],
-    queryFn: () => cartApi.previewPricing(
-      guestCartItems.map((i: any) => ({
+    queryFn: () => cartApi.previewPricing({
+      userEmail: null,
+      items: guestCartItems.map((i: any) => ({
         productType: i.productType,
         productId: Number(i.productId),
+        productName: i.productName,
+        productImage: i.productImage,
         fabricId: i.fabricId != null ? Number(i.fabricId) : undefined,
         designId: i.designId != null ? Number(i.designId) : undefined,
         quantity: i.quantity,
-        unitPrice: i.unitPrice,
-        fabricPrice: i.fabricPrice,
+        // Always the price as first added to cart — never the last synced (possibly
+        // already-discounted) display price, or a bulk discount gets applied twice.
+        unitPrice: i.rawUnitPrice ?? i.unitPrice,
+        fabricPrice: i.rawFabricPrice ?? i.fabricPrice,
         designPrice: i.designPrice,
         variants: i.variants,
         variantSelections: i.variantSelections,
         customFormData: i.customFormData,
-      }))
-    ),
+      })),
+    }),
     enabled: !isLoggedIn && guestCartItems.length > 0,
   });
+
+  useEffect(() => {
+    if (isLoggedIn || !guestPreview?.items?.length) return;
+    guestCart.syncServerPrices(guestPreview.items);
+  }, [isLoggedIn, guestPreview]);
+
+  const [breakdownItem, setBreakdownItem] = useState<any>(null);
+  const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
   
   // Fetch user profile for auto-prefill (only for logged-in users)
   const { data: userProfile } = useQuery({
@@ -296,26 +313,23 @@ const Checkout = () => {
   // Don't auto-select - let user manually choose address
   // Auto-fill will happen only when user selects an address
   
-  // Fetch cart with state, coupon, and country (India = quantity-based shipping)
-  const { data: cartData, isLoading: cartLoading, refetch: refetchCart } = useQuery({
-    queryKey: ['cart-checkout', formData.state, appliedCouponCode, formData.country],
-    queryFn: () => cartApi.getCart(formData.state || undefined, appliedCouponCode || undefined, formData.country || undefined),
+  // Checkout ledger — cart stays raw; quote computes discounts, GST, shipping
+  const { data: quote, isLoading: cartLoading } = useQuery({
+    queryKey: ['checkout-quote', appliedCouponCode, formData.country],
+    queryFn: () =>
+      checkoutApi.getQuote({
+        couponCode: appliedCouponCode || undefined,
+        country: formData.country || 'IN',
+      }),
     enabled: isLoggedIn,
   });
-  
-  // Update applied coupon code from cart data
-  useEffect(() => {
-    if (cartData?.appliedCouponCode) {
-      setAppliedCouponCode(cartData.appliedCouponCode);
-    }
-  }, [cartData?.appliedCouponCode]);
-  
-  // When state/country changes, refetch cart so shipping is recalculated (logged-in: backend uses country for India quantity-based)
+
+  // When country changes, refetch so shipping (India vs free/TBD) updates
   useEffect(() => {
     if (isLoggedIn) {
-      queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
+      queryClient.invalidateQueries({ queryKey: ['checkout-quote'] });
     }
-  }, [formData.state, formData.country, isLoggedIn, queryClient]);
+  }, [formData.country, isLoggedIn, queryClient]);
   
   // Load selected address - this is the single source of truth for logged-in users
   useEffect(() => {
@@ -366,8 +380,8 @@ const Checkout = () => {
         // Set validation errors if any fields are missing
         setFieldErrors(validationErrors);
         
-        // Trigger shipping recalculation
-        queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
+        // Trigger shipping recalculation via quote
+        queryClient.invalidateQueries({ queryKey: ['checkout-quote'] });
       }
     } else if (isLoggedIn && selectedAddressId === null) {
       // Clear errors when no address is selected (user will fill form manually)
@@ -391,7 +405,7 @@ const Checkout = () => {
             city: result.city || prev.city,
           }));
           if (result.state) {
-            queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
+            queryClient.invalidateQueries({ queryKey: ['checkout-quote'] });
           }
         }
       });
@@ -425,21 +439,7 @@ const Checkout = () => {
         orderData.guestPhone = formData.phone;
         
         // Add guest cart items (convert from guestCartItems format to AddToCartRequest format)
-        orderData.guestCartItems = guestCartItems.map((item: any) => ({
-          productType: item.productType,
-          productId: item.productId,
-          productName: item.productName,
-          productImage: item.productImage,
-          designId: item.designId,
-          fabricId: item.fabricId,
-          fabricPrice: item.fabricPrice,
-          designPrice: item.designPrice,
-          uploadedDesignUrl: item.uploadedDesignUrl,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          variants: item.variants || {},
-          customFormData: item.customFormData || {},
-        }));
+        orderData.guestCartItems = toGuestOrderItems(items);
       }
       
       try {
@@ -540,8 +540,12 @@ const Checkout = () => {
     queryFn: () => paymentConfigApi.getConfig(),
   });
   
-  // Calculate cart items and totals (must be before useMemo that uses items)
-  const items = isLoggedIn ? (cartData?.items || []) : guestCartItems;
+  // Calculate cart items and totals (must be before useMemo that uses items).
+  // Guests use server-priced lines — same numbers as cart page and order create.
+  const items = useMemo(() => {
+    if (isLoggedIn) return quote?.items || [];
+    return mergeGuestPricedItems(guestCartItems, guestPreview?.items);
+  }, [isLoggedIn, quote?.items, guestCartItems, guestPreview?.items]);
 
   /** Fabric quantity in metres: PLAIN / DESIGNED / CUSTOM line quantities; DIGITAL excluded (matches shipping backend). */
   const totalFabricMetres = useMemo(() => {
@@ -632,31 +636,38 @@ const Checkout = () => {
   }, [isLoggedIn, isIndia, formData.country, guestCartItems]);
   
   const subtotal = isLoggedIn
-    ? (cartData?.subtotal ? Number(cartData.subtotal) : 0)
+    ? (quote?.subtotal != null ? Number(quote.subtotal) : 0)
     : (guestPreview?.subtotal != null ? Number(guestPreview.subtotal) : subtotalFromLocalStorage);
-  // GST: For logged-in users, get from backend. For guest users, backend calculates it when order is created
-  const gst = isLoggedIn
-    ? (cartData?.gst ? Number(cartData.gst) : 0)
-    : 0; // Guest GST calculated by backend on order creation
+  // GST + discounts come from the checkout quote for logged-in users
+  const gst = isLoggedIn ? Number(quote?.gst ?? 0) : 0;
+  const fabricDiscountTotal = isLoggedIn ? Number(quote?.fabricDiscountTotal ?? 0) : 0;
+  const quoteDiscounts = isLoggedIn ? (quote?.discounts || []) : [];
+  const taxableAmount = isLoggedIn
+    ? Number(quote?.taxableAmount ?? Math.max(0, subtotal - fabricDiscountTotal - Number(quote?.couponDiscount ?? 0)))
+    : subtotal;
   const shippingBase = isLoggedIn
-    ? (cartData?.shipping ? Number(cartData.shipping) : 0)
+    ? Number(quote?.shipping ?? 0)
     : guestShipping;
   // Porter or large fabric (India standard): no auto shipping in order total — team confirms before confirmation
   const useManualFabricShippingInTotal =
     needsManualFabricShippingQuote && deliveryType === 'STANDARD' && isIndia;
   const shipping =
     deliveryType === 'PORTER' ? 0 : useManualFabricShippingInTotal ? 0 : shippingBase;
-  const couponDiscount = isLoggedIn
-    ? (cartData?.couponDiscount ? Number(cartData.couponDiscount) : 0)
-    : 0;
-  const total = subtotal + gst + shipping - couponDiscount;
-  const orderTotalBeforeCoupon = subtotal + gst + shipping;
+  const couponDiscount = isLoggedIn ? Number(quote?.couponDiscount ?? 0) : 0;
+  const quoteCouponCode = isLoggedIn ? (quote?.appliedCouponCode || null) : null;
+  const couponMessage = isLoggedIn ? (quote?.couponMessage || null) : null;
+  // Prefer server total when shipping is not overridden; otherwise rebuild from ledger parts
+  const total = isLoggedIn && shipping === shippingBase && quote?.total != null
+    ? Number(quote.total)
+    : taxableAmount + gst + shipping;
+  const orderTotalBeforeCoupon = Math.max(0, subtotal - fabricDiscountTotal);
   const codCharge = paymentGateway === 'COD' && paymentConfig?.codCharge != null && Number(paymentConfig.codCharge) > 0 ? Number(paymentConfig.codCharge) : 0;
   const displayTotal = total + codCharge;
 
   // Discount section: coupon input for collapsible
   const [couponCodeInput, setCouponCodeInput] = useState('');
   const [discountOpen, setDiscountOpen] = useState(false);
+  const [expandedDiscountIdx, setExpandedDiscountIdx] = useState<number | null>(null);
   const { data: eligibleCoupons = [] } = useQuery({
     queryKey: ['coupons-eligible-checkout', orderTotalBeforeCoupon],
     queryFn: () => couponApi.getEligible(orderTotalBeforeCoupon),
@@ -672,7 +683,7 @@ const Checkout = () => {
     onSuccess: (data: { discount?: number; code?: string }) => {
       if (data.code) {
         setAppliedCouponCode(data.code);
-        queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
+        queryClient.invalidateQueries({ queryKey: ['checkout-quote'] });
       }
       toast.success(`Coupon applied! You save ${format(data.discount || 0)}`);
       setCouponCodeInput('');
@@ -684,7 +695,7 @@ const Checkout = () => {
   const removeCoupon = () => {
     setAppliedCouponCode(null);
     setCouponCodeInput('');
-    queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
+    queryClient.invalidateQueries({ queryKey: ['checkout-quote'] });
     toast.success('Coupon removed');
   };
 
@@ -901,21 +912,7 @@ const Checkout = () => {
           orderData.guestFirstName = formData.firstName;
           orderData.guestLastName = formData.lastName;
           orderData.guestPhone = formData.phone;
-          orderData.guestCartItems = guestCartItems.map((item: any) => ({
-            productType: item.productType,
-            productId: item.productId,
-            productName: item.productName,
-            productImage: item.productImage,
-            designId: item.designId,
-            fabricId: item.fabricId,
-            fabricPrice: item.fabricPrice,
-            designPrice: item.designPrice,
-            uploadedDesignUrl: item.uploadedDesignUrl,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            variants: item.variants || {},
-            customFormData: item.customFormData || {},
-          }));
+          orderData.guestCartItems = toGuestOrderItems(items);
         }
 
         const order = await orderApi.createOrder(orderData);
@@ -974,21 +971,7 @@ const Checkout = () => {
         orderData.guestFirstName = formData.firstName;
         orderData.guestLastName = formData.lastName;
         orderData.guestPhone = formData.phone;
-        orderData.guestCartItems = guestCartItems.map((item: any) => ({
-          productType: item.productType,
-          productId: item.productId,
-          productName: item.productName,
-          productImage: item.productImage,
-          designId: item.designId,
-          fabricId: item.fabricId,
-          fabricPrice: item.fabricPrice,
-          designPrice: item.designPrice,
-          uploadedDesignUrl: item.uploadedDesignUrl,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          variants: item.variants || {},
-          customFormData: item.customFormData || {},
-        }));
+        orderData.guestCartItems = toGuestOrderItems(items);
       }
 
       const order = await orderApi.createOrder(orderData);
@@ -1462,7 +1445,7 @@ const Checkout = () => {
                             value={formData.state}
                             onValueChange={(val) => {
                               handleInputChange('state', val);
-                              queryClient.invalidateQueries({ queryKey: ['cart-checkout'] });
+                              queryClient.invalidateQueries({ queryKey: ['checkout-quote'] });
                               setTimeout(() => handleFieldBlur('state'), 0);
                             }}
                           >
@@ -1705,39 +1688,6 @@ const Checkout = () => {
                       </p>
                     </div>
                   )}
-                  {(() => {
-                    const fabricDiscounts: any[] = isLoggedIn
-                      ? ((cartData as any)?.fabricDiscounts || [])
-                      : ((guestPreview as any)?.fabricDiscounts || []);
-                    if (!Array.isArray(fabricDiscounts) || fabricDiscounts.length === 0) return null;
-                    return (
-                    <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50/70 text-emerald-900">
-                      <div className="font-medium mb-1">Quantity discount applied</div>
-                      <div className="space-y-1.5">
-                        {fabricDiscounts.map((fd: any) => {
-                          const perMeter = Number(fd.discountPerMeter || 0);
-                          const totalSaved = Number(fd.totalSavings || 0);
-                          const isPct = fd.discountType === 'PERCENTAGE';
-                          return (
-                            <div key={`co-fd-${fd.fabricId}-${fd.slabId}`} className="flex justify-between gap-3 text-xs">
-                              <div className="min-w-0">
-                                <div className="truncate">{fd.fabricName || `Fabric #${fd.fabricId}`}</div>
-                                <div className="text-emerald-800/70">
-                                  {fd.combinedMetres}m combined fabric · {fd.slabMinQuantity}
-                                  {fd.slabMaxQuantity ? `–${fd.slabMaxQuantity}` : '+'} m
-                                </div>
-                              </div>
-                              <div className="text-right whitespace-nowrap">
-                                <div>−{isPct ? `${Number(fd.discountValue || 0)}%` : `₹${perMeter.toFixed(2)}`}/m</div>
-                                <div className="text-emerald-800/70">Saved {format(totalSaved)}</div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    );
-                  })()}
                 </div>
 
                 {/* Delivery Option Selector */}
@@ -1781,54 +1731,118 @@ const Checkout = () => {
 
                 <div className="space-y-2 text-sm sm:text-base border-b pb-4 mb-4">
                   {items.map((item: any) => {
-                    const hasBreakdown = item.productType === 'DESIGNED' && (item.designPrice != null || item.fabricPrice != null) || (item.unitPrice != null && (item.quantity || 1) > 0);
+                    const hasBreakdown = !!item.breakdown;
                     return (
-                      <Collapsible key={item.id}>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <span className="font-sans font-normal line-clamp-1">{item.productName}</span>
+                      <div key={item.id} className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <span className="font-sans font-normal line-clamp-1">{item.productName}</span>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                            {item.quantity != null && (
+                              <span className="text-xs text-muted-foreground">Qty {item.quantity}</span>
+                            )}
+                            {item.gstRate != null && Number(item.gstRate) > 0 && (
+                              <span className="text-xs text-muted-foreground">GST {Number(item.gstRate)}%</span>
+                            )}
                             {hasBreakdown && (
-                              <CollapsibleTrigger asChild>
-                                <button type="button" className="text-xs text-muted-foreground hover:text-foreground mt-0.5 flex items-center gap-0.5">
-                                  Why this price? <ChevronDown className="w-3 h-3" />
-                                </button>
-                              </CollapsibleTrigger>
+                              <button
+                                type="button"
+                                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+                                onClick={() => {
+                                  setBreakdownItem(item);
+                                  setShowPriceBreakdown(true);
+                                }}
+                              >
+                                <Calculator className="w-3 h-3" />
+                                Why this price?
+                              </button>
                             )}
                           </div>
-                          <span className="flex-shrink-0 font-medium">{format(item.totalPrice || 0)}</span>
                         </div>
-                        {hasBreakdown && (
-                          <CollapsibleContent>
-                            <div className="mt-2 pl-2 border-l-2 border-muted text-xs text-muted-foreground space-y-0.5">
-                              {item.productType === 'DESIGNED' && item.designPrice != null && (
-                                <div>Design: {format(Number(item.designPrice))}</div>
-                              )}
-                              {item.productType === 'DESIGNED' && item.fabricPrice != null && (
-                                <div>Fabric: {format(Number(item.fabricPrice))}</div>
-                              )}
-                              {item.unitPrice != null && (
-                                <div>Unit: {format(Number(item.unitPrice))} × {item.quantity || 1}</div>
-                              )}
-                              <div className="font-medium text-foreground pt-0.5">Total: {format(item.totalPrice || 0)}</div>
-                            </div>
-                          </CollapsibleContent>
-                        )}
-                      </Collapsible>
+                        <span className="flex-shrink-0 font-medium">
+                          {!isLoggedIn && guestPreviewLoading && !guestPreview
+                            ? '…'
+                            : format(item.totalPrice || 0)}
+                        </span>
+                      </div>
                     );
                   })}
                 </div>
-                <div className="space-y-3 text-sm sm:text-base">
+
+                {/* Ledger: subtotal → discounts → taxable → GST → shipping → total */}
+                <div className="space-y-2.5 text-sm sm:text-base">
                   <div className="flex justify-between">
-                    <span>Subtotal</span>
+                    <span className="text-muted-foreground">Subtotal</span>
                     <span>{format(subtotal)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>GST</span>
-                    <span>{format(gst)}</span>
-                  </div>
-                  <div className="flex justify-between">
+
+                  {isLoggedIn && quoteDiscounts.map((d: any, idx: number) => {
+                    const amount = Number(d.amount || 0);
+                    if (amount <= 0) return null;
+                    const hasContributions = Array.isArray(d.contributions) && d.contributions.length > 0;
+                    const open = expandedDiscountIdx === idx;
+                    return (
+                      <div key={`disc-${idx}-${d.type}-${d.label}`} className="space-y-1">
+                        <div className="flex justify-between items-start gap-3 text-emerald-700 dark:text-emerald-400">
+                          <button
+                            type="button"
+                            className={`text-left min-w-0 ${hasContributions ? 'hover:underline' : ''}`}
+                            onClick={() => hasContributions && setExpandedDiscountIdx(open ? null : idx)}
+                            disabled={!hasContributions}
+                          >
+                            <span className="font-medium">{d.label || 'Discount'}</span>
+                            {d.detail && (
+                              <span className="block text-xs text-emerald-700/70 dark:text-emerald-400/70 font-normal">
+                                {d.detail}
+                              </span>
+                            )}
+                            {hasContributions && (
+                              <span className="block text-[11px] text-muted-foreground mt-0.5">
+                                {open ? 'Hide details' : 'Show how this was calculated'}
+                              </span>
+                            )}
+                          </button>
+                          <span className="whitespace-nowrap font-medium">−{format(amount)}</span>
+                        </div>
+                        {open && hasContributions && (
+                          <div className="ml-1 pl-3 border-l border-emerald-200 dark:border-emerald-900 space-y-1">
+                            {d.contributions.map((c: any, cIdx: number) => (
+                              <div key={`c-${c.cartItemId ?? cIdx}`} className="flex justify-between gap-2 text-xs text-muted-foreground">
+                                <span className="truncate">
+                                  {c.productName || 'Item'}
+                                  {c.quantity != null ? ` · ${c.quantity} m` : ''}
+                                  {c.perUnit != null ? ` · −${format(Number(c.perUnit))}/m` : ''}
+                                </span>
+                                <span className="whitespace-nowrap">−{format(Number(c.amount || 0))}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {isLoggedIn && (fabricDiscountTotal > 0 || couponDiscount > 0) && (
+                    <div className="flex justify-between pt-1 border-t border-dashed text-muted-foreground">
+                      <span>Amount before tax</span>
+                      <span>{format(taxableAmount)}</span>
+                    </div>
+                  )}
+
+                  {isLoggedIn && (
+                    <div className="flex justify-between items-start gap-3">
+                      <div>
+                        <span>GST</span>
+                        <span className="block text-xs text-muted-foreground font-normal">
+                          Charged at each product&apos;s own rate
+                        </span>
+                      </div>
+                      <span>{format(gst)}</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-start gap-3">
                     <span>Shipping</span>
-                    <span>
+                    <span className="text-right">
                       {deliveryType === 'PORTER'
                         ? 'Porter (TBD)'
                         : !isIndia
@@ -1849,25 +1863,17 @@ const Checkout = () => {
                       <span>+{format(codCharge)}</span>
                     </div>
                   )}
-                  {isLoggedIn && appliedCouponCode && couponDiscount > 0 && (
-                    <div className="flex justify-between items-center text-primary">
-                      <span>Coupon ({appliedCouponCode})</span>
-                      <span>-{format(couponDiscount)}</span>
-                    </div>
-                  )}
                   {paymentGateway === 'PARTIAL_COD' && paymentConfig?.partialCodAdvancePercentage && (
-                    <>
-                      <div className="pt-3 border-t space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Advance Payment ({paymentConfig.partialCodAdvancePercentage}%):</span>
-                          <span className="font-semibold text-blue-600 dark:text-blue-400">{format((total * paymentConfig.partialCodAdvancePercentage) / 100)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Remaining (COD):</span>
-                          <span className="font-semibold text-green-600 dark:text-green-400">{format(total - (total * paymentConfig.partialCodAdvancePercentage) / 100)}</span>
-                        </div>
+                    <div className="pt-3 border-t space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Advance Payment ({paymentConfig.partialCodAdvancePercentage}%):</span>
+                        <span className="font-semibold text-blue-600 dark:text-blue-400">{format((total * paymentConfig.partialCodAdvancePercentage) / 100)}</span>
                       </div>
-                    </>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Remaining (COD):</span>
+                        <span className="font-semibold text-green-600 dark:text-green-400">{format(total - (total * paymentConfig.partialCodAdvancePercentage) / 100)}</span>
+                      </div>
+                    </div>
                   )}
                   <div className="flex justify-between font-semibold text-lg sm:text-xl pt-4 border-t">
                     <span>Total</span>
@@ -1985,8 +1991,8 @@ const Checkout = () => {
                       className="flex w-full items-center justify-between text-left font-medium text-sm hover:opacity-80"
                     >
                       <span>
-                        {appliedCouponCode && couponDiscount > 0
-                          ? `Coupon: ${appliedCouponCode} — -${format(couponDiscount)}`
+                        {quoteCouponCode && couponDiscount > 0
+                          ? `Coupon: ${quoteCouponCode} — -${format(couponDiscount)}`
                           : 'Discount / Coupon'}
                       </span>
                       <ChevronDown className={`w-4 h-4 transition-transform ${discountOpen ? 'rotate-180' : ''}`} />
@@ -1998,10 +2004,10 @@ const Checkout = () => {
                         <div className="p-3 rounded-lg border border-border bg-muted/30 text-sm text-muted-foreground">
                           Log in to use discount coupons.
                         </div>
-                      ) : appliedCouponCode && couponDiscount > 0 ? (
+                      ) : quoteCouponCode && couponDiscount > 0 ? (
                         <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary/20">
                           <div>
-                            <p className="text-sm font-medium">Applied: {appliedCouponCode}</p>
+                            <p className="text-sm font-medium">Applied: {quoteCouponCode}</p>
                             <p className="text-xs text-muted-foreground">Discount: {format(couponDiscount)}</p>
                           </div>
                           <Button variant="ghost" size="sm" onClick={removeCoupon} className="text-xs h-8">
@@ -2047,6 +2053,9 @@ const Checkout = () => {
                               {applyCouponMutation.isPending ? 'Applying...' : 'Apply'}
                             </Button>
                           </div>
+                          {couponMessage && !quoteCouponCode && (
+                            <p className="text-xs text-destructive">{couponMessage}</p>
+                          )}
                         </>
                       )}
                     </div>
@@ -2077,6 +2086,14 @@ const Checkout = () => {
           )}
         </div>
       </section>
+
+      <PriceBreakdownPopup
+        open={showPriceBreakdown}
+        onOpenChange={setShowPriceBreakdown}
+        productName={breakdownItem?.productName}
+        breakdown={breakdownItem?.breakdown ?? null}
+        loading={!isLoggedIn && guestPreviewLoading && !guestPreview}
+      />
     </Layout>
   );
 };
