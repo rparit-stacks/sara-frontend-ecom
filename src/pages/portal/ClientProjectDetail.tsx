@@ -348,7 +348,6 @@ export default function ClientProjectDetail() {
     // @sara mentions now stay as plain messages; the block below (kept for when this is
     // re-enabled) used to detect the mention and call portalAiChatApi for a Sara AI reply.
     return;
-    // eslint-disable-next-line no-unreachable
     const trimmed = text.trim();
     if (!mentionsSara(trimmed) && uploadedImageUrls.length === 0) return;
     // Photos alone (without @sara) stay as normal messages; AI only runs on @sara.
