@@ -2750,9 +2750,114 @@ export interface ChatSessionSummaryDto {
  * of the app: fetchApi attaches `authToken` automatically when present (logged-in customer),
  * and omits it for guests — the backend resolves guest-vs-authenticated from that header.
  */
+export type AiChatStreamHandlers = {
+  onStatus?: (message: string) => void;
+  /** The assistant restarted its answer — drop whatever text was streamed so far. */
+  onReset?: () => void;
+  onDelta?: (text: string) => void;
+  onDone?: (response: AiChatTurnResponse) => void;
+  onError?: (message: string) => void;
+};
+
+/** Applies one `event:\ndata:\n\n` SSE frame to the caller's handlers. */
+function applySseFrame(chunk: string, handlers: AiChatStreamHandlers) {
+  const normalized = chunk.replace(/\r/g, '');
+  if (!normalized.trim()) return;
+  let eventName = 'message';
+  let data = '';
+  for (const line of normalized.split('\n')) {
+    if (line.startsWith('event:')) eventName = line.slice(6).trim();
+    else if (line.startsWith('data:')) data += (data ? '\n' : '') + line.slice(5).trimStart();
+  }
+  if (!data) return;
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(data) as Record<string, unknown>;
+  } catch {
+    return;
+  }
+  switch (eventName) {
+    case 'status':
+      if (typeof payload.message === 'string') handlers.onStatus?.(payload.message);
+      break;
+    case 'reset':
+      handlers.onReset?.();
+      break;
+    case 'delta':
+      if (typeof payload.text === 'string') handlers.onDelta?.(payload.text);
+      break;
+    case 'done': {
+      const nested = payload.response as AiChatTurnResponse | undefined;
+      if (nested?.replyText != null) handlers.onDone?.(nested);
+      break;
+    }
+    case 'error':
+      handlers.onError?.(typeof payload.message === 'string' ? payload.message : 'Ask Sara could not finish that reply.');
+      break;
+    default:
+      break;
+  }
+}
+
 export const aiChatApi = {
   sendMessage: (data: AiChatTurnRequest) =>
     fetchApi<AiChatTurnResponse>('/api/chat/message', { method: 'POST', body: JSON.stringify(data) }),
+  /**
+   * Progressive twin of `sendMessage` — same request contract, but consumes
+   * `/api/chat/message/stream` via the browser's native `fetch` (which, unlike React Native's
+   * default fetch that mobile had to work around with `expo/fetch`, already exposes a real
+   * `ReadableStream` here) so the reply types out live instead of arriving all at once.
+   */
+  sendMessageStream: async (data: AiChatTurnRequest, handlers: AiChatStreamHandlers = {}): Promise<AiChatTurnResponse> => {
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${API_BASE_URL}/api/chat/message/stream`, {
+      method: 'POST',
+      headers: {
+        Accept: 'text/event-stream',
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(body.message || 'Something went wrong.');
+    }
+    if (!response.body) {
+      throw new Error('Ask Sara closed the stream without a reply. Please try again.');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalResponse: AiChatTurnResponse | null = null;
+    let streamError: string | null = null;
+    const wrappedHandlers: AiChatStreamHandlers = {
+      ...handlers,
+      onDone: (r) => {
+        finalResponse = r;
+        handlers.onDone?.(r);
+      },
+      onError: (m) => {
+        streamError = m;
+        handlers.onError?.(m);
+      },
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split(/\n\n/);
+      buffer = parts.pop() || '';
+      for (const part of parts) applySseFrame(part, wrappedHandlers);
+    }
+    if (buffer.trim()) applySseFrame(buffer, wrappedHandlers);
+
+    if (streamError) throw new Error(streamError);
+    if (!finalResponse) throw new Error('Ask Sara closed the stream without a reply. Please try again.');
+    return finalResponse;
+  },
   requestOtp: (email: string, threadId: string | null) =>
     fetchApi<void>('/api/chat/auth/request-otp', {
       method: 'POST',

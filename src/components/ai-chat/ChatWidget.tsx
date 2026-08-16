@@ -63,6 +63,87 @@ function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+/**
+ * Constant-speed typewriter for streamed replies — the same fix mobile's Ask Sara needed:
+ * Gemini delivers text in bursts (a few characters, a long pause, then a paragraph at once), so
+ * rendering deltas as they land makes the reply visibly stutter. Buffering and draining at a
+ * fixed rate instead gives one calm, predictable read speed no matter how bursty the network
+ * was — and the drain naturally covers the schema round-trip, so chips/cards tend to be ready
+ * by the time the last character lands instead of popping in 2-3s after typing stopped.
+ */
+const TYPEWRITER_CHARS_PER_SECOND = 55;
+const TYPEWRITER_TICK_MS = 33;
+/** Beyond this backlog the reply is far ahead of the reader — speed up rather than lag further. */
+const TYPEWRITER_CATCHUP_THRESHOLD = 220;
+const TYPEWRITER_CATCHUP_MULTIPLIER = 2.5;
+
+function createTypewriter(onFlush: (text: string) => void) {
+  let pending = '';
+  let timer: ReturnType<typeof setInterval> | null = null;
+  let carry = 0;
+  let finished = false;
+  let onDrained: (() => void) | null = null;
+
+  const stop = () => {
+    if (timer) clearInterval(timer);
+    timer = null;
+  };
+
+  const tick = () => {
+    if (!pending) {
+      stop();
+      if (finished && onDrained) {
+        const done = onDrained;
+        onDrained = null;
+        done();
+      }
+      return;
+    }
+    const perTick = (TYPEWRITER_CHARS_PER_SECOND * TYPEWRITER_TICK_MS) / 1000;
+    const rate =
+      pending.length > TYPEWRITER_CATCHUP_THRESHOLD ? perTick * TYPEWRITER_CATCHUP_MULTIPLIER : perTick;
+    carry += rate;
+    const take = Math.floor(carry);
+    if (take <= 0) return;
+    carry -= take;
+    const slice = pending.slice(0, take);
+    pending = pending.slice(take);
+    onFlush(slice);
+  };
+
+  const ensureRunning = () => {
+    if (!timer) timer = setInterval(tick, TYPEWRITER_TICK_MS);
+  };
+
+  return {
+    push(text: string) {
+      if (!text) return;
+      pending += text;
+      ensureRunning();
+    },
+    /** Clears buffered text without rendering it — used when the server sends `reset`. */
+    discard() {
+      pending = '';
+      carry = 0;
+    },
+    /** Resolves once every buffered character has been rendered. */
+    drain(): Promise<void> {
+      finished = true;
+      if (!pending) return Promise.resolve();
+      ensureRunning();
+      return new Promise((resolve) => {
+        onDrained = resolve;
+      });
+    },
+    /** Abandons the queue immediately (error paths — the caller renders its own text). */
+    cancel() {
+      pending = '';
+      onDrained = null;
+      stop();
+    },
+  };
+}
+
 const SYNC_CHANNEL_NAME = 'ai-chat-sync';
 
 type SyncMessage =
@@ -147,6 +228,7 @@ export function ChatWidget() {
   const [viewMode, setViewMode] = useState<'chat' | 'history'>('chat');
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('authToken'));
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [streamStatus, setStreamStatus] = useState<string | null>(null);
 
   const threadIdRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -275,7 +357,16 @@ export function ChatWidget() {
     setShowScrollToBottom(false);
   };
 
-  const applyResponse = useCallback((response: AiChatTurnResponse): ChatMessage => {
+  /**
+   * `streamedText`, when given, wins over `response.replyText`. The server's structured pass is
+   * free to reword the reply (condense a streamed paragraph-plus-list into a shorter summary,
+   * move detail into `table`/options) — that pass is optimised for producing clean cards and
+   * buttons, not for matching what the customer already watched being typed. Swapping in a
+   * reworded version at the very end would read as the answer changing under them, so once a
+   * turn has streamed any text, that text IS the answer; the structured pass only ever
+   * contributes options/cards/table/portalRedirect alongside it, never a replacement body.
+   */
+  const applyResponse = useCallback((response: AiChatTurnResponse, streamedText?: string, existingId?: string): ChatMessage => {
     const previousThreadId = threadIdRef.current;
     threadIdRef.current = response.threadId;
     saveThreadId(response.threadId);
@@ -283,10 +374,11 @@ export function ChatWidget() {
       broadcastThreadChanged(response.threadId);
     }
 
+    const text = streamedText && streamedText.trim() ? streamedText : response.replyText;
     const assistantMessage: ChatMessage = {
-      id: makeId(),
+      id: existingId ?? makeId(),
       role: 'assistant',
-      text: response.replyText,
+      text,
       createdAt: Date.now(),
       visualCards: response.visualCards,
       table: response.table,
@@ -294,7 +386,12 @@ export function ChatWidget() {
       portalRedirect: response.portalRedirect,
       justLinkedToAccount: response.justLinkedToAccount,
     };
-    setMessages((prev) => [...prev, assistantMessage]);
+    setMessages((prev) => {
+      const exists = existingId && prev.some((m) => m.id === existingId);
+      return exists
+        ? prev.map((m) => (m.id === existingId ? assistantMessage : m))
+        : [...prev, assistantMessage];
+    });
 
     if (response.authPrompt) {
       setAuthStage({ stage: 'awaiting-email', reason: response.authPrompt.message });
@@ -336,31 +433,83 @@ export function ChatWidget() {
       };
       setMessages((prev) => [...prev, userMessage]);
       setIsSending(true);
+      setStreamStatus('Thinking…');
       setPendingInput({ kind: 'FREE_TEXT' }); // hide chips while waiting
+
+      // Same streaming bubble across the whole turn: created lazily on the first delta, then
+      // patched in place by the typewriter, then swapped for the final message (with
+      // options/cards/table) once `done` arrives and the buffer has fully drained.
+      const streamingId = makeId();
+      let hasRenderedAnyText = false;
+      let renderedText = '';
+      const typewriter = createTypewriter((slice) => {
+        hasRenderedAnyText = true;
+        renderedText += slice;
+        setMessages((prev) => {
+          const existing = prev.find((m) => m.id === streamingId);
+          if (!existing) {
+            return [...prev, { id: streamingId, role: 'assistant', text: slice, createdAt: Date.now() }];
+          }
+          return prev.map((m) => (m.id === streamingId ? { ...m, text: m.text + slice } : m));
+        });
+      });
 
       try {
         const baseContext = pageContext ?? getPageContext() ?? { pageType: 'OTHER' as const };
-        const response = await aiChatApi.sendMessage({
-          threadId: threadIdRef.current,
-          userMessage: text,
-          uploadedImageUrls: imageUrls,
-          pageContext: {
-            ...baseContext,
-            clientType: 'WEB',
-            siteOrigin: typeof window !== 'undefined' ? window.location.origin : baseContext.siteOrigin,
+        const response = await aiChatApi.sendMessageStream(
+          {
+            threadId: threadIdRef.current,
+            userMessage: text,
+            uploadedImageUrls: imageUrls,
+            pageContext: {
+              ...baseContext,
+              clientType: 'WEB',
+              siteOrigin: typeof window !== 'undefined' ? window.location.origin : baseContext.siteOrigin,
+            },
           },
-        });
-        const assistantMessage = applyResponse(response);
+          {
+            onStatus: (status) => {
+              if (!hasRenderedAnyText) setStreamStatus(status);
+            },
+            onReset: () => {
+              // A later tool round rewrote the answer — drop both what's on screen and whatever
+              // was still queued from the abandoned draft.
+              typewriter.discard();
+              renderedText = '';
+              hasRenderedAnyText = false;
+              setMessages((prev) => prev.map((m) => (m.id === streamingId ? { ...m, text: '' } : m)));
+            },
+            onDelta: (delta) => {
+              setStreamStatus(null);
+              typewriter.push(delta);
+            },
+          }
+        );
+
+        // The `done` event has landed (chips/cards/table ready) but the typewriter may still be
+        // mid-sentence — let it finish before swapping in the final message, so buttons appear
+        // exactly as the last character types rather than popping in seconds after text stopped.
+        await typewriter.drain();
+
+        const assistantMessage = applyResponse(response, renderedText, hasRenderedAnyText ? streamingId : undefined);
         // Other tabs on this same thread only ever see their OWN sendMessage results — mirror
         // this exchange to them in real time instead of leaving them stale until a reload.
         broadcastNewMessages(response.threadId, [userMessage, assistantMessage]);
         setPendingRetryText(null);
       } catch (err) {
+        typewriter.cancel();
         console.error('[AiChat] sendMessage failed', err);
         setLoadError("Sorry, I couldn't send that. Please try again.");
         setPendingRetryText(text);
+        // A partial streamed draft stays on screen (with the error shown separately below it)
+        // rather than vanishing — same recovery behavior mobile's Ask Sara has.
+        if (!hasRenderedAnyText) {
+          setMessages((prev) => prev.filter((m) => m.id !== streamingId));
+        }
       } finally {
+        typewriter.cancel();
         setIsSending(false);
+        setStreamStatus(null);
       }
     },
     [isSending, applyResponse, getPageContext, broadcastNewMessages]
@@ -545,9 +694,10 @@ export function ChatWidget() {
           />
         )}
 
-        {isSending && (
+        {isSending && streamStatus && (
           <div className="flex items-center gap-2.5 pl-9">
             <TypingDots />
+            <span className="text-xs text-muted-foreground">{streamStatus}</span>
           </div>
         )}
 
