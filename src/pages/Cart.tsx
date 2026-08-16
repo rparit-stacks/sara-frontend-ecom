@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { cartApi, wishlistApi, saveForLaterApi } from '@/lib/api';
+import { cartApi, wishlistApi, saveForLaterApi, productsApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
 import { mergeGuestPricedItems } from '@/lib/mergeGuestPricedItems';
 import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
