@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -62,9 +62,9 @@ const FabricSearchPopup: React.FC<FabricSearchPopupProps> = ({
             <Search className="w-6 h-6 text-primary" />
             Browse All Fabrics
           </DialogTitle>
-          <p className="text-sm text-muted-foreground mt-2">
+          <DialogDescription className="text-sm text-muted-foreground mt-2">
             Search and select from all available plain fabrics
-          </p>
+          </DialogDescription>
         </DialogHeader>
 
         {/* Search Input */}

@@ -55,11 +55,11 @@ const CustomProductDetail = () => {
   };
   const guestId = getGuestIdentifier();
 
-  // Resolve cart item when editing from cart
+  // Full cart for pricing-preview aggregation (+ resolve edit item when cartItemId present)
   const { data: cartData } = useQuery({
-    queryKey: ['cart'],
+    queryKey: ['cart', isLoggedIn],
     queryFn: () => cartApi.getCart(),
-    enabled: !!cartItemId && isLoggedIn,
+    enabled: isLoggedIn,
   });
   const resolvedCartItem = (() => {
     if (!cartItemId) return null;
@@ -526,6 +526,70 @@ const CustomProductDetail = () => {
       },
     };
   }, [fabricSelectionData, metersQuantity, combinedPrice, DESIGN_PRICE, customConfig?.pageTitle, customProductId, customFormData, effectiveConfigVariants, selectedConfigVariants]);
+
+  const {
+    data: customPricingPreview,
+    isFetching: customPricingLoading,
+    isError: customPricingError,
+  } = useQuery({
+    queryKey: ['pricing-preview', 'custom', currentCartLikeItem, isLoggedIn, cartData?.items],
+    queryFn: () => {
+      const existing: any[] = isLoggedIn
+        ? (cartData?.items || []).map((i: any) => ({
+            productType: i.productType,
+            productId: Number(i.productId),
+            productName: i.productName,
+            productImage: i.productImage,
+            fabricId: i.fabricId != null ? Number(i.fabricId) : undefined,
+            designId: i.designId != null ? Number(i.designId) : undefined,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            fabricPrice: i.fabricPrice,
+            designPrice: i.designPrice,
+            variants: i.variants,
+            variantSelections: i.variantSelections,
+            customFormData: i.customFormData,
+          }))
+        : guestCart.getItems().map((i: any) => ({
+            productType: i.productType,
+            productId: Number(i.productId),
+            productName: i.productName,
+            productImage: i.productImage,
+            fabricId: i.fabricId != null ? Number(i.fabricId) : undefined,
+            designId: i.designId != null ? Number(i.designId) : undefined,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            fabricPrice: i.fabricPrice,
+            designPrice: i.designPrice,
+            variants: i.variants,
+            variantSelections: i.variantSelections,
+            customFormData: i.customFormData,
+          }));
+
+      let userEmail: string | null = null;
+      try {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          userEmail = payload.sub || payload.email || null;
+        }
+      } catch {
+        userEmail = null;
+      }
+
+      return cartApi.previewPricing({
+        userEmail,
+        items: [...existing, currentCartLikeItem!],
+      });
+    },
+    enabled: !!currentCartLikeItem,
+    staleTime: 5_000,
+  });
+
+  const customServerBreakdown =
+    customPricingPreview?.items?.length
+      ? customPricingPreview.items[customPricingPreview.items.length - 1]?.breakdown ?? null
+      : null;
 
   const [showAddAsNewConfirm, setShowAddAsNewConfirm] = useState(false);
 
@@ -1063,22 +1127,15 @@ const CustomProductDetail = () => {
         </>
       )}
 
-      {/* Price Breakdown Popup */}
+      {/* Price Breakdown Popup — server JSON only */}
       {currentCartLikeItem && (
         <PriceBreakdownPopup
           open={showPriceBreakdown}
           onOpenChange={setShowPriceBreakdown}
-          item={currentCartLikeItem}
-          productData={{
-            type: 'CUSTOM',
-            designPrice: DESIGN_PRICE,
-            pricePerMeter: fabricSelectionData?.totalPrice,
-            variants: effectiveConfigVariants,
-          }}
-          selectedVariants={selectedConfigVariants}
-          fabricQuantity={metersQuantity}
-          fabricPricePerMeter={fabricSelectionData?.totalPrice}
-          selectedFabricVariants={fabricSelectionData?.selectedVariants}
+          productName={currentCartLikeItem.productName}
+          breakdown={customServerBreakdown}
+          loading={customPricingLoading && !customServerBreakdown}
+          error={customPricingError ? 'Could not load price breakdown. Please try again.' : null}
         />
       )}
 

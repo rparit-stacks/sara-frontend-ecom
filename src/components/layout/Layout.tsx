@@ -6,7 +6,6 @@ import Footer from './Footer';
 import { MobileBottomNav } from './MobileBottomNav';
 import AnimatedWaveBackground from '@/components/animations/AnimatedWaveBackground';
 import FloatingCurlyLines from '@/components/animations/FloatingCurlyLines';
-import FloatingWhatsApp from '@/components/common/FloatingWhatsApp';
 import GeoSuggestionBanner from '@/components/common/GeoSuggestionBanner';
 
 interface LayoutProps {
@@ -49,7 +48,6 @@ export const Layout = ({ children, showFooter = true }: LayoutProps) => {
       </main>
       {showFooter && <Footer />}
       <MobileBottomNav />
-      <FloatingWhatsApp />
 
       {/* Global page loader with blurred background */}
       <AnimatePresence>

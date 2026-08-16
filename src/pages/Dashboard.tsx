@@ -18,6 +18,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { MandatoryProfileDialog } from '@/components/MandatoryProfileDialog';
+import { dispatchLoggedOut } from '@/lib/authEvents';
 
 /** Recursive component for personalized category tree with expandable subcategories */
 const PersonalizedCategoryItem = ({
@@ -179,6 +180,7 @@ const Dashboard = () => {
               if (localStorage.getItem('authToken') === currentToken) {
                 localStorage.removeItem('authToken');
                 localStorage.removeItem('authEmail');
+                dispatchLoggedOut();
                 navigate('/login', { replace: true });
               }
             }, 500);
@@ -324,6 +326,7 @@ const Dashboard = () => {
     // User explicitly chose to log out
     localStorage.removeItem('authToken');
     localStorage.removeItem('authEmail');
+    dispatchLoggedOut();
     toast.info('You have been logged out');
     navigate('/login', { replace: true });
   };
@@ -463,6 +466,7 @@ const Dashboard = () => {
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('authEmail');
+    dispatchLoggedOut();
     toast.success('Logged out successfully');
     navigate('/', { replace: true });
   };

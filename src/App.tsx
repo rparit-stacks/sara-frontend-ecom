@@ -2,11 +2,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { ChatWidget } from "@/components/ai-chat";
+import { AdminAiChatWidget } from "@/components/admin-ai-chat";
 import { SITE_UNDER_MAINTENANCE } from "@/siteMaintenance";
 import Maintenance from "@/pages/Maintenance";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { LoadingProvider } from "@/context/LoadingContext";
+import { ChatPageContextProvider } from "@/context/ChatPageContext";
 import ScrollToTop from "./components/ScrollToTop";
 import AuthSessionListener from "./components/AuthSessionListener";
 import VisitTracker from "./components/VisitTracker";
@@ -114,6 +117,34 @@ const queryClient = new QueryClient({
   },
 });
 
+// Site-wide AI chat is mounted here, OUTSIDE <Routes>, so it survives route changes instead
+// of unmounting/remounting (and losing all conversation state) on every page navigation —
+// each <Route>'s element wraps itself in its own <Layout>, so anything mounted inside Layout
+// gets torn down on every nav. Hidden on admin/portal surfaces the same way FloatingWhatsApp
+// used to be — by simply not rendering there, not a per-page opt-in.
+const HIDDEN_CHAT_PREFIXES = ['/admin-sara', '/portal-admin', '/portal', '/super-admin'];
+
+const SiteWideChatWidget = () => {
+  const location = useLocation();
+  const isHidden = HIDDEN_CHAT_PREFIXES.some(
+    (prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`)
+  );
+  if (isHidden) return null;
+  return <ChatWidget />;
+};
+
+/** Admin Ops AI — only on /admin-sara (not login/invite). Outside AdminLayout so nav keeps the thread. */
+const AdminSiteWideChatWidget = () => {
+  const location = useLocation();
+  const path = location.pathname;
+  const onAdminSara = path === '/admin-sara' || path.startsWith('/admin-sara/');
+  const isAuthSurface =
+    path === '/admin-sara/login' || path.startsWith('/admin-sara/invite');
+  if (!onAdminSara || isAuthSurface) return null;
+  if (!localStorage.getItem('adminToken')) return null;
+  return <AdminAiChatWidget />;
+};
+
 const App = () =>
   SITE_UNDER_MAINTENANCE ? (
     <Maintenance />
@@ -125,9 +156,12 @@ const App = () =>
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ChatPageContextProvider>
         <ScrollToTop />
         <AuthSessionListener />
         <VisitTracker />
+        <SiteWideChatWidget />
+        <AdminSiteWideChatWidget />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/categories" element={<Categories />} />
@@ -422,6 +456,7 @@ const App = () =>
 
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </ChatPageContextProvider>
       </BrowserRouter>
     </TooltipProvider>
     </LoadingProvider>

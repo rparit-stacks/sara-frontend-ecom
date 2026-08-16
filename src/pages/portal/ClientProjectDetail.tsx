@@ -23,11 +23,11 @@ import ChatSearchBar from '@/components/portal/ChatSearchBar';
 import MessageHoverActions from '@/components/portal/MessageHoverActions';
 import { Sym } from '@/components/portal/Sym';
 import { STAGES, STAGE_INDEX, type StageKey } from '@/components/manufacturing/stages';
-import { defaultActiveDesignId, designStageLabel } from '@/lib/portalChatConstants';
+import { defaultActiveDesignId, designStageLabel, ensurePortalAiThreadId, mentionsSara } from '@/lib/portalChatConstants';
 import { useProjectMessagePolling } from '@/hooks/useProjectEventStream';
 import { useProjectStomp } from '@/hooks/useProjectStomp';
 import { usePrefetchProductPicker } from '@/hooks/usePrefetchProductPicker';
-import { clientProjectApi, getUserEmailFromToken, mediaApi, type ProjectMessageDto, type WorkspaceView, type ManufacturingProjectDetailDto } from '@/lib/api';
+import { clientProjectApi, getUserEmailFromToken, mediaApi, portalAiChatApi, type ProjectMessageDto, type WorkspaceView, type ManufacturingProjectDetailDto } from '@/lib/api';
 import { formatServerTime, formatServerDate } from '@/lib/serverTime';
 
 type DisplayMessage = ProjectMessageDto & { pending?: boolean };
@@ -48,15 +48,22 @@ function isImageUrl(url: string) {
 function MessageAvatar({ type }: { type: string }) {
   const isSystem = type === 'SYSTEM';
   const isAdmin = type === 'ADMIN';
+  const isAi = type === 'AI';
   return (
     <div
       className="w-9 h-9 rounded shrink-0 flex items-center justify-center text-white"
       style={{
-        background: isSystem ? 'var(--p-surface-container-high)' : isAdmin ? 'var(--p-secondary)' : 'var(--p-primary)',
+        background: isSystem
+          ? 'var(--p-surface-container-high)'
+          : isAi
+            ? 'var(--p-tertiary)'
+            : isAdmin
+              ? 'var(--p-secondary)'
+              : 'var(--p-primary)',
         color: isSystem ? 'var(--p-on-surface-variant)' : '#fff',
       }}
     >
-      <Sym name={isSystem ? 'info' : 'person'} className="text-[18px]" />
+      <Sym name={isSystem ? 'info' : isAi ? 'smart_toy' : 'person'} className="text-[18px]" />
     </div>
   );
 }
@@ -111,9 +118,15 @@ export default function ClientProjectDetail() {
 
   useEffect(() => {
     if (!shell?.designs?.length || activeDesignId != null) return;
+    const designParam = searchParams.get('design');
+    const fromQuery = designParam ? Number(designParam) : NaN;
+    if (Number.isFinite(fromQuery) && shell.designs.some((d) => d.id === fromQuery)) {
+      setActiveDesignId(fromQuery);
+      return;
+    }
     const id = defaultActiveDesignId(shell.designs);
     if (id != null) setActiveDesignId(id);
-  }, [shell?.designs, activeDesignId]);
+  }, [shell?.designs, activeDesignId, searchParams]);
 
   const needsFinancials = view === 'quotation' || view === 'invoices' || view === 'brief';
   const { data: financials } = useQuery({
@@ -300,10 +313,13 @@ export default function ClientProjectDetail() {
     skipSseRef.current = Date.now() + 2500 + plans.length * 500;
 
     // Upload + post each plan independently so one failure doesn't block the others.
+    // Track image attachment URLs for Portal AI vision (Feature 3.35).
+    const uploadedImageUrls: string[] = [];
     await Promise.all(
       plans.map(async (p) => {
         try {
           const attachmentUrl = p.att ? await mediaApi.upload(await toFile(p.att), 'projects') : undefined;
+          if (attachmentUrl && p.att?.kind === 'image') uploadedImageUrls.push(attachmentUrl);
           await new Promise<void>((resolve) => {
             postMutation.mutate(
               { body: p.body, attachmentUrl, parentMessageId, tempId: p.tempId },
@@ -326,6 +342,82 @@ export default function ClientProjectDetail() {
     if (parentMessageId) {
       setOpenThreadId(parentMessageId);
       clientProjectApi.markThreadRead(code, parentMessageId).catch(() => {});
+    }
+
+    // Portal AI disabled on web for now — customers should not be able to trigger it here.
+    // @sara mentions now stay as plain messages; the block below (kept for when this is
+    // re-enabled) used to detect the mention and call portalAiChatApi for a Sara AI reply.
+    return;
+    // eslint-disable-next-line no-unreachable
+    const trimmed = text.trim();
+    if (!mentionsSara(trimmed) && uploadedImageUrls.length === 0) return;
+    // Photos alone (without @sara) stay as normal messages; AI only runs on @sara.
+    if (!mentionsSara(trimmed)) return;
+
+    const aiTempId = -(Date.now() + 50_000);
+    if (!parentMessageId) {
+      setPendingMessages((xs) => [
+        ...xs,
+        {
+          id: aiTempId,
+          projectId: project?.id || 0,
+          designId: activeDesignId,
+          authorType: 'AI' as const,
+          authorName: 'Sara AI',
+          body: 'Sara AI is thinking…',
+          createdAt: new Date().toISOString(),
+          pending: true,
+          replyCount: 0,
+        },
+      ]);
+    }
+    skipSseRef.current = Date.now() + 30_000;
+    try {
+      const threadId = ensurePortalAiThreadId(code, activeDesignId);
+      const aiTurn = await portalAiChatApi.sendMessage(code, {
+        threadId,
+        userMessage: trimmed,
+        designId: activeDesignId,
+        parentMessageId: parentMessageId ?? null,
+        uploadedImageUrls: uploadedImageUrls.length ? uploadedImageUrls : undefined,
+      });
+      if (aiTurn.threadId) {
+        try {
+          localStorage.setItem(`portalAiThread:${code}:${activeDesignId ?? 'general'}`, aiTurn.threadId);
+        } catch { /* ignore */ }
+      }
+      const aiMsg = aiTurn.message;
+      setPendingMessages((xs) => xs.filter((x) => x.id !== aiTempId));
+      qc.setQueryData<ProjectMessageDto[]>(['client-project-messages', code, activeDesignId], (prev) => {
+        if (!prev) return [aiMsg];
+        if (prev.some((m) => m.id === aiMsg.id)) return prev;
+        return [...prev, aiMsg];
+      });
+      if (parentMessageId) qc.invalidateQueries({ queryKey: ['client-threads', code] });
+      if (aiTurn.portalRedirect?.route) {
+        const route = aiTurn.portalRedirect.route;
+        const label = aiTurn.portalRedirect.label || 'Open in portal';
+        toast.message(label, {
+          action: {
+            label: 'Open',
+            onClick: () => {
+              try {
+                const url = route.startsWith('http') ? new URL(route) : new URL(route, window.location.origin);
+                if (url.origin === window.location.origin) {
+                  window.location.assign(url.pathname + url.search + url.hash);
+                } else {
+                  window.open(route, '_blank', 'noopener,noreferrer');
+                }
+              } catch {
+                window.location.href = route;
+              }
+            },
+          },
+        });
+      }
+    } catch (e) {
+      setPendingMessages((xs) => xs.filter((x) => x.id !== aiTempId));
+      toast.error(e instanceof Error ? e.message : 'Sara AI could not reply');
     }
   };
 
@@ -364,6 +456,7 @@ export default function ClientProjectDetail() {
   const renderMessage = (post: DisplayMessage, inThread = false) => {
     const isSystem = post.authorType === 'SYSTEM';
     const isAdmin = post.authorType === 'ADMIN';
+    const isAi = post.authorType === 'AI';
     const att = post.attachmentUrl;
     const attIsImg = att && isImageUrl(att);
     const highlighted = highlightId === post.id;
@@ -380,9 +473,17 @@ export default function ClientProjectDetail() {
         <MessageAvatar type={post.authorType} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-            <span className={`font-bold text-[15px] ${isSystem ? 'italic' : ''}`} style={isAdmin ? { color: 'var(--p-secondary)' } : isSystem ? { color: 'var(--p-on-surface-variant)' } : undefined}>
-              {post.authorName || (isSystem ? 'System' : isAdmin ? post.authorName || 'Studio Sara' : 'You')}
+            <span className={`font-bold text-[15px] ${isSystem ? 'italic' : ''}`} style={isAi ? { color: 'var(--p-tertiary)' } : isAdmin ? { color: 'var(--p-secondary)' } : isSystem ? { color: 'var(--p-on-surface-variant)' } : undefined}>
+              {isAi ? 'Sara AI' : post.authorName || (isSystem ? 'System' : isAdmin ? post.authorName || 'Studio Sara' : 'You')}
             </span>
+            {isAi && (
+              <span
+                className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white shrink-0"
+                style={{ background: 'var(--p-tertiary)' }}
+              >
+                AI
+              </span>
+            )}
             <span className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{formatMsgTime(post.createdAt)}</span>
             {isSystem && post.announcementCategory ? <AnnouncementCategoryBadge category={post.announcementCategory} /> : null}
             {post.pending && (
@@ -696,7 +797,7 @@ export default function ClientProjectDetail() {
 
             {!isAnnouncements && (
               <div className="px-4 sm:px-6 pb-4 pt-2">
-                <Composer placeholder={`Message #${channelName.replace(/\s+/g, '-')}`} showProductAttach onSend={(t, a) => uploadAndSend(t, a)} />
+                <Composer placeholder={`Message #${channelName.replace(/\s+/g, '-')} · @sara for AI`} showProductAttach showAskSara onSend={(t, a) => uploadAndSend(t, a)} />
               </div>
             )}
           </main>
@@ -707,6 +808,7 @@ export default function ClientProjectDetail() {
             threadRoot={threadRoot}
             threadReplies={threadReplies}
             showComposer={!isAnnouncements}
+            showAskSara={!isAnnouncements}
             onClose={() => setOpenThreadId(null)}
             onSend={(t, a) => uploadAndSend(t, a, threadRoot!.id)}
             formatTime={formatMsgTime}

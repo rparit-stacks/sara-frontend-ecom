@@ -10,6 +10,7 @@ export default function ThreadPanel({
   threadRoot,
   threadReplies,
   showComposer,
+  showAskSara = false,
   onClose,
   onSend,
   formatTime,
@@ -20,6 +21,7 @@ export default function ThreadPanel({
   threadRoot: ProjectMessageDto | null;
   threadReplies: ProjectMessageDto[];
   showComposer?: boolean;
+  showAskSara?: boolean;
   onClose: () => void;
   onSend: (text: string, attachments: Attachment[]) => void | Promise<void>;
   formatTime?: (iso?: string) => string;
@@ -76,7 +78,7 @@ export default function ThreadPanel({
 
       {showComposer ? (
         <div className="p-3 border-t backdrop-blur-sm shrink-0" style={{ borderColor: 'var(--p-outline-variant)', background: 'rgba(255,255,255,0.88)' }}>
-          <Composer placeholder="Reply in thread…" compact showProductAttach onSend={onSend} />
+          <Composer placeholder="Reply in thread…" compact showProductAttach showAskSara={showAskSara} onSend={onSend} />
         </div>
       ) : null}
     </aside>

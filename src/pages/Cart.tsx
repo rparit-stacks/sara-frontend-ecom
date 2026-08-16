@@ -1,19 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, Calculator, ChevronDown, ChevronUp, Pencil, Heart } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, Calculator, ChevronDown, ChevronUp, Pencil, Heart, Sparkles } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import ScrollReveal from '@/components/animations/ScrollReveal';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { cartApi, productsApi, wishlistApi, saveForLaterApi, customConfigApi } from '@/lib/api';
+import { cartApi, wishlistApi, saveForLaterApi } from '@/lib/api';
 import { guestCart } from '@/lib/guestCart';
+import { mergeGuestPricedItems } from '@/lib/mergeGuestPricedItems';
 import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
 import CartItemDetails from '@/components/cart/CartItemDetails';
 import { QuantityStepper } from '@/components/common/QuantityStepper';
 import { usePrice } from '@/lib/currency';
+import { useSetChatPageContext } from '@/context/ChatPageContext';
+import { buildCartItemBreakdownPrompt, openAiChatAsk } from '@/lib/aiChatBridge';
 
 // Separate component for cart item to allow hooks usage; compact with expandable variants/details
 const CartItem = ({
@@ -106,14 +109,31 @@ const CartItem = ({
             </CollapsibleContent>
           </Collapsible>
 
-          <div className="flex items-center justify-between mt-2 xs:mt-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mt-2 xs:mt-3">
             <p className="font-semibold text-primary text-base xs:text-lg sm:text-xl">
               {format(item.totalPrice || item.unitPrice || 0)}
             </p>
-            <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => { setSelectedItemForBreakdown(item); setShowPriceBreakdown(true); }}>
-              <Calculator className="w-3.5 h-3.5" />
-              Breakdown
-            </Button>
+            <div className="flex flex-wrap items-center gap-1">
+              <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => { setSelectedItemForBreakdown(item); setShowPriceBreakdown(true); }}>
+                <Calculator className="w-3.5 h-3.5" />
+                Breakdown
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-xs text-primary hover:text-primary"
+                onClick={() =>
+                  openAiChatAsk(buildCartItemBreakdownPrompt(item), {
+                    expand: true,
+                    displayText: `Explain price breakdown for “${item.productName || 'this item'}”`,
+                  })
+                }
+                title="Explain this price with AI"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Breakdown with AI
+              </Button>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 xs:gap-3 sm:gap-4 mt-3 xs:mt-4">
             <QuantityStepper
@@ -202,37 +222,48 @@ const Cart = () => {
   }, []);
 
   // Guest pricing preview: server-authoritative totals + fabric-slab breakdown for guests.
-  // Re-runs whenever guest items change so toggling quantity refreshes the totals.
+  // Key excludes unit/fabric prices so syncing server prices into LS does not re-fetch forever.
   const guestPreviewKey = JSON.stringify(
     guestCartItems.map((i: any) => ({
       pid: i.productId,
       pt: i.productType,
       fid: i.fabricId,
+      did: i.designId,
       q: i.quantity,
-      up: i.unitPrice,
-      fp: i.fabricPrice,
-      dp: i.designPrice,
+      vs: i.variantSelections || i.variants || null,
+      cf: i.customFormData || null,
     }))
   );
-  const { data: guestPreview } = useQuery({
+  const { data: guestPreview, isFetching: guestPreviewLoading } = useQuery({
     queryKey: ['cart', 'guest-preview', guestPreviewKey],
-    queryFn: () => cartApi.previewPricing(
-      guestCartItems.map((i: any) => ({
+    queryFn: () => cartApi.previewPricing({
+      userEmail: null,
+      items: guestCartItems.map((i: any) => ({
         productType: i.productType,
         productId: Number(i.productId),
+        productName: i.productName,
+        productImage: i.productImage,
         fabricId: i.fabricId != null ? Number(i.fabricId) : undefined,
         designId: i.designId != null ? Number(i.designId) : undefined,
         quantity: i.quantity,
-        unitPrice: i.unitPrice,
-        fabricPrice: i.fabricPrice,
+        // Always the price as first added to cart — never the last synced (possibly
+        // already-discounted) display price, or a bulk discount gets applied twice.
+        unitPrice: i.rawUnitPrice ?? i.unitPrice,
+        fabricPrice: i.rawFabricPrice ?? i.fabricPrice,
         designPrice: i.designPrice,
         variants: i.variants,
         variantSelections: i.variantSelections,
         customFormData: i.customFormData,
-      }))
-    ),
+      })),
+    }),
     enabled: !isLoggedIn && guestCartItems.length > 0,
   });
+
+  // Persist server prices into guest LS so reload / checkout never flash stale ₹314 → ₹299.
+  useEffect(() => {
+    if (isLoggedIn || !guestPreview?.items?.length) return;
+    guestCart.syncServerPrices(guestPreview.items);
+  }, [isLoggedIn, guestPreview]);
   
   // Update cart item quantity
   const updateMutation = useMutation({
@@ -287,36 +318,60 @@ const Cart = () => {
     window.dispatchEvent(new Event('guestCartUpdated'));
     toast.success('Item removed from cart');
   };
-  
-  // Fetch custom config when showing breakdown for CUSTOM items
-  const { data: customConfig } = useQuery({
-    queryKey: ['customConfig'],
-    queryFn: () => customConfigApi.getPublicConfig(),
-    enabled: !!selectedItemForBreakdown && selectedItemForBreakdown.productType === 'CUSTOM',
-  });
 
-  // Fetch design product when showing breakdown for DESIGNED items (same breakdown as product page)
-  const { data: designProduct } = useQuery({
-    queryKey: ['product-for-breakdown', selectedItemForBreakdown?.productId],
-    queryFn: () => productsApi.getById(Number(selectedItemForBreakdown!.productId)),
-    enabled: !!selectedItemForBreakdown && selectedItemForBreakdown.productType === 'DESIGNED' && !!selectedItemForBreakdown.productId,
-  });
+  // Guests: merge server preview onto local lines (same source as checkout / order).
+  const items = useMemo(() => {
+    if (isLoggedIn) return cartData?.items || [];
+    return mergeGuestPricedItems(guestCartItems || [], guestPreview?.items);
+  }, [isLoggedIn, cartData?.items, guestCartItems, guestPreview?.items]);
 
-  // Calculate totals
-  const items = isLoggedIn ? (cartData?.items || []) : guestCartItems;
+  const guestPricesReady = isLoggedIn || guestCartItems.length === 0 || !!guestPreview?.items;
+  const cartBusy = (isLoggedIn && isLoading) || (!isLoggedIn && guestCartItems.length > 0 && !guestPricesReady && guestPreviewLoading);
+
   // Prefer the server-priced subtotal for guests when the preview has arrived; fall back to local.
   const subtotal = isLoggedIn 
     ? (cartData?.subtotal ? Number(cartData.subtotal) : 0)
     : (guestPreview?.subtotal != null
         ? Number(guestPreview.subtotal)
-        : guestCartItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0));
+        : items.reduce((sum: number, item: any) => sum + (Number(item.totalPrice) || 0), 0));
   const gst = isLoggedIn 
     ? (cartData?.gst ? Number(cartData.gst) : 0)
     : 0; // GST calculated at checkout for guests
-  const shipping = isLoggedIn 
+  const shipping = isLoggedIn
     ? (cartData?.shipping ? Number(cartData.shipping) : 0)
     : 0; // Guest shipping calculated at checkout
   const total = subtotal + gst + shipping;
+
+  // Tells the site-wide chat assistant this exact cart breakdown — the assistant must never
+  // invent or recompute cart totals, only relay what this page already shows.
+  useSetChatPageContext(
+    items.length > 0
+      ? {
+          pageType: 'CART',
+          cart: {
+            lines: items.map((item: any) => ({
+              name: item.productName || 'Item',
+              productType: item.productType ?? null,
+              quantity: item.quantity || 1,
+              unitPrice: Number(item.unitPrice || 0),
+              lineTotal: Number(item.totalPrice ?? item.unitPrice ?? 0),
+              baseFabricPerMeter:
+                item.baseFabricPerMeter != null ? Number(item.baseFabricPerMeter) : null,
+              fabricDiscountPerMeter:
+                item.fabricSlabDiscountPerMeter != null ? Number(item.fabricSlabDiscountPerMeter) : null,
+              effectiveFabricPerMeter:
+                item.effectiveFabricPerMeter != null ? Number(item.effectiveFabricPerMeter) : null,
+              printPerMeter: item.designPrice != null ? Number(item.designPrice) : null,
+            })),
+            subtotal,
+            discounts: [],
+            tax: isLoggedIn ? gst : null,
+            shipping: isLoggedIn ? shipping : null,
+            grandTotal: total,
+          },
+        }
+      : null
+  );
 
   const handleQuantityChange = (itemId: number | string, newQuantity: number) => {
     if (newQuantity > 0) {
@@ -441,7 +496,7 @@ const Cart = () => {
 
       <section className="w-full py-8 sm:py-12 lg:py-16 xl:py-20">
         <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
-          {(isLoading && isLoggedIn) ? (
+          {cartBusy ? (
             <div className="flex justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
@@ -630,105 +685,19 @@ const Cart = () => {
         </div>
       </section>
       
-      {/* Price Breakdown Popup */}
-      {selectedItemForBreakdown && (() => {
-        const raw = selectedItemForBreakdown;
-        let item: any = raw;
-        if (!isLoggedIn && guestPreview?.items && Array.isArray(guestCartItems)) {
-          const idx = guestCartItems.findIndex((g: any) => g.id === raw.id);
-          const priced = idx >= 0 ? (guestPreview as any).items[idx] : null;
-          if (priced) {
-            item = {
-              ...raw,
-              unitPrice: priced.unitPrice != null ? Number(priced.unitPrice) : raw.unitPrice,
-              fabricPrice: priced.fabricPrice != null ? Number(priced.fabricPrice) : raw.fabricPrice,
-              totalPrice: priced.totalPrice != null ? Number(priced.totalPrice) : raw.totalPrice,
-              discountSource: priced.discountSource ?? raw.discountSource,
-              combinedFabricMetres:
-                priced.combinedFabricMetres != null ? Number(priced.combinedFabricMetres) : raw.combinedFabricMetres,
-              baseFabricPerMeter:
-                priced.baseFabricPerMeter != null ? Number(priced.baseFabricPerMeter) : raw.baseFabricPerMeter,
-              fabricSlabDiscountPerMeter:
-                priced.fabricSlabDiscountPerMeter != null
-                  ? Number(priced.fabricSlabDiscountPerMeter)
-                  : raw.fabricSlabDiscountPerMeter,
-              effectiveFabricPerMeter:
-                priced.effectiveFabricPerMeter != null
-                  ? Number(priced.effectiveFabricPerMeter)
-                  : raw.effectiveFabricPerMeter,
-            };
+      {/* Price Breakdown Popup — server breakdown only */}
+      {selectedItemForBreakdown && (
+        <PriceBreakdownPopup
+          open={showPriceBreakdown}
+          onOpenChange={setShowPriceBreakdown}
+          productName={selectedItemForBreakdown.productName}
+          breakdown={
+            (items.find((i: any) => String(i.id) === String(selectedItemForBreakdown.id)) as any)
+              ?.breakdown ?? selectedItemForBreakdown.breakdown ?? null
           }
-        }
-        const isCustomOrDesigned = item.productType === 'DESIGNED' || item.productType === 'CUSTOM';
-        const quantity = item.quantity || 1;
-        const fabricTotal = item.fabricPrice ? Number(item.fabricPrice) : 0;
-        const fabricPerMeter = quantity > 0 ? fabricTotal / quantity : 0;
-
-        // Build selectedVariants (design/print) from variantSelections for DESIGNED and CUSTOM
-        const selectedDesignVariants: Record<string, string> = {};
-        if (item.variantSelections && typeof item.variantSelections === 'object') {
-          Object.entries(item.variantSelections).forEach(([, sel]: [string, any]) => {
-            if (sel && (sel.optionId != null || sel.optionValue != null)) {
-              const optVal = String(sel.optionId ?? sel.optionValue);
-              if (sel.variantId != null) selectedDesignVariants[String(sel.variantId)] = optVal;
-              if (sel.variantFrontendId != null && sel.variantFrontendId !== sel.variantId) {
-                selectedDesignVariants[String(sel.variantFrontendId)] = optVal;
-              }
-            }
-          });
-        }
-
-        // productData for CUSTOM: design price + config variants; for DESIGNED: design product
-        const productData = item.productType === 'CUSTOM' && customConfig
-          ? {
-              type: 'CUSTOM' as const,
-              designPrice: item.designPrice ? Number(item.designPrice) : customConfig.designPrice,
-              variants: customConfig.variants || [],
-            }
-          : item.productType === 'DESIGNED' && designProduct
-          ? {
-              type: 'DESIGNED' as const,
-              designPrice: designProduct.designPrice ?? item.designPrice ? Number(item.designPrice) : 0,
-              variants: designProduct.variants || [],
-            }
-          : undefined;
-
-        return (
-          <PriceBreakdownPopup
-            open={showPriceBreakdown}
-            onOpenChange={setShowPriceBreakdown}
-            item={{
-              productType: item.productType,
-              productName: item.productName,
-              productId: item.productId,
-              fabricId: item.fabricId ? Number(item.fabricId) : undefined,
-              designPrice: item.designPrice ? Number(item.designPrice) : undefined,
-              fabricPrice: item.fabricPrice ? Number(item.fabricPrice) : undefined,
-              unitPrice: item.unitPrice ? Number(item.unitPrice) : undefined,
-              totalPrice: item.totalPrice ? Number(item.totalPrice) : undefined,
-              quantity,
-              variants: item.variants,
-              variantSelections: item.variantSelections,
-              pricePerMeter: item.unitPrice ? Number(item.unitPrice) : undefined,
-              basePrice: item.designPrice ? Number(item.designPrice) : (item.unitPrice ? Number(item.unitPrice) : undefined),
-              customFormData: item.customFormData,
-              discountSource: item.discountSource,
-              combinedFabricMetres:
-                item.combinedFabricMetres != null ? Number(item.combinedFabricMetres) : undefined,
-              baseFabricPerMeter: item.baseFabricPerMeter != null ? Number(item.baseFabricPerMeter) : undefined,
-              fabricSlabDiscountPerMeter:
-                item.fabricSlabDiscountPerMeter != null ? Number(item.fabricSlabDiscountPerMeter) : undefined,
-              effectiveFabricPerMeter:
-                item.effectiveFabricPerMeter != null ? Number(item.effectiveFabricPerMeter) : undefined,
-            }}
-            productData={productData}
-            selectedVariants={Object.keys(selectedDesignVariants).length > 0 ? selectedDesignVariants : undefined}
-            fabricQuantity={isCustomOrDesigned && item.fabricId ? quantity : undefined}
-            fabricPricePerMeter={isCustomOrDesigned && item.fabricId ? fabricPerMeter : undefined}
-            selectedFabricVariants={isCustomOrDesigned ? item.variants : undefined}
-          />
-        );
-      })()}
+          loading={!isLoggedIn && guestPreviewLoading && !guestPreview}
+        />
+      )}
     </Layout>
   );
 };

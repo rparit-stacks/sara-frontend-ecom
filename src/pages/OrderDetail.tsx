@@ -5,7 +5,7 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, Download, FileText } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, FileText, Calculator } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { orderApi, paymentApi } from '@/lib/api';
 import { getPaymentStatusDisplay } from '@/lib/orderUtils';
@@ -15,6 +15,8 @@ import { formatPrice } from '@/lib/currency';
 import { useCurrency } from '@/context/CurrencyContext';
 import { renderCustomValue } from '@/lib/renderCustomValue';
 import { format } from 'date-fns';
+import PriceBreakdownPopup from '@/components/products/PriceBreakdownPopup';
+import OrderPriceLedger, { orderItemMetaLine } from '@/components/order/OrderPriceLedger';
 
 /** Renders one order item as key-value (left) + amount (right). Used in both single and all-products dialogs. */
 function OrderItemDetailBlock({
@@ -26,6 +28,7 @@ function OrderItemDetailBlock({
   onDownload,
   onPayAgain,
   isDownloading,
+  onShowBreakdown,
 }: {
   item: any;
   currency?: string;
@@ -35,10 +38,14 @@ function OrderItemDetailBlock({
   onDownload?: (item: any) => void;
   onPayAgain?: () => void;
   isDownloading?: boolean;
+  onShowBreakdown?: (item: any) => void;
 }) {
   const toDisplay = (inr: number) => (currency !== 'INR' ? inr * exchangeRate : inr);
   const price = (n: number | undefined) =>
     n != null ? formatPrice(toDisplay(Number(n)), currency) : '—';
+  const gstRate = item.gstRate != null ? Number(item.gstRate) : 0;
+  const gstAmount = item.gstAmount != null ? Number(item.gstAmount) : 0;
+  const b = item.breakdown;
   return (
     <div className="flex gap-6 border border-border rounded-lg p-4">
       <div className="flex-1 min-w-0 space-y-2 text-sm">
@@ -54,6 +61,44 @@ function OrderItemDetailBlock({
           <span className="font-medium text-muted-foreground shrink-0">Unit price</span>
           <span>{price(item.price ?? item.unitPrice)}</span>
         </div>
+        {b?.fabricAmount != null && Number(b.fabricAmount) > 0 && (
+          <div className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1 items-baseline">
+            <span className="font-medium text-muted-foreground shrink-0">Fabric</span>
+            <span>
+              {price(Number(b.fabricAmount))}
+              {b.fabricName ? ` · ${b.fabricName}` : ''}
+              {b.fabricPerUnit != null ? ` (${price(Number(b.fabricPerUnit))} / ${b.unitLabel || 'm'})` : ''}
+            </span>
+          </div>
+        )}
+        {b?.printAmount != null && Number(b.printAmount) > 0 && (
+          <div className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1 items-baseline">
+            <span className="font-medium text-muted-foreground shrink-0">Design / print</span>
+            <span>
+              {price(Number(b.printAmount))}
+              {b.printPerUnit != null ? ` (${price(Number(b.printPerUnit))} / ${b.unitLabel || 'm'})` : ''}
+            </span>
+          </div>
+        )}
+        {gstRate > 0 && (
+          <div className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1 items-baseline">
+            <span className="font-medium text-muted-foreground shrink-0">GST</span>
+            <span>
+              {gstRate}%
+              {gstAmount > 0 ? ` · ${price(gstAmount)}` : ''}
+            </span>
+          </div>
+        )}
+        {item.breakdown && onShowBreakdown && (
+          <button
+            type="button"
+            className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+            onClick={() => onShowBreakdown(item)}
+          >
+            <Calculator className="w-3 h-3" />
+            Why this price?
+          </button>
+        )}
         <div className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-3 gap-y-1 items-baseline">
           <span className="font-medium text-muted-foreground shrink-0">Type</span>
           <span>{item.productType || 'N/A'}</span>
@@ -193,7 +238,10 @@ function OrderItemDetailBlock({
       </div>
       <div className="shrink-0 text-right">
         <div className="font-semibold text-lg">{price(item.totalPrice)}</div>
-        <div className="text-xs text-muted-foreground">Incl. GST</div>
+        <div className="text-xs text-muted-foreground">Line total (excl. GST)</div>
+        {gstAmount > 0 && (
+          <div className="text-xs text-muted-foreground mt-0.5">+ GST {price(gstAmount)}</div>
+        )}
       </div>
     </div>
   );
@@ -205,6 +253,8 @@ const OrderDetail = () => {
   const [mainDetailOpen, setMainDetailOpen] = useState(false);
   const [productDetailItem, setProductDetailItem] = useState<any | null>(null);
   const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
+  const [breakdownItem, setBreakdownItem] = useState<any>(null);
+  const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['order', id],
@@ -477,58 +527,25 @@ const OrderDetail = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-2 text-sm">
+                    <OrderPriceLedger
+                      order={order}
+                      format={(n) => formatPrice(toDisplayAmount(n), currency)}
+                      shippingValue={
+                        order.deliveryType === 'PORTER'
+                          ? 'Porter (charges confirmed by team)'
+                          : order.shipping === 0
+                            ? (isNonIndiaOrNonINR
+                                ? 'Our executive will contact you soon for shipping rates'
+                                : 'Free')
+                            : undefined
+                      }
+                    />
+                    <div className="mt-3 pt-3 border-t text-sm">
                       <div className="flex justify-between">
-                        <span>Subtotal</span>
-                        <span>{formatPrice(toDisplayAmount(Number(order.subtotal ?? 0)), currency)}</span>
-                      </div>
-                      {order.gst != null && Number(order.gst) !== 0 && (
-                        <div className="flex justify-between">
-                          <span>GST</span>
-                          <span>{formatPrice(toDisplayAmount(Number(order.gst)), currency)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span>Shipping</span>
-                        <span>
-                          {order.deliveryType === 'PORTER'
-                            ? 'Porter (charges confirmed by team)'
-                            : order.shipping === 0
-                              ? (isNonIndiaOrNonINR ? 'Our executive will contact you soon for shipping rates' : 'Free')
-                              : formatPrice(toDisplayAmount(Number(order.shipping ?? 0)), currency)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Delivery</span>
+                        <span className="text-muted-foreground">Delivery</span>
                         <span className="font-medium">
                           {order.deliveryType === 'PORTER' ? 'Porter Delivery' : 'Standard Delivery'}
                         </span>
-                      </div>
-                      {order.couponCode && order.couponDiscount && order.couponDiscount > 0 && (
-                        <div className="flex justify-between text-primary">
-                          <span>Coupon ({order.couponCode})</span>
-                          <span>-{formatPrice(toDisplayAmount(Number(order.couponDiscount)), currency)}</span>
-                        </div>
-                      )}
-                      {(() => {
-                        // Calculate COD charge: Total - (Subtotal + GST + Shipping - Discount)
-                        const baseTotal = Number(order.subtotal ?? 0) + Number(order.gst ?? 0) + Number(order.shipping ?? 0) - Number(order.couponDiscount ?? 0);
-                        const codCharge = Number(order.total ?? 0) - baseTotal;
-                        const isCod = order.paymentMethod === 'COD' || order.paymentMethod === 'cod' || order.paymentMethod === 'CASH_ON_DELIVERY';
-                        
-                        if (isCod && codCharge > 0) {
-                          return (
-                            <div className="flex justify-between text-primary">
-                              <span>COD charge</span>
-                              <span>+{formatPrice(toDisplayAmount(codCharge), currency)}</span>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                      <div className="flex justify-between font-semibold text-lg pt-2 border-t">
-                        <span>Total</span>
-                        <span>{formatPrice(toDisplayAmount(Number(order.total ?? 0)), currency)}</span>
                       </div>
                     </div>
                     <div className="mt-4 pt-4 border-t">
@@ -600,13 +617,33 @@ const OrderDetail = () => {
                               )}
                             </div>
                             <p className="text-sm text-muted-foreground">
-                              {item.quantity} × {formatPrice(toDisplayAmount(Number(item.price ?? item.unitPrice ?? 0)), currency)}
+                              {orderItemMetaLine(item, (n) => formatPrice(toDisplayAmount(n), currency)).join(' · ')}
                             </p>
+                            {item.breakdown && (
+                              <button
+                                type="button"
+                                className="text-xs text-primary hover:underline mt-0.5 inline-flex items-center gap-1"
+                                onClick={() => {
+                                  setBreakdownItem(item);
+                                  setShowPriceBreakdown(true);
+                                }}
+                              >
+                                <Calculator className="w-3 h-3" />
+                                Why this price?
+                              </button>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <p className="font-semibold">
-                              {formatPrice(toDisplayAmount(Number(item.totalPrice ?? 0)), currency)}
-                            </p>
+                            <div className="text-right">
+                              <p className="font-semibold">
+                                {formatPrice(toDisplayAmount(Number(item.totalPrice ?? 0)), currency)}
+                              </p>
+                              {item.gstAmount != null && Number(item.gstAmount) > 0 && (
+                                <p className="text-[11px] text-muted-foreground">
+                                  + GST {formatPrice(toDisplayAmount(Number(item.gstAmount)), currency)}
+                                </p>
+                              )}
+                            </div>
                             {canDownload && (
                               <Button
                                 variant="default"
@@ -660,6 +697,10 @@ const OrderDetail = () => {
               onDownload={handleDigitalDownload}
               onPayAgain={() => navigate('/checkout')}
               isDownloading={downloadingIds.has(productDetailItem.productId)}
+              onShowBreakdown={(item) => {
+                setBreakdownItem(item);
+                setShowPriceBreakdown(true);
+              }}
             />
           )}
         </DialogContent>
@@ -678,57 +719,36 @@ const OrderDetail = () => {
                 item={item}
                 currency={currency}
                 exchangeRate={exchangeRate}
+                onShowBreakdown={(line) => {
+                  setBreakdownItem(line);
+                  setShowPriceBreakdown(true);
+                }}
               />
             ))}
           </div>
-          <div className="border-t pt-4 mt-4 space-y-2 text-sm shrink-0">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>{formatPrice(toDisplayAmount(Number(order.subtotal ?? 0)), currency)}</span>
-            </div>
-            {order.gst != null && Number(order.gst) !== 0 && (
-              <div className="flex justify-between">
-                <span>GST</span>
-                <span>{formatPrice(toDisplayAmount(Number(order.gst)), currency)}</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span>Shipping</span>
-              <span>
-                {order.shipping === 0
-                  ? (isNonIndiaOrNonINR ? 'Our executive will contact you soon for shipping rates' : 'Free')
-                  : formatPrice(toDisplayAmount(Number(order.shipping ?? 0)), currency)}
-              </span>
-            </div>
-            {order.couponCode && order.couponDiscount && order.couponDiscount > 0 && (
-              <div className="flex justify-between text-primary">
-                <span>Coupon ({order.couponCode})</span>
-                <span>-{formatPrice(toDisplayAmount(Number(order.couponDiscount)), currency)}</span>
-              </div>
-            )}
-            {(() => {
-              // Calculate COD charge: Total - (Subtotal + GST + Shipping - Discount)
-              const baseTotal = Number(order.subtotal ?? 0) + Number(order.gst ?? 0) + Number(order.shipping ?? 0) - Number(order.couponDiscount ?? 0);
-              const codCharge = Number(order.total ?? 0) - baseTotal;
-              const isCod = order.paymentMethod === 'COD' || order.paymentMethod === 'cod' || order.paymentMethod === 'CASH_ON_DELIVERY';
-              
-              if (isCod && codCharge > 0) {
-                return (
-                  <div className="flex justify-between text-primary">
-                    <span>COD charge</span>
-                    <span>+{formatPrice(toDisplayAmount(codCharge), currency)}</span>
-                  </div>
-                );
+          <div className="border-t pt-4 mt-4 shrink-0">
+            <OrderPriceLedger
+              order={order}
+              format={(n) => formatPrice(toDisplayAmount(n), currency)}
+              shippingValue={
+                order.shipping === 0
+                  ? (isNonIndiaOrNonINR
+                      ? 'Our executive will contact you soon for shipping rates'
+                      : 'Free')
+                  : undefined
               }
-              return null;
-            })()}
-            <div className="flex justify-between font-semibold text-lg pt-2 border-t">
-              <span>Total (incl. GST)</span>
-              <span>{formatPrice(toDisplayAmount(Number(order.total ?? 0)), currency)}</span>
-            </div>
+              compact
+            />
           </div>
         </DialogContent>
       </Dialog>
+
+      <PriceBreakdownPopup
+        open={showPriceBreakdown}
+        onOpenChange={setShowPriceBreakdown}
+        productName={breakdownItem?.name || breakdownItem?.productName}
+        breakdown={breakdownItem?.breakdown ?? null}
+      />
     </Layout>
   );
 };

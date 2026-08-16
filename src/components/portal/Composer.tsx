@@ -42,12 +42,15 @@ export default function Composer({
   compact = false,
   showProductAttach = false,
   showAnnouncementCategory = false,
+  showAskSara = false,
   onSend,
 }: {
   placeholder: string;
   compact?: boolean;
   showProductAttach?: boolean;
   showAnnouncementCategory?: boolean;
+  /** Feature 3 — insert `@sara ` so the customer can ask Portal AI in-channel. */
+  showAskSara?: boolean;
   onSend: (text: string, attachments: Attachment[], opts?: { announcementCategory?: string }) => void | Promise<void>;
 }) {
   const [atts, setAtts] = useState<Attachment[]>([]);
@@ -370,6 +373,18 @@ export default function Composer({
           {showProductAttach && (
             <button type="button" disabled={sending} onClick={() => setProductOpen(true)} title="Attach product" className="p-1.5 rounded-md hover:bg-black/6">
               <Sym name="shopping_bag" className="text-[20px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+            </button>
+          )}
+          {showAskSara && (
+            <button
+              type="button"
+              disabled={sending}
+              onClick={() => insertText('@sara ')}
+              title="Ask Sara AI (@sara)"
+              className="p-1.5 rounded-md hover:bg-black/6 flex items-center gap-1"
+            >
+              <Sym name="smart_toy" className="text-[20px]" style={{ color: 'var(--p-tertiary)' }} />
+              <span className="hidden sm:inline text-[12px] font-semibold pr-0.5" style={{ color: 'var(--p-tertiary)' }}>@sara</span>
             </button>
           )}
           <input ref={imgInput} type="file" accept="image/*" multiple hidden onChange={(e) => { addFiles(e.target.files, 'image'); e.target.value = ''; }} />

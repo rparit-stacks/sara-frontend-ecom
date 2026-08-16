@@ -133,7 +133,7 @@ export default function ProjectBriefPanel({ project, clientMode }: { project: Ma
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-px" style={{ background: 'var(--p-outline-variant)' }}>
             {[
               <Detail key="n" icon="person" label="Full name" value={project.clientName} />,
-              <Detail key="e" icon="mail" label="Email" value={project.clientEmail} />,
+              <Detail key="e" icon="mail" label="Email" value={project.clientEmail || project.accountEmail} />,
               <Detail key="p" icon="call" label="Phone" value={project.clientPhone} />,
               <Detail key="b" icon="storefront" label="Brand / company" value={project.brand} />,
             ].map((el, i) => (

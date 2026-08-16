@@ -1,5 +1,6 @@
 // API Configuration
 import type { InquiryPageContent } from '@/components/inquiry/inquiryContent';
+import { dispatchLoggedOut } from '@/lib/authEvents';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL as string;
 
@@ -119,6 +120,7 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
           localStorage.removeItem('authToken');
           localStorage.removeItem('authEmail');
           window.dispatchEvent(new CustomEvent('auth:sessionInvalid', { detail: { reason: 'user_not_found_or_unauth' } }));
+          dispatchLoggedOut();
         }
         let parsed: { errorCode?: string; error?: string } = {};
         try {
@@ -1008,11 +1010,28 @@ export const cartApi = {
   clearCart: () => fetchApi<void>('/api/cart', { method: 'DELETE' }),
   getCartCount: () => fetchApi<{ count: number }>('/api/cart/count'),
   /**
-   * Server-authoritative pricing preview for guest carts and product-page combined-cart hints.
-   * Sends a list of in-progress items and receives a priced CartDto (including the hybrid
-   * fabric-first slab breakdown) without persisting anything.
+   * Server-authoritative pricing for a user's full cart snapshot.
+   * Body: `{ userEmail?: string, items: CartLine[] }` — items are priced together
+   * (fabric slabs aggregate across lines). Each returned item includes `breakdown`.
    */
-  previewPricing: (items: Array<{
+  previewPricing: (payload: {
+    userEmail?: string | null;
+    items: Array<{
+      productType: string;
+      productId: number;
+      productName?: string;
+      productImage?: string;
+      fabricId?: number;
+      designId?: number;
+      quantity?: number;
+      unitPrice?: number;
+      fabricPrice?: number;
+      designPrice?: number;
+      variants?: Record<string, string>;
+      variantSelections?: Record<string, any>;
+      customFormData?: Record<string, any>;
+    }>;
+  } | Array<{
     productType: string;
     productId: number;
     fabricId?: number;
@@ -1024,8 +1043,62 @@ export const cartApi = {
     variants?: Record<string, string>;
     variantSelections?: Record<string, any>;
     customFormData?: Record<string, any>;
-  }>) =>
-    fetchApi<any>('/api/cart/pricing-preview', { method: 'POST', body: JSON.stringify({ items }) }),
+  }>) => {
+    const body = Array.isArray(payload) ? { items: payload } : payload;
+    return fetchApi<any>('/api/cart/pricing-preview', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+};
+
+// ===============================
+// Checkout quote API
+// ===============================
+/** Server ledger for checkout: discounts → taxable → GST → shipping → total. */
+export type CheckoutDiscountContribution = {
+  cartItemId?: number;
+  productName?: string;
+  quantity?: number;
+  perUnit?: number;
+  amount?: number;
+};
+
+export type CheckoutDiscountLine = {
+  type?: 'FABRIC_SLAB' | 'COUPON' | string;
+  label?: string;
+  detail?: string;
+  amount?: number;
+  contributions?: CheckoutDiscountContribution[];
+};
+
+export type CheckoutQuote = {
+  items?: any[];
+  itemCount?: number;
+  subtotal?: number;
+  discounts?: CheckoutDiscountLine[];
+  fabricDiscountTotal?: number;
+  couponDiscount?: number;
+  appliedCouponCode?: string | null;
+  couponMessage?: string | null;
+  taxableAmount?: number;
+  gst?: number;
+  shipping?: number;
+  total?: number;
+};
+
+export const checkoutApi = {
+  /**
+   * Full checkout ledger for the signed-in user's cart.
+   * Cart stays raw; this is where fabric slabs, coupon, GST and shipping are computed.
+   */
+  getQuote: (params?: { couponCode?: string; country?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.couponCode) search.set('couponCode', params.couponCode);
+    if (params?.country) search.set('country', params.country);
+    const query = search.toString();
+    return fetchApi<CheckoutQuote>(`/api/checkout/quote${query ? `?${query}` : ''}`);
+  },
 };
 
 // ===============================
@@ -1810,7 +1883,7 @@ export interface ProjectMessageDto {
   designId?: number | null;
   parentMessageId?: number | null;
   replyCount?: number;
-  authorType: 'ADMIN' | 'CLIENT' | 'SYSTEM';
+  authorType: 'ADMIN' | 'CLIENT' | 'SYSTEM' | 'AI';
   authorName?: string;
   body?: string;
   attachmentUrl?: string;
@@ -1999,6 +2072,18 @@ export const projectApi = {
     fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/threads/${messageId}/read`, {
       method: 'POST',
     }),
+  listAiHandovers: (code: string) =>
+    fetchApi<ProjectAiHandoverDto[]>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/ai-handovers`),
+  claimAiHandover: (code: string, id: number) =>
+    fetchApi<ProjectAiHandoverDto>(
+      `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/ai-handovers/${id}/claim`,
+      { method: 'POST' },
+    ),
+  closeAiHandover: (code: string, id: number) =>
+    fetchApi<{ ok: boolean; id: number; status: string }>(
+      `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/ai-handovers/${id}/close`,
+      { method: 'POST' },
+    ),
 };
 
 export interface AdminPortalAssignmentDto {
@@ -2117,6 +2202,55 @@ export const clientProjectApi = {
       `/api/portal/projects/${encodeURIComponent(code)}/quotes/${quoteId}`,
     ),
 };
+
+// ===============================
+// Feature 3 — Portal AI ("Sara AI")
+// ===============================
+// Not an /api/admin route, so fetchApi supplies the shopper's authToken automatically —
+// same auth as the rest of clientProjectApi above. The reply is posted directly into the
+// project feed by the backend and returned as the created ProjectMessageDto, so the caller
+// just needs to insert it into the message list (or let the STOMP/SSE feed deliver it).
+export const portalAiChatApi = {
+  sendMessage: (
+    code: string,
+    data: {
+      threadId: string | null;
+      userMessage: string;
+      designId?: number | null;
+      parentMessageId?: number | null;
+      uploadedImageUrls?: string[];
+    },
+  ) =>
+    fetchApi<PortalAiChatTurnResponse>(`/api/portal/ai-chat/projects/${encodeURIComponent(code)}/message`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+export interface PortalAiChatTurnResponse {
+  message: ProjectMessageDto;
+  threadId: string;
+  portalRedirect?: {
+    route: string;
+    label?: string;
+    orderId?: string;
+    projectCode?: string;
+    inquiryId?: string;
+    invoiceId?: string;
+  } | null;
+}
+
+export interface ProjectAiHandoverDto {
+  id: number;
+  projectId: number;
+  designId?: number | null;
+  clientEmail: string;
+  status: 'REQUESTED' | 'CLAIMED' | 'CLOSED' | string;
+  reason?: string;
+  claimedByAdminId?: number | null;
+  createdAt?: string;
+  claimedAt?: string;
+}
 
 export interface PortalAggregateDto {
   projects: ManufacturingProjectDto[];
@@ -2411,6 +2545,7 @@ export default {
   faq: faqApi,
   customConfig: customConfigApi,
   cart: cartApi,
+  checkout: checkoutApi,
   wishlist: wishlistApi,
   order: orderApi,
   coupon: couponApi,
@@ -2455,6 +2590,267 @@ export const aiProductApi = {
   // create the confirmed draft (a ProductRequest) -> returns the created ProductDto
   create: (draftProduct: any) =>
     fetchApi<any>('/api/admin/ai/product-create', { method: 'POST', body: JSON.stringify(draftProduct) }),
+};
+
+// ===============================
+// Site-wide AI Chat API
+// ===============================
+
+export type ChatInputType = 'FREE_TEXT' | 'BUTTONS' | 'DROPDOWN' | 'MULTI_SELECT';
+
+export interface ChatOptionDto {
+  label: string;
+  value: string;
+}
+
+export interface VisualCardDto {
+  title: string;
+  imageUrl?: string | null;
+  subtitle?: string | null;
+  linkUrl?: string | null;
+}
+
+export interface AuthPromptDto {
+  reasonToolName: string;
+  message: string;
+}
+
+export interface PortalRedirectDto {
+  route: string;
+  label: string;
+  orderId?: string | null;
+  projectCode?: string | null;
+  inquiryId?: string | null;
+  invoiceId?: string | null;
+}
+
+export interface ProductPageContextDto {
+  productId: number | null;
+  slug: string | null;
+  name: string | null;
+  type: string | null;
+  descriptionSummary: string | null;
+  price: number | null;
+  salePrice: number | null;
+  fabric: string | null;
+  gsm: number | null;
+  selectedVariantLabels: string[];
+  categoryName: string | null;
+}
+
+export interface CategoryPageContextDto {
+  categoryName: string | null;
+  path: string | null;
+  activeFilters: { key: string; value: string }[];
+  resultCount: number | null;
+}
+
+export interface CartLineDto {
+  name: string;
+  productType?: string | null;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  baseFabricPerMeter?: number | null;
+  fabricDiscountPerMeter?: number | null;
+  effectiveFabricPerMeter?: number | null;
+  printPerMeter?: number | null;
+}
+
+export interface CartAdjustmentDto {
+  label: string;
+  amount: number;
+}
+
+export interface CartPageContextDto {
+  lines: CartLineDto[];
+  subtotal: number | null;
+  discounts: CartAdjustmentDto[];
+  tax: number | null;
+  shipping: number | null;
+  grandTotal: number | null;
+}
+
+export interface PageContextDto {
+  pageType: 'HOME' | 'PRODUCT_DETAIL' | 'CATEGORY' | 'CART' | 'CHECKOUT' | 'ORDER_CONFIRMATION' | 'CMS' | 'OTHER';
+  /** Browser origin of the page the chat is open on, e.g. http://localhost:5173 or https://www.studiosara.in */
+  siteOrigin?: string | null;
+  /**
+   * WEB (website widget) keeps storefront URLs. MOBILE asks the model/tools for Expo deep links.
+   * Omit or WEB for backward compatibility.
+   */
+  clientType?: 'WEB' | 'MOBILE' | null;
+  product?: ProductPageContextDto | null;
+  category?: CategoryPageContextDto | null;
+  cart?: CartPageContextDto | null;
+  checkout?: unknown;
+  orderConfirmation?: unknown;
+  cms?: unknown;
+}
+
+export interface AiChatTurnRequest {
+  threadId: string | null;
+  userMessage: string;
+  uploadedImageUrls?: string[] | null;
+  pageContext?: PageContextDto | null;
+}
+
+export interface TableCardDto {
+  title: string | null;
+  columns: string[];
+  rows: string[][];
+}
+
+export interface AiChatTurnResponse {
+  threadId: string;
+  replyText: string;
+  inputType: ChatInputType;
+  options: ChatOptionDto[];
+  allowOther: boolean;
+  visualCards: VisualCardDto[];
+  table: TableCardDto | null;
+  suggestedFollowUps: string[];
+  authPrompt: AuthPromptDto | null;
+  portalRedirect: PortalRedirectDto | null;
+  justLinkedToAccount: boolean;
+}
+
+export interface ChatAuthResultDto {
+  token: string;
+  email: string;
+  threadId: string;
+}
+
+export interface ChatMessageMetadataDto {
+  visualCards: VisualCardDto[] | null;
+  table: TableCardDto | null;
+  portalRedirect: PortalRedirectDto | null;
+}
+
+export interface ChatHistoryMessageDto {
+  role: 'USER' | 'ASSISTANT';
+  content: string;
+  createdAt: string;
+  metadata: ChatMessageMetadataDto | null;
+}
+
+export interface ChatHistoryResponseDto {
+  threadId: string;
+  messages: ChatHistoryMessageDto[];
+}
+
+export interface ChatSessionSummaryDto {
+  threadId: string;
+  title: string;
+  updatedAt: string;
+}
+
+/**
+ * Site-wide AI chat widget. `sendMessage` follows the same optional-auth pattern as the rest
+ * of the app: fetchApi attaches `authToken` automatically when present (logged-in customer),
+ * and omits it for guests — the backend resolves guest-vs-authenticated from that header.
+ */
+export const aiChatApi = {
+  sendMessage: (data: AiChatTurnRequest) =>
+    fetchApi<AiChatTurnResponse>('/api/chat/message', { method: 'POST', body: JSON.stringify(data) }),
+  requestOtp: (email: string, threadId: string | null) =>
+    fetchApi<void>('/api/chat/auth/request-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, threadId }),
+    }),
+  verifyOtp: (email: string, otp: string, threadId: string | null) =>
+    fetchApi<ChatAuthResultDto>('/api/chat/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp, threadId }),
+    }),
+  /** Rehydrates a thread's full history after a hard reload wipes React state. */
+  getHistory: (threadId: string) =>
+    fetchApi<ChatHistoryResponseDto>(`/api/chat/thread/${threadId}/history`, { method: 'GET' }),
+  /** "New chat": permanently deletes this thread server-side. */
+  deleteThread: (threadId: string) =>
+    fetchApi<void>(`/api/chat/thread/${threadId}`, { method: 'DELETE' }),
+  /** Lists every chat session belonging to the logged-in customer. Requires auth. */
+  listThreads: () => fetchApi<ChatSessionSummaryDto[]>('/api/chat/threads', { method: 'GET' }),
+  /** Image upload (Feature 4). FormData, so it bypasses fetchApi's JSON content-type default. */
+  uploadImage: async (file: File): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${API_BASE_URL}/api/chat/upload-image`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: formData,
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: 'Upload failed.' }));
+      throw new Error(body.error || 'Upload failed.');
+    }
+    return response.json();
+  },
+};
+
+// ===============================
+// Admin AI chat (Feature 2 — /admin-sara ops copilot)
+// ===============================
+
+export type AdminPageType =
+  | 'DASHBOARD'
+  | 'ORDER_DETAIL'
+  | 'PRODUCT_EDIT'
+  | 'CMS'
+  | 'USERS'
+  | 'OTHER';
+
+export interface AdminPageContextDto {
+  pageType: AdminPageType;
+  route?: string | null;
+  orderId?: number | null;
+  orderNumber?: string | null;
+  productId?: number | null;
+  userEmail?: string | null;
+  cmsTab?: string | null;
+}
+
+export interface AdminAiChatTurnRequest {
+  threadId?: string | null;
+  userMessage: string;
+  uploadedImageUrls?: string[] | null;
+  adminPageContext?: AdminPageContextDto | null;
+}
+
+/**
+ * Admin-only AI assistant. Paths under `/api/admin/**` so fetchApi attaches `adminToken`.
+ */
+export const adminAiChatApi = {
+  sendMessage: (data: AdminAiChatTurnRequest) =>
+    fetchApi<AiChatTurnResponse>('/api/admin/ai-chat/message', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getHistory: (threadId: string) =>
+    fetchApi<ChatHistoryResponseDto>(`/api/admin/ai-chat/thread/${threadId}/history`, {
+      method: 'GET',
+    }),
+  deleteThread: (threadId: string) =>
+    fetchApi<void>(`/api/admin/ai-chat/thread/${threadId}`, { method: 'DELETE' }),
+  listThreads: () =>
+    fetchApi<ChatSessionSummaryDto[]>('/api/admin/ai-chat/threads', { method: 'GET' }),
+  uploadImage: async (file: File, folder?: string): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (folder) formData.append('folder', folder);
+    const token = localStorage.getItem('adminToken');
+    const response = await fetch(`${API_BASE_URL}/api/admin/ai-chat/upload-image`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: formData,
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: 'Upload failed.' }));
+      throw new Error(body.error || 'Upload failed.');
+    }
+    return response.json();
+  },
 };
 
 // ===============================

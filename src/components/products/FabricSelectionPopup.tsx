@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Search, X, ChevronRight, Palette } from 'lucide-react';
@@ -55,9 +55,9 @@ const FabricSelectionPopup: React.FC<FabricSelectionPopupProps> = ({
               <Palette className="w-6 h-6 text-primary" />
               Select Fabric for Your Design
             </DialogTitle>
-            <p className="text-sm text-muted-foreground mt-2">
+            <DialogDescription className="text-sm text-muted-foreground mt-2">
               Choose from recommended fabrics or browse all available options
-            </p>
+            </DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
