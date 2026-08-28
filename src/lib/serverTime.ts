@@ -35,3 +35,23 @@ export function formatServerDate(iso?: string | null): string {
   if (!d) return '';
   return d.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' });
 }
+
+/** "Today" / "Yesterday" / "4 July 2026" — for chat date dividers. */
+export function formatChatDateDivider(iso?: string | null): string {
+  const d = parseServerDate(iso);
+  if (!d) return '';
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === now.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/** True when two server timestamps fall on different calendar days (IST-normalized). */
+export function isDifferentServerDay(a?: string | null, b?: string | null): boolean {
+  const da = parseServerDate(a);
+  const db = parseServerDate(b);
+  if (!da || !db) return false;
+  return da.toDateString() !== db.toDateString();
+}

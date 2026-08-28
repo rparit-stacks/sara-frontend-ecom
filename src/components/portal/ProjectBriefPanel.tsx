@@ -87,12 +87,12 @@ export default function ProjectBriefPanel({ project, clientMode }: { project: Ma
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-5">
-      <div className="max-w-3xl space-y-6">
+      <div className="max-w-4xl space-y-6">
         {/* header */}
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <span className="text-[11px] font-bold uppercase tracking-widest opacity-60" style={{ color: 'var(--p-on-surface-variant)' }}>{project.code}</span>
-            <h2 className="font-display text-[26px] leading-tight mt-1">{project.title || project.brand || 'Project brief'}</h2>
+            <h2 className="font-bold text-[26px] leading-tight mt-1">{project.title || project.brand || 'Project brief'}</h2>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               <Pill label={project.currentStage?.replace(/_/g, ' ') || 'Inquiry'} />
               {project.valueDisplay && <span className="text-[13px] font-semibold" style={{ color: 'var(--p-on-surface-variant)' }}>{project.valueDisplay}</span>}

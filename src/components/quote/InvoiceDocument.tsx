@@ -127,18 +127,15 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
           </div>
         </div>
 
-        {/* Quote context — only shown when this invoice is a partial/advance
-            against a larger quote, so "this invoice" is never confused with
-            the full project value. */}
-        {invoice.quoteTotal != null && invoice.quoteTotal > invoice.amount && (
+        {/* Quote reference — purely informational lineage ("this invoice was raised
+            against quote X, whose total was Y"). Quotation, invoice and payment are
+            independent entities: this invoice's amount is never a deduction from or
+            balance against the quote total, so no "paid till date"/"remaining
+            balance" is computed or shown here. */}
+        {invoice.quoteTotal != null && invoice.quoteReference && (
           <div className="mt-4 rounded-lg p-4 text-[13px]" style={{ background: '#faf7f1', border: '1px solid #eee' }}>
             <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-2">Against quote {invoice.quoteReference}</p>
             <Row label="Quote total" value={money(invoice.quoteTotal, cur)} />
-            <Row label="Paid till date" value={money(invoice.paidTillDate ?? 0, cur)} />
-            <div className="flex items-center justify-between py-1.5">
-              <span className="font-bold text-gray-700">Balance remaining</span>
-              <span className="font-bold text-gray-800">{money(Math.max(0, invoice.quoteTotal - (invoice.paidTillDate ?? 0)), cur)}</span>
-            </div>
           </div>
         )}
 

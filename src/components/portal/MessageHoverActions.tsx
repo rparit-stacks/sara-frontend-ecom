@@ -1,15 +1,36 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Sym } from './Sym';
 
 /** A small, curated reaction set — Slack-style quick reactions. */
-export const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '👀', '🙏', '🔥', '✅', '😮', '💯', '👏', '🚀'];
+export const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '🙏', '🔥', '✅', '😮', '👏', '🚀'];
 
+const MENU_WIDTH = 220;
+const MENU_MARGIN = 8;
+
+/** Clamp a WhatsApp-style right-click context menu inside the viewport, anchored to the
+ *  click point rather than a toolbar button — flips left/up when there isn't room. */
+function clampMenuPosition(clickX: number, clickY: number, estimatedHeight: number) {
+  const left = Math.min(clickX, window.innerWidth - MENU_WIDTH - MENU_MARGIN);
+  const openUp = window.innerHeight - clickY < estimatedHeight + MENU_MARGIN && clickY > estimatedHeight + MENU_MARGIN;
+  return {
+    left: Math.max(MENU_MARGIN, left),
+    top: openUp ? undefined : clickY,
+    bottom: openUp ? window.innerHeight - clickY : undefined,
+  };
+}
+
+/**
+ * WhatsApp-style message actions: nothing shows on hover — right-click (or long-press,
+ * via the caller's onContextMenu wiring) opens a single popup at the click point with
+ * quick-react emojis up top and reply/copy/delete actions below.
+ */
 export default function MessageHoverActions({
   inThread,
   isSystem,
   pending,
   disableReply = false,
   menuOpen,
+  menuPosition,
   onMenuToggle,
   onReply,
   onDelete,
@@ -22,6 +43,8 @@ export default function MessageHoverActions({
   pending?: boolean;
   disableReply?: boolean;
   menuOpen: boolean;
+  /** Viewport click coordinates from the triggering contextmenu event. */
+  menuPosition?: { x: number; y: number } | null;
   onMenuToggle: () => void;
   onReply: () => void;
   onDelete: () => void;
@@ -29,87 +52,65 @@ export default function MessageHoverActions({
   onReact?: (emoji: string) => void;
   canDelete?: boolean;
 }) {
-  const [emojiOpen, setEmojiOpen] = useState(false);
-  if (isSystem || pending) return null;
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
 
-  const btn = 'p-1.5 rounded-md hover:bg-black/6 transition-colors';
+  useEffect(() => {
+    if (!menuOpen || !menuPosition) {
+      setPos(null);
+      return;
+    }
+    setPos(clampMenuPosition(menuPosition.x, menuPosition.y, 320));
+  }, [menuOpen, menuPosition]);
+
+  if (isSystem || pending || !menuOpen || !pos) return null;
 
   return (
-    <div
-      // Always visible on touch devices (no :hover there) — only fades in on
-      // hover for mouse/trackpad users (md and up), where it would otherwise
-      // clutter every message row.
-      className={`absolute right-2 sm:right-4 top-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-all duration-150 flex items-center gap-0.5 border rounded-lg px-0.5 py-0.5 shadow-sm scale-100 md:scale-95 md:group-hover:scale-100 z-10 ${inThread ? 'right-0' : ''}`}
-      style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
-    >
-      <div className="relative">
-        <button type="button" title="Add reaction" className={btn} onClick={() => setEmojiOpen((o) => !o)}>
-          <Sym name="add_reaction" className="text-[17px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-        </button>
-        {emojiOpen && (
-          <>
-            <div className="fixed inset-0 z-30" onClick={() => setEmojiOpen(false)} />
-            <div
-              className="absolute right-0 top-9 z-40 grid grid-cols-4 sm:grid-cols-6 gap-0.5 p-1.5 border rounded-xl shadow-lg animate-in fade-in slide-in-from-top-1 duration-150 max-w-[calc(100vw-2rem)]"
-              style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
-            >
-              {QUICK_EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => { onReact?.(e); setEmojiOpen(false); }}
-                  className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-black/6 text-[18px] leading-none"
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-      {!inThread && !disableReply && (
-        <button type="button" title="Reply in thread" onClick={onReply} className={btn}>
-          <Sym name="forum" className="text-[17px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-        </button>
-      )}
-      <div className="relative">
-        <button type="button" title="More actions" onClick={onMenuToggle} className={btn}>
-          <Sym name="more_horiz" className="text-[17px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-        </button>
-        {menuOpen && (
-          <>
-            <div className="fixed inset-0 z-30" onClick={onMenuToggle} />
-            <div
-              className="absolute right-0 top-9 w-44 border rounded-lg py-1 z-40 shadow-lg animate-in fade-in slide-in-from-top-1 duration-150"
-              style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
-            >
-              {!inThread && !disableReply && (
-                <button type="button" onClick={() => { onReply(); onMenuToggle(); }} className="w-full text-left px-3 py-2 text-[13px] flex items-center gap-2 hover:bg-black/5">
-                  <Sym name="forum" className="text-[16px]" /> Open thread
-                </button>
-              )}
-              <button type="button" onClick={() => { onCopyLink(); onMenuToggle(); }} className="w-full text-left px-3 py-2 text-[13px] flex items-center gap-2 hover:bg-black/5">
-                <Sym name="content_copy" className="text-[16px]" /> Copy link
+    <>
+      <div className="fixed inset-0 z-[100]" onClick={onMenuToggle} onContextMenu={(e) => { e.preventDefault(); onMenuToggle(); }} />
+      <div
+        className="fixed z-[101] border rounded-xl shadow-lg animate-in fade-in zoom-in-95 duration-100 overflow-hidden"
+        style={{
+          top: pos.top,
+          bottom: pos.bottom,
+          left: pos.left,
+          width: MENU_WIDTH,
+          background: 'var(--p-surface-container-lowest)',
+          borderColor: 'var(--p-outline-variant)',
+        }}
+      >
+        {onReact && (
+          <div className="flex items-center justify-between px-2 py-2 border-b" style={{ borderColor: 'var(--p-outline-variant)' }}>
+            {QUICK_EMOJIS.slice(0, 6).map((e) => (
+              <button
+                key={e}
+                type="button"
+                onClick={() => { onReact(e); onMenuToggle(); }}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/6 text-[18px] leading-none hover:scale-125 transition-transform"
+              >
+                {e}
               </button>
-              {canDelete && (
-                <button
-                  type="button"
-                  onClick={() => { onDelete(); onMenuToggle(); }}
-                  className="w-full text-left px-3 py-2 text-[13px] flex items-center gap-2 hover:bg-red-50"
-                  style={{ color: '#b42318' }}
-                >
-                  <Sym name="delete" className="text-[16px]" /> Delete message
-                </button>
-              )}
-            </div>
-          </>
+            ))}
+          </div>
+        )}
+        {!inThread && !disableReply && (
+          <button type="button" onClick={() => { onReply(); onMenuToggle(); }} className="w-full text-left px-3 py-2.5 text-[13px] flex items-center gap-2.5 hover:bg-black/5">
+            <Sym name="forum" className="text-[17px]" style={{ color: 'var(--p-on-surface-variant)' }} /> Reply in thread
+          </button>
+        )}
+        <button type="button" onClick={() => { onCopyLink(); onMenuToggle(); }} className="w-full text-left px-3 py-2.5 text-[13px] flex items-center gap-2.5 hover:bg-black/5">
+          <Sym name="content_copy" className="text-[17px]" style={{ color: 'var(--p-on-surface-variant)' }} /> Copy link
+        </button>
+        {canDelete && (
+          <button
+            type="button"
+            onClick={() => { onDelete(); onMenuToggle(); }}
+            className="w-full text-left px-3 py-2.5 text-[13px] flex items-center gap-2.5 hover:bg-red-50"
+            style={{ color: '#b42318' }}
+          >
+            <Sym name="delete" className="text-[17px]" /> Delete message
+          </button>
         )}
       </div>
-      {canDelete && (
-        <button type="button" title="Delete" onClick={onDelete} className={`${btn} hover:!bg-red-50`}>
-          <Sym name="delete" className="text-[17px]" style={{ color: '#b42318' }} />
-        </button>
-      )}
-    </div>
+    </>
   );
 }

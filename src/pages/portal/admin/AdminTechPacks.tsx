@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import AdminShell, { AdminBtn } from '@/components/portal/AdminShell';
 import { Sym } from '@/components/portal/Sym';
+import StatTile from '@/components/portal/StatTile';
 import { techPackApi } from '@/lib/api';
 import { formatInquiryDate } from '@/components/inquiry/inquiryUtils';
 
@@ -10,16 +11,35 @@ import { formatInquiryDate } from '@/components/inquiry/inquiryUtils';
 // new tab; it reads/writes the SAME studio_sara rows via the shared API, so
 // changes sync back to this list.
 const BUILDER_URL = (import.meta.env.VITE_TECHPACK_BUILDER_URL as string | undefined)?.replace(/\/$/, '') ?? '';
+const PAGE_SIZE = 24;
 
 export default function PortalAdminTechPacks() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<'saved' | 'templates'>('saved');
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const { data: items = [], isLoading } = useQuery({
-    queryKey: ['tech-packs', tab],
-    queryFn: () => techPackApi.list(tab === 'templates'),
+  const { data: savedItems = [], isLoading: savedLoading } = useQuery({
+    queryKey: ['tech-packs', 'saved'],
+    queryFn: () => techPackApi.list(false),
   });
+  const { data: templateItems = [], isLoading: templatesLoading } = useQuery({
+    queryKey: ['tech-packs', 'templates'],
+    queryFn: () => techPackApi.list(true),
+  });
+
+  const items = tab === 'templates' ? templateItems : savedItems;
+  const isLoading = tab === 'templates' ? templatesLoading : savedLoading;
+
+  const q = query.trim().toLowerCase();
+  const filtered = useMemo(
+    () => (q ? items.filter((it) => it.name.toLowerCase().includes(q)) : items),
+    [items, q],
+  );
+
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [tab, q]);
+  const shown = filtered.slice(0, visibleCount);
 
   const invalidateAll = () =>
     qc.invalidateQueries({ queryKey: ['tech-packs'] }); // both tabs
@@ -92,48 +112,72 @@ export default function PortalAdminTechPacks() {
         </div>
       }
     >
-      <div className="p-4 md:p-6">
-        {/* tabs */}
-        <div className="flex gap-1 mb-5">
-          {(['saved', 'templates'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`text-[13px] px-4 py-2 rounded-lg font-medium transition-colors ${
-                tab === t ? 'bg-[#00676a] text-white' : 'text-gray-600 hover:bg-black/5'
-              }`}
-            >
-              {t === 'saved' ? 'Saved' : 'Templates'}
-            </button>
-          ))}
+      <div className="p-5 sm:p-8">
+        <div className="grid grid-cols-2 gap-4 mb-6 max-w-sm">
+          <StatTile label="Saved documents" value={savedItems.length} icon="description" color="var(--p-primary)" />
+          <StatTile label="Templates" value={templateItems.length} icon="bookmark" color="#b45309" />
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <div className="flex items-center bg-black/[0.04] rounded-lg p-1 w-fit">
+            {(['saved', 'templates'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-colors ${tab === t ? 'bg-white shadow-sm' : ''}`}
+                style={{ color: tab === t ? 'var(--p-primary)' : 'var(--p-on-surface-variant)' }}
+              >
+                {t === 'saved' ? 'Saved' : 'Templates'}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative">
+            <Sym name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name…"
+              className="pl-8 pr-3 py-1.5 rounded-lg text-[13px] w-64 sm:w-72 outline-none border"
+              style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
+            />
+          </div>
         </div>
 
         {isLoading ? (
-          <p className="text-sm text-gray-400">Loading…</p>
-        ) : items.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
-            <Sym name="description" className="text-[40px] mb-2 block" />
-            <p className="text-sm">No {tab === 'templates' ? 'templates' : 'tech packs'} yet.</p>
-            <button onClick={() => openBuilder()} className="text-[13px] text-[#00676a] hover:underline mt-2">
-              + Create one
-            </button>
+          <div className="flex justify-center py-24">
+            <Sym name="progress_activity" className="text-[32px] animate-spin" style={{ color: 'var(--p-primary)' }} />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16" style={{ color: 'var(--p-on-surface-variant)' }}>
+            <Sym name={q ? 'search_off' : 'description'} className="text-[40px] mb-2 block opacity-40" />
+            <p className="text-[14px]">
+              {q ? `No ${tab === 'templates' ? 'templates' : 'tech packs'} match "${query}".` : `No ${tab === 'templates' ? 'templates' : 'tech packs'} yet.`}
+            </p>
+            {!q && (
+              <button onClick={() => openBuilder()} className="text-[13px] font-bold hover:underline mt-2" style={{ color: 'var(--p-primary)' }}>
+                + Create one
+              </button>
+            )}
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((it) => (
+            {shown.map((it) => (
               <div
                 key={it.id}
-                className="border border-gray-200 rounded-xl p-4 bg-white hover:shadow-md transition-shadow flex flex-col"
+                className="border rounded-2xl p-4 hover:shadow-md transition-shadow flex flex-col"
+                style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="w-10 h-10 rounded-lg bg-[#00676a]/10 text-[#00676a] flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(0,103,106,0.1)', color: 'var(--p-primary)' }}>
                     <Sym name={it.isTemplate ? 'bookmark' : 'description'} className="text-[20px]" />
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setRenaming(it.id)} className="text-gray-300 hover:text-[#00676a]" title="Rename">
+                    <button onClick={() => setRenaming(it.id)} className="p-1 rounded hover:bg-black/5" style={{ color: 'var(--p-on-surface-variant)' }} title="Rename">
                       <Sym name="edit" className="text-[17px]" />
                     </button>
-                    <button onClick={() => remove(it.id)} className="text-gray-300 hover:text-red-500" title="Delete">
+                    <button onClick={() => remove(it.id)} className="p-1 rounded hover:bg-black/5" style={{ color: 'var(--p-on-surface-variant)' }} title="Delete">
                       <Sym name="delete" className="text-[18px]" />
                     </button>
                   </div>
@@ -148,17 +192,18 @@ export default function PortalAdminTechPacks() {
                       if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                       if (e.key === 'Escape') setRenaming(null);
                     }}
-                    className="mt-3 w-full text-[14px] px-2 py-1 border border-[#00676a] rounded outline-none"
+                    className="mt-3 w-full text-[14px] px-2 py-1 rounded outline-none border"
+                    style={{ borderColor: 'var(--p-primary)' }}
                   />
                 ) : (
-                  <p className="text-[15px] font-medium text-gray-800 mt-3 truncate">{it.name}</p>
+                  <p className="text-[15px] font-medium mt-3 truncate">{it.name}</p>
                 )}
 
                 <div className="flex items-center gap-1.5 mt-0.5">
                   {it.isTemplate && (
-                    <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">TEMPLATE</span>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--p-surface-container-high)', color: 'var(--p-on-surface-variant)' }}>TEMPLATE</span>
                   )}
-                  <p className="text-[11px] text-gray-400">
+                  <p className="text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}>
                     {it.updatedAt ? `Updated ${formatInquiryDate(it.updatedAt)}` : '—'}
                   </p>
                 </div>
@@ -170,26 +215,29 @@ export default function PortalAdminTechPacks() {
                     <>
                       <button
                         onClick={() => useTemplate(it.id)}
-                        className="w-full py-2 rounded-lg bg-[#00676a] text-white text-[13px] font-medium hover:bg-[#004d50] flex items-center justify-center gap-1.5"
+                        className="w-full py-2 rounded-lg text-white text-[13px] font-medium flex items-center justify-center gap-1.5"
+                        style={{ background: 'var(--p-primary)' }}
                       >
                         <Sym name="add" className="text-[16px]" /> Use template
                       </button>
                       <div className="flex gap-1.5">
-                        <button onClick={() => openBuilder(it.id)} className="flex-1 py-1.5 rounded-lg border border-gray-200 text-[12px] text-gray-600 hover:bg-gray-50">Edit</button>
-                        <button onClick={() => toggleTemplate(it.id, false)} className="flex-1 py-1.5 rounded-lg border border-gray-200 text-[12px] text-gray-600 hover:bg-gray-50">Make document</button>
+                        <button onClick={() => openBuilder(it.id)} className="flex-1 py-1.5 rounded-lg border text-[12px]" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>Edit template</button>
+                        <button onClick={() => toggleTemplate(it.id, false)} className="flex-1 py-1.5 rounded-lg border text-[12px]" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>Make document</button>
                       </div>
                     </>
                   ) : (
                     <>
                       <button
                         onClick={() => openBuilder(it.id)}
-                        className="w-full py-2 rounded-lg bg-[#00676a] text-white text-[13px] font-medium hover:bg-[#004d50]"
+                        className="w-full py-2 rounded-lg text-white text-[13px] font-medium"
+                        style={{ background: 'var(--p-primary)' }}
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => toggleTemplate(it.id, true)}
-                        className="w-full py-1.5 rounded-lg border border-gray-200 text-[12px] text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-1.5"
+                        className="w-full py-1.5 rounded-lg border text-[12px] flex items-center justify-center gap-1.5"
+                        style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}
                       >
                         <Sym name="bookmark" className="text-[15px]" /> Save as template
                       </button>
@@ -199,6 +247,19 @@ export default function PortalAdminTechPacks() {
               </div>
             ))}
           </div>
+          {filtered.length > visibleCount && (
+            <div className="flex justify-center mt-6">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+                className="px-5 py-2 rounded-lg border text-[13px] font-semibold"
+                style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-primary)' }}
+              >
+                Load {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
     </AdminShell>

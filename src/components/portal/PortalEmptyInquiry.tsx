@@ -16,7 +16,7 @@ export default function PortalEmptyInquiry({ compact }: { compact?: boolean }) {
       >
         <Sym name="factory" className="text-[32px]" />
       </div>
-      <h3 className="font-display text-[22px] mb-2" style={{ color: 'var(--p-on-surface)' }}>
+      <h3 className="font-bold text-[22px] mb-2" style={{ color: 'var(--p-on-surface)' }}>
         No production projects yet
       </h3>
       <p className={`max-w-md mx-auto text-[14px] ${compact ? '' : 'mb-6'}`}>

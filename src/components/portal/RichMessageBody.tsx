@@ -1,11 +1,48 @@
 import type { ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { parseProductCard, stripProductMarker } from './ProductCard';
 import LinkPreviewCard, { firstUrl } from './LinkPreviewCard';
+import MessageLinkPreviewCard, { parseMessageLink } from './MessageLinkPreviewCard';
+import EntityTagChip, { parseEntityTag, type ParsedEntityTag } from './EntityTagCard';
+import { setPendingFilePreview } from './filePreviewBridge';
 
-/** Lightweight markdown: **bold**, *italic*, `code`, [links](url), bare URLs, bullets, numbered lists. */
+/** Navigate to a tagged entity's workspace pane, staying on whichever side (client/admin)
+ *  is currently open. Design/invoice/quote all resolve to a resource pane on the tagged
+ *  entity's own project — none of them have a dedicated per-item detail route yet. A file
+ *  tag has no route at all; it opens the shared FilePreviewModal via a tiny pub/sub bridge
+ *  (filePreviewBridge) since RichMessageBody can render deep inside a thread panel that has
+ *  no direct access to the workspace page's preview-modal state. */
+function goToTaggedEntity(navigate: ReturnType<typeof useNavigate>, tag: ParsedEntityTag) {
+  const base = window.location.pathname.startsWith('/portal-admin') ? '/portal-admin' : '/portal';
+  if (tag.type === 'file') {
+    setPendingFilePreview({ url: tag.key, name: tag.title });
+    return;
+  }
+  if (tag.type === 'project') {
+    navigate(`${base}/workspace-preview?project=${encodeURIComponent(tag.key)}`);
+    return;
+  }
+  if (tag.type === 'design') {
+    if (tag.projectCode) navigate(`${base}/workspace-preview?project=${encodeURIComponent(tag.projectCode)}&tab=design&design=${encodeURIComponent(tag.key)}`);
+    return;
+  }
+  if (tag.type === 'invoice') {
+    if (tag.projectCode) navigate(`${base}/workspace-preview?project=${encodeURIComponent(tag.projectCode)}&tab=resource&resource=invoices`);
+    return;
+  }
+  if (tag.type === 'quote') {
+    if (tag.projectCode) navigate(`${base}/workspace-preview?project=${encodeURIComponent(tag.projectCode)}&tab=resource&resource=quotation`);
+  }
+}
+
+/** Lightweight markdown: **bold**, *italic*, `code`, [links](url), bare URLs, bullets, numbered lists, @project tags.
+ *  Link/chip colors come from the `.chat-bubble-body`/`.chat-bubble-mine` CSS context (portal.css) — callers don't
+ *  need to pass a `mine` flag; wrap the "mine" bubble in a `chat-bubble-mine` ancestor and it flips automatically. */
 export function RichMessageBody({ text, className = '', showLinkPreview = true }: { text: string; className?: string; showLinkPreview?: boolean }) {
+  const navigate = useNavigate();
   const cleaned = stripProductMarker(text);
   const previewUrl = showLinkPreview ? firstUrl(cleaned) : null;
+  const messageLink = previewUrl ? parseMessageLink(previewUrl) : null;
   const lines = cleaned.split('\n');
   const blocks: ReactNode[] = [];
   let bulletRun: string[] = [];
@@ -16,7 +53,7 @@ export function RichMessageBody({ text, className = '', showLinkPreview = true }
     blocks.push(
       <ul key={key} className="list-disc pl-5 my-1 space-y-0.5">
         {bulletRun.map((line, i) => (
-          <li key={i} className="text-[15px] leading-relaxed">{inlineFormat(line)}</li>
+          <li key={i} className="text-[15px] leading-relaxed">{inlineFormat(line, navigate)}</li>
         ))}
       </ul>,
     );
@@ -28,7 +65,7 @@ export function RichMessageBody({ text, className = '', showLinkPreview = true }
     blocks.push(
       <ol key={key} className="list-decimal pl-5 my-1 space-y-0.5">
         {numberRun.map((item, i) => (
-          <li key={i} className="text-[15px] leading-relaxed" value={item.n}>{inlineFormat(item.text)}</li>
+          <li key={i} className="text-[15px] leading-relaxed" value={item.n}>{inlineFormat(item.text, navigate)}</li>
         ))}
       </ol>,
     );
@@ -53,7 +90,7 @@ export function RichMessageBody({ text, className = '', showLinkPreview = true }
     if (line.trim()) {
       blocks.push(
         <p key={`p-${idx}`} className="text-[15px] leading-relaxed mb-1 last:mb-0 whitespace-pre-wrap">
-          {inlineFormat(line)}
+          {inlineFormat(line, navigate)}
         </p>,
       );
     } else if (idx < lines.length - 1) {
@@ -64,29 +101,35 @@ export function RichMessageBody({ text, className = '', showLinkPreview = true }
   flushNumbers('n-end');
 
   return (
-    <div className={className}>
+    <div className={`chat-bubble-body ${className}`}>
       {blocks}
-      {previewUrl && <LinkPreviewCard url={previewUrl} />}
+      {messageLink ? <MessageLinkPreviewCard link={messageLink} /> : previewUrl && <LinkPreviewCard url={previewUrl} />}
     </div>
   );
 }
 
-function inlineFormat(text: string): ReactNode[] {
+function inlineFormat(text: string, navigate: ReturnType<typeof useNavigate>): ReactNode[] {
   const parts: ReactNode[] = [];
-  // Added a bare-URL token (http/https) so raw links become clickable too.
-  const re = /(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_|https?:\/\/[^\s<]+)/g;
+  // Added a bare-URL token (http/https) and an entity-tag token (@project/@design/@invoice/
+  // @quote/@file) so both render inline.
+  const re = /(\[\[(?:project|design|invoice|quote|file):[^\]]+\]\]|\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_|https?:\/\/[^\s<]+)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let k = 0;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index));
     const tok = m[0];
-    if (tok.startsWith('http://') || tok.startsWith('https://')) {
+    if (tok.startsWith('[[')) {
+      const tag = parseEntityTag(tok);
+      if (tag) {
+        parts.push(<EntityTagChip key={k++} data={tag} onClick={(t) => goToTaggedEntity(navigate, t)} />);
+      }
+    } else if (tok.startsWith('http://') || tok.startsWith('https://')) {
       // Trim trailing punctuation that's likely sentence punctuation, not part of the URL.
       const trail = tok.match(/[.,;:!?)\]]+$/);
       const href = trail ? tok.slice(0, -trail[0].length) : tok;
       parts.push(
-        <a key={k++} href={href} target="_blank" rel="noreferrer" className="underline font-medium break-all" style={{ color: 'var(--p-primary)' }}>
+        <a key={k++} href={href} target="_blank" rel="noreferrer" className="underline font-medium break-all">
           {href}
         </a>,
       );
@@ -95,7 +138,7 @@ function inlineFormat(text: string): ReactNode[] {
       const link = tok.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       if (link) {
         parts.push(
-          <a key={k++} href={link[2]} target="_blank" rel="noreferrer" className="underline font-medium break-all" style={{ color: 'var(--p-primary)' }}>
+          <a key={k++} href={link[2]} target="_blank" rel="noreferrer" className="underline font-medium break-all">
             {link[1]}
           </a>,
         );

@@ -1,8 +1,17 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Sym } from './Sym';
-import { projectApi } from '@/lib/api';
+import { projectApi, portalAssignmentApi } from '@/lib/api';
 
+/**
+ * Quick full-project assign, reachable from a project itself. This is a thin
+ * wrapper over the same save path as the dedicated "Portal assignments" page
+ * (`portalAssignmentApi.setAssignments`, replace-semantics) — there is only one
+ * place assignment actually gets written. To keep this action purely additive
+ * (never silently dropping an admin's other assignments) it first reads the
+ * target admin's current full/partial assignments and merges these project ids
+ * into the full-project set before saving.
+ */
 export default function ProjectAssignModal({
   open,
   projectIds,
@@ -36,7 +45,14 @@ export default function ProjectAssignModal({
     setSaving(true);
     setError('');
     try {
-      await projectApi.bulkAssign(Number(adminId), projectIds);
+      const id = Number(adminId);
+      const current = await portalAssignmentApi.getAssignments(id);
+      const fullProjectIds = Array.from(new Set([...current.fullProjectIds, ...projectIds]));
+      // A project now getting full access supersedes any partial (design-level)
+      // access it may have had — matches the "full includes everything" rule
+      // enforced on the Assignments page itself.
+      const designAssignments = current.designAssignments.filter((d) => !projectIds.includes(d.projectId));
+      await portalAssignmentApi.setAssignments(id, { fullProjectIds, designAssignments });
       onAssigned();
       onClose();
       setAdminId('');
@@ -55,7 +71,7 @@ export default function ProjectAssignModal({
         style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-display text-[18px]">Assign to portal admin</h3>
+          <h3 className="font-bold text-[18px]">Assign to portal admin</h3>
           <button type="button" onClick={onClose} className="p-1 rounded hover:bg-black/5"><Sym name="close" /></button>
         </div>
         <p className="text-[13px] mb-3" style={{ color: 'var(--p-on-surface-variant)' }}>

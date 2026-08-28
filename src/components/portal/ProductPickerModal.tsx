@@ -69,7 +69,7 @@ export default function ProductPickerModal({
       >
         <div className="px-5 py-4 border-b flex items-center justify-between gap-3" style={{ borderColor: 'var(--p-outline-variant)' }}>
           <div>
-            <h3 className="font-display text-[18px]">Attach product</h3>
+            <h3 className="font-bold text-[18px]">Attach product</h3>
             <p className="text-[12px] mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>
               Search and pick a product to share in this chat
             </p>

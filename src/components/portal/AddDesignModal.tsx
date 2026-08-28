@@ -58,7 +58,7 @@ export default function AddDesignModal({
       <>
         <div className="fixed inset-0 z-50 bg-black/40" onClick={uploading ? undefined : onClose} />
         <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 border rounded-2xl shadow-2xl p-5" style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}>
-          <h3 className="font-display text-[17px] mb-1">New chat</h3>
+          <h3 className="font-bold text-[17px] mb-1">New chat</h3>
           <p className="text-[13px] mb-4" style={{ color: 'var(--p-on-surface-variant)' }}>Each design is its own chat — give it a name to start.</p>
           <input
             value={name}
@@ -85,7 +85,7 @@ export default function AddDesignModal({
     <>
       <div className="fixed inset-0 z-50 bg-black/40" onClick={uploading ? undefined : onClose} />
       <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 border rounded-2xl shadow-2xl p-6" style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}>
-        <h3 className="font-display text-[18px] mb-1">New design channel</h3>
+        <h3 className="font-bold text-[18px] mb-1">New design channel</h3>
         <p className="text-[13px] mb-4" style={{ color: 'var(--p-on-surface-variant)' }}>Add a name and optional cover image or PDF reference.</p>
 
         <label className="block text-[11px] font-bold uppercase mb-1" style={{ color: 'var(--p-on-surface-variant)' }}>Design name</label>

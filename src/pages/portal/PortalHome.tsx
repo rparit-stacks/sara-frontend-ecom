@@ -180,7 +180,7 @@ export default function PortalHome() {
                   <button
                     key={p.code}
                     type="button"
-                    onClick={() => navigate(`/portal/projects/${encodeURIComponent(p.code)}`)}
+                    onClick={() => navigate(`/portal/workspace-preview?project=${encodeURIComponent(p.code)}`)}
                     className="w-full flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors text-left"
                     style={{ color: 'var(--p-on-surface-variant)' }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--p-surface-container-high)')}
@@ -343,7 +343,7 @@ export default function PortalHome() {
                             return (
                               <div
                                 key={p.code}
-                                onClick={() => navigate(`/portal/projects/${encodeURIComponent(p.code)}`)}
+                                onClick={() => navigate(`/portal/workspace-preview?project=${encodeURIComponent(p.code)}`)}
                                 className="border p-5 card-hover flex flex-col rounded-xl cursor-pointer relative"
                                 style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
                               >
@@ -437,7 +437,7 @@ export default function PortalHome() {
                             <button
                               key={f.id}
                               type="button"
-                              onClick={() => navigate(`/portal/projects/${encodeURIComponent(f.projectCode)}`)}
+                              onClick={() => navigate(`/portal/workspace-preview?project=${encodeURIComponent(f.projectCode)}`)}
                               className="w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-black/[0.02]"
                             >
                               <Sym name="attach_file" className="text-[18px] shrink-0" style={{ color: 'var(--p-primary)' }} />

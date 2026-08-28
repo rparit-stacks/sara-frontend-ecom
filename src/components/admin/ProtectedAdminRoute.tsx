@@ -27,11 +27,12 @@ const ProtectedAdminRoute = ({ children }: ProtectedAdminRouteProps) => {
       // Check if session expired (1 hour = 3600000ms)
       const loginTimestamp = parseInt(loginTime);
       const now = Date.now();
-      const sessionDuration = 60 * 60 * 1000; // 1 hour
+      const sessionDuration = 30 * 24 * 60 * 60 * 1000; // 30 days — matches the refresh token's lifetime
       
       if (now - loginTimestamp > sessionDuration) {
         console.log('[Admin Auth] Session expired');
         localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminRefreshToken');
         localStorage.removeItem('adminUser');
         localStorage.removeItem('adminLoginTime');
         setIsAuthenticated(false);
@@ -49,6 +50,7 @@ const ProtectedAdminRoute = ({ children }: ProtectedAdminRouteProps) => {
         console.error('[Admin Auth] Token verification failed:', error);
         // Token is invalid, clear it
         localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminRefreshToken');
         localStorage.removeItem('adminUser');
         localStorage.removeItem('adminLoginTime');
         setIsAuthenticated(false);
@@ -65,11 +67,12 @@ const ProtectedAdminRoute = ({ children }: ProtectedAdminRouteProps) => {
       if (loginTime) {
         const loginTimestamp = parseInt(loginTime);
         const now = Date.now();
-        const sessionDuration = 60 * 60 * 1000; // 1 hour
+        const sessionDuration = 30 * 24 * 60 * 60 * 1000; // 30 days — matches the refresh token's lifetime
         
         if (now - loginTimestamp > sessionDuration) {
           console.log('[Admin Auth] Session expired, logging out');
           localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminRefreshToken');
           localStorage.removeItem('adminUser');
           localStorage.removeItem('adminLoginTime');
           window.location.href = '/admin-sara/login';
@@ -89,7 +92,8 @@ const ProtectedAdminRoute = ({ children }: ProtectedAdminRouteProps) => {
   }
 
   if (!isAuthenticated) {
-    // Redirect to login page, saving the attempted location
+    // Redirect to login page, saving the attempted location (full path+search+hash, so a
+    // deep link like a copied message link lands back on that exact pane/message).
     return <Navigate to="/admin-sara/login" state={{ from: location }} replace />;
   }
 

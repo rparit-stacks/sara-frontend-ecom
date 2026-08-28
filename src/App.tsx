@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { ChatWidget } from "@/components/ai-chat";
 import { AdminAiChatWidget } from "@/components/admin-ai-chat";
 import { SITE_UNDER_MAINTENANCE } from "@/siteMaintenance";
@@ -75,7 +75,7 @@ import ProtectedSuperAdminRoute from "./components/admin/ProtectedSuperAdminRout
 import MaintenancePlan from "./pages/admin/MaintenancePlan";
 import PortalGuard from "./components/portal/PortalGuard";
 import PortalHome from "./pages/portal/PortalHome";
-import ClientProjectDetail from "./pages/portal/ClientProjectDetail";
+import ClientWorkspacePreview from "./pages/portal/ClientWorkspacePreview";
 import PortalMessages from "./pages/portal/PortalMessages";
 import PortalActivity from "./pages/portal/PortalActivity";
 import PortalFiles from "./pages/portal/PortalFiles";
@@ -85,8 +85,7 @@ import PortalThreads from "./pages/portal/PortalThreads";
 import PortalInvoices from "./pages/portal/PortalInvoices";
 import PortalPaymentHistory from "./pages/portal/PortalPaymentHistory";
 import PortalAdminDashboard from "./pages/portal/admin/AdminDashboard";
-import PortalAdminProjects from "./pages/portal/admin/AdminProjects";
-import PortalAdminProjectDetail from "./pages/portal/admin/AdminProjectDetail";
+import AdminClientWorkspacePreview from "./pages/portal/admin/AdminClientWorkspacePreview";
 import PortalAdminInquiries from "./pages/portal/admin/AdminInquiries";
 import PortalAdminQuotations from "./pages/portal/admin/AdminQuotations";
 import PortalAdminPaymentLinks from "./pages/portal/admin/AdminPaymentLinks";
@@ -145,6 +144,20 @@ const AdminSiteWideChatWidget = () => {
   return <AdminAiChatWidget />;
 };
 
+/** Old `/portal-admin/projects/:code`-style deep links (bookmarks, notification
+ * emails, Sara AI redirect links) still exist — redirect them to the workspace's
+ * `?project=` query-param scheme rather than 404ing. */
+const RedirectToAdminWorkspaceProject = () => {
+  const { code } = useParams();
+  return <Navigate to={`/portal-admin/workspace-preview?project=${encodeURIComponent(code ?? '')}`} replace />;
+};
+
+/** Client-side equivalent of the above, for old `/portal/projects/:code` links. */
+const RedirectToClientWorkspaceProject = () => {
+  const { code } = useParams();
+  return <Navigate to={`/portal/workspace-preview?project=${encodeURIComponent(code ?? '')}`} replace />;
+};
+
 const App = () =>
   SITE_UNDER_MAINTENANCE ? (
     <Maintenance />
@@ -196,7 +209,8 @@ const App = () =>
           
           {/* Manufacturing Portal (client side) */}
           <Route path="/portal" element={<PortalGuard><PortalHome /></PortalGuard>} />
-          <Route path="/portal/projects/:code" element={<PortalGuard><ClientProjectDetail /></PortalGuard>} />
+          <Route path="/portal/workspace-preview" element={<PortalGuard><ClientWorkspacePreview /></PortalGuard>} />
+          <Route path="/portal/projects/:code" element={<PortalGuard><RedirectToClientWorkspaceProject /></PortalGuard>} />
           <Route path="/portal/workspace" element={<PortalGuard><Navigate to="/portal" replace /></PortalGuard>} />
           <Route path="/portal/quotation" element={<PortalGuard><Navigate to="/portal" replace /></PortalGuard>} />
           <Route path="/portal/messages" element={<PortalGuard><PortalMessages /></PortalGuard>} />
@@ -214,9 +228,10 @@ const App = () =>
 
           {/* Manufacturing Portal — ADMIN side (store admin auth + portal access flag) */}
           <Route path="/portal-admin" element={<ProtectedPortalAdminRoute><PortalAdminDashboard /></ProtectedPortalAdminRoute>} />
-          <Route path="/portal-admin/projects" element={<ProtectedPortalAdminRoute><PortalAdminProjects /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/projects" element={<ProtectedPortalAdminRoute><AdminClientWorkspacePreview /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/workspace-preview" element={<ProtectedPortalAdminRoute><AdminClientWorkspacePreview /></ProtectedPortalAdminRoute>} />
           <Route path="/portal-admin/assignments" element={<ProtectedPortalAdminRoute><ProtectedSuperAdminRoute><PortalAdminAssignments /></ProtectedSuperAdminRoute></ProtectedPortalAdminRoute>} />
-          <Route path="/portal-admin/projects/:code" element={<ProtectedPortalAdminRoute><PortalAdminProjectDetail /></ProtectedPortalAdminRoute>} />
+          <Route path="/portal-admin/projects/:code" element={<ProtectedPortalAdminRoute><RedirectToAdminWorkspaceProject /></ProtectedPortalAdminRoute>} />
           <Route path="/portal-admin/inquiries" element={<ProtectedPortalAdminRoute><PortalAdminInquiries /></ProtectedPortalAdminRoute>} />
           <Route path="/portal-admin/inquiries/:id" element={<ProtectedPortalAdminRoute><PortalAdminInquiryDetail /></ProtectedPortalAdminRoute>} />
           <Route path="/portal-admin/inquiry-form" element={<ProtectedPortalAdminRoute><PortalAdminInquiryForm /></ProtectedPortalAdminRoute>} />

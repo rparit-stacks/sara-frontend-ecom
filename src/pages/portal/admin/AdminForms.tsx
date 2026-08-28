@@ -119,7 +119,6 @@ export default function PortalAdminForms() {
                         <div className="fixed inset-0 z-10" onClick={() => setMenu(null)} />
                         <div className="absolute right-0 top-8 w-44 border rounded-lg py-1 z-20 shadow-lg" style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}>
                           {[
-                            { i: 'edit', l: 'Edit', a: () => navigate('/portal-admin/inquiry-form') },
                             { i: 'visibility', l: 'Preview', a: () => window.open('/inquiry', '_blank') },
                             { i: 'inbox', l: 'View submissions', a: () => navigate('/portal-admin/inquiries') },
                           ].map((m) => (

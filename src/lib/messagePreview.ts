@@ -23,6 +23,11 @@ function plainPreviewText(body?: string | null): string {
   if (!body) return '';
   let s = stripProductMarker(body);
   s = s.replace(/\[\[(?:product|payment):[^\]]+\]\]/g, '');
+  // Show the tagged project's title instead of dropping the mention entirely.
+  s = s.replace(/\[\[project:([^\]]+)\]\]/g, (_all, payload: string) => {
+    const m = payload.match(/(?:^|\|)title=([^|\]]+)/);
+    return m ? `@${decodeURIComponent(m[1])}` : '';
+  });
   s = s.replace(/`([^`]+)`/g, '$1');
   s = s.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
   s = s.replace(/\*\*|__/g, '').replace(/\*|_/g, '');

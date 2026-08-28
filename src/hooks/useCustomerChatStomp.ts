@@ -1,0 +1,111 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { acquireStomp, releaseStomp, subscribeTopic } from '@/lib/stompClient';
+
+export type CustomerChatMode = 'admin' | 'client';
+
+const TYPING_STOP_AFTER_MS = 4000;
+const TYPING_SEND_THROTTLE_MS = 2000;
+
+/**
+ * STOMP subscription for the customer-level General Chat — mirrors
+ * useProjectStomp's pattern but keyed by customerEmail (topic
+ * /topic/customer/{email}, published by ProjectRealtimeBroadcaster.publishCustomer)
+ * instead of project code. Invalidates/refetches the same TanStack Query keys
+ * used by AdminClientWorkspacePreview / ClientWorkspacePreview.
+ *
+ * Also relays the ephemeral "typing" event (TypingIndicatorController on the
+ * backend) — nothing is persisted, a dropped frame just means the dot
+ * disappears a little late.
+ */
+export function useCustomerChatStomp(
+  customerEmail: string | undefined,
+  mode: CustomerChatMode = 'admin',
+  authorName?: string,
+) {
+  const qc = useQueryClient();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSentAt = useRef(0);
+  const clientRef = useRef<ReturnType<typeof acquireStomp> | null>(null);
+  const [typingUser, setTypingUser] = useState<{ authorName: string; isAdmin: boolean; isAi?: boolean } | null>(null);
+
+  useEffect(() => {
+    if (!customerEmail) return;
+
+    const token = mode === 'client'
+      ? localStorage.getItem('authToken')
+      : localStorage.getItem('adminToken');
+    if (!token) return;
+
+    const messagesKey = mode === 'client' ? 'client-customer-chat-messages' : 'customer-chat-messages';
+    const threadsKey = mode === 'client' ? 'client-customer-chat-threads' : 'customer-chat-threads';
+    const messagesQueryKey = mode === 'client' ? [messagesKey] : [messagesKey, customerEmail];
+    const threadsQueryKey = mode === 'client' ? [threadsKey] : [threadsKey, customerEmail];
+
+    const refetchMessages = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        void qc.refetchQueries({ queryKey: messagesQueryKey, type: 'active' });
+        void qc.refetchQueries({ queryKey: threadsQueryKey, type: 'active' });
+      }, 100);
+    };
+
+    const client = acquireStomp(mode);
+    clientRef.current = client;
+    const unsubscribe = subscribeTopic(client, `/topic/customer/${customerEmail}`, (frame) => {
+      let event = '';
+      let data: unknown = null;
+      try {
+        const parsed = JSON.parse(frame.body) as { event?: string; data?: unknown };
+        event = parsed.event ?? '';
+        data = parsed.data;
+      } catch {
+        return;
+      }
+      if (event === 'message') {
+        refetchMessages();
+      } else if (event === 'typing') {
+        const payload = data as { isTyping?: boolean; authorName?: string; isAdmin?: boolean; isAi?: boolean } | null;
+        if (!payload) return;
+        // Ignore our own echoed typing event (the sender knows it's typing already). The AI
+        // composing an auto-reply is flagged isAi and is never a self-echo — it's published
+        // server-side as the team, so an admin watching the chat must still see it.
+        const isSelf = payload.isAi ? false : mode === 'admin' ? !!payload.isAdmin : !payload.isAdmin;
+        if (isSelf) return;
+        if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+        if (payload.isTyping) {
+          setTypingUser({ authorName: payload.authorName || 'Someone', isAdmin: !!payload.isAdmin, isAi: !!payload.isAi });
+          typingStopTimerRef.current = setTimeout(() => setTypingUser(null), TYPING_STOP_AFTER_MS);
+        } else {
+          setTypingUser(null);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      releaseStomp();
+      clientRef.current = null;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+      setTypingUser(null);
+    };
+  }, [customerEmail, mode, qc]);
+
+  /** Call on every keystroke in the composer — throttled, and auto-sends "stopped" after a pause. */
+  const notifyTyping = useCallback((isTyping: boolean) => {
+    if (!customerEmail) return;
+    const client = clientRef.current;
+    if (!client || !client.connected) return;
+    const now = Date.now();
+    if (isTyping && now - lastTypingSentAt.current < TYPING_SEND_THROTTLE_MS) return;
+    lastTypingSentAt.current = now;
+    client.publish({
+      destination: `/app/typing/customer/${customerEmail}`,
+      body: JSON.stringify({ isTyping, authorName }),
+    });
+  }, [customerEmail, authorName]);
+
+  return { typingUser, notifyTyping };
+}

@@ -12,12 +12,13 @@ import { presenceApi } from '@/lib/api';
 import { getStoredAdminUser } from '@/lib/adminAccess';
 
 /**
- * Central admin-presence state for the whole admin app.
+ * Central admin-presence state for the manufacturing portal admin app.
  *
  * Presence is MANUAL: the admin toggles themselves online/offline from the
- * header. While online we (a) hold a WebSocket connection, (b) send periodic
- * heartbeats so the backend safety-net sweep doesn't drop us, and (c) warn on
- * tab close so the admin remembers to go offline first.
+ * header. While online we send a heartbeat every HEARTBEAT_MS so the backend
+ * doesn't auto-drop us — the backend flips us back offline on its own after
+ * 10 minutes with no heartbeat (closed tab, sleep, crash, dead network), so
+ * there's nothing to warn the admin about before leaving.
  *
  * `onlineAdminIds` is the live set of everyone currently online (for dots on
  * lists); `myOnline` is the current admin's own effective status.
@@ -32,7 +33,7 @@ interface AdminPresenceValue {
 
 const AdminPresenceContext = createContext<AdminPresenceValue | null>(null);
 
-const HEARTBEAT_MS = 45_000; // < backend 120s stale window
+const HEARTBEAT_MS = 45_000; // well under the backend's 10-minute stale window
 
 export function AdminPresenceProvider({ children }: { children: ReactNode }) {
   const [onlineAdminIds, setOnlineAdminIds] = useState<Set<number>>(new Set());
@@ -40,10 +41,6 @@ export function AdminPresenceProvider({ children }: { children: ReactNode }) {
   const [toggling, setToggling] = useState(false);
   const myAdminId = getStoredAdminUser()?.id ?? null;
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Keep a ref of myOnline for the beforeunload handler (avoids stale closure).
-  const myOnlineRef = useRef(myOnline);
-  myOnlineRef.current = myOnline;
 
   // --- connect + live presence feed --------------------------------------
   useEffect(() => {
@@ -109,21 +106,6 @@ export function AdminPresenceProvider({ children }: { children: ReactNode }) {
       heartbeatRef.current = null;
     };
   }, [myOnline]);
-
-  // --- warn on tab close while online ------------------------------------
-  useEffect(() => {
-    const handler = (e: BeforeUnloadEvent) => {
-      if (myOnlineRef.current) {
-        // Browsers show a generic prompt; the returnValue just triggers it.
-        e.preventDefault();
-        e.returnValue =
-          'You are still marked Online. Set yourself Offline before leaving, or close anyway.';
-        return e.returnValue;
-      }
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, []);
 
   const changeMyOnline = useCallback(async (online: boolean) => {
     setToggling(true);

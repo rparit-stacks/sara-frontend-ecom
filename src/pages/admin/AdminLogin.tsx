@@ -6,6 +6,14 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { adminAuthApi } from '@/lib/api';
 
+/** Reconstruct the full attempted path (pathname+search+hash) from the redirect state —
+ *  pathname alone would drop a deep link's ?project=/?customer= and #msg-<id>. */
+function fromLocation(location: ReturnType<typeof useLocation>): string {
+  const from = (location.state as any)?.from;
+  if (!from?.pathname) return '/admin-sara';
+  return `${from.pathname}${from.search || ''}${from.hash || ''}`;
+}
+
 const AdminLogin = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,23 +41,25 @@ const AdminLogin = () => {
         if (loginTime) {
           const loginTimestamp = parseInt(loginTime);
           const now = Date.now();
-          const sessionDuration = 60 * 60 * 1000; // 1 hour
+          const sessionDuration = 30 * 24 * 60 * 60 * 1000; // 30 days — matches the refresh token's lifetime
           
           if (now - loginTimestamp <= sessionDuration) {
             // Session still valid, redirect to dashboard
-            const from = (location.state as any)?.from?.pathname || '/admin-sara';
+            const from = fromLocation(location);
             navigate(from, { replace: true });
             return;
           }
         }
         // Session expired or no login time
         localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminRefreshToken');
         localStorage.removeItem('adminUser');
         localStorage.removeItem('adminLoginTime');
         setIsChecking(false);
       } catch (error) {
         // Token is invalid, clear it
         localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminRefreshToken');
         localStorage.removeItem('adminUser');
         localStorage.removeItem('adminLoginTime');
         setIsChecking(false);
@@ -68,13 +78,15 @@ const AdminLogin = () => {
       console.log('[Admin Login] Attempting login with email:', email);
       const response = await adminAuthApi.login(email, password);
       localStorage.setItem('adminToken', response.token);
+      // 30-day refresh token — api.ts spends this to silently renew the 24h access token.
+      if (response.refreshToken) localStorage.setItem('adminRefreshToken', response.refreshToken);
       localStorage.setItem('adminUser', JSON.stringify(response.admin));
       localStorage.setItem('adminLoginTime', Date.now().toString());
       console.log('[Admin Login] Login successful, token saved, session started');
       toast.success('Login successful');
       
       // Redirect to the page they were trying to access, or dashboard
-      const from = (location.state as any)?.from?.pathname || '/admin-sara';
+      const from = fromLocation(location);
       navigate(from, { replace: true });
     } catch (error: any) {
       console.error('[Admin Login] Login failed:', error);

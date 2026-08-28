@@ -8,6 +8,7 @@ import { useAdminPresence } from '@/hooks/useAdminPresence';
 import PresenceDot from '@/components/admin/PresenceDot';
 
 type DesignMap = Record<number, Set<number>>;
+const PROJECT_PAGE_SIZE = 20;
 
 function designKey(projectId: number, designId: number) {
   return `${projectId}:${designId}`;
@@ -21,6 +22,7 @@ export default function PortalAdminAssignments() {
   const [partialDesigns, setPartialDesigns] = useState<DesignMap>({});
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [dirty, setDirty] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PROJECT_PAGE_SIZE);
   const onlineAdminIds = useAdminPresence();
 
   const { data: portalAdmins = [], isLoading: adminsLoading } = useQuery({
@@ -61,6 +63,9 @@ export default function PortalAdminAssignments() {
         (p.clientName || '').toLowerCase().includes(q),
     );
   }, [catalog, search]);
+
+  useEffect(() => { setVisibleCount(PROJECT_PAGE_SIZE); }, [search, adminId]);
+  const visibleCatalog = filteredCatalog.slice(0, visibleCount);
 
   const toggleFullProject = (projectId: number, on: boolean) => {
     setFullProjects((prev) => {
@@ -135,9 +140,9 @@ export default function PortalAdminAssignments() {
         </AdminBtn>
       }
     >
-      <div className="max-w-5xl mx-auto p-5 sm:p-8 space-y-6">
+      <div className="p-5 sm:p-8 space-y-6">
         <div
-          className="rounded-xl border p-4 text-[13px]"
+          className="rounded-2xl border p-4 text-[13px]"
           style={{ borderColor: 'var(--p-outline-variant)', background: 'rgba(0,103,106,0.06)' }}
         >
           <p className="font-semibold mb-1" style={{ color: 'var(--p-primary)' }}>How access works</p>
@@ -150,7 +155,7 @@ export default function PortalAdminAssignments() {
 
         <div className="grid sm:grid-cols-[320px_1fr] gap-5">
           <div
-            className="rounded-xl border p-3 space-y-2 h-fit"
+            className="rounded-2xl border p-3 space-y-2 h-fit"
             style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}
           >
             <div className="flex items-center justify-between px-1 pt-1">
@@ -225,7 +230,7 @@ export default function PortalAdminAssignments() {
           <div className="space-y-3">
             {!adminId ? (
               <div
-                className="rounded-xl border p-12 text-center text-[14px]"
+                className="rounded-2xl border p-12 text-center text-[14px]"
                 style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}
               >
                 Select a portal admin to manage their assignments.
@@ -234,13 +239,19 @@ export default function PortalAdminAssignments() {
               <div className="py-16 text-center text-[14px]" style={{ color: 'var(--p-on-surface-variant)' }}>Loading…</div>
             ) : filteredCatalog.length === 0 ? (
               <div
-                className="rounded-xl border p-12 text-center text-[14px]"
+                className="rounded-2xl border p-12 text-center text-[14px]"
                 style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}
               >
                 {search ? 'No projects match your search.' : 'No manufacturing projects yet.'}
               </div>
             ) : (
-              filteredCatalog.map((project) => {
+              <>
+              {filteredCatalog.length > PROJECT_PAGE_SIZE && (
+                <p className="text-[12px] px-1" style={{ color: 'var(--p-on-surface-variant)' }}>
+                  Showing {Math.min(visibleCount, filteredCatalog.length)} of {filteredCatalog.length} projects
+                </p>
+              )}
+              {visibleCatalog.map((project) => {
                 const isFull = fullProjects.has(project.projectId);
                 const designSet = partialDesigns[project.projectId] || new Set<number>();
                 const hasPartial = designSet.size > 0;
@@ -248,7 +259,7 @@ export default function PortalAdminAssignments() {
                 return (
                   <div
                     key={project.projectId}
-                    className="rounded-xl border overflow-hidden"
+                    className="rounded-2xl border overflow-hidden"
                     style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}
                   >
                     <div className="flex items-center gap-3 px-4 py-3">
@@ -321,7 +332,18 @@ export default function PortalAdminAssignments() {
                     )}
                   </div>
                 );
-              })
+              })}
+              {filteredCatalog.length > visibleCount && (
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((n) => n + PROJECT_PAGE_SIZE)}
+                  className="w-full py-2.5 rounded-lg border text-[13px] font-semibold"
+                  style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-primary)' }}
+                >
+                  Load {Math.min(PROJECT_PAGE_SIZE, filteredCatalog.length - visibleCount)} more
+                </button>
+              )}
+              </>
             )}
           </div>
         </div>

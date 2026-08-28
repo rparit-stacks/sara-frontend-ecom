@@ -41,22 +41,33 @@ export function parsePaymentCard(body?: string): ParsedPayment | null {
  */
 export default function PaymentCard({ data, paid, actionable }: { data: ParsedPayment; paid?: boolean; actionable?: boolean }) {
   return (
-    <div className="max-w-sm border rounded-xl overflow-hidden mb-1" style={{ borderColor: 'var(--p-outline-variant)' }}>
-      <div className="px-4 py-3 flex items-center gap-3" style={{ background: paid ? 'var(--p-secondary-container)' : 'var(--p-surface-container-low)' }}>
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--p-surface-container-lowest)' }}>
-          <Sym name={paid ? 'task_alt' : 'payments'} className="text-[20px]" style={{ color: 'var(--p-primary)' }} />
+    <div className="w-72 border rounded-2xl overflow-hidden mb-1 shadow-sm" style={{ borderColor: 'var(--p-outline-variant)' }}>
+      <div
+        className="px-4 py-4 flex items-center gap-3"
+        style={paid
+          ? { background: 'var(--p-secondary-container)' }
+          : { background: 'linear-gradient(135deg, var(--p-primary), var(--p-tertiary))' }}
+      >
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+          style={{ background: paid ? 'var(--p-surface-container-lowest)' : 'rgba(255,255,255,0.2)' }}
+        >
+          <Sym name={paid ? 'task_alt' : 'payments'} className="text-[22px]" style={{ color: paid ? 'var(--p-primary)' : '#fff' }} />
         </div>
         <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>
+          <p
+            className="text-[10px] font-bold uppercase tracking-wide"
+            style={{ color: paid ? 'var(--p-on-secondary-container)' : 'rgba(255,255,255,0.85)' }}
+          >
             {paid ? 'Payment received' : 'Payment requested'}
           </p>
-          <p className="font-display text-[18px] leading-tight">{data.amount}</p>
+          <p className="font-display text-[22px] leading-tight" style={{ color: paid ? 'var(--p-on-secondary-container)' : '#fff' }}>{data.amount}</p>
         </div>
       </div>
-      <div className="px-4 py-3">
+      <div className="px-4 py-3.5" style={{ background: 'var(--p-surface-container-lowest)' }}>
         <p className="text-[13px] mb-3 break-words" style={{ color: 'var(--p-on-surface)' }}>{data.title}</p>
         {paid ? (
-          <span className="inline-flex items-center gap-1 text-[13px] font-semibold" style={{ color: 'var(--p-primary)' }}>
+          <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: 'var(--p-primary)' }}>
             <Sym name="check_circle" className="text-[16px]" /> Paid
           </span>
         ) : actionable ? (
@@ -64,16 +75,16 @@ export default function PaymentCard({ data, paid, actionable }: { data: ParsedPa
             href={data.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold text-white"
+            className="flex items-center justify-center gap-1.5 w-full px-4 py-2.5 rounded-xl text-[13px] font-semibold text-white shadow-sm hover:brightness-110 transition-all"
             style={{ background: 'var(--p-primary)' }}
           >
             <Sym name="lock" className="text-[15px]" /> Pay securely
           </a>
         ) : (
-          <div className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>
+          <div className="flex items-center gap-2 text-[12px] px-3 py-2 rounded-lg" style={{ background: 'var(--p-surface-container-high)', color: 'var(--p-on-surface-variant)' }}>
             <Sym name="hourglass_top" className="text-[15px]" /> Awaiting client payment
             {data.url ? (
-              <a href={data.url} target="_blank" rel="noreferrer" className="ml-auto underline" style={{ color: 'var(--p-primary)' }}>Open link</a>
+              <a href={data.url} target="_blank" rel="noreferrer" className="ml-auto font-semibold underline" style={{ color: 'var(--p-primary)' }}>Open link</a>
             ) : null}
           </div>
         )}

@@ -5,6 +5,7 @@ import EmojiPicker from './EmojiPicker';
 import ProductPickerModal, { type ProductPickerItem } from './ProductPickerModal';
 import FilePreviewModal from './FilePreviewModal';
 import { buildProductMarker } from './ProductCard';
+import { buildFileTagMarker, type EntityTagType } from './EntityTagCard';
 import { ANNOUNCEMENT_CATEGORIES } from '@/lib/portalChatConstants';
 import { applyFormat, handleListEnter, readFormatState, wrapSelectionInCode, type FormatState } from '@/lib/richEditor';
 import { handleInlineAutoFormat, handleListShortcut, handleAutoLink } from '@/lib/autoFormat';
@@ -17,6 +18,24 @@ export interface Attachment {
   url: string;
   file?: File;
 }
+
+/** One @-mention search result — pre-flattened by the caller (who owns the actual API
+ *  calls per entity type) so Composer stays entity-agnostic: it just renders label/sublabel/
+ *  icon-by-type and inserts `marker` verbatim as the chip's underlying [[type:...]] text. */
+export interface MentionResult {
+  type: EntityTagType;
+  marker: string;
+  label: string;
+  sublabel?: string;
+}
+
+const MENTION_ICON: Record<EntityTagType, string> = {
+  project: 'folder',
+  design: 'palette',
+  invoice: 'receipt_long',
+  quote: 'request_quote',
+  file: 'attach_file',
+};
 
 let uid = 0;
 const fmtSize = (bytes: number) => (bytes > 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
@@ -43,6 +62,9 @@ export default function Composer({
   showProductAttach = false,
   showAnnouncementCategory = false,
   showAskSara = false,
+  onRequestPayment,
+  onSearchMentions,
+  onPickFileTag,
   onSend,
 }: {
   placeholder: string;
@@ -51,6 +73,17 @@ export default function Composer({
   showAnnouncementCategory?: boolean;
   /** Feature 3 — insert `@sara ` so the customer can ask Portal AI in-channel. */
   showAskSara?: boolean;
+  /** When provided, "/payment" is offered in the slash-command menu — opens the caller's own
+   *  Request Payment flow (amount/label/description), same as its dedicated header button. */
+  onRequestPayment?: () => void;
+  /** When provided, typing "@" opens an entity-mention search box (scoped to whatever the
+   *  caller wants to allow — the caller owns the actual API calls and picks which entity
+   *  types to search, e.g. project+design+invoice+quote in parallel). */
+  onSearchMentions?: (q: string) => Promise<MentionResult[]>;
+  /** When provided, the @-mention dropdown offers a "Files" row that calls this to let the
+   *  user browse/pick an already-uploaded file (files have no text-searchable metadata, so
+   *  they're tagged via a picker instead of live search). Resolve null if the user cancels. */
+  onPickFileTag?: () => Promise<{ url: string; name: string } | null>;
   onSend: (text: string, attachments: Attachment[], opts?: { announcementCategory?: string }) => void | Promise<void>;
 }) {
   const [atts, setAtts] = useState<Attachment[]>([]);
@@ -58,12 +91,19 @@ export default function Composer({
   const [uploadLabel, setUploadLabel] = useState('');
   const [empty, setEmpty] = useState(true);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [slashMenuOpen, setSlashMenuOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductPickerItem | null>(null);
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [announcementCategory, setAnnouncementCategory] = useState(ANNOUNCEMENT_CATEGORIES[0].key);
   const [fmt, setFmt] = useState<FormatState>({ bold: false, italic: false, underline: false, unorderedList: false, orderedList: false });
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionResults, setMentionResults] = useState<MentionResult[]>([]);
+  const [mentionLoading, setMentionLoading] = useState(false);
+  const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
+  const mentionRangeRef = useRef<Range | null>(null);
+  const mentionSeqRef = useRef(0);
   const editorRef = useRef<HTMLDivElement>(null);
   const emojiBtnRef = useRef<HTMLButtonElement>(null);
   const imgInput = useRef<HTMLInputElement>(null);
@@ -197,22 +237,62 @@ export default function Composer({
     setEmpty(true);
     setAtts([]);
     setSelectedProduct(null);
+    setMentionQuery(null);
+    mentionRangeRef.current = null;
+    // Always mark sending — not just when uploading attachments. A text-only send can still
+    // take a while (e.g. an AI auto-reply turn) with nothing else disabling the button in the
+    // meantime, which previously let a fast double-Enter/double-click submit the same message twice.
+    setSending(true);
     if (hasAttachments) {
-      setSending(true);
       setUploadLabel(outgoing.some((a) => a.kind === 'image') ? 'Uploading image…' : 'Uploading file…');
     }
     try {
       await onSend(payload, outgoing, showAnnouncementCategory ? { announcementCategory } : undefined);
     } finally {
       outgoing.forEach((a) => URL.revokeObjectURL(a.url));
-      if (hasAttachments) { setSending(false); setUploadLabel(''); }
+      setSending(false);
+      if (hasAttachments) setUploadLabel('');
     }
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if (mentionQuery != null && mentionResults.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionActiveIndex((i) => (i + 1) % mentionResults.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionActiveIndex((i) => (i - 1 + mentionResults.length) % mentionResults.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertMention(mentionResults[mentionActiveIndex]);
+        return;
+      }
+    }
+    if (mentionQuery != null && e.key === 'Escape') {
+      e.preventDefault();
+      setMentionQuery(null);
+      return;
+    }
+    if (slashMenuOpen && e.key === 'Escape') {
+      e.preventDefault();
+      setSlashMenuOpen(false);
+      return;
+    }
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       submit();
+      return;
+    }
+    if (slashMenuOpen && e.key === 'Enter') {
+      // Bare "/" + Enter runs the only/first available command rather than sending "/" as a message.
+      e.preventDefault();
+      if (showProductAttach) runSlashCommand('product');
+      else if (onRequestPayment) runSlashCommand('payment');
       return;
     }
     // Slack/WhatsApp-style: "- " / "* " / "1. " + Space starts a list.
@@ -232,11 +312,119 @@ export default function Composer({
     }
   };
 
+  const detectMention = useCallback(() => {
+    if (!onSearchMentions && !onPickFileTag) return;
+    const editor = editorRef.current;
+    const sel = window.getSelection();
+    if (!editor || !sel || sel.rangeCount === 0 || !sel.isCollapsed) {
+      setMentionQuery(null);
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE || !editor.contains(node)) {
+      setMentionQuery(null);
+      return;
+    }
+    const textBefore = (node.textContent || '').slice(0, range.startOffset);
+    const match = textBefore.match(/(?:^|\s)@([\w-]*)$/);
+    if (!match) {
+      setMentionQuery(null);
+      return;
+    }
+    const markerRange = range.cloneRange();
+    markerRange.setStart(node, textBefore.length - match[1].length - 1);
+    mentionRangeRef.current = markerRange;
+    setMentionQuery(match[1]);
+    setMentionActiveIndex(0);
+  }, [onSearchMentions, onPickFileTag]);
+
+  useEffect(() => {
+    if (mentionQuery == null || !onSearchMentions) {
+      setMentionResults([]);
+      return;
+    }
+    const seq = ++mentionSeqRef.current;
+    if (!mentionQuery.trim()) {
+      setMentionResults([]);
+      setMentionLoading(false);
+      return;
+    }
+    setMentionLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await onSearchMentions(mentionQuery);
+        if (mentionSeqRef.current === seq) {
+          setMentionResults(results);
+          setMentionLoading(false);
+        }
+      } catch {
+        if (mentionSeqRef.current === seq) setMentionLoading(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [mentionQuery, onSearchMentions]);
+
+  /** Inserts a non-editable chip span at the saved mention range — its underlying
+   *  [[type:...]] marker text is read back out by htmlToMarkdown at submit time. */
+  const insertMentionMarker = (marker: string, label: string) => {
+    const editor = editorRef.current;
+    const range = mentionRangeRef.current;
+    if (!editor || !range) return;
+    range.deleteContents();
+    const span = document.createElement('span');
+    span.setAttribute('data-project-marker', encodeURIComponent(marker));
+    span.contentEditable = 'false';
+    span.className = 'project-tag-chip';
+    span.style.cssText = 'display:inline-flex;align-items:center;padding:1px 6px;border-radius:6px;font-weight:600;font-size:13px;background:rgba(0,103,106,0.14);color:var(--p-primary);';
+    span.textContent = label;
+    range.insertNode(span);
+    const spaceNode = document.createTextNode(' ');
+    span.after(spaceNode);
+    editor.focus();
+    const newRange = document.createRange();
+    newRange.setStartAfter(spaceNode);
+    newRange.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(newRange);
+    setMentionQuery(null);
+    mentionRangeRef.current = null;
+    syncEmpty();
+    syncFmt();
+  };
+
+  const insertMention = (r: MentionResult) => {
+    insertMentionMarker(r.marker, r.label);
+  };
+
+  const pickFileTag = async () => {
+    if (!onPickFileTag) return;
+    const picked = await onPickFileTag();
+    if (picked) insertMentionMarker(buildFileTagMarker(picked), picked.name);
+  };
+
   const onInput = () => {
     // Inline markdown (**bold**, *italic*, `code`) formats the moment the closing char lands.
     handleInlineAutoFormat(editorRef.current);
     syncEmpty();
     syncFmt();
+    // Slack-style slash command: bare "/" as the entire message opens the menu.
+    setSlashMenuOpen((editorRef.current?.textContent || '') === '/');
+    detectMention();
+  };
+
+  const clearEditor = () => {
+    if (editorRef.current) editorRef.current.innerHTML = '';
+    syncEmpty();
+  };
+
+  const runSlashCommand = (cmd: 'product' | 'payment') => {
+    setSlashMenuOpen(false);
+    clearEditor();
+    focusEditor();
+    if (cmd === 'product') setProductOpen(true);
+    else onRequestPayment?.();
   };
 
   const toolbar = (
@@ -264,7 +452,7 @@ export default function Composer({
 
   return (
     <div
-      className={`border rounded-xl slack-input-shadow focus-within:ring-2 focus-within:ring-offset-0 transition-all relative ${sending ? 'opacity-90' : ''} ${dragOver ? 'ring-2' : ''}`}
+      className={`border rounded-xl slack-input-shadow focus-within:ring-2 focus-within:ring-offset-0 transition-all relative ${sending && uploadLabel ? 'opacity-90' : ''} ${dragOver ? 'ring-2' : ''}`}
       style={{ borderColor: dragOver ? 'var(--p-primary)' : 'var(--p-outline)', background: 'var(--p-surface-container-lowest)', ['--tw-ring-color' as string]: 'rgba(0,103,106,0.25)' }}
       onDragOver={(e) => { if (!sending && e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); setDragOver(true); } }}
       onDragLeave={(e) => { if (e.currentTarget === e.target) setDragOver(false); }}
@@ -276,6 +464,108 @@ export default function Composer({
             <Sym name="upload_file" className="text-[18px]" />Drop to attach
           </div>
         </div>
+      )}
+      {mentionQuery != null && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setMentionQuery(null)} />
+          <div
+            className="absolute left-2 bottom-full mb-1.5 w-72 border rounded-xl shadow-xl z-40 overflow-hidden animate-in fade-in duration-150 max-h-64 overflow-y-auto"
+            style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
+          >
+            <p className="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wide sticky top-0 flex items-center gap-1" style={{ color: 'var(--p-on-surface-variant)', background: 'var(--p-surface-container-lowest)' }}>
+              <Sym name="alternate_email" className="text-[12px]" /> Tag something
+            </p>
+            {onPickFileTag && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={pickFileTag}
+                className="w-full text-left px-3 py-2.5 flex items-center gap-3 border-b"
+                style={{ borderColor: 'var(--p-outline-variant)' }}
+              >
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--p-surface-container-high)' }}>
+                  <Sym name="attach_file" className="text-[17px]" style={{ color: 'var(--p-primary)' }} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold">Files…</p>
+                  <p className="text-[11px] truncate" style={{ color: 'var(--p-on-surface-variant)' }}>Browse and tag an uploaded file</p>
+                </div>
+              </button>
+            )}
+            {!mentionQuery.trim() ? (
+              onSearchMentions && (
+                <div className="px-3 py-3 text-[13px]" style={{ color: 'var(--p-on-surface-variant)' }}>Type a name to search projects, designs, invoices, quotes…</div>
+              )
+            ) : mentionLoading ? (
+              <div className="px-3 py-3 flex items-center gap-2 text-[13px]" style={{ color: 'var(--p-on-surface-variant)' }}>
+                <Sym name="progress_activity" className="text-[16px] animate-spin" /> Searching…
+              </div>
+            ) : mentionResults.length === 0 ? (
+              <div className="px-3 py-3 text-[13px]" style={{ color: 'var(--p-on-surface-variant)' }}>No matches</div>
+            ) : (
+              mentionResults.map((r, i) => (
+                <button
+                  key={`${r.type}-${r.marker}`}
+                  type="button"
+                  onMouseEnter={() => setMentionActiveIndex(i)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => insertMention(r)}
+                  className="w-full text-left px-3 py-2.5 flex items-center gap-3"
+                  style={i === mentionActiveIndex ? { background: 'rgba(0,103,106,0.08)' } : undefined}
+                >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--p-surface-container-high)' }}>
+                    <Sym name={MENTION_ICON[r.type]} className="text-[17px]" style={{ color: 'var(--p-primary)' }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold truncate">{r.label}</p>
+                    <p className="text-[11px] truncate" style={{ color: 'var(--p-on-surface-variant)' }}>{r.type}{r.sublabel ? ` · ${r.sublabel}` : ''}</p>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </>
+      )}
+      {slashMenuOpen && (showProductAttach || onRequestPayment) && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setSlashMenuOpen(false)} />
+          <div
+            className="absolute left-2 bottom-full mb-1.5 w-64 border rounded-xl shadow-xl z-40 overflow-hidden animate-in fade-in duration-150"
+            style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
+          >
+            <p className="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>Commands</p>
+            {showProductAttach && (
+              <button
+                type="button"
+                onClick={() => runSlashCommand('product')}
+                className="w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-black/5"
+              >
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--p-surface-container-high)' }}>
+                  <Sym name="shopping_bag" className="text-[17px]" style={{ color: 'var(--p-primary)' }} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold">/product</p>
+                  <p className="text-[11px] truncate" style={{ color: 'var(--p-on-surface-variant)' }}>Attach a product to this message</p>
+                </div>
+              </button>
+            )}
+            {onRequestPayment && (
+              <button
+                type="button"
+                onClick={() => runSlashCommand('payment')}
+                className="w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-black/5"
+              >
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--p-surface-container-high)' }}>
+                  <Sym name="payments" className="text-[17px]" style={{ color: 'var(--p-primary)' }} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold">/payment</p>
+                  <p className="text-[11px] truncate" style={{ color: 'var(--p-on-surface-variant)' }}>Request a payment from the client</p>
+                </div>
+              </button>
+            )}
+          </div>
+        </>
       )}
       {toolbar}
       {showAnnouncementCategory && (
@@ -293,7 +583,11 @@ export default function Composer({
           </select>
         </div>
       )}
-      {sending && (
+      {/* Upload banner — gated on uploadLabel, not on `sending`. `sending` is now also true for
+          a plain text send (it guards against double-submit), and showing a "cloud upload"
+          banner with an empty label for every text message was wrong. Text sends get their
+          feedback from the send button's spinner instead. */}
+      {sending && uploadLabel && (
         <div className="px-3 py-2 flex items-center gap-2 text-[12px] font-semibold border-b animate-pulse" style={{ background: 'rgba(0,103,106,0.08)', borderColor: 'var(--p-outline-variant)', color: 'var(--p-primary)' }}>
           <Sym name="cloud_upload" className="text-[16px]" />{uploadLabel}
         </div>

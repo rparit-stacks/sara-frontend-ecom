@@ -1,19 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Sym } from './Sym';
-import type { ProjectMessageDto } from '@/lib/api';
 import { stripMessageMarkers } from '@/lib/messageFormat';
 import { highlightText } from '@/lib/highlightText';
 
-export default function ChatSearchBar({
+/** Structural minimum this bar needs — satisfied by both ProjectMessageDto and CustomerMessageDto. */
+export interface SearchableMessage {
+  id: number;
+  authorName?: string;
+  body?: string;
+  designId?: number | null;
+}
+
+export default function ChatSearchBar<T extends SearchableMessage>({
   onSearch,
   onJumpTo,
 }: {
-  onSearch: (q: string) => Promise<ProjectMessageDto[]>;
+  onSearch: (q: string) => Promise<T[]>;
   onJumpTo: (messageId: number, designId?: number | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
-  const [results, setResults] = useState<ProjectMessageDto[]>([]);
+  const [results, setResults] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {

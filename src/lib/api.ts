@@ -29,8 +29,63 @@ const setGlobalLoading = (loading: boolean, message?: string) => {
   loadingCallbacks.forEach(cb => cb(loading, message));
 };
 
+// ---- Silent token refresh -------------------------------------------------
+// Access tokens live 24h, refresh tokens 30 days. On a 401 we spend the refresh token once to
+// get a new access token and replay the original request, so a session survives a month without
+// the user (or admin, who used to get dropped after an hour) ever seeing a login screen.
+//
+// In-flight promises are shared per side: a page that fires five requests at once gets five
+// 401s, and without this each would burn its own refresh — the last four racing against an
+// already-rotated token and logging the user out.
+let userRefreshInFlight: Promise<string | null> | null = null;
+let adminRefreshInFlight: Promise<string | null> | null = null;
+
+async function refreshAccessToken(isAdminRoute: boolean): Promise<string | null> {
+  const storageKey = isAdminRoute ? 'adminToken' : 'authToken';
+  const refreshKey = isAdminRoute ? 'adminRefreshToken' : 'refreshToken';
+  const endpoint = isAdminRoute ? '/api/admin/auth/refresh' : '/api/auth/refresh';
+
+  const refreshToken = localStorage.getItem(refreshKey);
+  if (!refreshToken) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!response.ok) {
+      // Refresh token itself is expired/revoked — nothing left to try.
+      localStorage.removeItem(refreshKey);
+      return null;
+    }
+    const data = await response.json();
+    if (!data?.token) return null;
+    localStorage.setItem(storageKey, data.token);
+    // The server rotates the refresh token on every use; store the new one or the next
+    // refresh would present a stale token.
+    if (data.refreshToken) localStorage.setItem(refreshKey, data.refreshToken);
+    return data.token as string;
+  } catch {
+    return null;
+  }
+}
+
+function refreshAccessTokenShared(isAdminRoute: boolean): Promise<string | null> {
+  if (isAdminRoute) {
+    adminRefreshInFlight = adminRefreshInFlight ?? refreshAccessToken(true).finally(() => {
+      adminRefreshInFlight = null;
+    });
+    return adminRefreshInFlight;
+  }
+  userRefreshInFlight = userRefreshInFlight ?? refreshAccessToken(false).finally(() => {
+    userRefreshInFlight = null;
+  });
+  return userRefreshInFlight;
+}
+
 // Helper function for API calls
-async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+async function fetchApi<T>(endpoint: string, options?: RequestInit, isRetryAfterRefresh = false): Promise<T> {
   // Check if it's an admin route – use adminToken ONLY for admin routes
   const isAdminRoute = endpoint.startsWith('/api/admin');
   const adminToken = localStorage.getItem('adminToken');
@@ -113,10 +168,20 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
         setGlobalLoading(false);
       }
       
-      // For 401 errors: if this was a user token, clear session and dispatch so app redirects to login
+      // For 401 errors: try one silent refresh + replay before treating the session as dead.
+      // Guarded by isRetryAfterRefresh so a still-401 replay can't loop.
+      if (response.status === 401 && !isRetryAfterRefresh && token) {
+        const newToken = await refreshAccessTokenShared(isAdminRoute);
+        if (newToken) {
+          if (shouldShowLoading) setGlobalLoading(false);
+          return fetchApi<T>(endpoint, options, true);
+        }
+      }
+
       if (response.status === 401) {
         const usedUserToken = !isAdminRoute && !!authToken && token === authToken;
         if (usedUserToken) {
+          localStorage.removeItem('refreshToken');
           localStorage.removeItem('authToken');
           localStorage.removeItem('authEmail');
           window.dispatchEvent(new CustomEvent('auth:sessionInvalid', { detail: { reason: 'user_not_found_or_unauth' } }));
@@ -697,9 +762,6 @@ export interface PortalAdminSettings {
   projectCodePrefix: string;
   defaultCurrency: string;
   autoGenerateProjectCodes: boolean;
-  notifyNewInquiries: boolean;
-  notifyClientApprovals: boolean;
-  notifyPaymentsReceived: boolean;
 }
 
 export interface ManufacturingQuoteDto {
@@ -714,10 +776,60 @@ export interface ManufacturingQuoteDto {
   total: number;
   status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'DECLINED';
   isTemplate?: boolean;
+  /** True for exactly one quote per inquiry — the Live quotation; others are history. */
+  active?: boolean;
   pdfUrl?: string;
   doc: Record<string, unknown> | null;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/** Real-time financial overview for a project: live quotation (reference only) + invoices. */
+export interface FinancialOverviewDto {
+  projectCode: string;
+  status: string | null;
+  liveQuotation: {
+    id: number;
+    reference: string;
+    title: string;
+    total: number;
+    currency: string;
+    status: string;
+    createdAt?: string;
+  } | null;
+  quotationHistory: {
+    id: number;
+    reference: string;
+    title: string;
+    total: number;
+    currency: string;
+    status: string;
+    createdAt?: string;
+  }[];
+  invoices: {
+    id: number;
+    reference: string;
+    title: string;
+    amount: number;
+    currency: string;
+    status: string;
+    quoteReference?: string;
+    paymentLinkCode?: string;
+    createdAt?: string;
+  }[];
+  totalCollected: number;
+  currency: string;
+  paymentHistory: {
+    id: number;
+    linkCode?: string;
+    amount: number;
+    currency: string;
+    status: string;
+    payerName?: string;
+    payerEmail?: string;
+    paidAt?: string;
+    createdAt?: string;
+  }[];
 }
 
 export interface ManufacturingQuoteSaveRequest {
@@ -1579,13 +1691,6 @@ export const adminManagementApi = {
     fetchApi<any>(`/api/admin/admins/invite/${token}`),
   acceptInvite: (data: { token: string; name: string; password: string; confirmPassword: string }) =>
     fetchApi<any>('/api/admin/admins/invite/accept', { method: 'POST', body: JSON.stringify(data) }),
-  getProjectAssignments: (adminId: number) =>
-    fetchApi<{ projectIds: number[] }>(`/api/admin/admins/${adminId}/project-assignments`),
-  setProjectAssignments: (adminId: number, projectIds: number[]) =>
-    fetchApi<{ projectIds: number[] }>(`/api/admin/admins/${adminId}/project-assignments`, {
-      method: 'PUT',
-      body: JSON.stringify({ projectIds }),
-    }),
 };
 
 // ===============================
@@ -1809,6 +1914,13 @@ export const paymentApi = {
 // ===============================
 export type PaymentLinkMode = 'OPEN' | 'FIXED' | 'CLIENT' | 'QUOTE';
 
+export interface PaymentLinkItem {
+  id: string;
+  description: string;
+  qty: number;
+  rate: number;
+}
+
 export interface PaymentLinkDto {
   id: number;
   code: string;
@@ -1818,8 +1930,11 @@ export interface PaymentLinkDto {
   currency: string;
   clientEmail?: string;
   clientName?: string;
+  clientPhone?: string;
   quoteReference?: string;
+  projectCode?: string;
   note?: string;
+  itemsJson?: string;
   active: boolean;
   createdAt?: string;
 }
@@ -1853,7 +1968,23 @@ export interface ResolvedPayTarget {
   amountEditable?: boolean;
   clientEmail?: string;
   clientName?: string;
+  clientPhone?: string;
   clientAddress?: string;
+  itemsJson?: string;
+  projectCode?: string;
+  /** The linked project's CURRENT live quotation — reference only, never the amount charged. */
+  liveQuote?: {
+    reference: string;
+    title?: string;
+    total?: number;
+    currency?: string;
+    pdfUrl?: string;
+    items?: PayLineItem[];
+    subtotal?: number;
+    discount?: number;
+    gstPercent?: number;
+    gstAmount?: number;
+  };
   quoteReference?: string;
   quoteTitle?: string;
   companyName?: string;
@@ -1877,6 +2008,13 @@ export interface ResolvedPayTarget {
 // ===============================
 // Manufacturing Projects API (Admin)
 // ===============================
+export interface MessageReactionSummaryDto {
+  emoji: string;
+  count: number;
+  readerNames?: string[];
+  reactedByMe: boolean;
+}
+
 export interface ProjectMessageDto {
   id: number;
   projectId: number;
@@ -1887,8 +2025,11 @@ export interface ProjectMessageDto {
   authorName?: string;
   body?: string;
   attachmentUrl?: string;
+  attachmentUrls?: string[];
   announcementCategory?: string;
+  aiGenerated?: boolean;
   createdAt?: string;
+  reactions?: MessageReactionSummaryDto[];
 }
 
 export interface ProjectThreadSummaryDto {
@@ -1908,6 +2049,13 @@ export interface ProjectThreadSummaryDto {
 
 export type WorkspaceView = 'channels' | 'threads' | 'quotation' | 'brief' | 'invoices' | 'files';
 
+export interface GlobalNotificationPreferenceDto {
+  eventKey: string;
+  label: string;
+  description: string;
+  enabled: boolean;
+}
+
 export interface ProjectDesignDto {
   id: number;
   projectId: number;
@@ -1920,6 +2068,10 @@ export interface ProjectDesignDto {
   stage?: string;
   createdAt?: string;
   unreadCount?: number;
+  /** Private WhatsApp-style label — only ever populated on the side that owns it: admins
+   *  see adminTag, clients see clientTag, never both on the same response. */
+  adminTag?: string | null;
+  clientTag?: string | null;
 }
 
 export interface ManufacturingProjectDto {
@@ -1931,6 +2083,7 @@ export interface ManufacturingProjectDto {
   brand?: string;
   clientName?: string;
   clientEmail?: string;
+  source?: string; // INQUIRY_FORM | CUSTOM_DESIGN
   currentStage: string;
   currentStatus: string;
   progressPercent: number;
@@ -1941,6 +2094,9 @@ export interface ManufacturingProjectDto {
   assignedAgentName?: string;
   assignedAgentEmail?: string;
   assignedAgents?: { adminId: number; name: string; email: string }[];
+  /** Private WhatsApp-style label — only ever populated on the side that owns it. */
+  adminTag?: string | null;
+  clientTag?: string | null;
 }
 
 export interface ManufacturingProjectDetailDto extends ManufacturingProjectDto {
@@ -1972,11 +2128,43 @@ export const projectApi = {
   },
   listPortalAdmins: () =>
     fetchApi<{ adminId: number; name: string; email: string }[]>('/api/admin/manufacturing/projects/portal-admins'),
-  bulkAssign: (adminId: number, projectIds: number[]) =>
-    fetchApi<{ projectIds: number[] }>('/api/admin/manufacturing/projects/bulk-assign', {
-      method: 'POST',
-      body: JSON.stringify({ adminId, projectIds }),
+  searchForTag: (q: string, customerEmail: string) =>
+    fetchApi<ProjectTagSuggestionDto[]>(
+      `/api/admin/manufacturing/projects/search?q=${encodeURIComponent(q)}&customerEmail=${encodeURIComponent(customerEmail)}`,
+    ),
+  searchDesignsForTag: (q: string, customerEmail: string) =>
+    fetchApi<DesignTagSuggestionDto[]>(
+      `/api/admin/manufacturing/projects/designs/search?q=${encodeURIComponent(q)}&customerEmail=${encodeURIComponent(customerEmail)}`,
+    ),
+  searchInvoicesForTag: (q: string, customerEmail: string) =>
+    fetchApi<InvoiceTagSuggestionDto[]>(
+      `/api/admin/manufacturing/projects/invoices/search?q=${encodeURIComponent(q)}&customerEmail=${encodeURIComponent(customerEmail)}`,
+    ),
+  searchQuotesForTag: (q: string, customerEmail: string) =>
+    fetchApi<QuoteTagSuggestionDto[]>(
+      `/api/admin/manufacturing/projects/quotes/search?q=${encodeURIComponent(q)}&customerEmail=${encodeURIComponent(customerEmail)}`,
+    ),
+  /** Private WhatsApp-style label — shared across all admins, invisible to the client.
+   *  Pass an empty/blank tag to clear it. */
+  setTag: (code: string, tag: string) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/tag`, {
+      method: 'PATCH',
+      body: JSON.stringify({ tag }),
     }),
+  setDesignTag: (code: string, designId: number, tag: string) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/designs/${designId}/tag`, {
+      method: 'PATCH',
+      body: JSON.stringify({ tag }),
+    }),
+  setCustomerTag: (customerEmail: string, tag: string) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/projects/customer-tag/${encodeURIComponent(customerEmail)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ tag }),
+    }),
+  getCustomerTags: (customerEmails: string[]) =>
+    fetchApi<Record<string, string>>(
+      `/api/admin/manufacturing/projects/customer-tags?emails=${encodeURIComponent(customerEmails.join(','))}`,
+    ),
   getByCode: (code: string, designId?: number, opts?: { includeMessages?: boolean; includeFinancials?: boolean }) => {
     const p = new URLSearchParams();
     if (designId != null) p.set('designId', String(designId));
@@ -1997,8 +2185,14 @@ export const projectApi = {
     fetchApi<ProjectMessageDto[]>(
       `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/messages/search?q=${encodeURIComponent(q)}`,
     ),
+  getMessage: (code: string, messageId: number) =>
+    fetchApi<ProjectMessageDto>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/messages/${messageId}`),
   listAttachments: (code: string) =>
     fetchApi<ProjectMessageDto[]>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/attachments`),
+  getFinancialOverview: (code: string) =>
+    fetchApi<FinancialOverviewDto>(
+      `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/financial-overview`,
+    ),
   getQuote: (code: string, quoteId: number) =>
     fetchApi<ManufacturingQuoteDto>(
       `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/quotes/${quoteId}`,
@@ -2044,13 +2238,13 @@ export const projectApi = {
   postMessage: (
     code: string,
     body: string,
-    opts?: { attachmentUrl?: string; authorName?: string; designId?: number; parentMessageId?: number; announcementCategory?: string },
+    opts?: { attachmentUrls?: string[]; authorName?: string; designId?: number; parentMessageId?: number; announcementCategory?: string },
   ) =>
     fetchApi<ProjectMessageDto>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/messages`, {
       method: 'POST',
       body: JSON.stringify({
         body,
-        ...(opts?.attachmentUrl != null ? { attachmentUrl: opts.attachmentUrl } : {}),
+        ...(opts?.attachmentUrls != null ? { attachmentUrls: opts.attachmentUrls } : {}),
         ...(opts?.authorName != null ? { authorName: opts.authorName } : {}),
         ...(opts?.designId != null ? { designId: opts.designId } : {}),
         ...(opts?.parentMessageId != null ? { parentMessageId: opts.parentMessageId } : {}),
@@ -2061,6 +2255,28 @@ export const projectApi = {
     fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/messages/${messageId}`, {
       method: 'DELETE',
     }),
+  toggleReaction: (code: string, messageId: number, emoji: string) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/messages/${messageId}/reaction`, {
+      method: 'PUT',
+      body: JSON.stringify({ emoji }),
+    }),
+  /** Manufacturing Admin AI auto-reply status/controls for one design channel (omit designId
+   *  for the project's own General/system-adjacent channel). Default is active — no admin has
+   *  taken over yet. */
+  aiStatus: (code: string, designId?: number) =>
+    fetchApi<{ aiActive: boolean }>(
+      `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/ai-status${designId != null ? `?designId=${designId}` : ''}`,
+    ),
+  stopAi: (code: string, designId?: number) =>
+    fetchApi<{ ok: boolean }>(
+      `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/ai-stop${designId != null ? `?designId=${designId}` : ''}`,
+      { method: 'POST' },
+    ),
+  resumeAi: (code: string, designId?: number) =>
+    fetchApi<{ ok: boolean }>(
+      `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/ai-resume${designId != null ? `?designId=${designId}` : ''}`,
+      { method: 'POST' },
+    ),
   requestPayment: (code: string, amount: number, opts?: { currency?: string; label?: string; description?: string }) =>
     fetchApi<ProjectMessageDto>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/request-payment`, {
       method: 'POST',
@@ -2084,6 +2300,143 @@ export const projectApi = {
       `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/ai-handovers/${id}/close`,
       { method: 'POST' },
     ),
+};
+
+/** Platform-wide notification settings — one switch per event, applying to every project.
+ *  This is the CLIENT-facing set (whether clients get notified). */
+export const notificationSettingsApi = {
+  list: () =>
+    fetchApi<GlobalNotificationPreferenceDto[]>('/api/admin/manufacturing/notification-settings'),
+  setPreference: (eventKey: string, enabled: boolean) =>
+    fetchApi<{ ok: boolean }>(
+      `/api/admin/manufacturing/notification-settings/${encodeURIComponent(eventKey)}`,
+      { method: 'PATCH', body: JSON.stringify({ enabled }) },
+    ),
+};
+
+/** ADMIN-facing counterpart of notificationSettingsApi — whether STAFF get notified
+ *  (handover requests, quotation requests, client message digests). Same shared/org-wide
+ *  model, same shape, different audience/endpoint. */
+export const adminNotificationSettingsApi = {
+  list: () =>
+    fetchApi<GlobalNotificationPreferenceDto[]>('/api/admin/manufacturing/admin-notification-settings'),
+  setPreference: (eventKey: string, enabled: boolean) =>
+    fetchApi<{ ok: boolean }>(
+      `/api/admin/manufacturing/admin-notification-settings/${encodeURIComponent(eventKey)}`,
+      { method: 'PATCH', body: JSON.stringify({ enabled }) },
+    ),
+};
+
+/** A logged-in CLIENT's own notification preferences — per-client (one client toggling an
+ *  event off affects only them), unlike notificationSettingsApi/adminNotificationSettingsApi
+ *  above, which are both shared/org-wide for their respective audience. */
+export const clientNotificationSettingsApi = {
+  list: () =>
+    fetchApi<GlobalNotificationPreferenceDto[]>('/api/portal/notification-settings'),
+  setPreference: (eventKey: string, enabled: boolean) =>
+    fetchApi<{ ok: boolean }>(
+      `/api/portal/notification-settings/${encodeURIComponent(eventKey)}`,
+      { method: 'PATCH', body: JSON.stringify({ enabled }) },
+    ),
+};
+
+export interface CustomerMessageDto {
+  id: number;
+  customerEmail: string;
+  authorType: 'ADMIN' | 'CLIENT' | 'SYSTEM';
+  authorName?: string;
+  body?: string;
+  attachmentUrl?: string;
+  attachmentUrls?: string[];
+  parentMessageId?: number | null;
+  replyCount?: number;
+  aiGenerated?: boolean;
+  createdAt?: string;
+  reactions?: MessageReactionSummaryDto[];
+}
+
+export interface CustomerThreadSummaryDto {
+  messageId: number;
+  rootAuthorName?: string;
+  rootAuthorType: string;
+  snippet: string;
+  replyCount: number;
+  lastReplyBy?: string;
+  lastReplyAuthorType?: string;
+  lastReplyAt?: string;
+  createdAt?: string;
+  unread: boolean;
+}
+
+/** Admin side of the customer-level General Chat — scoped by {customerEmail} path segment. */
+export const adminCustomerChatApi = {
+  listMessages: (customerEmail: string) =>
+    fetchApi<CustomerMessageDto[]>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/messages`),
+  postMessage: (customerEmail: string, body: string, opts?: { attachmentUrls?: string[]; parentMessageId?: number }) =>
+    fetchApi<CustomerMessageDto>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ body, attachmentUrls: opts?.attachmentUrls, parentMessageId: opts?.parentMessageId }),
+    }),
+  deleteMessage: (customerEmail: string, messageId: number) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/messages/${messageId}`, {
+      method: 'DELETE',
+    }),
+  toggleReaction: (customerEmail: string, messageId: number, emoji: string) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/messages/${messageId}/reaction`, {
+      method: 'PUT',
+      body: JSON.stringify({ emoji }),
+    }),
+  /** Manufacturing Admin AI auto-reply status/controls for this customer's General Chat.
+   *  Default is active — no admin has taken over yet. */
+  aiStatus: (customerEmail: string) =>
+    fetchApi<{ aiActive: boolean }>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/ai-status`),
+  stopAi: (customerEmail: string) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/ai-stop`, {
+      method: 'POST',
+    }),
+  resumeAi: (customerEmail: string) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/ai-resume`, {
+      method: 'POST',
+    }),
+  searchMessages: (customerEmail: string, q: string) =>
+    fetchApi<CustomerMessageDto[]>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/messages/search?q=${encodeURIComponent(q)}`),
+  listThreads: (customerEmail: string) =>
+    fetchApi<CustomerThreadSummaryDto[]>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/threads`),
+  markThreadRead: (customerEmail: string, messageId: number) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/threads/${messageId}/read`, {
+      method: 'POST',
+    }),
+  unreadCount: (customerEmail: string) =>
+    fetchApi<{ count: number }>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/unread-count`),
+  unreadCounts: (customerEmails: string[]) =>
+    fetchApi<Record<string, number>>(`/api/admin/manufacturing/customer-chat/unread-counts?emails=${encodeURIComponent(customerEmails.join(','))}`),
+  getMessage: (customerEmail: string, messageId: number) =>
+    fetchApi<CustomerMessageDto>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/messages/${messageId}`),
+};
+
+/** Client side of the customer-level General Chat — always scoped to the logged-in user's own email. */
+export const clientCustomerChatApi = {
+  listMessages: () => fetchApi<CustomerMessageDto[]>('/api/portal/customer-chat/messages'),
+  postMessage: (body: string, opts?: { attachmentUrls?: string[]; parentMessageId?: number }) =>
+    fetchApi<CustomerMessageDto>('/api/portal/customer-chat/messages', {
+      method: 'POST',
+      body: JSON.stringify({ body, attachmentUrls: opts?.attachmentUrls, parentMessageId: opts?.parentMessageId }),
+    }),
+  deleteMessage: (messageId: number) =>
+    fetchApi<{ ok: boolean }>(`/api/portal/customer-chat/messages/${messageId}`, { method: 'DELETE' }),
+  toggleReaction: (messageId: number, emoji: string) =>
+    fetchApi<{ ok: boolean }>(`/api/portal/customer-chat/messages/${messageId}/reaction`, {
+      method: 'PUT',
+      body: JSON.stringify({ emoji }),
+    }),
+  searchMessages: (q: string) =>
+    fetchApi<CustomerMessageDto[]>(`/api/portal/customer-chat/messages/search?q=${encodeURIComponent(q)}`),
+  listThreads: () => fetchApi<CustomerThreadSummaryDto[]>('/api/portal/customer-chat/threads'),
+  markThreadRead: (messageId: number) =>
+    fetchApi<{ ok: boolean }>(`/api/portal/customer-chat/threads/${messageId}/read`, { method: 'POST' }),
+  unreadCount: () => fetchApi<{ count: number }>('/api/portal/customer-chat/unread-count'),
+  getMessage: (messageId: number) =>
+    fetchApi<CustomerMessageDto>(`/api/portal/customer-chat/messages/${messageId}`),
 };
 
 export interface AdminPortalAssignmentDto {
@@ -2128,9 +2481,61 @@ export const portalAssignmentApi = {
 };
 
 /** Client manufacturing project workspace — scoped to logged-in user's projects. */
+export interface ProjectTagSuggestionDto {
+  code: string;
+  title: string;
+  stage?: string;
+}
+
+export interface DesignTagSuggestionDto {
+  id: number;
+  name: string;
+  stage?: string;
+  projectCode: string;
+  projectTitle: string;
+}
+
+export interface InvoiceTagSuggestionDto {
+  id: number;
+  reference: string;
+  title: string;
+  amount?: number;
+  currency?: string;
+  status: string;
+}
+
+export interface QuoteTagSuggestionDto {
+  id: number;
+  reference: string;
+  title: string;
+  total?: number;
+  currency?: string;
+  status: string;
+}
+
 export const clientProjectApi = {
   list: () => fetchApi<ManufacturingProjectDto[]>('/api/portal/projects'),
   aggregate: () => fetchApi<PortalAggregateDto>('/api/portal/projects/aggregate'),
+  searchForTag: (q: string) =>
+    fetchApi<ProjectTagSuggestionDto[]>(`/api/portal/projects/search?q=${encodeURIComponent(q)}`),
+  searchDesignsForTag: (q: string) =>
+    fetchApi<DesignTagSuggestionDto[]>(`/api/portal/projects/designs/search?q=${encodeURIComponent(q)}`),
+  searchInvoicesForTag: (q: string) =>
+    fetchApi<InvoiceTagSuggestionDto[]>(`/api/portal/projects/invoices/search?q=${encodeURIComponent(q)}`),
+  searchQuotesForTag: (q: string) =>
+    fetchApi<QuoteTagSuggestionDto[]>(`/api/portal/projects/quotes/search?q=${encodeURIComponent(q)}`),
+  /** Private WhatsApp-style label the client sets on their own project — visible only to
+   *  them, invisible to admins. Pass an empty/blank tag to clear it. */
+  setTag: (code: string, tag: string) =>
+    fetchApi<{ ok: boolean }>(`/api/portal/projects/${encodeURIComponent(code)}/tag`, {
+      method: 'PATCH',
+      body: JSON.stringify({ tag }),
+    }),
+  setDesignTag: (code: string, designId: number, tag: string) =>
+    fetchApi<{ ok: boolean }>(`/api/portal/projects/${encodeURIComponent(code)}/designs/${designId}/tag`, {
+      method: 'PATCH',
+      body: JSON.stringify({ tag }),
+    }),
   markActivityRead: (activityId: string) =>
     fetchApi<{ ok: boolean }>(`/api/portal/projects/activity/${encodeURIComponent(activityId)}/read`, {
       method: 'POST',
@@ -2156,18 +2561,22 @@ export const clientProjectApi = {
     fetchApi<ProjectMessageDto[]>(
       `/api/portal/projects/${encodeURIComponent(code)}/messages/search?q=${encodeURIComponent(q)}`,
     ),
+  getMessage: (code: string, messageId: number) =>
+    fetchApi<ProjectMessageDto>(`/api/portal/projects/${encodeURIComponent(code)}/messages/${messageId}`),
   listAttachments: (code: string) =>
     fetchApi<ProjectMessageDto[]>(`/api/portal/projects/${encodeURIComponent(code)}/attachments`),
+  getFinancialOverview: (code: string) =>
+    fetchApi<FinancialOverviewDto>(`/api/portal/projects/${encodeURIComponent(code)}/financial-overview`),
   postMessage: (
     code: string,
     body: string,
-    opts?: { attachmentUrl?: string; designId?: number; parentMessageId?: number },
+    opts?: { attachmentUrls?: string[]; designId?: number; parentMessageId?: number },
   ) =>
     fetchApi<ProjectMessageDto>(`/api/portal/projects/${encodeURIComponent(code)}/messages`, {
       method: 'POST',
       body: JSON.stringify({
         body,
-        ...(opts?.attachmentUrl != null ? { attachmentUrl: opts.attachmentUrl } : {}),
+        ...(opts?.attachmentUrls != null ? { attachmentUrls: opts.attachmentUrls } : {}),
         ...(opts?.designId != null ? { designId: opts.designId } : {}),
         ...(opts?.parentMessageId != null ? { parentMessageId: opts.parentMessageId } : {}),
       }),
@@ -2175,6 +2584,11 @@ export const clientProjectApi = {
   deleteMessage: (code: string, messageId: number) =>
     fetchApi<{ ok: boolean }>(`/api/portal/projects/${encodeURIComponent(code)}/messages/${messageId}`, {
       method: 'DELETE',
+    }),
+  toggleReaction: (code: string, messageId: number, emoji: string) =>
+    fetchApi<{ ok: boolean }>(`/api/portal/projects/${encodeURIComponent(code)}/messages/${messageId}/reaction`, {
+      method: 'PUT',
+      body: JSON.stringify({ emoji }),
     }),
   listThreads: (code: string) =>
     fetchApi<ProjectThreadSummaryDto[]>(`/api/portal/projects/${encodeURIComponent(code)}/threads`),
@@ -2313,10 +2727,9 @@ export interface ManufacturingInvoiceDto {
   pdfUrl?: string;
   createdAt?: string;
   updatedAt?: string;
-  /** Full value of the quote this invoice was raised against (advance/balance context). */
+  /** Full value of the quote this invoice references — informational lineage only,
+   *  never used to compute a balance (quotation and invoice are independent entities). */
   quoteTotal?: number;
-  /** Sum of all PAID invoices against the same quote, including this one. */
-  paidTillDate?: number;
 }
 
 export const invoiceApi = {
@@ -2404,6 +2817,7 @@ export const paymentLinkApi = {
   setActive: (id: number, active: boolean) =>
     fetchApi<PaymentLinkDto>(`/api/admin/payment-links/${id}/active`, { method: 'PATCH', body: JSON.stringify({ active }) }),
   listAllPayments: () => fetchApi<PaymentLinkPaymentDto[]>('/api/admin/payment-links/payments/all'),
+  paymentsForLink: (id: number) => fetchApi<PaymentLinkPaymentDto[]>(`/api/admin/payment-links/${id}/payments`),
 };
 
 // ===============================

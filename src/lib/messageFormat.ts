@@ -40,6 +40,11 @@ function walkNodes(node: Node): string {
       const href = el.getAttribute('href') || 'url';
       return `[${children || href}](${href})`;
     }
+    case 'SPAN': {
+      const marker = el.getAttribute('data-project-marker');
+      if (marker) return decodeURIComponent(marker);
+      return children;
+    }
     default:
       return children;
   }
@@ -51,11 +56,11 @@ export function isEditorEmpty(el: HTMLElement | null): boolean {
   return !text;
 }
 
-/** Strip product/payment markers for plain-text previews. */
+/** Strip product/payment/project-tag markers for plain-text previews. */
 export function stripMessageMarkers(text?: string | null): string {
   if (!text) return '';
   return text
-    .replace(/\[\[(?:product|payment):[^\]]+\]\]/g, '')
+    .replace(/\[\[(?:product|payment|project):[^\]]+\]\]/g, '')
     .replace(/\*\*|__/g, '')
     .replace(/\*|_/g, '')
     .trim();

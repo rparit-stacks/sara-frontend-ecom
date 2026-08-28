@@ -30,7 +30,10 @@ export default function ProjectFilesPanel({
   isLoading?: boolean;
   title?: string;
 }) {
-  const items = files.filter((f) => f.attachmentUrl);
+  const items = files.flatMap((f) => {
+    const urls = f.attachmentUrls && f.attachmentUrls.length > 0 ? f.attachmentUrls : (f.attachmentUrl ? [f.attachmentUrl] : []);
+    return urls.map((url, i) => ({ ...f, id: urls.length > 1 ? Number(`${f.id}${i}`) : f.id, attachmentUrl: url }));
+  });
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
 
   return (
@@ -38,7 +41,7 @@ export default function ProjectFilesPanel({
       <div className="flex-1 overflow-y-auto px-6 py-5">
         <div className="max-w-3xl">
           <div className="mb-5">
-            <h2 className="font-display text-[20px]">{title}</h2>
+            <h2 className="font-bold text-[20px]">{title}</h2>
             <p className="text-[13px] mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>
               Attachments shared in this project&apos;s chats — view PDFs, images and more.
             </p>

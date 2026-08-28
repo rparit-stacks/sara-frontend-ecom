@@ -187,7 +187,7 @@ function buildFromAggregate(data: PortalAggregateDto): {
       time: relTime(t.lastReplyAt || t.createdAt),
       sortAt: new Date(t.lastReplyAt || t.createdAt || 0).getTime(),
       unread: true,
-      to: `/portal/projects/${encodeURIComponent(t.projectCode)}?tab=threads`,
+      to: `/portal/workspace-preview?project=${encodeURIComponent(t.projectCode)}&tab=threads`,
     });
   });
 
@@ -205,7 +205,7 @@ function buildFromAggregate(data: PortalAggregateDto): {
       time: relTime(project?.updatedAt),
       sortAt: new Date(project?.updatedAt || 0).getTime(),
       unread: st.includes('AWAITING') && !readIds.has(`quote-${q.id}`),
-      to: `/portal/projects/${encodeURIComponent(q.projectCode)}?tab=quotation`,
+      to: `/portal/workspace-preview?project=${encodeURIComponent(q.projectCode)}&tab=resource&resource=quotation`,
     });
   });
 
@@ -222,7 +222,7 @@ function buildFromAggregate(data: PortalAggregateDto): {
       time: relTime(project?.updatedAt),
       sortAt: new Date(project?.updatedAt || 0).getTime(),
       unread: !readIds.has(`inv-${inv.id}`),
-      to: `/portal/projects/${encodeURIComponent(inv.projectCode)}?tab=invoices`,
+      to: `/portal/workspace-preview?project=${encodeURIComponent(inv.projectCode)}&tab=resource&resource=invoices`,
     });
   });
 
@@ -237,7 +237,7 @@ function buildFromAggregate(data: PortalAggregateDto): {
       time: relTime(f.createdAt),
       sortAt: new Date(f.createdAt || 0).getTime(),
       unread: !readIds.has(f.id),
-      to: `/portal/projects/${encodeURIComponent(f.projectCode)}?tab=files`,
+      to: `/portal/workspace-preview?project=${encodeURIComponent(f.projectCode)}&tab=resource&resource=files`,
     });
   });
 
@@ -253,7 +253,7 @@ function buildFromAggregate(data: PortalAggregateDto): {
       time: relTime(pay.paidAt),
       sortAt: new Date(pay.paidAt || 0).getTime(),
       unread: !readIds.has(id),
-      to: `/portal/projects/${encodeURIComponent(pay.projectCode)}?tab=invoices`,
+      to: `/portal/workspace-preview?project=${encodeURIComponent(pay.projectCode)}&tab=resource&resource=invoices`,
     });
   });
 
@@ -270,7 +270,7 @@ function buildFromAggregate(data: PortalAggregateDto): {
       time: relTime(p.updatedAt),
       sortAt: new Date(p.updatedAt).getTime(),
       unread: false,
-      to: `/portal/projects/${encodeURIComponent(p.code)}`,
+      to: `/portal/workspace-preview?project=${encodeURIComponent(p.code)}`,
     });
   });
 

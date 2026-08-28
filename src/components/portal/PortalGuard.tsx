@@ -13,9 +13,12 @@ export default function PortalGuard({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!token) {
-      navigate('/login', { replace: true, state: { returnTo: location.pathname } });
+      // Keep the full path — a deep link like a copied message link (?project=...#msg-123)
+      // must still land on that exact pane/message after login, not just the bare page.
+      const returnTo = `${location.pathname}${location.search}${location.hash}`;
+      navigate('/login', { replace: true, state: { returnTo } });
     }
-  }, [token, navigate, location.pathname]);
+  }, [token, navigate, location.pathname, location.search, location.hash]);
 
   if (!token) return null;
   return <>{children}</>;

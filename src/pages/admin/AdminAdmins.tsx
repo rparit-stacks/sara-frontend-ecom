@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { adminManagementApi, projectApi } from '@/lib/api';
-import { useAdminPresence } from '@/hooks/useAdminPresence';
-import PresenceDot from '@/components/admin/PresenceDot';
+import { adminManagementApi } from '@/lib/api';
 
 const AdminAdmins = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,10 +20,8 @@ const AdminAdmins = () => {
   const [editingAdmin, setEditingAdmin] = useState<any>(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [invitePortalAccess, setInvitePortalAccess] = useState(false);
-  const [assignedProjectIds, setAssignedProjectIds] = useState<number[]>([]);
   const queryClient = useQueryClient();
-  const onlineAdminIds = useAdminPresence();
-  
+
   const [formData, setFormData] = useState({
     username: '',
     name: '',
@@ -39,22 +35,6 @@ const AdminAdmins = () => {
     queryKey: ['adminAdmins'],
     queryFn: () => adminManagementApi.getAll(),
   });
-  
-  const { data: allProjects = [] } = useQuery({
-    queryKey: ['admin-projects-all'],
-    queryFn: () => projectApi.list(),
-    enabled: isEditDialogOpen && !!editingAdmin && editingAdmin.username !== 'admin' && formData.portalAdminAccess,
-  });
-
-  useEffect(() => {
-    if (!isEditDialogOpen || !editingAdmin?.id || editingAdmin.username === 'admin') {
-      setAssignedProjectIds([]);
-      return;
-    }
-    adminManagementApi.getProjectAssignments(editingAdmin.id)
-      .then((r) => setAssignedProjectIds(r.projectIds || []))
-      .catch(() => setAssignedProjectIds([]));
-  }, [isEditDialogOpen, editingAdmin?.id, editingAdmin?.username]);
   
   const sendInviteMutation = useMutation({
     mutationFn: ({ email, portalAdminAccess }: { email: string; portalAdminAccess: boolean }) =>
@@ -77,13 +57,6 @@ const AdminAdmins = () => {
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['adminAdmins'] });
       toast.success('Admin updated successfully!');
-      if (editingAdmin?.username !== 'admin' && formData.portalAdminAccess) {
-        try {
-          await adminManagementApi.setProjectAssignments(editingAdmin.id, assignedProjectIds);
-        } catch (e: any) {
-          toast.error(e?.message || 'Admin saved but project assignments failed');
-        }
-      }
       try {
         const stored = JSON.parse(localStorage.getItem('adminUser') || '{}');
         if (editingAdmin?.id === stored.id) {
@@ -332,9 +305,6 @@ const AdminAdmins = () => {
                     <div className="flex items-center gap-3 mb-2">
                       <div className="relative w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <User className="w-5 h-5 text-primary" />
-                        <span className="absolute -bottom-0.5 -right-0.5 ring-2 ring-card rounded-full">
-                          <PresenceDot online={onlineAdminIds.has(admin.id)} />
-                        </span>
                       </div>
                       <div>
                         <h3 className="font-semibold text-lg">{admin.name || admin.username}</h3>
@@ -363,7 +333,6 @@ const AdminAdmins = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <PresenceDot online={onlineAdminIds.has(admin.id)} withLabel />
                     <Badge variant={admin.status === 'ACTIVE' ? 'default' : 'secondary'}>
                       {admin.status}
                     </Badge>
@@ -471,29 +440,20 @@ const AdminAdmins = () => {
                 />
               </div>
               {editingAdmin?.username !== 'admin' && formData.portalAdminAccess && (
-                <div className="rounded-lg border border-border p-3 space-y-2 max-h-48 overflow-y-auto">
-                  <Label>Assigned manufacturing projects</Label>
+                <div className="rounded-lg border border-border p-3 space-y-1.5">
+                  <Label>Manufacturing project assignments</Label>
                   <p className="text-xs text-muted-foreground">
-                    This admin will only see inquiries, quotes, and data for the selected projects.
+                    Full or partial (per-design) project access for this admin is managed from one place —
+                    the Portal assignments page inside the manufacturing portal.
                   </p>
-                  {allProjects.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No projects available</p>
-                  ) : (
-                    allProjects.map((p) => (
-                      <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={assignedProjectIds.includes(p.id)}
-                          onChange={(e) => {
-                            setAssignedProjectIds((ids) =>
-                              e.target.checked ? [...ids, p.id] : ids.filter((id) => id !== p.id),
-                            );
-                          }}
-                        />
-                        <span className="truncate">{p.code} — {p.title || p.clientName || 'Project'}</span>
-                      </label>
-                    ))
-                  )}
+                  <a
+                    href="/portal-admin/assignments"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-semibold text-primary hover:underline inline-block pt-0.5"
+                  >
+                    Open Portal assignments →
+                  </a>
                 </div>
               )}
               <div className="flex gap-2 pt-2">

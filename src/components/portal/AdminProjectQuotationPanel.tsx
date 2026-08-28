@@ -48,7 +48,7 @@ export default function AdminProjectQuotationPanel({
   );
 
   const revisions = useMemo(() => {
-    const rows: { quoteRef: string; quoteId: number; rev: QuoteRevision; latest: boolean }[] = [];
+    const rows: { quoteRef: string; quoteId: number; rev: QuoteRevision; latest: boolean; active: boolean }[] = [];
     for (const q of projectQuotes) {
       const doc = q.doc as { revisions?: QuoteRevision[] } | undefined;
       const revs = doc?.revisions?.length
@@ -60,6 +60,7 @@ export default function AdminProjectQuotationPanel({
           quoteId: q.id,
           rev,
           latest: i === revs.length - 1,
+          active: !!q.active,
         });
       });
     }
@@ -74,10 +75,10 @@ export default function AdminProjectQuotationPanel({
   return (
     <>
       <div className="flex-1 overflow-y-auto px-6 py-5">
-        <div className="max-w-3xl">
+        <div className="max-w-5xl">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="font-display text-[20px]">Quotations</h2>
+              <h2 className="font-bold text-[20px]">Quotations</h2>
               <p className="text-[13px] mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>
                 All versions for this project — view, download or edit. Changes are announced to the client.
               </p>
@@ -101,27 +102,32 @@ export default function AdminProjectQuotationPanel({
               <p className="text-[13px]">Create the first quote for this project.</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {revisions.map((row) => (
                 <div
                   key={`${row.quoteRef}-v${row.rev.version}`}
-                  className="border rounded-xl p-4 flex flex-wrap items-center gap-4"
+                  className="border rounded-xl p-4 flex flex-col gap-3"
                   style={{ borderColor: 'var(--p-outline-variant)', background: row.latest ? 'var(--p-surface-container-low)' : 'var(--p-surface-container-lowest)' }}
                 >
-                  <div className="flex-1 min-w-[200px]">
+                  <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-[14px]">{row.quoteRef}</span>
                       <span className="px-2 py-0.5 rounded-full text-[11px] font-bold" style={{ background: 'rgba(0,103,106,0.12)', color: 'var(--p-primary)' }}>
                         v{row.rev.version}{row.latest ? ' · current' : ''}
                       </span>
+                      {row.active && (
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold text-white" style={{ background: 'var(--p-secondary)' }} title="This is the project's Live quotation">
+                          Live
+                        </span>
+                      )}
                       <Pill label={row.rev.status} />
                     </div>
                     <p className="text-[12px] mt-1" style={{ color: 'var(--p-on-surface-variant)' }}>
                       Saved {row.rev.savedAt ? new Date(row.rev.savedAt).toLocaleString() : '—'}
                     </p>
+                    <p className="font-bold text-[16px] mt-1.5">{money(row.rev.total, projectQuotes.find((q) => q.id === row.quoteId)?.currency || 'INR')}</p>
                   </div>
-                  <p className="font-bold text-[15px]">{money(row.rev.total, projectQuotes.find((q) => q.id === row.quoteId)?.currency || 'INR')}</p>
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-2 flex-wrap mt-auto">
                     <button
                       type="button"
                       onClick={() => setViewQuoteId(row.quoteId)}

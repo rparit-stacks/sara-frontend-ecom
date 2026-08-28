@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Sym } from '@/components/portal/Sym';
@@ -24,7 +23,6 @@ const statusTone = (s: string): { bg: string; fg: string } => {
  * the full invoice document.
  */
 export default function ProjectInvoicesPanel({ project, clientMode }: { project: ManufacturingProjectDetailDto; clientMode?: boolean }) {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [viewing, setViewing] = useState<ManufacturingInvoiceDto | null>(null);
   const invoices = project.invoices || [];
@@ -52,29 +50,17 @@ export default function ProjectInvoicesPanel({ project, clientMode }: { project:
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-5">
-      <div className="max-w-3xl">
-        <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
-          <div>
-            <h2 className="font-display text-[20px]">Invoices</h2>
-            <p className="text-[13px] mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>Advance & balance invoices for this project.</p>
-          </div>
-          {!clientMode && (
-            <button
-              type="button"
-              onClick={() => navigate(`/portal-admin/invoices?inquiry=${project.inquiryId}`)}
-              className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white flex items-center gap-1.5"
-              style={{ background: 'var(--p-primary)' }}
-            >
-              <Sym name="add" className="text-[16px]" /> New / manage invoices
-            </button>
-          )}
+      <div className="max-w-5xl">
+        <div className="mb-5">
+          <h2 className="font-bold text-[20px]">Invoices</h2>
+          <p className="text-[13px] mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>Advance & balance invoices for this project — created automatically when a payment is requested.</p>
         </div>
 
         {invoices.length === 0 ? (
           <div className="border-2 border-dashed rounded-xl p-12 text-center" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>
             <Sym name="receipt_long" className="text-[40px] opacity-40" />
             <p className="mt-2 font-semibold">No invoices yet</p>
-            <p className="text-[13px]">Raise an advance or balance invoice from a quotation.</p>
+            <p className="text-[13px]">{clientMode ? 'Invoices will appear here once your studio requests a payment.' : 'Invoices are created automatically from the Payments tab — request a payment there.'}</p>
           </div>
         ) : (
           <div className="space-y-2">

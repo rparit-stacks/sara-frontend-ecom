@@ -100,7 +100,10 @@ export default function PaymentPage() {
 
   const currency = target?.currency || 'INR';
   const amountEditable = target?.amountEditable ?? (target?.mode === 'OPEN');
-  const clientLocked = target?.mode === 'CLIENT' && !!target?.clientEmail;
+  // Client-picked links (mode CLIENT, or QUOTE when project-linked with a pre-filled
+  // contact) lock the email field since we already know who this is for — cosmetic
+  // only, doesn't restrict who can actually pay.
+  const clientLocked = (target?.mode === 'CLIENT' || target?.mode === 'QUOTE') && !!target?.clientEmail;
   const numericAmount = useMemo(() => parseFloat(amount) || 0, [amount]);
 
   const { data: methods } = useQuery({
@@ -284,9 +287,24 @@ function TrustRow() {
   );
 }
 
+function parseLinkItems(itemsJson?: string): { description: string; qty: number; rate: number }[] {
+  if (!itemsJson) return [];
+  try {
+    const parsed = JSON.parse(itemsJson);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((it) => ({
+      description: String(it.description ?? ''),
+      qty: Number(it.qty) || 0,
+      rate: Number(it.rate) || 0,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 function DetailsPanel({ target, currency }: { target: ResolvedPayTarget; currency: string }) {
   const hasQuote = !!target.quoteReference;
-  const items = target.items ?? [];
+  const items = target.items?.length ? target.items : parseLinkItems(target.itemsJson).map((it) => ({ ...it, amount: it.qty * it.rate }));
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-[#e6ddcd] overflow-hidden">
       <div className="px-6 py-4 border-b border-[#efe8db]">
@@ -315,6 +333,49 @@ function DetailsPanel({ target, currency }: { target: ResolvedPayTarget; currenc
                 {!!target.validityDays && <p className="text-[#6b6357]">Valid {target.validityDays} days</p>}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Live quotation — reference only, never the amount charged below */}
+        {target.liveQuote && (
+          <div className="rounded-xl border border-[#e6ddcd] overflow-hidden">
+            <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: `${ACCENT}0d` }}>
+              <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: ACCENT }}>Project's live quotation</p>
+              {target.liveQuote.pdfUrl && (
+                <a href={target.liveQuote.pdfUrl} target="_blank" rel="noreferrer" className="text-[11px] font-semibold flex items-center gap-1" style={{ color: ACCENT }}>
+                  <i className="fa-solid fa-file-pdf" /> View PDF
+                </a>
+              )}
+            </div>
+            <div className="p-4 text-[13px]">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-[#2b2620]">{target.liveQuote.reference}{target.liveQuote.title ? ` — ${target.liveQuote.title}` : ''}</span>
+                {target.liveQuote.total != null && <span className="font-semibold text-[#2b2620]">{money(target.liveQuote.total, target.liveQuote.currency || currency)}</span>}
+              </div>
+              {!!target.liveQuote.items?.length && (
+                <table className="w-full text-[12px] border-collapse mt-3">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-wide text-[#a99f8c]">
+                      <th className="text-left font-bold pb-1.5">Item</th>
+                      <th className="text-right font-bold pb-1.5 w-10">Qty</th>
+                      <th className="text-right font-bold pb-1.5 w-20">Rate</th>
+                      <th className="text-right font-bold pb-1.5 w-20">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {target.liveQuote.items.map((it, i) => (
+                      <tr key={i} className="border-t border-[#f0e9dc]">
+                        <td className="py-1.5 text-[#2b2620]">{it.description}</td>
+                        <td className="py-1.5 text-right text-[#6b6357]">{it.qty}</td>
+                        <td className="py-1.5 text-right text-[#6b6357]">{money(it.rate, target.liveQuote?.currency || currency)}</td>
+                        <td className="py-1.5 text-right font-medium text-[#2b2620]">{money(it.amount, target.liveQuote?.currency || currency)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <p className="text-[11px] mt-3" style={{ color: '#a99f8c' }}>Shown for reference — this project's quotation, kept in sync automatically. It does not set or limit the amount you're paying below.</p>
+            </div>
           </div>
         )}
 

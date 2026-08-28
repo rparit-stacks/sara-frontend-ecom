@@ -35,6 +35,9 @@
   --p-on-secondary-fixed: #0e1d1b;
   --p-on-secondary-fixed-variant: #374947;
   --p-tertiary: #924623;
+  /* Sara AI message bubble — violet, distinct from every human author's bubble color
+     (teal "mine", grey "them", brown tertiary badge) so an AI reply is unmistakable at a glance. */
+  --p-ai-bubble: #6d28d9;
   --p-on-surface: #171d1c;
   --p-on-surface-variant: #3f4948;
   --p-on-background: #171d1c;
@@ -145,6 +148,52 @@
 .portal-root .composer-editor a {
   color: var(--p-primary);
   text-decoration: underline;
+}
+
+/* Chat bubble text-color context: any inline element rendered inside a message body
+   (links, @project chips, future tags) reads --bubble-fg / --bubble-chip-bg instead of
+   hardcoding var(--p-primary) — so it stays legible on both the "mine" teal bubble and
+   the default light bubble, without every component branching on a `mine` prop. */
+.portal-root .chat-bubble-body {
+  --bubble-fg: var(--p-primary);
+  --bubble-chip-bg: rgba(0,103,106,0.14);
+}
+.portal-root .chat-bubble-mine .chat-bubble-body {
+  --bubble-fg: #fff;
+  --bubble-chip-bg: rgba(255,255,255,0.2);
+}
+.portal-root .chat-bubble-body a {
+  color: var(--bubble-fg);
+}
+.portal-root .chat-bubble-body .chat-tag-chip {
+  color: var(--bubble-fg);
+  background: var(--bubble-chip-bg);
+  border-color: var(--bubble-fg);
+  opacity: 0.92;
+  cursor: pointer;
+}
+.portal-root .chat-bubble-body .chat-tag-chip:hover {
+  opacity: 1;
+}
+.portal-root .chat-bubble-body .chat-tag-chip-icon {
+  background: var(--bubble-fg);
+  color: var(--p-surface-container-lowest);
+}
+.portal-root .chat-bubble-mine .chat-bubble-body .chat-tag-chip-icon {
+  color: var(--p-primary);
+}
+.portal-root .chat-bubble-ai .chat-bubble-body {
+  --bubble-fg: #fff;
+  --bubble-chip-bg: rgba(255,255,255,0.2);
+}
+.portal-root .chat-bubble-ai .chat-bubble-body .chat-tag-chip-icon {
+  color: var(--p-ai-bubble);
+}
+/* AI-authored reply text (Portal AI + Manufacturing Admin AI auto-replies) — white with a
+   golden glow so an AI message reads as distinct from every human bubble at a glance, not
+   just by background color. */
+.portal-root .chat-bubble-ai-text {
+  text-shadow: 0 0 6px rgba(255,215,120,0.65), 0 0 14px rgba(255,191,64,0.55);
 }
 
 /* WYSIWYG in the composer: Tailwind's preflight strips list bullets/numbers and bold weight,

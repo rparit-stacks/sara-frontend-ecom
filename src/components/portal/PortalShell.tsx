@@ -38,6 +38,7 @@ export default function PortalShell({
 
   const logout = () => {
     localStorage.removeItem('authToken');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('authEmail');
     navigate('/login', { replace: true });
   };

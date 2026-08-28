@@ -167,7 +167,7 @@ export default function PortalAdminClients() {
                 {open.name.split(' ').map((p) => p[0]).join('').slice(0, 2)}
               </div>
               <div className="min-w-0">
-                <h3 className="font-display text-[20px] truncate capitalize">{open.name}</h3>
+                <h3 className="font-bold text-[20px] truncate capitalize">{open.name}</h3>
                 <p className="text-[13px] truncate" style={{ color: 'var(--p-on-surface-variant)' }}>
                   {open.brand ? `${open.brand} · ` : ''}since {formatSince(open.since)}
                 </p>
@@ -194,7 +194,7 @@ export default function PortalAdminClients() {
                 type="button"
                 onClick={() => {
                   const code = open.projectCodes[0];
-                  if (code) navigate(`/portal-admin/projects/${encodeURIComponent(code)}`);
+                  if (code) navigate(`/portal-admin/workspace-preview?project=${encodeURIComponent(code)}`);
                   else setOpen(null);
                 }}
                 className="flex-1 px-4 py-2.5 rounded-lg text-[14px] font-semibold text-white hover:brightness-110"

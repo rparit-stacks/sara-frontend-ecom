@@ -136,6 +136,7 @@ export const AdminSidebar = () => {
   const handleLogout = () => {
     console.log('[Admin Logout] Logging out...');
     localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminRefreshToken');
     localStorage.removeItem('adminUser');
     localStorage.removeItem('adminLoginTime');
     navigate('/admin-sara/login');

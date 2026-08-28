@@ -49,7 +49,7 @@ export default function PortalThreads() {
                     thread={t}
                     showProject
                     timeLabel={relTime(t.lastReplyAt || t.createdAt)}
-                    onClick={() => navigate(`/portal/projects/${encodeURIComponent(t.projectCode)}`)}
+                    onClick={() => navigate(`/portal/workspace-preview?project=${encodeURIComponent(t.projectCode)}&tab=threads`)}
                   />
                 ))}
               </div>

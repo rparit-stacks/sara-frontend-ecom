@@ -67,7 +67,7 @@ export default function PortalMessages() {
                 <button
                   key={p.code}
                   type="button"
-                  onClick={() => navigate(`/portal/projects/${encodeURIComponent(p.code)}`)}
+                  onClick={() => navigate(`/portal/workspace-preview?project=${encodeURIComponent(p.code)}`)}
                   className="w-full flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors text-left"
                   style={{ color: 'var(--p-on-surface-variant)' }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--p-surface-container-high)')}
@@ -110,7 +110,7 @@ export default function PortalMessages() {
                     return (
                       <div
                         key={p.code}
-                        onClick={() => navigate(`/portal/projects/${encodeURIComponent(p.code)}`)}
+                        onClick={() => navigate(`/portal/workspace-preview?project=${encodeURIComponent(p.code)}`)}
                         className="border p-6 card-hover flex flex-col h-full rounded-xl cursor-pointer"
                         style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
                       >

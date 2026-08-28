@@ -109,6 +109,7 @@ export const Navbar = () => {
   const handleLogout = () => {
     setIsProfileMenuOpen(false);
     localStorage.removeItem('authToken');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('authEmail');
     dispatchLoggedOut();
     navigate('/', { replace: true });

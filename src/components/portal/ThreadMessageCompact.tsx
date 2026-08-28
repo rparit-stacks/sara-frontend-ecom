@@ -24,14 +24,17 @@ export default function ThreadMessageCompact({
   variant = 'reply',
   formatTime = defaultFormatTime,
 }: {
-  message: Pick<ProjectMessageDto, 'body' | 'attachmentUrl' | 'authorName' | 'authorType' | 'createdAt' | 'announcementCategory'>;
+  message: Pick<ProjectMessageDto, 'body' | 'attachmentUrl' | 'attachmentUrls' | 'authorName' | 'authorType' | 'createdAt' | 'announcementCategory'>;
   variant?: 'root' | 'reply';
   formatTime?: (iso?: string) => string;
 }) {
   const isSystem = message.authorType === 'SYSTEM';
   const isAdmin = message.authorType === 'ADMIN';
   const isAi = message.authorType === 'AI';
-  const att = message.attachmentUrl;
+  const attUrls = message.attachmentUrls && message.attachmentUrls.length > 0
+    ? message.attachmentUrls
+    : (message.attachmentUrl ? [message.attachmentUrl] : []);
+  const att = attUrls[0];
   const pay = parsePaymentCard(message.body);
   const product = parseProductCard(message.body);
   const textBody = stripProductMarker(message.body ?? '');
@@ -96,8 +99,12 @@ export default function ThreadMessageCompact({
       ) : null}
 
       {att && isImageUrl(att) ? (
-        <div className="mt-2 w-24 h-24 rounded-lg border overflow-hidden" style={{ borderColor: 'var(--p-outline-variant)' }}>
-          <img src={att} alt="" className="w-full h-full object-cover" />
+        <div className={`mt-2 grid gap-0.5 ${attUrls.length > 1 ? 'grid-cols-2 w-48' : 'w-24'}`}>
+          {attUrls.map((url, i) => (
+            <div key={i} className="h-24 rounded-lg border overflow-hidden" style={{ borderColor: 'var(--p-outline-variant)' }}>
+              <img src={url} alt="" className="w-full h-full object-cover" />
+            </div>
+          ))}
         </div>
       ) : null}
 

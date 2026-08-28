@@ -1,15 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import AdminShell, { AdminBtn } from '@/components/portal/AdminShell';
 import { Pill } from '@/components/portal/Pill';
 import { Sym } from '@/components/portal/Sym';
+import StatTile from '@/components/portal/StatTile';
 import { manufacturingApi, type ManufacturingQuoteDto } from '@/lib/api';
 import { formatInquiryDate, portalDateKey, portalDateSearchText } from '@/components/inquiry/inquiryUtils';
 
 const CUR: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
 const money = (n: number, c: string) => `${CUR[c] ?? ''}${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const PAGE_SIZE = 25;
 
 type Tab = 'quotes' | 'templates';
 type ForKind = 'inquiry' | 'external';
@@ -85,7 +87,7 @@ function UseTemplateModal({
     <>
       <div className="fixed inset-0 z-50 bg-black/40" onClick={onClose} />
       <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 border rounded-2xl shadow-2xl p-6" style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}>
-        <h3 className="font-display text-[18px] mb-1">Use template</h3>
+        <h3 className="font-bold text-[18px] mb-1">Use template</h3>
         <p className="text-[13px] mb-4" style={{ color: 'var(--p-on-surface-variant)' }}>
           "{template.title}" — everything stays the same, only the client changes.
         </p>
@@ -207,7 +209,7 @@ function NewQuotationChooserModal({
     <>
       <div className="fixed inset-0 z-50 bg-black/40" onClick={onClose} />
       <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 border rounded-2xl shadow-2xl p-6" style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}>
-        <h3 className="font-display text-[18px] mb-1">New quotation</h3>
+        <h3 className="font-bold text-[18px] mb-1">New quotation</h3>
         <p className="text-[13px] mb-4" style={{ color: 'var(--p-on-surface-variant)' }}>How do you want to start?</p>
         <div className="grid gap-3">
           <button
@@ -255,6 +257,7 @@ export default function PortalAdminQuotations() {
   const [minAmount, setMinAmount] = useState(params.get('minAmount') ?? '');
   const [maxAmount, setMaxAmount] = useState(params.get('maxAmount') ?? '');
   const [menu, setMenu] = useState<number | null>(null);
+  const [page, setPage] = useState(0);
 
   const { data: quotes = [], isLoading: loadingQuotes } = useQuery({
     queryKey: ['admin-quotes', 'quotes'],
@@ -298,7 +301,7 @@ export default function PortalAdminQuotations() {
       queryClient.invalidateQueries({ queryKey: ['admin-quotes'] });
       queryClient.invalidateQueries({ queryKey: ['admin-projects'] });
       toast.success(`Project created · ${project.code}`);
-      navigate(`/portal-admin/projects/${project.code}`);
+      navigate(`/portal-admin/workspace-preview?project=${project.code}`);
     },
     onError: (e) => toast.error((e as Error).message || 'Failed to convert to project'),
   });
@@ -356,6 +359,16 @@ export default function PortalAdminQuotations() {
     syncParams('', '', '', '', '');
   };
 
+  useEffect(() => { setPage(0); }, [tab, term, dateFilter, statusFilter, minAmount, maxAmount]);
+  const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const paged = shown.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
+  const totals = useMemo(() => {
+    let value = 0;
+    for (const q of quotes) value += q.total || 0;
+    return { quoteCount: quotes.length, templateCount: templates.length, value };
+  }, [quotes, templates]);
+
   return (
     <AdminShell
       title={inquiryFilter ? 'Quotations · Project' : 'Quotations'}
@@ -367,6 +380,14 @@ export default function PortalAdminQuotations() {
             Showing quotes for inquiry #{inquiryFilter}
             <button onClick={() => navigate('/portal-admin/quotations')} className="ml-2 font-bold underline" style={{ color: 'var(--p-primary)' }}>Show all</button>
           </p>
+        )}
+
+        {!inquiryFilter && (
+          <div className="grid grid-cols-3 gap-4 mb-6 max-w-xl">
+            <StatTile label="Quotations" value={totals.quoteCount} icon="request_quote" color="var(--p-primary)" />
+            <StatTile label="Templates" value={totals.templateCount} icon="bookmark" color="#b45309" />
+            <StatTile label="Total value" value={money(totals.value, 'INR')} icon="payments" color="#15803d" />
+          </div>
         )}
 
         <div className="flex flex-wrap items-center gap-3 mb-5">
@@ -509,7 +530,8 @@ export default function PortalAdminQuotations() {
             ) : null}
           </div>
         ) : (
-          <div className="border rounded-xl overflow-hidden overflow-x-auto" style={{ borderColor: 'var(--p-outline-variant)' }}>
+          <>
+          <div className="border rounded-2xl overflow-hidden overflow-x-auto" style={{ borderColor: 'var(--p-outline-variant)' }}>
             <table className="w-full text-left border-collapse min-w-[820px]">
               <thead>
                 <tr style={{ background: 'var(--p-surface-container-low)' }}>
@@ -519,12 +541,10 @@ export default function PortalAdminQuotations() {
                 </tr>
               </thead>
               <tbody>
-                {shown.map((q, i) => (
+                {paged.map((q, i) => (
                   <tr
                     key={q.id}
-                    className="cursor-pointer hover:bg-black/[0.02]"
                     style={{ borderTop: i ? '1px solid var(--p-outline-variant)' : undefined }}
-                    onClick={() => (tab === 'templates' ? undefined : navigate(`/portal-admin/quote-editor/${q.reference}`))}
                   >
                     <td className="px-4 py-3 font-semibold text-[13px]">{q.reference}</td>
                     <td className="px-4 py-3 text-[13px]">{q.title}</td>
@@ -543,7 +563,7 @@ export default function PortalAdminQuotations() {
                       <td className="px-4 py-3"><Pill label={q.status} /></td>
                     )}
                     <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{q.createdAt ? formatInquiryDate(q.createdAt) : '—'}</td>
-                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-1">
                         {tab === 'templates' ? (
                           <button
@@ -610,6 +630,35 @@ export default function PortalAdminQuotations() {
               </tbody>
             </table>
           </div>
+          {pageCount > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>
+                Showing {page * PAGE_SIZE + 1}–{Math.min(shown.length, (page + 1) * PAGE_SIZE)} of {shown.length}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  className="w-8 h-8 rounded-lg border flex items-center justify-center disabled:opacity-40"
+                  style={{ borderColor: 'var(--p-outline-variant)' }}
+                >
+                  <Sym name="chevron_left" className="text-[18px]" />
+                </button>
+                <span className="text-[12px] font-semibold px-2">{page + 1} / {pageCount}</span>
+                <button
+                  type="button"
+                  disabled={page >= pageCount - 1}
+                  onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                  className="w-8 h-8 rounded-lg border flex items-center justify-center disabled:opacity-40"
+                  style={{ borderColor: 'var(--p-outline-variant)' }}
+                >
+                  <Sym name="chevron_right" className="text-[18px]" />
+                </button>
+              </div>
+            </div>
+          )}
+          </>
         )}
       </div>
 

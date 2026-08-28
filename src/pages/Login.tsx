@@ -149,6 +149,8 @@ const Login = () => {
       const data = await authApi.verifyOtp(effectiveEmail, otp);
 
       localStorage.setItem('authToken', data.token);
+      // 30-day refresh token — api.ts spends this to silently renew the 24h access token.
+      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('authEmail', data.email ?? effectiveEmail);
       console.log('[Login] Token stored successfully, length:', data.token.length);
 

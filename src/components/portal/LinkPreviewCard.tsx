@@ -45,11 +45,11 @@ export default function LinkPreviewCard({ url, compact = false }: { url: string;
       href={url}
       target="_blank"
       rel="noreferrer"
-      className={`mt-1.5 flex overflow-hidden rounded-xl border hover:shadow-sm transition-shadow ${compact ? 'max-w-xs' : 'max-w-sm'}`}
+      className="mt-1.5 flex w-full overflow-hidden rounded-xl border hover:shadow-sm transition-shadow"
       style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}
     >
       {data.image && (
-        <div className={`shrink-0 overflow-hidden ${compact ? 'w-16' : 'w-20'} `} style={{ background: 'var(--p-surface-container-high)' }}>
+        <div className={`shrink-0 self-stretch overflow-hidden ${compact ? 'w-16' : 'w-20'}`} style={{ background: 'var(--p-surface-container-high)' }}>
           <img src={data.image} alt="" className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }} />
         </div>
       )}

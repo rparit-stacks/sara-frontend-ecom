@@ -179,6 +179,7 @@ const Dashboard = () => {
             setTimeout(() => {
               if (localStorage.getItem('authToken') === currentToken) {
                 localStorage.removeItem('authToken');
+                localStorage.removeItem('refreshToken');
                 localStorage.removeItem('authEmail');
                 dispatchLoggedOut();
                 navigate('/login', { replace: true });
@@ -325,6 +326,7 @@ const Dashboard = () => {
   const handleMandatoryLogout = () => {
     // User explicitly chose to log out
     localStorage.removeItem('authToken');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('authEmail');
     dispatchLoggedOut();
     toast.info('You have been logged out');
@@ -465,6 +467,7 @@ const Dashboard = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('authEmail');
     dispatchLoggedOut();
     toast.success('Logged out successfully');

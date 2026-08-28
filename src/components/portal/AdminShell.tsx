@@ -5,7 +5,6 @@ import { adminAuthApi, getUserEmailFromToken } from '@/lib/api';
 import { getAdminChatDisplayName, getStoredAdminUser, isSuperAdmin } from '@/lib/adminAccess';
 import { useAdminNotificationCounts } from '@/hooks/useAdminNotificationCounts';
 import { AdminPresenceProvider } from '@/context/AdminPresenceContext';
-import PresenceToggle from '@/components/admin/PresenceToggle';
 import '@/pages/portal/portal.css';
 
 type NavItem = { icon: string; label: string; to: string; badge?: number };
@@ -44,10 +43,6 @@ function buildNavGroups(counts: { inquiries: number; paymentLinks: number; payme
     {
       title: 'Work',
       items: workItems,
-    },
-    {
-      title: 'Tools',
-      items: [{ icon: 'dynamic_form', label: 'Forms', to: '/portal-admin/forms' }],
     },
   ];
 }
@@ -123,6 +118,7 @@ export default function AdminShell({
 
   const logout = () => {
     localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminRefreshToken');
     navigate('/admin-sara/login', { replace: true });
   };
 
@@ -167,7 +163,6 @@ export default function AdminShell({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <PresenceToggle />
           <button onClick={() => navigate('/portal-admin/inquiries')} className="msym text-white/70 hover:text-white relative">
             inbox
             {notifCounts.inquiries > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white" />}
@@ -242,7 +237,7 @@ export default function AdminShell({
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--p-surface-container-lowest)' }}>
           {!workspace && (
             <div className="h-14 px-5 sm:px-8 border-b flex items-center justify-between shrink-0 gap-3" style={{ borderColor: 'var(--p-outline-variant)' }}>
-              <h1 className="font-display text-[18px] sm:text-[20px] truncate">{title}</h1>
+              <h1 className="font-bold text-[18px] sm:text-[20px] truncate">{title}</h1>
               {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
             </div>
           )}

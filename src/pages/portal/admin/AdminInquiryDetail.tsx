@@ -140,7 +140,7 @@ export default function PortalAdminInquiryDetail() {
                       <span className="text-[12px] font-bold opacity-60">{inq.reference}</span>
                       <Pill label={statusLabel(inq.status)} />
                       {inq.source === 'CUSTOM_DESIGN' && (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#00676a]/10 text-[#00676a]">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,103,106,0.1)', color: 'var(--p-primary)' }}>
                           Custom Design
                         </span>
                       )}

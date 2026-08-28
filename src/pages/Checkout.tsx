@@ -453,6 +453,7 @@ const Checkout = () => {
             const tempToken = localStorage.getItem('authToken');
             if (tempToken) {
               localStorage.removeItem('authToken');
+              localStorage.removeItem('refreshToken');
               try {
                 const result = await orderApi.createOrder(orderData);
                 // Restore token

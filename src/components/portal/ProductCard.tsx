@@ -58,26 +58,33 @@ export function stripProductMarker(body?: string): string {
 }
 
 export default function ProductCard({ data }: { data: ParsedProduct }) {
-  const href = data.slug ? `/products/${data.slug}` : `/products/${data.id}`;
+  const href = data.slug ? `/product/${data.slug}` : `/product/${data.id}`;
   return (
     <Link
       to={href}
-      className="max-w-xs border rounded-xl overflow-hidden mb-2 flex hover:shadow-md transition-shadow"
+      className="w-64 border rounded-2xl overflow-hidden mb-1 block shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all"
       style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}
     >
-      <div className="w-20 h-20 shrink-0 flex items-center justify-center overflow-hidden" style={{ background: 'var(--p-surface-container-high)' }}>
+      <div className="w-full h-40 flex items-center justify-center overflow-hidden" style={{ background: 'var(--p-surface-container-high)' }}>
         {data.image ? (
           <img src={data.image} alt="" className="w-full h-full object-cover" />
         ) : (
-          <Sym name="shopping_bag" className="text-[28px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+          <Sym name="shopping_bag" className="text-[40px]" style={{ color: 'var(--p-on-surface-variant)' }} />
         )}
       </div>
-      <div className="flex-1 min-w-0 p-3">
-        <p className="text-[11px] font-bold uppercase tracking-wide mb-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>Product</p>
-        <p className="font-semibold text-[14px] truncate">{data.name}</p>
-        {data.price ? (
-          <p className="text-[13px] font-bold mt-1" style={{ color: 'var(--p-primary)' }}>{data.price}</p>
-        ) : null}
+      <div className="p-3.5">
+        <p className="text-[10px] font-bold uppercase tracking-wide mb-1 flex items-center gap-1" style={{ color: 'var(--p-primary)' }}>
+          <Sym name="shopping_bag" className="text-[13px]" /> Product
+        </p>
+        <p className="font-semibold text-[14px] leading-snug line-clamp-2 mb-1.5">{data.name}</p>
+        <div className="flex items-center justify-between gap-2">
+          {data.price ? (
+            <p className="text-[15px] font-bold" style={{ color: 'var(--p-on-surface)' }}>{data.price}</p>
+          ) : <span />}
+          <span className="flex items-center gap-0.5 text-[12px] font-semibold" style={{ color: 'var(--p-primary)' }}>
+            View <Sym name="arrow_forward" className="text-[14px]" />
+          </span>
+        </div>
       </div>
     </Link>
   );

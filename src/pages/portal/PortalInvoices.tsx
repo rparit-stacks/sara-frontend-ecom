@@ -90,7 +90,7 @@ export default function PortalInvoices() {
                               <td className="px-4 py-3 text-right">
                                 <button
                                   type="button"
-                                  onClick={() => navigate(`/portal/projects/${encodeURIComponent(inv.projectCode)}?tab=invoices`)}
+                                  onClick={() => navigate(`/portal/workspace-preview?project=${encodeURIComponent(inv.projectCode)}&tab=resource&resource=invoices`)}
                                   className="text-[13px] font-bold hover:underline"
                                   style={{ color: 'var(--p-primary)' }}
                                 >
