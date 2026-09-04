@@ -4,6 +4,7 @@ import { formatMessagePreview, getMessagePreviewKind, previewAccent, previewIcon
 import { parsePaymentCard } from './PaymentCard';
 import ProductCard, { parseProductCard, stripProductMarker } from './ProductCard';
 import RichMessageBody from './RichMessageBody';
+import MarkdownMessageBody from './MarkdownMessageBody';
 
 function isImageUrl(url: string) {
   return /\.(png|jpe?g|gif|webp|svg|avif)(\?|#|$)/i.test(url) || url.startsWith('data:image/');
@@ -93,6 +94,8 @@ export default function ThreadMessageCompact({
       ) : textBody && textBody !== '(attachment)' ? (
         isSystem ? (
           <p className="text-[13px] leading-relaxed break-words whitespace-pre-wrap">{textBody}</p>
+        ) : isAi ? (
+          <MarkdownMessageBody text={textBody} className="text-[14px]" />
         ) : (
           <RichMessageBody text={textBody} className="text-[14px]" />
         )

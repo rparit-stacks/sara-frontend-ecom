@@ -17,6 +17,7 @@ import FileTagPickerModal from '@/components/portal/FileTagPickerModal';
 import EntityTagMenu, { EntityTagPill } from '@/components/portal/EntityTagMenu';
 import { buildProjectTagMarker, buildDesignTagMarker, buildInvoiceTagMarker, buildQuoteTagMarker } from '@/components/portal/EntityTagCard';
 import { RichMessageBody } from '@/components/portal/RichMessageBody';
+import { MarkdownMessageBody } from '@/components/portal/MarkdownMessageBody';
 import FinancialOverviewPanel from '@/components/portal/FinancialOverviewPanel';
 import ProjectBriefPanel from '@/components/portal/ProjectBriefPanel';
 import ProjectFilesPanel from '@/components/portal/ProjectFilesPanel';
@@ -227,7 +228,7 @@ function StageTracker({ stages, currentIndex }: { stages: string[]; currentIndex
 }
 
 type MockMessageKind = 'text' | 'image' | 'voice' | 'file' | 'system';
-type MockMessage = { id: number; kind: MockMessageKind; author: string; authorType?: string; aiGenerated?: boolean; mine?: boolean; time: string; createdAt?: string; text?: string; attachmentUrl?: string; attachmentUrls?: string[]; replyCount?: number; category?: string; reactions?: MessageReactionSummaryDto[] };
+type MockMessage = { id: number; kind: MockMessageKind; author: string; authorType?: string; aiGenerated?: boolean; mine?: boolean; time: string; createdAt?: string; text?: string; attachmentUrl?: string; attachmentUrls?: string[]; replyCount?: number; category?: string; reactions?: MessageReactionSummaryDto[]; /** True only for the live-growing STOMP streaming preview bubble, not the final persisted message — lets the AI markdown renderer use its lenient partial-markdown fallback. */ streaming?: boolean };
 
 /** Avatar color/icon per author type — mirrors the real production MessageAvatar. */
 function MessageAvatar({ type }: { type?: string }) {
@@ -292,7 +293,7 @@ function MessageBubble({
   const isAi = m.authorType === 'AI' || !!m.aiGenerated;
   const align = m.mine ? 'self-end items-end' : 'self-start items-start';
   const bubbleBg = isAi ? 'var(--p-ai-bubble)' : m.mine ? 'var(--p-primary)' : 'var(--p-surface-container-high)';
-  const bubbleColor = isAi || m.mine ? '#fff' : undefined;
+  const bubbleColor = isAi ? 'var(--p-ai-bubble-text)' : m.mine ? '#fff' : undefined;
   const radius = m.mine ? 'rounded-2xl rounded-tr-sm' : 'rounded-2xl rounded-tl-sm';
   const isGroupStart = groupStart !== false;
 
@@ -319,9 +320,9 @@ function MessageBubble({
       )}
       {isGroupStart ? (
         <span className="flex items-center gap-1.5 px-1">
-          {showAvatar && <MessageAvatar type={m.authorType} />}
-          <span className="text-[11px] font-semibold" style={{ color: m.authorType === 'AI' ? 'var(--p-tertiary)' : m.authorType === 'ADMIN' ? 'var(--p-secondary)' : 'var(--p-on-surface-variant)' }}>{m.author}</span>
-          {m.authorType === 'AI' && (
+          {showAvatar && <MessageAvatar type={isAi ? 'AI' : m.authorType} />}
+          <span className="text-[11px] font-semibold" style={{ color: isAi ? 'var(--p-tertiary)' : m.authorType === 'ADMIN' ? 'var(--p-secondary)' : 'var(--p-on-surface-variant)' }}>{m.author}</span>
+          {isAi && (
             <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white shrink-0" style={{ background: 'var(--p-tertiary)' }}>AI</span>
           )}
           <span className="text-[11px] font-semibold" style={{ color: 'var(--p-on-surface-variant)' }}>· {m.time}</span>
@@ -338,7 +339,11 @@ function MessageBubble({
         if (product) return <ProductCard data={product} />;
         return (
           <div className={`${radius} px-4 py-2.5 text-[13px] ${isAi ? 'chat-bubble-ai chat-bubble-ai-text' : m.mine ? 'chat-bubble-mine' : ''}`} style={{ background: bubbleBg, color: bubbleColor }}>
-            <RichMessageBody text={stripProductMarker(m.text) || m.text || ''} />
+            {isAi ? (
+              <MarkdownMessageBody text={stripProductMarker(m.text) || m.text || ''} streaming={m.streaming} />
+            ) : (
+              <RichMessageBody text={stripProductMarker(m.text) || m.text || ''} />
+            )}
           </div>
         );
       })()}
@@ -460,8 +465,12 @@ function toMockMessage(m: ChatMessageLike): MockMessage {
   // A payment/product card can be posted as a SYSTEM message (e.g. Request Payment posts to
   // #announcements as SYSTEM) — it must still render as a real card, not the generic grey
   // system pill, so the marker check takes precedence over the system-type check.
+  // NOTE: an AI-authored message (authorType 'AI', or 'ADMIN' + aiGenerated) must NOT be routed
+  // into the generic grey 'system' pill — it needs the real AI-styled bubble ('text' kind) so
+  // its markdown renders and the beige/badge styling applies. Only actual SYSTEM messages
+  // (join/leave/stage-change notices, etc.) get the pill.
   const hasCardMarker = !!m.body && (m.body.includes('[[payment:requested') || m.body.includes('[[product:'));
-  const kind: MockMessageKind = (m.authorType === 'SYSTEM' || m.authorType === 'AI') && !hasCardMarker ? 'system'
+  const kind: MockMessageKind = m.authorType === 'SYSTEM' && !hasCardMarker ? 'system'
     : firstUrl ? (isImageUrl(firstUrl) ? 'image' : isAudioUrl(firstUrl) ? 'voice' : 'file')
     : 'text';
   return {
@@ -1542,7 +1551,7 @@ export default function ClientWorkspacePreview() {
                   )}
                 </div>
 
-                <div className="relative flex-1 min-h-0" style={{ background: 'var(--p-surface-container-lowest)' }}>
+                <div className="relative flex flex-1 min-h-0 flex-col" style={{ background: 'var(--p-surface-container-lowest)' }}>
                   {/* Chat wallpaper — fixed behind the messages (not inside the scroller, so it
                       doesn't scroll away) and pointer-events-none so it never eats clicks. Same
                       watercolor asset + low opacity the inquiry/quote pages already use. */}
@@ -1555,10 +1564,15 @@ export default function ClientWorkspacePreview() {
                       backgroundRepeat: 'no-repeat',
                     }}
                   />
+                  {/* Real flex-sized scroller (not absolute inset-0) — a flex-1 min-h-0 child of
+                      this flex-column parent can never overflow past where the Composer sibling
+                      starts, unlike the previous absolute-positioned version which relied on
+                      every ancestor above it correctly sizing this container and could bleed
+                      under the composer if that chain broke. */}
                   <div
                     ref={chatScrollRef}
                     onScroll={handleScroll}
-                    className="absolute inset-0 overflow-y-auto p-5 flex flex-col gap-0.5"
+                    className="relative flex-1 min-h-0 overflow-y-auto p-5 flex flex-col gap-0.5"
                   >
                     {activeMessages.map((m, i) => {
                       const prev = activeMessages[i - 1];
@@ -1600,13 +1614,14 @@ export default function ClientWorkspacePreview() {
                           mine: false,
                           time: '',
                           text: activeAiStreamText || '…',
+                          streaming: true,
                         }}
                         showAvatar
                       />
                     )}
                     {typingVisible && (() => {
                       const who = active.kind === 'general' ? generalTypingUser : channelTypingUser;
-                      const dot = who?.isAi ? 'var(--p-ai-bubble)' : 'var(--p-on-surface-variant)';
+                      const dot = who?.isAi ? 'var(--p-ai-accent)' : 'var(--p-on-surface-variant)';
                       return (
                         <div className="self-start flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px]" style={{ background: 'var(--p-surface-container-high)', color: 'var(--p-on-surface-variant)' }}>
                           <span className="flex gap-0.5">
@@ -1746,6 +1761,7 @@ export default function ClientWorkspacePreview() {
                         mine: false,
                         time: '',
                         text: threadAiStreamText || '…',
+                        streaming: true,
                       }}
                     />
                   </div>

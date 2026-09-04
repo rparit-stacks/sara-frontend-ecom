@@ -35,9 +35,16 @@
   --p-on-secondary-fixed: #0e1d1b;
   --p-on-secondary-fixed-variant: #374947;
   --p-tertiary: #924623;
-  /* Sara AI message bubble — violet, distinct from every human author's bubble color
-     (teal "mine", grey "them", brown tertiary badge) so an AI reply is unmistakable at a glance. */
-  --p-ai-bubble: #6d28d9;
+  /* Sara AI message bubble — soft, desaturated beige, distinct from every human author's
+     bubble color (teal "mine", grey "them") without being another saturated/loud color.
+     --p-ai-bubble-text is the paired readable dark warm-grey foreground for it. */
+  --p-ai-bubble: #f5efe6;
+  --p-ai-bubble-text: #4a4238;
+  /* Separate accent for AI-related UI chrome that ISN'T a message bubble (the "Sara AI is
+     replying" banner/button) — kept as the original violet so that non-bubble indicator still
+     reads as an accent color against a white "Join chat" label; only the message bubble itself
+     moved to the neutral beige above. */
+  --p-ai-accent: #6d28d9;
   --p-on-surface: #171d1c;
   --p-on-surface-variant: #3f4948;
   --p-on-background: #171d1c;
@@ -183,17 +190,63 @@
   color: var(--p-primary);
 }
 .portal-root .chat-bubble-ai .chat-bubble-body {
-  --bubble-fg: #fff;
-  --bubble-chip-bg: rgba(255,255,255,0.2);
+  --bubble-fg: var(--p-ai-bubble-text);
+  --bubble-chip-bg: rgba(74,66,56,0.12);
 }
 .portal-root .chat-bubble-ai .chat-bubble-body .chat-tag-chip-icon {
-  color: var(--p-ai-bubble);
+  color: var(--p-ai-bubble-text);
 }
-/* AI-authored reply text (Portal AI + Manufacturing Admin AI auto-replies) — white with a
-   golden glow so an AI message reads as distinct from every human bubble at a glance, not
-   just by background color. */
+/* AI-authored reply text (Portal AI + Manufacturing Admin AI auto-replies) — the beige bubble
+   is a light, low-contrast surface, so the text just needs the readable dark warm-grey
+   foreground (no glow/shadow — that was a leftover from the previous white-on-violet bubble). */
 .portal-root .chat-bubble-ai-text {
-  text-shadow: 0 0 6px rgba(255,215,120,0.65), 0 0 14px rgba(255,191,64,0.55);
+  color: var(--p-ai-bubble-text);
+}
+
+/* react-markdown output inside an AI bubble (see MarkdownMessageBody) — code/table/blockquote
+   accents read from the same beige-bubble foreground so they look native, not bolted-on. */
+.portal-root .chat-bubble-ai .markdown-message-body code {
+  background: rgba(74,66,56,0.10);
+}
+.portal-root .chat-bubble-ai .markdown-message-body pre {
+  background: rgba(74,66,56,0.08);
+}
+.portal-root .chat-bubble-ai .markdown-message-body blockquote {
+  border-color: rgba(74,66,56,0.35);
+}
+.portal-root .chat-bubble-ai .markdown-message-body th,
+.portal-root .chat-bubble-ai .markdown-message-body td {
+  border-color: rgba(74,66,56,0.25);
+}
+.portal-root .chat-bubble-ai .markdown-message-body hr {
+  border-color: rgba(74,66,56,0.35);
+}
+.portal-root .chat-bubble-ai .markdown-message-body a {
+  color: var(--p-ai-bubble-text);
+  text-decoration: underline;
+}
+
+/* Default (non-AI-bubble) markdown-message-body usage, e.g. general surfaces — reuse the
+   portal's neutral surface/outline tokens so it matches other non-bubble content. */
+.portal-root .markdown-message-body code {
+  background: var(--p-surface-container-high);
+}
+.portal-root .markdown-message-body pre {
+  background: var(--p-surface-container-high);
+}
+.portal-root .markdown-message-body blockquote {
+  border-color: var(--p-outline-variant);
+}
+.portal-root .markdown-message-body th,
+.portal-root .markdown-message-body td {
+  border-color: var(--p-outline-variant);
+}
+.portal-root .markdown-message-body hr {
+  border-color: var(--p-outline-variant);
+}
+.portal-root .markdown-message-body a {
+  color: var(--p-primary);
+  text-decoration: underline;
 }
 
 /* WYSIWYG in the composer: Tailwind's preflight strips list bullets/numbers and bold weight,
