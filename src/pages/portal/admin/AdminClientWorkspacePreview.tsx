@@ -1037,7 +1037,7 @@ export default function AdminClientWorkspacePreview() {
       setFileTagPickerOpen(true);
     });
 
-  const { typingUser: generalTypingUser, notifyTyping: notifyGeneralTyping, aiStream: generalAiStream } =
+  const { typingUser: generalTypingUser, notifyTyping: notifyGeneralTyping, aiStream: generalAiStream, clearAiStream: clearGeneralAiStream } =
     useCustomerChatStomp(hasRealEmail ? customerEmail : undefined, 'admin', 'Admin');
 
   const { data: generalMessages = [] } = useQuery({
@@ -1097,7 +1097,7 @@ export default function AdminClientWorkspacePreview() {
   });
 
   // Feature 3 — real project detail (designs list) + per-channel messages + project threads.
-  const { typingUser: channelTypingUser, notifyTyping: notifyChannelTyping, aiStream: channelAiStream } =
+  const { typingUser: channelTypingUser, notifyTyping: notifyChannelTyping, aiStream: channelAiStream, clearAiStream: clearChannelAiStream } =
     useProjectStomp(project?.code, 'admin', 'Admin');
 
   const { data: projectDetail } = useQuery({
@@ -1578,6 +1578,20 @@ export default function AdminClientWorkspacePreview() {
     resetToBottom();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChannelKey]);
+
+  /**
+   * Streaming preview → real message handoff — same fix as ClientWorkspacePreview: the stream
+   * is held on screen after `ai-done` (the `settled` flag) and only cleared once the persisted
+   * AI message is actually in the list, so the reply never blinks out during the refetch.
+   */
+  const lastAiMessageId = activeMessages.length > 0
+    ? [...activeMessages].reverse().find((m) => m.authorType === 'AI' || m.aiGenerated)?.id
+    : undefined;
+  useEffect(() => {
+    if (generalAiStream?.settled && active.kind === 'customerGeneral') clearGeneralAiStream();
+    if (channelAiStream?.settled && active.kind !== 'customerGeneral') clearChannelAiStream();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastAiMessageId]);
 
   const isGeneralChatThread = !!thread && thread.channelLabel === 'General Chat';
   const isChannelThread = !!thread && !isGeneralChatThread && isChannelPane;
@@ -2569,7 +2583,10 @@ export default function AdminClientWorkspacePreview() {
                         </div>
                       );
                     })()}
-                    <div ref={chatBottomRef} />
+                    {/* Scroll anchor with real height — see the matching comment in
+                        ClientWorkspacePreview: keeps the newest streamed line clear of the
+                        composer while the reply grows. */}
+                    <div ref={chatBottomRef} className="h-4 shrink-0" />
                   </div>
                   {!isAtBottom && newCount > 0 && (
                     <button

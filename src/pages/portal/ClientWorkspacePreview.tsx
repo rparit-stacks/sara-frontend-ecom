@@ -697,7 +697,7 @@ export default function ClientWorkspacePreview() {
   const announcementsDesign = projectDesigns.find((d) => d.system);
 
   const myEmail = getUserEmailFromToken() ?? undefined;
-  const { typingUser: generalTypingUser, notifyTyping: notifyGeneralTyping, aiStream: generalAiStream } = useCustomerChatStomp(myEmail, 'client', 'You');
+  const { typingUser: generalTypingUser, notifyTyping: notifyGeneralTyping, aiStream: generalAiStream, clearAiStream: clearGeneralAiStream } = useCustomerChatStomp(myEmail, 'client', 'You');
 
   const { data: generalMessages = [] } = useQuery({
     queryKey: ['client-customer-chat-messages'],
@@ -760,7 +760,7 @@ export default function ClientWorkspacePreview() {
     },
   });
 
-  const { typingUser: channelTypingUser, notifyTyping: notifyChannelTyping, aiStream: channelAiStream } =
+  const { typingUser: channelTypingUser, notifyTyping: notifyChannelTyping, aiStream: channelAiStream, clearAiStream: clearChannelAiStream } =
     useProjectStomp(project?.code, 'client', 'You');
 
   const activeChannelDesignId = active.kind === 'announcements' ? announcementsDesign?.id
@@ -1054,6 +1054,24 @@ export default function ClientWorkspacePreview() {
     resetToBottom();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChannelKey]);
+
+  /**
+   * Streaming preview → real message handoff. The stream is kept on screen after `ai-done`
+   * (see the `settled` flag in useProjectStomp/useCustomerChatStomp) because the persisted
+   * row only arrives via a debounced refetch — clearing on `done` blanked the bubble for the
+   * length of that round-trip, which is what read as "the reply appears, disappears, then the
+   * whole thing pops in at once". So the preview is only torn down here, once an actual AI
+   * message is present in the rendered list, guaranteeing there is never an empty frame.
+   */
+  const lastAiMessageId = activeMessages.length > 0
+    ? [...activeMessages].reverse().find((m) => m.authorType === 'AI' || m.aiGenerated)?.id
+    : undefined;
+  useEffect(() => {
+    if (generalAiStream?.settled && active.kind === 'general') clearGeneralAiStream();
+    if (channelAiStream?.settled && active.kind !== 'general') clearChannelAiStream();
+    // Keyed on the newest AI message id: it changes exactly when the real reply lands.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastAiMessageId]);
 
   const isGeneralChatThread = !!thread && thread.channelLabel === 'General Chat';
   const isChannelThread = !!thread && !isGeneralChatThread && isChannelPane;
@@ -1633,7 +1651,11 @@ export default function ClientWorkspacePreview() {
                         </div>
                       );
                     })()}
-                    <div ref={chatBottomRef} />
+                    {/* Scroll anchor. Given real height (not a 0px div) so that while the AI
+                        reply streams in — growing the content on every delta — the newest line
+                        always has clearance below it instead of ending up flush against (and
+                        visually behind) the composer as auto-scroll races the growth. */}
+                    <div ref={chatBottomRef} className="h-4 shrink-0" />
                   </div>
                   {!isAtBottom && newCount > 0 && (
                     <button

@@ -34,15 +34,22 @@ export function useProjectStomp(
   const clientRef = useRef<ReturnType<typeof acquireStomp> | null>(null);
   const [typingUser, setTypingUser] = useState<{ authorName: string; isAdmin: boolean; isAi?: boolean; designId?: number } | null>(null);
   // Live-growing preview of the Portal AI's reply as it's actually generated
-  // (see MfgAdminAiAutoResponderService.deltaStreamListener on the backend) —
-  // purely cosmetic, cleared the instant `ai-done`/`ai-error` arrives and
-  // handed off to the real persisted message the subsequent refetch picks up.
+  // (see MfgAdminAiAutoResponderService.deltaStreamListener on the backend).
   // `designId` (absent for the project's own General-Chat-shaped events) lets
   // the consumer show the preview only on the design screen it belongs to.
   // `parentMessageId` (absent for a main-channel reply) further scopes it to
   // one ThreadPanel, same idea as designId one level up.
-  const [aiStream, setAiStream] = useState<{ text: string; designId?: number; parentMessageId?: number } | null>(null);
+  // `settled` = the stream finished (`ai-done`) but the persisted row may not have
+  // arrived yet; the preview must stay on screen until it does, or the reply visibly
+  // blinks out for the length of the refetch. `clearAiStream` is what the consumer
+  // calls once it can actually see the real message in its list.
+  const [aiStream, setAiStream] = useState<{ text: string; designId?: number; parentMessageId?: number; settled?: boolean } | null>(null);
   const aiStreamTextRef = useRef('');
+
+  const clearAiStream = useCallback(() => {
+    aiStreamTextRef.current = '';
+    setAiStream(null);
+  }, []);
 
   useEffect(() => {
     if (!projectCode) return;
@@ -104,9 +111,19 @@ export function useProjectStomp(
           aiStreamTextRef.current = '';
           setAiStream({ text: '', designId, parentMessageId });
         } else if (kind === 'done' || kind === 'error') {
-          aiStreamTextRef.current = '';
-          setAiStream(null);
-          if (kind === 'done') refetchMessages(designId);
+          // Do NOT clear the streamed text here. `refetchMessages` is a debounced network
+          // round-trip, so clearing on `done` blanked the bubble for the few hundred ms until
+          // the persisted row arrived — the reported "reply appears, then disappears, then the
+          // whole thing pops in at once". Keep the finished text on screen and let the refetch
+          // land underneath it; the effect below clears the preview only once the real message
+          // is actually in the list, so there is never a gap.
+          if (kind === 'done') {
+            setAiStream((prev) => (prev ? { ...prev, settled: true } : prev));
+            refetchMessages(designId);
+          } else {
+            aiStreamTextRef.current = '';
+            setAiStream(null);
+          }
         }
       } else if (event === 'typing') {
         const payload = data as { isTyping?: boolean; authorName?: string; isAdmin?: boolean; isAi?: boolean; designId?: number } | null;
@@ -151,5 +168,5 @@ export function useProjectStomp(
     });
   }, [projectCode, authorName]);
 
-  return { typingUser, notifyTyping, aiStream };
+  return { typingUser, notifyTyping, aiStream, clearAiStream };
 }
