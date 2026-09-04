@@ -330,7 +330,14 @@ export function ChatWidget() {
       if (msg.threadId !== threadIdRef.current) return;
       if (msg.type === 'NEW_MESSAGES') {
         hasGreetedRef.current = true;
-        setMessages((prev) => [...prev, ...msg.messages]);
+        // Defensive de-dupe by id: broadcasts are one-shot with no delivery guarantee against
+        // duplicates (a listener re-subscribing, or the same NEW_MESSAGES frame processed twice),
+        // and re-appending an id already present would show a message twice in this tab.
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const incoming = msg.messages.filter((m) => !existingIds.has(m.id));
+          return incoming.length > 0 ? [...prev, ...incoming] : prev;
+        });
       } else if (msg.type === 'THREAD_CHANGED') {
         // Guest→login attach happened in another tab — reload history for continuity.
         threadIdRef.current = msg.threadId;
@@ -473,11 +480,16 @@ export function ChatWidget() {
             },
             onReset: () => {
               // A later tool round rewrote the answer — drop both what's on screen and whatever
-              // was still queued from the abandoned draft.
+              // was still queued from the abandoned draft. Remove the bubble outright rather than
+              // blanking its text: MessageBubble only renders the text block when `message.text`
+              // is truthy, so setting it to '' collapsed the whole bubble to an empty shell — the
+              // exact "answer flashes then disappears" symptom. The next onDelta recreates the
+              // bubble (same streamingId) once the redrafted answer actually starts arriving.
               typewriter.discard();
               renderedText = '';
               hasRenderedAnyText = false;
-              setMessages((prev) => prev.map((m) => (m.id === streamingId ? { ...m, text: '' } : m)));
+              setStreamStatus(null);
+              setMessages((prev) => prev.filter((m) => m.id !== streamingId));
             },
             onDelta: (delta) => {
               setStreamStatus(null);
