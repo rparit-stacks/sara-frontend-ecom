@@ -50,6 +50,7 @@ import AdminCMS from "./pages/admin/AdminCMS";
 import AdminCategories from "./pages/admin/AdminCategories";
 import AdminCategoryForm from "./pages/admin/AdminCategoryForm";
 import AdminCustomConfig from "./pages/admin/AdminCustomConfig";
+import AdminAiContext from "./pages/admin/AdminAiContext";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminAdmins from "./pages/admin/AdminAdmins";
 import CustomProductDetail from "./pages/CustomProductDetail";
@@ -333,12 +334,20 @@ const App = () =>
             } 
           />
           <Route 
-            path="/admin-sara/custom-config" 
+            path="/admin-sara/custom-config"
             element={
               <ProtectedAdminRoute>
                 <AdminCustomConfig />
               </ProtectedAdminRoute>
-            } 
+            }
+          />
+          <Route
+            path="/admin-sara/ai-context"
+            element={
+              <ProtectedAdminRoute>
+                <AdminAiContext />
+              </ProtectedAdminRoute>
+            }
           />
           <Route 
             path="/admin-sara/categories" 

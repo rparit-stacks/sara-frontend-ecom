@@ -18,6 +18,7 @@ import {
   CreditCard,
   Percent,
   Activity,
+  Sparkles,
   Wrench,
   Factory,
 } from 'lucide-react';
@@ -82,6 +83,7 @@ const adminMenuSections = [
     title: 'Settings',
     items: [
       { icon: Settings, label: 'Custom Config', path: '/admin-sara/custom-config' },
+      { icon: Sparkles, label: 'AI Context', path: '/admin-sara/ai-context' },
       { icon: Settings, label: 'Business Config', path: '/admin-sara/business-config' },
       { icon: CreditCard, label: 'Payment Settings', path: '/admin-sara/payment-config' },
       { icon: Percent, label: 'Currency Multipliers', path: '/admin-sara/currency-multipliers' },

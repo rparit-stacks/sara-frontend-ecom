@@ -3466,6 +3466,50 @@ export interface AdminAiChatTurnRequest {
 /**
  * Admin-only AI assistant. Paths under `/api/admin/**` so fetchApi attaches `adminToken`.
  */
+// ---- AI Context: client-authored extra prompt points per AI persona ----
+export interface AiPersonaOptionDto {
+  id: string;
+  label: string;
+}
+
+export interface AiPromptDirectiveDto {
+  id: number;
+  personaId: string;
+  body: string;
+  sortOrder: number;
+  active: boolean;
+  createdByAdminEmail: string | null;
+  updatedAt: string | null;
+}
+
+/**
+ * Extra prompt points layered onto each AI's hardcoded system prompt. The system prompt stays
+ * primary; these take precedence only where the two conflict (the backend states that rule to
+ * the model — see AiPromptDirectiveService). Main-admin only.
+ */
+export const aiContextApi = {
+  listPersonas: () => fetchApi<AiPersonaOptionDto[]>('/api/admin/ai-context/personas'),
+  list: (personaId: string) =>
+    fetchApi<AiPromptDirectiveDto[]>(`/api/admin/ai-context/${encodeURIComponent(personaId)}`),
+  /** The exact block appended to this AI's prompt right now, precedence preamble included. */
+  preview: (personaId: string) =>
+    fetchApi<{ rendered: string }>(`/api/admin/ai-context/${encodeURIComponent(personaId)}/preview`),
+  create: (personaId: string, body: string, sortOrder?: number) =>
+    fetchApi<AiPromptDirectiveDto>(`/api/admin/ai-context/${encodeURIComponent(personaId)}`, {
+      method: 'POST',
+      body: JSON.stringify({ body, ...(sortOrder != null ? { sortOrder } : {}) }),
+    }),
+  update: (personaId: string, id: number, patch: { body?: string; sortOrder?: number; active?: boolean }) =>
+    fetchApi<AiPromptDirectiveDto>(`/api/admin/ai-context/${encodeURIComponent(personaId)}/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  remove: (personaId: string, id: number) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/ai-context/${encodeURIComponent(personaId)}/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
 export const adminAiChatApi = {
   sendMessage: (data: AdminAiChatTurnRequest) =>
     fetchApi<AiChatTurnResponse>('/api/admin/ai-chat/message', {
