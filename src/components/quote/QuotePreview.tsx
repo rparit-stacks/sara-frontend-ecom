@@ -162,30 +162,53 @@ export default function QuotePreview({
   );
 }
 
-/* ---------- per-block renderer ---------- */
-function PreviewBlock({
-  block, accent, currency, subtotal, totals, onPatch,
+/* ---------- per-block renderer ----------
+ * Exported so QuotePaginator's off-screen measurement probe renders each
+ * candidate block/slice through the EXACT same markup that ends up on a real
+ * page — a probe using different JSX would measure the wrong thing. */
+export function PreviewBlock({
+  block, accent, currency, subtotal, totals, onPatch, readOnly, isContinuation, isFinalSlice = true,
 }: {
   block: QuoteBlock; accent: string; currency: string; subtotal: number;
   totals: ReturnType<typeof computeTotals>;
   onPatch?: (p: Partial<QuoteBlock>) => void;
+  /** True in the paginated print/PDF render — disables inline editing. */
+  readOnly?: boolean;
+  /** True for every row-slice after an items/table block's first (produced
+   *  when pagination splits an oversized block across pages) — hides the
+   *  block's own title, which already rendered on the earlier page. */
+  isContinuation?: boolean;
+  /** False for every slice EXCEPT the one containing the block's last row —
+   *  an items block's running subtotal is only meaningful once every row has
+   *  been shown, so it renders on the final slice only. Defaults true (an
+   *  unsplit block is always its own final, and only, slice). */
+  isFinalSlice?: boolean;
 }) {
   const patch = onPatch ?? (() => {});
+  const showTitle = !!block.title && !isContinuation;
   return (
     <div className="relative">
-      {block.title ? (
-        <EditableText
-          value={block.title}
-          onChange={(v) => patch({ title: v })}
-          className={`font-bold text-[15px] mb-1.5 ${alignClass(block.align)}`}
-          style={{ color: accent }}
-          placeholder="Section title"
-        />
+      {showTitle ? (
+        readOnly ? (
+          <p className={`font-bold text-[15px] mb-1.5 ${alignClass(block.align)}`} style={{ color: accent }}>{block.title}</p>
+        ) : (
+          <EditableText
+            value={block.title!}
+            onChange={(v) => patch({ title: v })}
+            className={`font-bold text-[15px] mb-1.5 ${alignClass(block.align)}`}
+            style={{ color: accent }}
+            placeholder="Section title"
+          />
+        )
       ) : null}
 
-      {block.type === 'items' && <ItemsView block={block as ItemsBlock} accent={accent} currency={currency} subtotal={subtotal} />}
+      {block.type === 'items' && (
+        <ItemsView block={block as ItemsBlock} accent={accent} currency={currency} subtotal={subtotal} hideSubtotal={!isFinalSlice} />
+      )}
       {block.type === 'text' && (
-        <RichText html={(block as TextBlock).text} align={block.align} accent={accent} onChange={(v) => patch({ text: v } as Partial<QuoteBlock>)} />
+        readOnly
+          ? <RichText html={(block as TextBlock).text} align={block.align} accent={accent} onChange={() => {}} readOnly />
+          : <RichText html={(block as TextBlock).text} align={block.align} accent={accent} onChange={(v) => patch({ text: v } as Partial<QuoteBlock>)} />
       )}
       {block.type === 'image' && <ImageView block={block as ImageBlock} />}
       {block.type === 'table' && <TableView block={block as TableBlock} accent={accent} />}
@@ -208,8 +231,11 @@ function ImageView({ block }: { block: ImageBlock }) {
   );
 }
 
-/* Priced line items — Amount = Qty × Rate, optional subtotal. Feeds totals. */
-function ItemsView({ block, accent, currency, subtotal }: { block: ItemsBlock; accent: string; currency: string; subtotal: number }) {
+/* Priced line items — Amount = Qty × Rate, optional subtotal. Feeds totals.
+ * `hideSubtotal` is set on every split slice except the LAST one covering
+ * this block — the running subtotal only makes sense once all of the
+ * block's rows have actually been shown. */
+function ItemsView({ block, accent, currency, subtotal, hideSubtotal }: { block: ItemsBlock; accent: string; currency: string; subtotal: number; hideSubtotal?: boolean }) {
   return (
     <table className="w-full border-collapse text-[13px]">
       <thead>
@@ -229,7 +255,7 @@ function ItemsView({ block, accent, currency, subtotal }: { block: ItemsBlock; a
             <td className="border border-gray-200 px-2 py-1 text-right font-medium text-gray-800">{money((Number(it.qty) || 0) * (Number(it.rate) || 0), currency)}</td>
           </tr>
         ))}
-        {block.showSubtotal !== false && (
+        {block.showSubtotal !== false && !hideSubtotal && (
           <tr>
             <td className="px-2 py-1.5 text-right font-semibold text-gray-600" colSpan={3}>Subtotal</td>
             <td className="px-2 py-1.5 text-right font-bold border-t-2" style={{ color: accent, borderColor: accent }}>{money(subtotal, currency)}</td>

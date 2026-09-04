@@ -33,6 +33,16 @@ export function useProjectStomp(
   const lastTypingSentAt = useRef(0);
   const clientRef = useRef<ReturnType<typeof acquireStomp> | null>(null);
   const [typingUser, setTypingUser] = useState<{ authorName: string; isAdmin: boolean; isAi?: boolean; designId?: number } | null>(null);
+  // Live-growing preview of the Portal AI's reply as it's actually generated
+  // (see MfgAdminAiAutoResponderService.deltaStreamListener on the backend) —
+  // purely cosmetic, cleared the instant `ai-done`/`ai-error` arrives and
+  // handed off to the real persisted message the subsequent refetch picks up.
+  // `designId` (absent for the project's own General-Chat-shaped events) lets
+  // the consumer show the preview only on the design screen it belongs to.
+  // `parentMessageId` (absent for a main-channel reply) further scopes it to
+  // one ThreadPanel, same idea as designId one level up.
+  const [aiStream, setAiStream] = useState<{ text: string; designId?: number; parentMessageId?: number } | null>(null);
+  const aiStreamTextRef = useRef('');
 
   useEffect(() => {
     if (!projectCode) return;
@@ -82,6 +92,22 @@ export function useProjectStomp(
         const designId = payload?.designId != null && payload.designId > 0 ? payload.designId : undefined;
         void qc.invalidateQueries({ queryKey: [shellKey, projectCode] });
         refetchMessages(designId);
+      } else if (event.startsWith('ai-')) {
+        const kind = event.slice(3);
+        const payload = data as { text?: string; designId?: number; parentMessageId?: number } | null;
+        const designId = payload?.designId != null && payload.designId > 0 ? payload.designId : undefined;
+        const parentMessageId = payload?.parentMessageId != null ? payload.parentMessageId : undefined;
+        if (kind === 'delta') {
+          aiStreamTextRef.current += payload?.text || '';
+          setAiStream({ text: aiStreamTextRef.current, designId, parentMessageId });
+        } else if (kind === 'reset') {
+          aiStreamTextRef.current = '';
+          setAiStream({ text: '', designId, parentMessageId });
+        } else if (kind === 'done' || kind === 'error') {
+          aiStreamTextRef.current = '';
+          setAiStream(null);
+          if (kind === 'done') refetchMessages(designId);
+        }
       } else if (event === 'typing') {
         const payload = data as { isTyping?: boolean; authorName?: string; isAdmin?: boolean; isAi?: boolean; designId?: number } | null;
         if (!payload) return;
@@ -106,6 +132,8 @@ export function useProjectStomp(
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
       setTypingUser(null);
+      aiStreamTextRef.current = '';
+      setAiStream(null);
     };
   }, [projectCode, mode, qc, skipMessageInvalidationUntil]);
 
@@ -123,5 +151,5 @@ export function useProjectStomp(
     });
   }, [projectCode, authorName]);
 
-  return { typingUser, notifyTyping };
+  return { typingUser, notifyTyping, aiStream };
 }

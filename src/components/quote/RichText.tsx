@@ -6,11 +6,16 @@ export const alignClass = (a?: QuoteAlign) =>
 
 /* ---------- inline editable plain text ---------- */
 export function EditableText({
-  value, onChange, as: As = 'div', className, placeholder, style,
+  value, onChange, as: As = 'div', className, placeholder, style, readOnly,
 }: {
   value: string; onChange: (v: string) => void; as?: ElementType;
   className?: string; placeholder?: string; style?: React.CSSProperties;
+  /** True in the read-only paginated preview/PDF render — no editing chrome, no focus ring. */
+  readOnly?: boolean;
 }) {
+  if (readOnly) {
+    return <As className={`${className ?? ''} ${!value ? 'text-gray-300' : ''}`} style={style}>{value || placeholder}</As>;
+  }
   return (
     <As
       className={`${className ?? ''} outline-none focus:ring-2 focus:ring-[#00676a]/30 rounded transition-shadow ${!value ? 'text-gray-300' : ''}`}
@@ -27,9 +32,11 @@ export function EditableText({
 
 /* ---------- compact inline rich text (used in the live page preview) ---------- */
 export function RichText({
-  html, onChange, align, accent,
+  html, onChange, align, accent, readOnly,
 }: {
   html: string; onChange: (html: string) => void; align?: QuoteAlign; accent: string;
+  /** True in the read-only paginated preview/PDF render — plain HTML, no toolbar/editing. */
+  readOnly?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [focused, setFocused] = useState(false);
@@ -38,6 +45,16 @@ export function RichText({
     if (ref.current && ref.current.innerHTML !== html) ref.current.innerHTML = html || '';
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (readOnly) {
+    return (
+      <div
+        className={`rt text-[13px] text-gray-700 leading-relaxed min-h-[1.5em] ${alignClass(align)}`}
+        style={{ ['--rt-accent' as string]: accent }}
+        dangerouslySetInnerHTML={{ __html: html || '' }}
+      />
+    );
+  }
 
   const commit = () => onChange(ref.current?.innerHTML || '');
   const exec = (cmd: string, val?: string) => { document.execCommand(cmd, false, val); commit(); };

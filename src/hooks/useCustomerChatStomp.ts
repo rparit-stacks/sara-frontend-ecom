@@ -29,6 +29,14 @@ export function useCustomerChatStomp(
   const lastTypingSentAt = useRef(0);
   const clientRef = useRef<ReturnType<typeof acquireStomp> | null>(null);
   const [typingUser, setTypingUser] = useState<{ authorName: string; isAdmin: boolean; isAi?: boolean } | null>(null);
+  // Live-growing preview of the Portal AI's reply as it's actually generated
+  // (see MfgAdminAiAutoResponderService.deltaStreamListener on the backend) —
+  // purely cosmetic, cleared the instant `ai-done`/`ai-error` arrives and
+  // handed off to the real persisted message the subsequent refetch picks up.
+  // `parentMessageId` (absent for a main-channel reply) lets the consumer show
+  // the preview only inside the ThreadPanel it belongs to, not the main pane.
+  const [aiStream, setAiStream] = useState<{ text: string; parentMessageId?: number } | null>(null);
+  const aiStreamTextRef = useRef('');
 
   useEffect(() => {
     if (!customerEmail) return;
@@ -65,6 +73,21 @@ export function useCustomerChatStomp(
       }
       if (event === 'message') {
         refetchMessages();
+      } else if (event.startsWith('ai-')) {
+        const kind = event.slice(3);
+        const payload = data as { text?: string; parentMessageId?: number } | null;
+        const parentMessageId = payload?.parentMessageId != null ? payload.parentMessageId : undefined;
+        if (kind === 'delta') {
+          aiStreamTextRef.current += payload?.text || '';
+          setAiStream({ text: aiStreamTextRef.current, parentMessageId });
+        } else if (kind === 'reset') {
+          aiStreamTextRef.current = '';
+          setAiStream({ text: '', parentMessageId });
+        } else if (kind === 'done' || kind === 'error') {
+          aiStreamTextRef.current = '';
+          setAiStream(null);
+          if (kind === 'done') refetchMessages();
+        }
       } else if (event === 'typing') {
         const payload = data as { isTyping?: boolean; authorName?: string; isAdmin?: boolean; isAi?: boolean } | null;
         if (!payload) return;
@@ -90,6 +113,8 @@ export function useCustomerChatStomp(
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
       setTypingUser(null);
+      aiStreamTextRef.current = '';
+      setAiStream(null);
     };
   }, [customerEmail, mode, qc]);
 
@@ -107,5 +132,5 @@ export function useCustomerChatStomp(
     });
   }, [customerEmail, authorName]);
 
-  return { typingUser, notifyTyping };
+  return { typingUser, notifyTyping, aiStream };
 }

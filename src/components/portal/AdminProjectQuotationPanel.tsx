@@ -67,6 +67,21 @@ export default function AdminProjectQuotationPanel({
     return rows.sort((a, b) => (b.rev.savedAt || '').localeCompare(a.rev.savedAt || ''));
   }, [projectQuotes]);
 
+  // Default view: only the LIVE quote's own most recent revisions (current + last 2) — a
+  // project can accumulate dozens of draft/superseded quotes and revisions over time, and
+  // showing all of them by default buried the one that actually matters. "Show all" (below)
+  // reveals every quote/revision for this project, unfiltered — nothing is ever hidden data,
+  // just collapsed out of the default view.
+  const [showAllRevisions, setShowAllRevisions] = useState(false);
+  const RECENT_LIVE_REVISIONS = 3;
+  const liveRevisions = useMemo(() => revisions.filter((r) => r.active).slice(0, RECENT_LIVE_REVISIONS), [revisions]);
+  // No quote is marked Live yet (e.g. every quote here is still a draft) — there's nothing
+  // to scope down to, so the default view falls back to showing everything rather than an
+  // empty list with unexplained hidden rows.
+  const defaultRevisions = liveRevisions.length > 0 ? liveRevisions : revisions;
+  const visibleRevisions = showAllRevisions ? revisions : defaultRevisions;
+  const hiddenCount = revisions.length - defaultRevisions.length;
+
   const confirmDelete = (quoteId: number, quoteRef: string) => {
     if (!window.confirm(`Delete quotation "${quoteRef}" permanently? It will also disappear from the client portal. This cannot be undone.`)) return;
     deleteQuote.mutate(quoteId);
@@ -80,7 +95,9 @@ export default function AdminProjectQuotationPanel({
             <div>
               <h2 className="font-bold text-[20px]">Quotations</h2>
               <p className="text-[13px] mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>
-                All versions for this project — view, download or edit. Changes are announced to the client.
+                {showAllRevisions
+                  ? 'All versions for this project — view, download or edit. Changes are announced to the client.'
+                  : 'The live quotation and its recent revisions. Changes are announced to the client.'}
               </p>
             </div>
             <button
@@ -103,7 +120,7 @@ export default function AdminProjectQuotationPanel({
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {revisions.map((row) => (
+              {visibleRevisions.map((row) => (
                 <div
                   key={`${row.quoteRef}-v${row.rev.version}`}
                   className="border rounded-xl p-4 flex flex-col gap-3"
@@ -166,6 +183,31 @@ export default function AdminProjectQuotationPanel({
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {!showAllRevisions && hiddenCount > 0 && (
+            <div className="flex justify-center mt-4">
+              <button
+                type="button"
+                onClick={() => setShowAllRevisions(true)}
+                className="px-4 py-2 rounded-lg text-[13px] font-semibold border"
+                style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-primary)' }}
+              >
+                Show all {revisions.length} quotations
+              </button>
+            </div>
+          )}
+          {showAllRevisions && hiddenCount > 0 && (
+            <div className="flex justify-center mt-4">
+              <button
+                type="button"
+                onClick={() => setShowAllRevisions(false)}
+                className="px-4 py-2 rounded-lg text-[13px] font-semibold"
+                style={{ color: 'var(--p-on-surface-variant)' }}
+              >
+                Show only the live quotation
+              </button>
             </div>
           )}
         </div>

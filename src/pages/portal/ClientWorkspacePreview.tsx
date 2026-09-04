@@ -20,10 +20,12 @@ import { RichMessageBody } from '@/components/portal/RichMessageBody';
 import FinancialOverviewPanel from '@/components/portal/FinancialOverviewPanel';
 import ProjectBriefPanel from '@/components/portal/ProjectBriefPanel';
 import ProjectFilesPanel from '@/components/portal/ProjectFilesPanel';
+import ProjectResourceLinksPanel from '@/components/portal/ProjectResourceLinksPanel';
+import ProjectTechPacksPanel from '@/components/portal/ProjectTechPacksPanel';
 import ClientProjectQuotationPanel from '@/components/portal/ClientProjectQuotationPanel';
 import ProjectInvoicesPanel from '@/components/portal/ProjectInvoicesPanel';
 import {
-  clientCustomerChatApi, clientProjectApi, mediaApi, getUserEmailFromToken,
+  clientCustomerChatApi, clientProjectApi, mediaApi, getUserEmailFromToken, sortMessagesByTime,
   type ManufacturingProjectDto, type ProjectDesignDto, type MessageReactionSummaryDto,
   type ProjectMessageDto, type CustomerMessageDto,
 } from '@/lib/api';
@@ -57,6 +59,8 @@ const PROJECT_RESOURCES: { key: string; icon: string; label: string; color: stri
   { key: 'quotation', icon: 'request_quote', label: 'Quotation', color: '#1d4ed8', bg: 'rgba(29,78,216,0.1)' },
   { key: 'invoices', icon: 'receipt_long', label: 'Invoices', color: '#b45309', bg: 'rgba(180,83,9,0.1)' },
   { key: 'files', icon: 'folder_open', label: 'Files', color: '#be185d', bg: 'rgba(190,24,101,0.1)' },
+  { key: 'links', icon: 'link', label: 'File Links', color: '#0891b2', bg: 'rgba(8,145,178,0.1)' },
+  { key: 'techpacks', icon: 'design_services', label: 'Tech Packs', color: '#7c3aed', bg: 'rgba(124,58,237,0.1)' },
 ];
 
 type Level = { kind: 'home' } | { kind: 'project'; projectId: number };
@@ -222,7 +226,7 @@ function StageTracker({ stages, currentIndex }: { stages: string[]; currentIndex
   );
 }
 
-type MockMessageKind = 'text' | 'image' | 'file' | 'system';
+type MockMessageKind = 'text' | 'image' | 'voice' | 'file' | 'system';
 type MockMessage = { id: number; kind: MockMessageKind; author: string; authorType?: string; aiGenerated?: boolean; mine?: boolean; time: string; createdAt?: string; text?: string; attachmentUrl?: string; attachmentUrls?: string[]; replyCount?: number; category?: string; reactions?: MessageReactionSummaryDto[] };
 
 /** Avatar color/icon per author type — mirrors the real production MessageAvatar. */
@@ -365,6 +369,15 @@ function MessageBubble({
           </div>
         );
       })()}
+      {m.kind === 'voice' && (() => {
+        const url = m.attachmentUrls?.[0] || m.attachmentUrl;
+        if (!url) return null;
+        return (
+          <div className={`${radius} px-3 py-2.5 border`} style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)', minWidth: 220 }}>
+            <audio controls preload="metadata" src={url} className="w-full h-9" style={{ borderRadius: 8 }} />
+          </div>
+        );
+      })()}
       {m.kind === 'file' && (
         <button
           type="button"
@@ -409,6 +422,14 @@ function isImageUrl(url?: string): boolean {
   return (!!url && /\.(png|jpe?g|gif|webp|svg)$/i.test(url.split('?')[0])) || !!url?.startsWith('data:image/');
 }
 
+// Mobile's voice recorder always uploads `.m4a`; covering the other common
+// voice-note/audio container formats too so a recording from any source
+// still gets the inline player instead of falling through to a plain file
+// download link.
+function isAudioUrl(url?: string): boolean {
+  return !!url && /\.(m4a|mp3|wav|aac|ogg|webm)$/i.test(url.split('?')[0]);
+}
+
 function fileNameFromUrl(url?: string): string | undefined {
   if (!url) return undefined;
   try {
@@ -441,7 +462,7 @@ function toMockMessage(m: ChatMessageLike): MockMessage {
   // system pill, so the marker check takes precedence over the system-type check.
   const hasCardMarker = !!m.body && (m.body.includes('[[payment:requested') || m.body.includes('[[product:'));
   const kind: MockMessageKind = (m.authorType === 'SYSTEM' || m.authorType === 'AI') && !hasCardMarker ? 'system'
-    : firstUrl ? (isImageUrl(firstUrl) ? 'image' : 'file')
+    : firstUrl ? (isImageUrl(firstUrl) ? 'image' : isAudioUrl(firstUrl) ? 'voice' : 'file')
     : 'text';
   return {
     id: m.id,
@@ -471,7 +492,9 @@ export default function ClientWorkspacePreview() {
   // re-firing on every pane/tab change the outbound state->URL sync effect makes.
   const resolvedProjectCodeRef = useRef<string | null>(null);
   const [designsCollapsed, setDesignsCollapsed] = useState(true);
-  const [resourcesCollapsed, setResourcesCollapsed] = useState(true);
+  // Resources defaults OPEN (unlike Designs, which defaults collapsed) — it's the more
+  // frequently used section. Collapsing it is still remembered per-project in localStorage.
+  const [resourcesCollapsed, setResourcesCollapsed] = useState(false);
   const [thread, setThread] = useState<{ root: MockMessage; channelLabel: string } | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
@@ -480,6 +503,7 @@ export default function ClientWorkspacePreview() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [filePreview, setFilePreview] = useState<{ url: string; fileName?: string } | null>(null);
   const [renameDesignTarget, setRenameDesignTarget] = useState<{ id: number; name: string } | null>(null);
+  const [renameProjectOpen, setRenameProjectOpen] = useState(false);
   // Mobile only: false = show the sidebar list full-screen (WhatsApp-style);
   // true = the chat/panel is open full-screen with a back button. Desktop (md+)
   // ignores this entirely — both panes are always visible side-by-side there.
@@ -610,12 +634,16 @@ export default function ClientWorkspacePreview() {
     setSearchParams(next, { replace: true });
   }, [level, active, urlResolved, myProjects, searchParams, setSearchParams]);
 
-  // Same per-project remembered collapse state as the admin workspace.
+  // Same per-project remembered collapse state as the admin workspace. Designs defaults
+  // collapsed (stored '1' means "explicitly opened"); Resources defaults OPEN, so its stored
+  // flag means the opposite — '1' means "explicitly collapsed" — a never-set key (new project,
+  // or a browser that never touched this control) falls back to each section's own default
+  // instead of both reading as collapsed.
   useEffect(() => {
     if (!project?.code) return;
     try {
       setDesignsCollapsed(localStorage.getItem(`sara-sidebar-designs-open-${project.code}`) !== '1');
-      setResourcesCollapsed(localStorage.getItem(`sara-sidebar-resources-open-${project.code}`) !== '1');
+      setResourcesCollapsed(localStorage.getItem(`sara-sidebar-resources-collapsed-${project.code}`) === '1');
     } catch { /* ignore */ }
   }, [project?.code]);
 
@@ -632,7 +660,7 @@ export default function ClientWorkspacePreview() {
     setResourcesCollapsed((prev) => {
       const next = !prev;
       if (project?.code) {
-        try { localStorage.setItem(`sara-sidebar-resources-open-${project.code}`, next ? '0' : '1'); } catch { /* ignore */ }
+        try { localStorage.setItem(`sara-sidebar-resources-collapsed-${project.code}`, next ? '1' : '0'); } catch { /* ignore */ }
       }
       return next;
     });
@@ -644,15 +672,28 @@ export default function ClientWorkspacePreview() {
     queryFn: () => clientProjectApi.listAttachments(projectSummary!.code),
     enabled: !!projectSummary && active.kind === 'resource' && active.resourceKey === 'files',
   });
+  // File Links tab (REQ-1) — client is read-only; links are admin-managed.
+  const { data: resourceLinks = [], isLoading: resourceLinksLoading } = useQuery({
+    queryKey: ['client-project-resource-links', projectSummary?.code],
+    queryFn: () => clientProjectApi.listResourceLinks(projectSummary!.code),
+    enabled: !!projectSummary && active.kind === 'resource' && active.resourceKey === 'links',
+  });
+  // Tech Packs tab (REQ-2) — read-only; linking is admin-side only.
+  const { data: projectTechPacks = [], isLoading: projectTechPacksLoading } = useQuery({
+    queryKey: ['client-project-tech-packs', projectSummary?.code],
+    queryFn: () => clientProjectApi.listTechPacks(projectSummary!.code),
+    enabled: !!projectSummary && active.kind === 'resource' && active.resourceKey === 'techpacks',
+  });
   const realDesigns = projectDesigns.filter((d) => !d.system && !d.general);
   const announcementsDesign = projectDesigns.find((d) => d.system);
 
   const myEmail = getUserEmailFromToken() ?? undefined;
-  const { typingUser: generalTypingUser, notifyTyping: notifyGeneralTyping } = useCustomerChatStomp(myEmail, 'client', 'You');
+  const { typingUser: generalTypingUser, notifyTyping: notifyGeneralTyping, aiStream: generalAiStream } = useCustomerChatStomp(myEmail, 'client', 'You');
 
   const { data: generalMessages = [] } = useQuery({
     queryKey: ['client-customer-chat-messages'],
     queryFn: () => clientCustomerChatApi.listMessages(),
+    select: sortMessagesByTime,
     enabled: active.kind === 'general',
     refetchInterval: 15_000,
   });
@@ -694,7 +735,7 @@ export default function ClientWorkspacePreview() {
         attachmentUrls: vars.attachmentUrls,
         createdAt: new Date().toISOString(),
       };
-      qc.setQueryData<CustomerMessageDto[]>(key, (old = []) => [...old, optimistic]);
+      qc.setQueryData<CustomerMessageDto[]>(key, (old = []) => sortMessagesByTime([...old, optimistic]));
       return { optimisticId: optimistic.id };
     },
     onSuccess: (_data, vars) => {
@@ -710,7 +751,7 @@ export default function ClientWorkspacePreview() {
     },
   });
 
-  const { typingUser: channelTypingUser, notifyTyping: notifyChannelTyping } =
+  const { typingUser: channelTypingUser, notifyTyping: notifyChannelTyping, aiStream: channelAiStream } =
     useProjectStomp(project?.code, 'client', 'You');
 
   const activeChannelDesignId = active.kind === 'announcements' ? announcementsDesign?.id
@@ -720,6 +761,7 @@ export default function ClientWorkspacePreview() {
   const { data: channelMessages = [] } = useQuery({
     queryKey: ['client-project-channel-messages', project?.code, activeChannelDesignId],
     queryFn: () => clientProjectApi.getChannelMessages(project!.code, activeChannelDesignId),
+    select: sortMessagesByTime,
     enabled: !!project && activeChannelDesignId != null,
     refetchInterval: 15_000,
   });
@@ -748,7 +790,7 @@ export default function ClientWorkspacePreview() {
         attachmentUrls: vars.attachmentUrls,
         createdAt: new Date().toISOString(),
       };
-      qc.setQueryData<ProjectMessageDto[]>(key, (old = []) => [...old, optimistic]);
+      qc.setQueryData<ProjectMessageDto[]>(key, (old = []) => sortMessagesByTime([...old, optimistic]));
       return { optimisticId: optimistic.id };
     },
     onSuccess: (_data, vars) => {
@@ -804,6 +846,16 @@ export default function ClientWorkspacePreview() {
       toast.success(`Renamed to "${d.name}"`);
     },
     onError: (e: Error) => toast.error(e.message || 'Failed to rename design'),
+  });
+
+  const renameProjectMutation = useMutation({
+    mutationFn: (title: string) => clientProjectApi.renameProject(project!.code, title),
+    onSuccess: (p) => {
+      qc.invalidateQueries({ queryKey: ['client-project-detail', project?.code] });
+      qc.invalidateQueries({ queryKey: ['client-projects'] });
+      toast.success(`Renamed to "${p.title}"`);
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to rename project'),
   });
 
   const deleteGeneralMessageMutation = useMutation({
@@ -970,12 +1022,25 @@ export default function ClientWorkspacePreview() {
   const activeChannelKey = active.kind === 'design' ? `design:${active.designId}`
     : active.kind === 'announcements' ? `announcements:${active.projectId}`
     : active.kind;
+  // Scoped to whichever pane is actually open, same reasoning as typingVisible
+  // below — General Chat's stream is keyed by customerEmail (no designId to
+  // check), a design/announcements channel's stream carries designId and
+  // must match the one currently open. Also excludes a thread-reply stream
+  // (parentMessageId set) — that one only ever renders inside the thread
+  // panel below, never the main pane, or a threaded AI reply would flash in
+  // both places at once while it's still generating.
+  const activeAiStreamText = active.kind === 'general'
+    ? (generalAiStream && generalAiStream.parentMessageId == null ? generalAiStream.text : null)
+    : active.kind === 'design'
+      ? (channelAiStream && channelAiStream.parentMessageId == null
+          && (channelAiStream.designId == null || channelAiStream.designId === activeChannelDesignId) ? channelAiStream.text : null)
+      : null;
   // Same condition the typing bubble renders on (below) — it grows the scroll height without
   // adding a message, so the auto-scroll hook needs to know when it appears.
-  const typingVisible = !!((active.kind === 'general' && generalTypingUser)
-    || (active.kind === 'design' && channelTypingUser
+  const typingVisible = !!((active.kind === 'general' && generalTypingUser && !activeAiStreamText)
+    || (active.kind === 'design' && channelTypingUser && !activeAiStreamText
         && (channelTypingUser.designId == null || channelTypingUser.designId === activeChannelDesignId)));
-  const { containerRef: chatScrollRef, bottomRef: chatBottomRef, isAtBottom, newCount, scrollToBottom, handleScroll, resetToBottom } = useAutoScrollChat(activeMessages.length, typingVisible);
+  const { containerRef: chatScrollRef, bottomRef: chatBottomRef, isAtBottom, newCount, scrollToBottom, handleScroll, resetToBottom } = useAutoScrollChat(activeMessages.length, typingVisible || !!activeAiStreamText);
   useEffect(() => {
     resetToBottom();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -988,6 +1053,15 @@ export default function ClientWorkspacePreview() {
     : isChannelThread && thread
       ? channelMessages.filter((m) => m.parentMessageId === thread.root.id).map(toMockMessage)
       : [];
+  // The thread-panel twin of activeAiStreamText — only a delta tagged with
+  // THIS thread's root message id, from whichever stream (General Chat or
+  // channel) the open thread actually belongs to.
+  const threadAiStreamText = !thread ? null
+    : isGeneralChatThread
+      ? (generalAiStream && generalAiStream.parentMessageId === thread.root.id ? generalAiStream.text : null)
+      : isChannelThread
+        ? (channelAiStream && channelAiStream.parentMessageId === thread.root.id ? channelAiStream.text : null)
+        : null;
 
   return (
     <PortalShell active="dms">
@@ -1043,18 +1117,28 @@ export default function ClientWorkspacePreview() {
           {level.kind === 'project' && project && (
             <>
               <div className="border-b shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
-                <button onClick={backToHome} className="w-full flex items-center gap-3 px-3 pt-3 pb-1.5 text-left hover:bg-black/[0.03] transition-colors">
-                  <Sym name="arrow_back_ios" className="text-[16px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold text-[14px] truncate leading-tight">{project.title}</p>
-                    <p className="text-[11px] truncate" style={{ color: 'var(--p-on-surface-variant)' }}>{project.code}</p>
-                    {project.assignedAgentName && (
-                      <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--p-primary)' }}>
-                        Your agent: {project.assignedAgentName}
-                      </p>
-                    )}
-                  </div>
-                </button>
+                <div className="w-full flex items-center gap-1 px-3 pt-3 pb-1.5 group/projecttitle">
+                  <button onClick={backToHome} className="flex items-center gap-3 min-w-0 flex-1 text-left hover:bg-black/[0.03] transition-colors rounded-lg -m-1 p-1">
+                    <Sym name="arrow_back_ios" className="text-[16px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-[14px] truncate leading-tight">{project.title}</p>
+                      <p className="text-[11px] truncate" style={{ color: 'var(--p-on-surface-variant)' }}>{project.code}</p>
+                      {project.assignedAgentName && (
+                        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--p-primary)' }}>
+                          Your agent: {project.assignedAgentName}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    title="Rename project"
+                    onClick={() => setRenameProjectOpen(true)}
+                    className="p-1 rounded opacity-0 group-hover/projecttitle:opacity-100 hover:bg-black/5 transition-all shrink-0"
+                  >
+                    <Sym name="edit" className="text-[16px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+                  </button>
+                </div>
                 <div className="px-3 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,103,106,0.12)', color: 'var(--p-primary)' }}>
                     Stage: {stageDef(project.currentStage).label}
@@ -1195,6 +1279,24 @@ export default function ClientWorkspacePreview() {
                 <div className="flex-1 overflow-y-auto p-5 sm:p-6">
                   <ProjectFilesPanel files={chatAttachments} isLoading={attachmentsLoading} />
                 </div>
+              </>
+            ) : active.kind === 'resource' && activeResource?.key === 'links' && project ? (
+              <>
+                <div className="h-14 px-5 border-b flex items-center gap-3 shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+                  <MobileBackButton onClick={() => setMobilePanelOpen(false)} />
+                  <Sym name={activeResource.icon} className="text-[20px]" style={{ color: activeResource.color }} />
+                  <p className="font-bold text-[14px]">{activeResource.label}</p>
+                </div>
+                <ProjectResourceLinksPanel links={resourceLinks} isLoading={resourceLinksLoading} />
+              </>
+            ) : active.kind === 'resource' && activeResource?.key === 'techpacks' && project ? (
+              <>
+                <div className="h-14 px-5 border-b flex items-center gap-3 shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+                  <MobileBackButton onClick={() => setMobilePanelOpen(false)} />
+                  <Sym name={activeResource.icon} className="text-[20px]" style={{ color: activeResource.color }} />
+                  <p className="font-bold text-[14px]">{activeResource.label}</p>
+                </div>
+                <ProjectTechPacksPanel techPacks={projectTechPacks} isLoading={projectTechPacksLoading} />
               </>
             ) : active.kind === 'resource' && activeResource ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3" style={{ color: 'var(--p-on-surface-variant)' }}>
@@ -1487,6 +1589,21 @@ export default function ClientWorkspacePreview() {
                       </Fragment>
                       );
                     })}
+                    {activeAiStreamText != null && (
+                      <MessageBubble
+                        m={{
+                          id: -1,
+                          kind: 'text',
+                          author: 'Studio Sara',
+                          authorType: 'AI',
+                          aiGenerated: true,
+                          mine: false,
+                          time: '',
+                          text: activeAiStreamText || '…',
+                        }}
+                        showAvatar
+                      />
+                    )}
                     {typingVisible && (() => {
                       const who = active.kind === 'general' ? generalTypingUser : channelTypingUser;
                       const dot = who?.isAi ? 'var(--p-ai-bubble)' : 'var(--p-on-surface-variant)';
@@ -1617,6 +1734,22 @@ export default function ClientWorkspacePreview() {
                     />
                   </div>
                 ))}
+                {threadAiStreamText != null && (
+                  <div className="flex flex-col pl-3 border-l-2" style={{ borderColor: 'var(--p-outline-variant)' }}>
+                    <MessageBubble
+                      m={{
+                        id: -1,
+                        kind: 'text',
+                        author: 'Studio Sara',
+                        authorType: 'AI',
+                        aiGenerated: true,
+                        mine: false,
+                        time: '',
+                        text: threadAiStreamText || '…',
+                      }}
+                    />
+                  </div>
+                )}
               </div>
               {(isGeneralChatThread || isChannelThread) && (
                 <div className="p-3 border-t shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
@@ -1660,6 +1793,17 @@ export default function ClientWorkspacePreview() {
         onClose={() => setRenameDesignTarget(null)}
         onSave={async (name) => {
           if (renameDesignTarget) await renameDesignMutation.mutateAsync({ designId: renameDesignTarget.id, name });
+        }}
+      />
+
+      <RenameDesignModal
+        open={renameProjectOpen}
+        currentName={project?.title || ''}
+        heading="Rename project"
+        placeholder="Project name"
+        onClose={() => setRenameProjectOpen(false)}
+        onSave={async (title) => {
+          await renameProjectMutation.mutateAsync(title);
         }}
       />
 

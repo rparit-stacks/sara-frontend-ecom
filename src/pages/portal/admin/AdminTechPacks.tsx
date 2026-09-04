@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import AdminShell, { AdminBtn } from '@/components/portal/AdminShell';
 import { Sym } from '@/components/portal/Sym';
 import StatTile from '@/components/portal/StatTile';
-import { techPackApi } from '@/lib/api';
+import { techPackApi, projectApi, type ManufacturingProjectDto } from '@/lib/api';
 import { formatInquiryDate } from '@/components/inquiry/inquiryUtils';
 
 // The standalone Tech Pack Studio (deployed on Vercel). New/Edit open it in a
@@ -18,6 +18,13 @@ export default function PortalAdminTechPacks() {
   const [tab, setTab] = useState<'saved' | 'templates'>('saved');
   const [renaming, setRenaming] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [linkingId, setLinkingId] = useState<string | null>(null);
+  // REQ-2 — tech pack summaries only carry the linked projectId, not its code/title, so
+  // the chip label is captured locally the moment a link is made/discovered (from the
+  // picker's search result) and remembered here across re-renders/refetches, keyed by
+  // tech pack id. A tech pack linked in an earlier session just shows "Linked" until
+  // re-linked or the page is refreshed after the picker resolves it once.
+  const [linkedProjectLabel, setLinkedProjectLabel] = useState<Record<string, string>>({});
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const { data: savedItems = [], isLoading: savedLoading } = useQuery({
@@ -83,6 +90,33 @@ export default function PortalAdminTechPacks() {
       invalidateAll();
     } catch {
       toast.error('Update failed');
+    }
+  }
+
+  async function linkProject(id: string, project: ManufacturingProjectDto) {
+    try {
+      await techPackApi.patch(id, { projectId: project.id });
+      setLinkedProjectLabel((m) => ({ ...m, [id]: `${project.code} · ${project.title || project.code}` }));
+      setLinkingId(null);
+      toast.success(`Linked to ${project.code}`);
+      invalidateAll();
+    } catch {
+      toast.error('Failed to link project');
+    }
+  }
+
+  async function unlinkProject(id: string) {
+    try {
+      await techPackApi.patch(id, { projectId: null });
+      setLinkedProjectLabel((m) => {
+        const next = { ...m };
+        delete next[id];
+        return next;
+      });
+      toast.success('Unlinked from project');
+      invalidateAll();
+    } catch {
+      toast.error('Failed to unlink project');
     }
   }
 
@@ -208,6 +242,42 @@ export default function PortalAdminTechPacks() {
                   </p>
                 </div>
 
+                {/* REQ-2 — linked project chip / link affordance. */}
+                <div className="mt-2 relative">
+                  {it.projectId ? (
+                    <div
+                      className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded-full"
+                      style={{ background: 'rgba(124,58,237,0.1)', color: '#7c3aed' }}
+                    >
+                      <Sym name="link" className="text-[13px]" />
+                      <span className="truncate max-w-[140px]">{linkedProjectLabel[it.id] ?? `Project #${it.projectId}`}</span>
+                      <button
+                        type="button"
+                        onClick={() => void unlinkProject(it.id)}
+                        className="hover:opacity-70"
+                        title="Unlink project"
+                      >
+                        <Sym name="close" className="text-[13px]" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setLinkingId(linkingId === it.id ? null : it.id)}
+                      className="text-[11px] font-semibold flex items-center gap-1"
+                      style={{ color: 'var(--p-on-surface-variant)' }}
+                    >
+                      <Sym name="add_link" className="text-[14px]" /> Link to project
+                    </button>
+                  )}
+                  {linkingId === it.id && (
+                    <ProjectLinkPicker
+                      onPick={(project) => void linkProject(it.id, project)}
+                      onClose={() => setLinkingId(null)}
+                    />
+                  )}
+                </div>
+
                 <div className="flex-1" />
 
                 <div className="mt-4 space-y-1.5">
@@ -263,5 +333,92 @@ export default function PortalAdminTechPacks() {
         )}
       </div>
     </AdminShell>
+  );
+}
+
+/** REQ-2 — small inline search-as-you-type project picker, in the spirit of the chat
+ *  @-mention pickers elsewhere in the portal but self-contained here: those are scoped to
+ *  one customer's own projects (chat is always inside one customer's workspace), while
+ *  this card has no customer context, so it searches cross-customer via the same
+ *  `projectApi.list({ search })` the main admin Projects list page uses. */
+function ProjectLinkPicker({
+  onPick,
+  onClose,
+}: {
+  onPick: (project: ManufacturingProjectDto) => void;
+  onClose: () => void;
+}) {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<ManufacturingProjectDto[]>([]);
+  const [loading, setLoading] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) onClose();
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [onClose]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const t = window.setTimeout(() => {
+      projectApi
+        .list({ search: q || undefined })
+        .then((rows) => {
+          if (!cancelled) setResults(rows.slice(0, 8));
+        })
+        .catch(() => {
+          if (!cancelled) setResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [q]);
+
+  return (
+    <div
+      ref={boxRef}
+      onClick={(e) => e.stopPropagation()}
+      className="absolute z-20 top-full left-0 mt-1 w-72 rounded-xl border shadow-lg overflow-hidden"
+      style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}
+    >
+      <div className="p-2 border-b" style={{ borderColor: 'var(--p-outline-variant)' }}>
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search projects by code or title…"
+          className="w-full px-2.5 py-1.5 rounded-lg text-[12.5px] outline-none border"
+          style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface)' }}
+        />
+      </div>
+      <div className="max-h-56 overflow-y-auto">
+        {loading ? (
+          <p className="text-[12px] px-3 py-3" style={{ color: 'var(--p-on-surface-variant)' }}>Searching…</p>
+        ) : results.length === 0 ? (
+          <p className="text-[12px] px-3 py-3" style={{ color: 'var(--p-on-surface-variant)' }}>No projects found.</p>
+        ) : (
+          results.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onPick(p)}
+              className="w-full text-left px-3 py-2 text-[12.5px] hover:bg-black/[0.03] flex flex-col"
+            >
+              <span className="font-semibold truncate">{p.code}</span>
+              <span className="truncate" style={{ color: 'var(--p-on-surface-variant)' }}>{p.title || p.clientName || '—'}</span>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
   );
 }

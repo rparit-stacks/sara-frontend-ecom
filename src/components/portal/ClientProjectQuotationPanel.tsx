@@ -24,9 +24,9 @@ export default function ClientProjectQuotationPanel({
       <div className="flex-1 overflow-y-auto px-6 py-5">
         <div className="max-w-5xl">
           <div className="mb-5">
-            <h2 className="font-bold text-[20px]">Quotations</h2>
+            <h2 className="font-bold text-[20px]">Quotation</h2>
             <p className="text-[13px] mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>
-              Quotes shared by the Studio Sara team. Updates also appear in Announcements.
+              The current quotation for this project. Updates also appear in Announcements.
             </p>
           </div>
 

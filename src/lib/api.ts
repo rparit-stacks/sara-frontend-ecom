@@ -84,6 +84,19 @@ function refreshAccessTokenShared(isAdminRoute: boolean): Promise<string | null>
   return userRefreshInFlight;
 }
 
+/** Backend's GlobalExceptionHandler always names the human-readable field
+ *  "error" (never "message") — shared by both the 401 branch and every
+ *  other error status in fetchApi() below, so both paths agree on how a
+ *  friendly message is extracted from a raw response body. */
+function parseApiErrorBody(rawBody: string): { error?: string; errorCode?: string } | null {
+  if (!rawBody) return null;
+  try {
+    return JSON.parse(rawBody);
+  } catch {
+    return null;
+  }
+}
+
 // Helper function for API calls
 async function fetchApi<T>(endpoint: string, options?: RequestInit, isRetryAfterRefresh = false): Promise<T> {
   // Check if it's an admin route – use adminToken ONLY for admin routes
@@ -187,17 +200,21 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit, isRetryAfter
           window.dispatchEvent(new CustomEvent('auth:sessionInvalid', { detail: { reason: 'user_not_found_or_unauth' } }));
           dispatchLoggedOut();
         }
-        let parsed: { errorCode?: string; error?: string } = {};
-        try {
-          parsed = error ? JSON.parse(error) : {};
-        } catch {
-          // ignore
-        }
-        const errorObj = { status: 401, message: parsed?.error || error || 'Unauthorized', errorCode: parsed?.errorCode, response };
+        const parsed401 = parseApiErrorBody(error);
+        const errorObj = { status: 401, message: parsed401?.error || error || 'Unauthorized', errorCode: parsed401?.errorCode, response };
         throw errorObj;
       }
-      
-      throw new Error(error || `API Error: ${response.status}`);
+
+      // Backend's GlobalExceptionHandler always names the human-readable
+      // field "error" — every non-401 status used to throw the raw,
+      // unparsed response body as this Error's .message, which any
+      // `toast.error((e as Error).message)` call site then showed verbatim.
+      const parsedOther = parseApiErrorBody(error);
+      const friendly = new Error(parsedOther?.error || error || `API Error: ${response.status}`);
+      (friendly as Error & { status?: number; errorCode?: string; raw?: string }).status = response.status;
+      (friendly as Error & { status?: number; errorCode?: string; raw?: string }).errorCode = parsedOther?.errorCode;
+      (friendly as Error & { status?: number; errorCode?: string; raw?: string }).raw = error;
+      throw friendly;
     }
     
     // Handle empty responses
@@ -785,6 +802,17 @@ export interface ManufacturingQuoteDto {
 }
 
 /** Real-time financial overview for a project: live quotation (reference only) + invoices. */
+/** REQ-1 (Portal Feature Requirements, 1st Sept) — a "File Links" entry under a project's
+ *  Resources: a label + URL to a file on a shared drive, not a portal-uploaded file.
+ *  `addedByAdminEmail` is omitted from the client-facing listing. */
+export interface ProjectResourceLinkDto {
+  id: number;
+  label: string;
+  url: string;
+  addedByAdminEmail: string | null;
+  createdAt: string;
+}
+
 export interface FinancialOverviewDto {
   projectCode: string;
   status: string | null;
@@ -2032,6 +2060,26 @@ export interface ProjectMessageDto {
   reactions?: MessageReactionSummaryDto[];
 }
 
+/**
+ * Defensive chronological sort for a message feed. The backend orders by `createdAt` with an
+ * `id` tiebreaker (see ProjectMessageRepository/CustomerMessageRepository), but a feed array is
+ * also built/merged client-side — an optimistic row appended in `onMutate`, a query cache update
+ * spliced in ahead of the next refetch — and those merges were plain array concatenation with no
+ * re-sort. A burst of rapid-fire messages could then render out of order, most visibly after a
+ * reload if the concatenation order didn't match actual send order. Sort by `createdAt` first,
+ * then by `id` as a tiebreaker (an optimistic row's negative placeholder id sorts before any real
+ * id it might tie with on timestamp, which is fine — it's always the newest thing in the list and
+ * its `createdAt` is already the freshest timestamp present).
+ */
+export function sortMessagesByTime<T extends { id: number; createdAt?: string }>(messages: T[]): T[] {
+  return [...messages].sort((a, b) => {
+    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    if (ta !== tb) return ta - tb;
+    return a.id - b.id;
+  });
+}
+
 export interface ProjectThreadSummaryDto {
   messageId: number;
   designId?: number | null;
@@ -2189,6 +2237,21 @@ export const projectApi = {
     fetchApi<ProjectMessageDto>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/messages/${messageId}`),
   listAttachments: (code: string) =>
     fetchApi<ProjectMessageDto[]>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/attachments`),
+  /** REQ-1 — "File Links" folder under Resources: links to files already on a shared drive. */
+  listResourceLinks: (code: string) =>
+    fetchApi<ProjectResourceLinkDto[]>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/resource-links`),
+  addResourceLink: (code: string, label: string, url: string) =>
+    fetchApi<ProjectResourceLinkDto>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/resource-links`, {
+      method: 'POST',
+      body: JSON.stringify({ label, url }),
+    }),
+  deleteResourceLink: (code: string, linkId: number) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/resource-links/${linkId}`, {
+      method: 'DELETE',
+    }),
+  /** REQ-2 — tech packs linked to this project's Resources "Tech Packs" pane. */
+  listTechPacks: (code: string) =>
+    fetchApi<ProjectTechPackSummary[]>(`/api/admin/manufacturing/projects/${encodeURIComponent(code)}/tech-packs`),
   getFinancialOverview: (code: string) =>
     fetchApi<FinancialOverviewDto>(
       `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/financial-overview`,
@@ -2412,7 +2475,52 @@ export const adminCustomerChatApi = {
     fetchApi<Record<string, number>>(`/api/admin/manufacturing/customer-chat/unread-counts?emails=${encodeURIComponent(customerEmails.join(','))}`),
   getMessage: (customerEmail: string, messageId: number) =>
     fetchApi<CustomerMessageDto>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/messages/${messageId}`),
+
+  // REQ-4 (Multiple Tags per Customer) — a customer can have any number of free-text admin
+  // tags, unlike the old single-tag projectApi.setCustomerTag/getCustomerTags (left in place,
+  // unused by this screen now, in case anything else — e.g. the AI tools — still relies on it).
+  listTags: (customerEmail: string) =>
+    fetchApi<CustomerTagDto[]>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/tags`),
+  listTagsBatch: (customerEmails: string[]) =>
+    fetchApi<Record<string, string[]>>(
+      `/api/admin/manufacturing/customer-chat/tags?emails=${encodeURIComponent(customerEmails.join(','))}`,
+    ),
+  listKnownTags: () =>
+    fetchApi<string[]>('/api/admin/manufacturing/customer-chat/tags/known'),
+  addTag: (customerEmail: string, tagText: string) =>
+    fetchApi<CustomerTagDto>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/tags`, {
+      method: 'POST',
+      body: JSON.stringify({ tagText }),
+    }),
+  removeTag: (customerEmail: string, tagId: number) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/tags/${tagId}`, {
+      method: 'DELETE',
+    }),
+
+  // REQ-3 (Customer Chat — Tags, Filters & Chat Status) — Open/Priority/Closed triage status
+  // per customer's General Chat. No status set yet means OPEN.
+  getStatus: (customerEmail: string) =>
+    fetchApi<{ status: CustomerChatStatus }>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/status`),
+  getStatusBatch: (customerEmails: string[]) =>
+    fetchApi<Record<string, CustomerChatStatus>>(
+      `/api/admin/manufacturing/customer-chat/status?emails=${encodeURIComponent(customerEmails.join(','))}`,
+    ),
+  setStatus: (customerEmail: string, status: CustomerChatStatus) =>
+    fetchApi<{ ok: boolean }>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
 };
+
+export type CustomerChatStatus = 'OPEN' | 'PRIORITY' | 'CLOSED';
+
+/** One free-text admin tag on a customer — id is needed to remove it individually. */
+export interface CustomerTagDto {
+  id: number;
+  customerEmail: string;
+  tagText: string;
+  createdAt: string;
+}
 
 /** Client side of the customer-level General Chat — always scoped to the logged-in user's own email. */
 export const clientCustomerChatApi = {
@@ -2565,6 +2673,12 @@ export const clientProjectApi = {
     fetchApi<ProjectMessageDto>(`/api/portal/projects/${encodeURIComponent(code)}/messages/${messageId}`),
   listAttachments: (code: string) =>
     fetchApi<ProjectMessageDto[]>(`/api/portal/projects/${encodeURIComponent(code)}/attachments`),
+  /** REQ-1 — client is read-only here; links are added/removed from the admin side only. */
+  listResourceLinks: (code: string) =>
+    fetchApi<ProjectResourceLinkDto[]>(`/api/portal/projects/${encodeURIComponent(code)}/resource-links`),
+  /** REQ-2 — client is read-only here too; linking is admin-side only (AdminTechPacks.tsx). */
+  listTechPacks: (code: string) =>
+    fetchApi<ProjectTechPackSummary[]>(`/api/portal/projects/${encodeURIComponent(code)}/tech-packs`),
   getFinancialOverview: (code: string) =>
     fetchApi<FinancialOverviewDto>(`/api/portal/projects/${encodeURIComponent(code)}/financial-overview`),
   postMessage: (
@@ -2751,6 +2865,9 @@ export interface TechPackSummary {
   id: string;
   name: string;
   isTemplate: boolean;
+  /** REQ-2 (Tech Pack Creation, Saving & Project Linking) — the ManufacturingProject this
+   *  tech pack is linked to, if any. Null/undefined = unlinked. */
+  projectId?: number | null;
   updatedAt: string;
 }
 export const techPackApi = {
@@ -2758,7 +2875,8 @@ export const techPackApi = {
     fetchApi<TechPackSummary[]>(
       `/api/admin/tech-packs${template === undefined ? '' : `?template=${template}`}`,
     ),
-  patch: (id: string, data: { name?: string; isTemplate?: boolean }) =>
+  /** projectId: omit to leave unchanged, pass null to unlink. */
+  patch: (id: string, data: { name?: string; isTemplate?: boolean; projectId?: number | null }) =>
     fetchApi<TechPackSummary>(`/api/admin/tech-packs/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -2771,6 +2889,14 @@ export const techPackApi = {
   remove: (id: string) =>
     fetchApi<void>(`/api/admin/tech-packs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };
+
+/** REQ-2 — tech packs linked to one project's Resources ("Tech Packs" pane). */
+export interface ProjectTechPackSummary {
+  id: string;
+  name: string;
+  isTemplate: boolean;
+  updatedAt: string;
+}
 
 // ---- Maintenance activity log (store-admin Maintenance page) ----
 export interface MaintenanceLogDto {

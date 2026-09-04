@@ -28,7 +28,7 @@ const STEPS = [
  */
 export default function QuoteWizard({
   doc, currency, accent, inquiry, canPickInquiry, onPickInquiry,
-  onPatchMeta, onPatchBranding, onPatchCalc, onPatchBlock, onAddBlock, onAddBlockFull, onRemoveBlock, onReorder, onToggle, onAddPage, onRemovePage,
+  onPatchMeta, onPatchBranding, onPatchCalc, onPatchBlock, onAddBlock, onAddBlockFull, onRemoveBlock, onReorder, onToggle, onRemovePage,
   onGenerate,
 }: {
   doc: QuoteDoc; currency: string; accent: string;
@@ -44,7 +44,6 @@ export default function QuoteWizard({
   onRemoveBlock: (pageId: string, blockId: string) => void;
   onReorder: (pageId: string, from: number, to: number) => void;
   onToggle: (pageId: string, blockId: string) => void;
-  onAddPage: () => void;
   onRemovePage: (pageId: string) => void;
   onGenerate: () => void;
 }) {
@@ -128,9 +127,9 @@ export default function QuoteWizard({
                     onRemovePage={() => onRemovePage(page.id)}
                   />
                 ))}
-                <button onClick={onAddPage} className="w-full py-2.5 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-[#00676a] hover:text-[#00676a] font-semibold text-[13px] flex items-center justify-center gap-2">
-                  <i className="fa-solid fa-file-circle-plus" /> Add page
-                </button>
+                {/* "Add page" lives only in the Split view's form panel now — having it
+                    here too (identical button, same onAddPage) was a straight duplicate
+                    that just made the header/toolbar area feel more cluttered than it is. */}
               </div>
             </>
           )}
@@ -170,7 +169,7 @@ export default function QuoteWizard({
             </button>
           ) : (
             <button onClick={onGenerate} className="h-10 px-6 rounded-xl text-white text-[13px] font-semibold flex items-center gap-2" style={{ background: accent }}>
-              <i className="fa-solid fa-wand-magic-sparkles text-[12px]" /> Generate &amp; edit preview
+              <i className="fa-solid fa-arrow-right text-[12px]" /> Continue to editor
             </button>
           )}
         </div>

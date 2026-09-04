@@ -20,15 +20,18 @@ import { Pill } from '@/components/portal/Pill';
 import FinancialOverviewPanel from '@/components/portal/FinancialOverviewPanel';
 import ProjectBriefPanel from '@/components/portal/ProjectBriefPanel';
 import ProjectFilesPanel from '@/components/portal/ProjectFilesPanel';
+import ProjectResourceLinksPanel from '@/components/portal/ProjectResourceLinksPanel';
+import ProjectTechPacksPanel from '@/components/portal/ProjectTechPacksPanel';
 import AdminProjectQuotationPanel from '@/components/portal/AdminProjectQuotationPanel';
 import ProjectInvoicesPanel from '@/components/portal/ProjectInvoicesPanel';
 import ProjectPaymentsPanel from '@/components/portal/ProjectPaymentsPanel';
 import { STAGE_TONE, type Stage } from '@/components/portal/adminData';
 import { highlightText } from '@/lib/highlightText';
-import { projectApi, adminCustomerChatApi, manufacturingApi, mediaApi, type ManufacturingProjectDto, type CustomerMessageDto, type ProjectDesignDto, type ProjectMessageDto, type MessageReactionSummaryDto } from '@/lib/api';
+import { projectApi, adminCustomerChatApi, manufacturingApi, mediaApi, sortMessagesByTime, type ManufacturingProjectDto, type CustomerMessageDto, type ProjectDesignDto, type ProjectMessageDto, type MessageReactionSummaryDto, type CustomerChatStatus, type CustomerTagDto } from '@/lib/api';
 import type { MentionResult } from '@/components/portal/Composer';
 import FileTagPickerModal from '@/components/portal/FileTagPickerModal';
 import EntityTagMenu, { EntityTagPill } from '@/components/portal/EntityTagMenu';
+import CustomerTagMenu, { CustomerTagChips, CustomerStatusBadge } from '@/components/portal/CustomerTagMenu';
 import { buildProjectTagMarker, buildDesignTagMarker, buildInvoiceTagMarker, buildQuoteTagMarker } from '@/components/portal/EntityTagCard';
 import { STAGES, STAGE_INDEX, defaultStatusFor, stageDef, type StageKey } from '@/components/manufacturing/stages';
 import { DESIGN_STAGES as REAL_DESIGN_STAGES, designStageLabel } from '@/lib/portalChatConstants';
@@ -109,7 +112,12 @@ const PROJECT_RESOURCES: { key: string; icon: string; label: string; color: stri
   { key: 'invoices', icon: 'receipt_long', label: 'Invoices', color: '#b45309', bg: 'rgba(180,83,9,0.1)' },
   { key: 'payments', icon: 'payments', label: 'Payments', color: '#15803d', bg: 'rgba(21,128,61,0.1)' },
   { key: 'files', icon: 'folder_open', label: 'Files', color: '#be185d', bg: 'rgba(190,24,101,0.1)' },
+  { key: 'links', icon: 'link', label: 'File Links', color: '#0891b2', bg: 'rgba(8,145,178,0.1)' },
+  { key: 'techpacks', icon: 'design_services', label: 'Tech Packs', color: '#7c3aed', bg: 'rgba(124,58,237,0.1)' },
 ];
+
+// Same standalone builder AdminTechPacks.tsx opens for New/Edit — see that file's comment.
+const TECHPACK_BUILDER_URL = (import.meta.env.VITE_TECHPACK_BUILDER_URL as string | undefined)?.replace(/\/$/, '') ?? '';
 
 type Level =
   | { kind: 'customers' }
@@ -207,7 +215,7 @@ function MobileBackButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function ListRow({ icon, iconBg, iconColor, leading, title, titleBadges, subtitle, active, onClick, onContextMenu, onDoubleClick, unread, trailing, kindTag, pinned, tag }: {
+function ListRow({ icon, iconBg, iconColor, leading, title, titleBadges, subtitle, active, onClick, onContextMenu, onDoubleClick, unread, trailing, kindTag, pinned, tag, tagChips, statusBadge }: {
   icon?: string;
   iconBg?: string;
   iconColor?: string;
@@ -217,7 +225,7 @@ function ListRow({ icon, iconBg, iconColor, leading, title, titleBadges, subtitl
   subtitle?: string;
   active?: boolean;
   onClick: () => void;
-  /** Right-click — opens the private-tag editor (see EntityTagMenu). */
+  /** Right-click — opens the private-tag editor (see EntityTagMenu / CustomerTagMenu). */
   onContextMenu?: (e: React.MouseEvent) => void;
   /** Double-click — same tag editor, for trackpad/touch users without an easy right-click. */
   onDoubleClick?: (e: React.MouseEvent) => void;
@@ -225,8 +233,13 @@ function ListRow({ icon, iconBg, iconColor, leading, title, titleBadges, subtitl
   trailing?: React.ReactNode;
   kindTag?: 'chat' | 'project' | 'design';
   pinned?: boolean;
-  /** This row's own private WhatsApp-style tag, if any — rendered next to the title. */
+  /** This row's own private WhatsApp-style tag, if any — rendered next to the title.
+   *  Project/design rows only — customer rows use `tagChips` (multi-tag) instead. */
   tag?: string | null;
+  /** Multiple tags on a customer row (REQ-4) — renders as chips instead of the single `tag` pill. */
+  tagChips?: string[];
+  /** Chat-status marker (Open/Priority/Closed) on a customer row (REQ-3). */
+  statusBadge?: React.ReactNode;
 }) {
   const accent = kindTag ? KIND_ACCENT[kindTag] : undefined;
   return (
@@ -252,12 +265,13 @@ function ListRow({ icon, iconBg, iconColor, leading, title, titleBadges, subtitl
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <p className="font-semibold text-[14px] truncate" style={active ? { color: 'var(--p-primary)' } : undefined}>{title}</p>
           {titleBadges}
           {kindTag && <KindTag kind={kindTag} />}
           {pinned && <Sym name="push_pin" className="text-[12px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />}
-          <EntityTagPill tag={tag} />
+          {statusBadge}
+          {tagChips ? <CustomerTagChips tags={tagChips} /> : <EntityTagPill tag={tag} />}
         </div>
         {subtitle && <p className="text-[12px] truncate" style={{ color: 'var(--p-on-surface-variant)' }}>{subtitle}</p>}
       </div>
@@ -294,7 +308,7 @@ function SectionLabel({ children, collapsible, collapsed, onToggle }: {
 
 /** One chat message, rendered by "kind" — mirrors the real message-type inventory:
  *  text, image attachment, file attachment, product card, payment card, system/announcement. */
-type MockMessageKind = 'text' | 'image' | 'file' | 'system';
+type MockMessageKind = 'text' | 'image' | 'voice' | 'file' | 'system';
 type MockMessage = {
   id: number;
   kind: MockMessageKind;
@@ -459,6 +473,16 @@ function MessageBubble({
         );
       })()}
 
+      {m.kind === 'voice' && (() => {
+        const url = m.attachmentUrls?.[0] || m.attachmentUrl;
+        if (!url) return null;
+        return (
+          <div className={`${radius} px-3 py-2.5 border`} style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)', minWidth: 220 }}>
+            <audio controls preload="metadata" src={url} className="w-full h-9" style={{ borderRadius: 8 }} />
+          </div>
+        );
+      })()}
+
       {m.kind === 'file' && (
         <button
           type="button"
@@ -510,6 +534,12 @@ function isImageUrl(url?: string): boolean {
   return !!url && /\.(png|jpe?g|gif|webp|svg)$/i.test(url.split('?')[0]) || !!url?.startsWith('data:image/');
 }
 
+// Mirrors ClientWorkspacePreview.tsx's isAudioUrl — mobile's voice recorder
+// always uploads `.m4a`; the rest cover other common voice-note containers.
+function isAudioUrl(url?: string): boolean {
+  return !!url && /\.(m4a|mp3|wav|aac|ogg|webm)$/i.test(url.split('?')[0]);
+}
+
 function fileNameFromUrl(url?: string): string | undefined {
   if (!url) return undefined;
   try {
@@ -542,7 +572,7 @@ function toMockMessage(m: ChatMessageLike): MockMessage {
   // system pill, so the marker check takes precedence over the system-type check.
   const hasCardMarker = !!m.body && (m.body.includes('[[payment:requested') || m.body.includes('[[product:'));
   const kind: MockMessageKind = (m.authorType === 'SYSTEM' || m.authorType === 'AI') && !hasCardMarker ? 'system'
-    : firstUrl ? (isImageUrl(firstUrl) ? 'image' : 'file')
+    : firstUrl ? (isImageUrl(firstUrl) ? 'image' : isAudioUrl(firstUrl) ? 'voice' : 'file')
     : 'text';
   return {
     id: m.id,
@@ -592,7 +622,9 @@ export default function AdminClientWorkspacePreview() {
   // — switching to a different project starts collapsed again unless that project was
   // itself expanded before.
   const [designsCollapsed, setDesignsCollapsed] = useState(true);
-  const [resourcesCollapsed, setResourcesCollapsed] = useState(true);
+  // Resources defaults OPEN (unlike Designs, which defaults collapsed) — it's the more
+  // frequently used section. Collapsing it is still remembered per-project in localStorage.
+  const [resourcesCollapsed, setResourcesCollapsed] = useState(false);
   const [thread, setThread] = useState<{ root: MockMessage; channelLabel: string } | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
@@ -691,11 +723,81 @@ export default function AdminClientWorkspacePreview() {
     enabled: customerEmails.length > 0,
     refetchInterval: 20_000,
   });
-  const { data: customerTags = {} } = useQuery({
-    queryKey: ['admin-customer-tags', customerEmails],
-    queryFn: () => projectApi.getCustomerTags(customerEmails),
+  // REQ-4 (Multiple Tags per Customer) — replaces the old single-tag projectApi.getCustomerTags
+  // for this screen; batch keyed by every customer currently visible in the sidebar.
+  const { data: customerTagsByEmail = {} } = useQuery({
+    queryKey: ['admin-customer-tags-multi', customerEmails],
+    queryFn: () => adminCustomerChatApi.listTagsBatch(customerEmails),
     enabled: customerEmails.length > 0,
   });
+  const { data: knownTags = [] } = useQuery({
+    queryKey: ['admin-customer-tags-known'],
+    queryFn: () => adminCustomerChatApi.listKnownTags(),
+  });
+  // REQ-3 (Customer Chat — Tags, Filters & Chat Status) — Open/Priority/Closed per customer.
+  const { data: customerStatuses = {} } = useQuery({
+    queryKey: ['admin-customer-statuses', customerEmails],
+    queryFn: () => adminCustomerChatApi.getStatusBatch(customerEmails),
+    enabled: customerEmails.length > 0,
+  });
+  const [tagFilter, setTagFilter] = useState<string>('All');
+  /** "Active" is the default sentinel — every non-Closed chat (Open + Priority), not just
+   *  status OPEN — distinct from the real CustomerChatStatus enum values. */
+  type StatusFilterValue = 'Active' | 'All' | CustomerChatStatus;
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('Active');
+  // Stage/status/tag filter pills default collapsed — most sessions never touch them, so
+  // showing three rows of pills under the search bar on every visit was pure clutter. A
+  // non-default filter still applied while collapsed keeps working (collapsing never clears
+  // a selection) — the toggle only hides/shows the row, it isn't a "reset filters" control.
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  // Safety net: if the tag currently selected in the filter ever stops being a known tag
+  // (removed from its last customer — from this session or any other), fall back to "All"
+  // rather than silently keeping a selection that can never match anything again.
+  useEffect(() => {
+    if (tagFilter !== 'All' && knownTags.length > 0 && !knownTags.includes(tagFilter)) {
+      setTagFilter('All');
+    }
+  }, [knownTags, tagFilter]);
+
+  /** Tag + chat-status triage filters (REQ-3/REQ-4), applied on top of the stage/search
+   *  filtering already done in `filteredGroups`. Default view (`statusFilter === 'Active'`,
+   *  same "All" pattern as stageFilter) excludes Closed chats — an explicit "Closed" (or "All")
+   *  selection is required to see them.
+   *
+   *  REQ-5 ("better chat sorting") — once filtered, groups are ordered Priority first, then by
+   *  most-recent project activity within each status tier, Closed always last regardless of
+   *  activity (a closed chat needing no attention shouldn't outrank an active one just because
+   *  it happened to be touched more recently before closing). This only reorders the sidebar —
+   *  it never hides anything the filters above didn't already exclude. */
+  const triagedGroups = useMemo(() => {
+    const STATUS_RANK: Record<CustomerChatStatus, number> = { PRIORITY: 0, OPEN: 1, CLOSED: 2 };
+    const lastActivity = (g: CustomerGroup) =>
+      g.projects.reduce((max, p) => {
+        const t = p.updatedAt ? new Date(p.updatedAt).getTime() : 0;
+        return t > max ? t : max;
+      }, 0);
+
+    return filteredGroups
+      .filter((g) => {
+        const email = g.email.toLowerCase();
+        const status: CustomerChatStatus = (customerStatuses[email] as CustomerChatStatus) || 'OPEN';
+        if (statusFilter === 'Active' && status === 'CLOSED') return false;
+        if (statusFilter !== 'All' && statusFilter !== 'Active' && status !== statusFilter) return false;
+        if (tagFilter !== 'All') {
+          const tags = customerTagsByEmail[email] || [];
+          if (!tags.some((t) => t.toLowerCase() === tagFilter.toLowerCase())) return false;
+        }
+        return true;
+      })
+      .slice()
+      .sort((a, b) => {
+        const statusA: CustomerChatStatus = (customerStatuses[a.email.toLowerCase()] as CustomerChatStatus) || 'OPEN';
+        const statusB: CustomerChatStatus = (customerStatuses[b.email.toLowerCase()] as CustomerChatStatus) || 'OPEN';
+        const rankDiff = STATUS_RANK[statusA] - STATUS_RANK[statusB];
+        if (rankDiff !== 0) return rankDiff;
+        return lastActivity(b) - lastActivity(a);
+      });
+  }, [filteredGroups, customerStatuses, customerTagsByEmail, statusFilter, tagFilter]);
 
   const customerKey =
     (level.kind !== 'customers' ? level.customerKey : undefined)
@@ -780,12 +882,15 @@ export default function AdminClientWorkspacePreview() {
   }, [level, active, urlResolved, allProjects, searchParams, setSearchParams]);
 
   // Re-derive collapse state whenever the selected project changes — read this
-  // project's own remembered state (default collapsed if never expanded before).
+  // project's own remembered state. Designs defaults collapsed (stored '1' means
+  // "explicitly opened"); Resources defaults OPEN, so its stored flag means the
+  // opposite — '1' means "explicitly collapsed" — a never-set key falls back to
+  // each section's own default instead of both reading as collapsed.
   useEffect(() => {
     if (!project?.code) return;
     try {
       setDesignsCollapsed(localStorage.getItem(`sara-sidebar-designs-open-${project.code}`) !== '1');
-      setResourcesCollapsed(localStorage.getItem(`sara-sidebar-resources-open-${project.code}`) !== '1');
+      setResourcesCollapsed(localStorage.getItem(`sara-sidebar-resources-collapsed-${project.code}`) === '1');
     } catch { /* ignore */ }
   }, [project?.code]);
 
@@ -802,7 +907,7 @@ export default function AdminClientWorkspacePreview() {
     setResourcesCollapsed((prev) => {
       const next = !prev;
       if (project?.code) {
-        try { localStorage.setItem(`sara-sidebar-resources-open-${project.code}`, next ? '0' : '1'); } catch { /* ignore */ }
+        try { localStorage.setItem(`sara-sidebar-resources-collapsed-${project.code}`, next ? '1' : '0'); } catch { /* ignore */ }
       }
       return next;
     });
@@ -836,17 +941,6 @@ export default function AdminClientWorkspacePreview() {
     onSave: (tag: string) => void;
   } | null>(null);
 
-  const openCustomerTagMenu = (e: React.MouseEvent, customerEmail: string) => {
-    setTagMenu({
-      position: { x: e.clientX, y: e.clientY },
-      currentTag: customerTags[customerEmail.toLowerCase()],
-      onSave: async (tag) => {
-        await projectApi.setCustomerTag(customerEmail, tag);
-        qc.invalidateQueries({ queryKey: ['admin-customer-tags', customerEmails] });
-      },
-    });
-  };
-
   const openProjectTagMenu = (e: React.MouseEvent, projectCode: string, currentTag: string | null | undefined) => {
     setTagMenu({
       position: { x: e.clientX, y: e.clientY },
@@ -870,6 +964,60 @@ export default function AdminClientWorkspacePreview() {
     });
   };
 
+  // REQ-3/REQ-4 — multi-tag + chat-status editor for customer rows. Separate popup/state from
+  // `tagMenu` above (which stays single-tag, for project/design rows) since a customer can have
+  // many tags and also carries a status the other levels don't.
+  const [customerTagMenu, setCustomerTagMenu] = useState<{ position: { x: number; y: number }; customerEmail: string } | null>(null);
+
+  const openCustomerTagMenu = (e: React.MouseEvent, customerEmail: string) => {
+    setCustomerTagMenu({ position: { x: e.clientX, y: e.clientY }, customerEmail });
+  };
+
+  const addCustomerTagMutation = useMutation({
+    mutationFn: ({ customerEmail, tagText }: { customerEmail: string; tagText: string }) =>
+      adminCustomerChatApi.addTag(customerEmail, tagText),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['admin-customer-tags-multi', customerEmails] });
+      qc.invalidateQueries({ queryKey: ['admin-customer-tags-known'] });
+      qc.invalidateQueries({ queryKey: ['admin-customer-tags-detail', vars.customerEmail] });
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to add tag'),
+  });
+  const removeCustomerTagMutation = useMutation({
+    mutationFn: ({ customerEmail, tagId }: { customerEmail: string; tagId: number; tagText?: string }) =>
+      adminCustomerChatApi.removeTag(customerEmail, tagId),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['admin-customer-tags-multi', customerEmails] });
+      qc.invalidateQueries({ queryKey: ['admin-customer-tags-detail', vars.customerEmail] });
+      // Was missing — a tag removed from its last customer must also drop out of the
+      // known-tags list (the filter pills + autocomplete suggestions), or it lingers there
+      // forever until something else happens to invalidate this query.
+      qc.invalidateQueries({ queryKey: ['admin-customer-tags-known'] });
+      // If the tag being removed is the one currently selected in the filter row, fall back
+      // to "All" — otherwise the filter silently keeps a now-nonexistent tag selected and the
+      // list would just show zero results with no visible explanation.
+      if (vars.tagText && vars.tagText === tagFilter) setTagFilter('All');
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to remove tag'),
+  });
+  const setCustomerStatusMutation = useMutation({
+    mutationFn: ({ customerEmail, status }: { customerEmail: string; status: CustomerChatStatus }) =>
+      adminCustomerChatApi.setStatus(customerEmail, status),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-customer-statuses', customerEmails] });
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to update chat status'),
+  });
+
+  // Full tag rows (id + text) for the customer currently in the tag/status popup — the batch
+  // query above only returns tag text (fine for row chips), so fetch this one customer's full
+  // tag list (with real ids, needed to remove a specific tag) only while the popup is open.
+  const { data: customerTagMenuTags = [] } = useQuery({
+    queryKey: ['admin-customer-tags-detail', customerTagMenu?.customerEmail],
+    queryFn: () => adminCustomerChatApi.listTags(customerTagMenu!.customerEmail),
+    enabled: !!customerTagMenu,
+  });
+
   const [fileTagPickerOpen, setFileTagPickerOpen] = useState(false);
   const fileTagResolveRef = useRef<((f: { url: string; name: string } | null) => void) | null>(null);
   const pickFileTagForComposer = (): Promise<{ url: string; name: string } | null> =>
@@ -878,12 +1026,13 @@ export default function AdminClientWorkspacePreview() {
       setFileTagPickerOpen(true);
     });
 
-  const { typingUser: generalTypingUser, notifyTyping: notifyGeneralTyping } =
+  const { typingUser: generalTypingUser, notifyTyping: notifyGeneralTyping, aiStream: generalAiStream } =
     useCustomerChatStomp(hasRealEmail ? customerEmail : undefined, 'admin', 'Admin');
 
   const { data: generalMessages = [] } = useQuery({
     queryKey: ['customer-chat-messages', customerEmail],
     queryFn: () => adminCustomerChatApi.listMessages(customerEmail!),
+    select: sortMessagesByTime,
     enabled: hasRealEmail && active.kind === 'customerGeneral',
     refetchInterval: 15_000,
   });
@@ -920,7 +1069,7 @@ export default function AdminClientWorkspacePreview() {
         attachmentUrls: vars.attachmentUrls,
         createdAt: new Date().toISOString(),
       };
-      qc.setQueryData<CustomerMessageDto[]>(key, (old = []) => [...old, optimistic]);
+      qc.setQueryData<CustomerMessageDto[]>(key, (old = []) => sortMessagesByTime([...old, optimistic]));
       return { optimisticId: optimistic.id };
     },
     onSuccess: (_data, vars) => {
@@ -937,7 +1086,7 @@ export default function AdminClientWorkspacePreview() {
   });
 
   // Feature 3 — real project detail (designs list) + per-channel messages + project threads.
-  const { typingUser: channelTypingUser, notifyTyping: notifyChannelTyping } =
+  const { typingUser: channelTypingUser, notifyTyping: notifyChannelTyping, aiStream: channelAiStream } =
     useProjectStomp(project?.code, 'admin', 'Admin');
 
   const { data: projectDetail } = useQuery({
@@ -977,6 +1126,36 @@ export default function AdminClientWorkspacePreview() {
     }
     return [...chatAttachments, ...formFiles];
   }, [chatAttachments, briefInquiry, projectDetail?.createdAt]);
+  // File Links tab (REQ-1) — admin can add/remove; the client-side panel is read-only.
+  const { data: resourceLinks = [], isLoading: resourceLinksLoading } = useQuery({
+    queryKey: ['project-resource-links', project?.code],
+    queryFn: () => projectApi.listResourceLinks(project!.code),
+    enabled: !!project && active.kind === 'resource' && active.resourceKey === 'links',
+  });
+  const addResourceLinkMutation = useMutation({
+    mutationFn: ({ label, url }: { label: string; url: string }) => projectApi.addResourceLink(project!.code, label, url),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['project-resource-links', project?.code] });
+      qc.invalidateQueries({ queryKey: ['client-project-resource-links', project?.code] });
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to add link'),
+  });
+  const deleteResourceLinkMutation = useMutation({
+    mutationFn: (linkId: number) => projectApi.deleteResourceLink(project!.code, linkId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['project-resource-links', project?.code] });
+      qc.invalidateQueries({ queryKey: ['client-project-resource-links', project?.code] });
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to remove link'),
+  });
+  // Tech Packs tab (REQ-2) — "Create Tech Pack" here opens the builder pre-linked to this
+  // project (?projectId=); an existing doc can still be linked/unlinked from the admin
+  // Tech Packs list for the case of reusing one that predates this project.
+  const { data: projectTechPacks = [], isLoading: projectTechPacksLoading } = useQuery({
+    queryKey: ['project-tech-packs', project?.code],
+    queryFn: () => projectApi.listTechPacks(project!.code),
+    enabled: !!project && active.kind === 'resource' && active.resourceKey === 'techpacks',
+  });
   const announcementsDesign = projectDesigns.find((d) => d.system);
   const realDesigns = projectDesigns.filter((d) => !d.system && !d.general);
 
@@ -1000,6 +1179,7 @@ export default function AdminClientWorkspacePreview() {
   const { data: channelMessages = [] } = useQuery({
     queryKey: ['project-channel-messages', project?.code, activeChannelDesignId],
     queryFn: () => projectApi.getChannelMessages(project!.code, activeChannelDesignId),
+    select: sortMessagesByTime,
     enabled: !!project && activeChannelDesignId != null,
     refetchInterval: 15_000,
   });
@@ -1059,7 +1239,7 @@ export default function AdminClientWorkspacePreview() {
         attachmentUrls: vars.attachmentUrls,
         createdAt: new Date().toISOString(),
       };
-      qc.setQueryData<ProjectMessageDto[]>(key, (old = []) => [...old, optimistic]);
+      qc.setQueryData<ProjectMessageDto[]>(key, (old = []) => sortMessagesByTime([...old, optimistic]));
       return { optimisticId: optimistic.id };
     },
     onSuccess: (_data, vars) => {
@@ -1364,12 +1544,25 @@ export default function AdminClientWorkspacePreview() {
     : active.kind === 'announcements' ? `announcements:${active.projectId}`
     : active.kind === 'customerGeneral' ? `general:${active.customerKey}`
     : active.kind;
+  // Scoped to whichever pane is actually open, same reasoning as typingVisible
+  // below — General Chat's stream is keyed by customerEmail (no designId to
+  // check), a design/announcements channel's stream carries designId and
+  // must match the one currently open. Also excludes a thread-reply stream
+  // (parentMessageId set) — that one only ever renders inside the thread
+  // panel below, never the main pane, or a threaded AI reply would flash in
+  // both places at once while it's still generating.
+  const activeAiStreamText = active.kind === 'customerGeneral'
+    ? (generalAiStream && generalAiStream.parentMessageId == null ? generalAiStream.text : null)
+    : active.kind === 'design'
+      ? (channelAiStream && channelAiStream.parentMessageId == null
+          && (channelAiStream.designId == null || channelAiStream.designId === activeChannelDesignId) ? channelAiStream.text : null)
+      : null;
   // Same condition the typing bubble renders on (below) — it grows the scroll height without
   // adding a message, so the auto-scroll hook needs to know when it appears.
-  const typingVisible = !!((active.kind === 'customerGeneral' && generalTypingUser)
-    || (active.kind === 'design' && channelTypingUser
+  const typingVisible = !!((active.kind === 'customerGeneral' && generalTypingUser && !activeAiStreamText)
+    || (active.kind === 'design' && channelTypingUser && !activeAiStreamText
         && (channelTypingUser.designId == null || channelTypingUser.designId === activeChannelDesignId)));
-  const { containerRef: chatScrollRef, bottomRef: chatBottomRef, isAtBottom, newCount, scrollToBottom, handleScroll, resetToBottom } = useAutoScrollChat(activeMessages.length, typingVisible);
+  const { containerRef: chatScrollRef, bottomRef: chatBottomRef, isAtBottom, newCount, scrollToBottom, handleScroll, resetToBottom } = useAutoScrollChat(activeMessages.length, typingVisible || !!activeAiStreamText);
   useEffect(() => {
     resetToBottom();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1382,6 +1575,15 @@ export default function AdminClientWorkspacePreview() {
     : isChannelThread && thread
       ? channelMessages.filter((m) => m.parentMessageId === thread.root.id).map(toMockMessage)
       : thread ? (THREAD_REPLIES[thread.root.id] ?? []) : [];
+  // The thread-panel twin of activeAiStreamText — only a delta tagged with
+  // THIS thread's root message id, from whichever stream (General Chat or
+  // channel) the open thread actually belongs to.
+  const threadAiStreamText = !thread ? null
+    : isGeneralChatThread
+      ? (generalAiStream && generalAiStream.parentMessageId === thread.root.id ? generalAiStream.text : null)
+      : isChannelThread
+        ? (channelAiStream && channelAiStream.parentMessageId === thread.root.id ? channelAiStream.text : null)
+        : null;
 
   if (customerView === 'flat' && level.kind === 'customers') {
     return (
@@ -1597,45 +1799,107 @@ export default function AdminClientWorkspacePreview() {
                 </div>
               </div>
               <div className="px-3 py-2 border-b shrink-0 space-y-2" style={{ borderColor: 'var(--p-outline-variant)' }}>
-                <div className="flex items-center gap-2 rounded-lg px-3 h-9" style={{ background: 'var(--p-surface-container-high)' }}>
-                  <Sym name="search" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-                  <input
-                    value={clientSearch}
-                    onChange={(e) => setClientSearch(e.target.value)}
-                    placeholder="Search clients, projects, code…"
-                    className="flex-1 bg-transparent border-none outline-none text-[13px]"
-                  />
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 flex items-center gap-2 rounded-lg px-3 h-9" style={{ background: 'var(--p-surface-container-high)' }}>
+                    <Sym name="search" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+                    <input
+                      value={clientSearch}
+                      onChange={(e) => setClientSearch(e.target.value)}
+                      placeholder="Search clients, projects, code…"
+                      className="flex-1 bg-transparent border-none outline-none text-[13px]"
+                    />
+                  </div>
+                  {/* Filter pills default collapsed (see filtersExpanded) — this toggle shows/hides
+                      them without ever clearing a selection made while they were open. The dot
+                      marks that a non-default filter is applied, so it stays discoverable collapsed. */}
+                  <button
+                    type="button"
+                    onClick={() => setFiltersExpanded((v) => !v)}
+                    className="relative flex items-center justify-center w-9 h-9 rounded-lg shrink-0"
+                    style={filtersExpanded
+                      ? { background: 'var(--p-primary)', color: '#fff' }
+                      : { background: 'var(--p-surface-container-high)', color: 'var(--p-on-surface-variant)' }}
+                    title={filtersExpanded ? 'Hide filters' : 'Show filters'}
+                  >
+                    <Sym name="tune" className="text-[18px]" />
+                    {!filtersExpanded && (stageFilter !== 'All' || statusFilter !== 'Active' || tagFilter !== 'All') && (
+                      <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--p-error, #b42318)' }} />
+                    )}
+                  </button>
                 </div>
-                <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-                  {['All' as const, ...STAGES.map((s) => s.key)].map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setStageFilter(s)}
-                      className="px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap shrink-0"
-                      style={s === stageFilter
-                        ? { background: 'var(--p-primary)', color: '#fff' }
-                        : { background: 'var(--p-surface-container-high)', color: 'var(--p-on-surface-variant)' }}
-                    >
-                      {s === 'All' ? 'All' : stageDef(s).label}
-                    </button>
-                  ))}
-                </div>
+                {filtersExpanded && (
+                  <>
+                    <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                      {['All' as const, ...STAGES.map((s) => s.key)].map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => setStageFilter(s)}
+                          className="px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap shrink-0"
+                          style={s === stageFilter
+                            ? { background: 'var(--p-primary)', color: '#fff' }
+                            : { background: 'var(--p-surface-container-high)', color: 'var(--p-on-surface-variant)' }}
+                        >
+                          {s === 'All' ? 'All' : stageDef(s).label}
+                        </button>
+                      ))}
+                    </div>
+                    {/* REQ-3 — chat-status triage filter. Default is "Open" (excludes Closed); an
+                        explicit "Closed" (or "All") selection is required to see closed chats. */}
+                    <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                      {([
+                        { key: 'Active', label: 'Open' },
+                        { key: 'PRIORITY', label: 'Priority' },
+                        { key: 'CLOSED', label: 'Closed' },
+                        { key: 'All', label: 'All' },
+                      ] as const).map((s) => (
+                        <button
+                          key={s.key}
+                          onClick={() => setStatusFilter(s.key)}
+                          className="px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap shrink-0"
+                          style={s.key === statusFilter
+                            ? { background: 'var(--p-primary)', color: '#fff' }
+                            : { background: 'var(--p-surface-container-high)', color: 'var(--p-on-surface-variant)' }}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                    {/* REQ-4 — tag filter, same pill pattern as stage/status above. */}
+                    {knownTags.length > 0 && (
+                      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                        {['All', ...knownTags].map((t) => (
+                          <button
+                            key={t}
+                            onClick={() => setTagFilter(t)}
+                            className="px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap shrink-0"
+                            style={t === tagFilter
+                              ? { background: '#6d28d9', color: '#fff' }
+                              : { background: 'var(--p-surface-container-high)', color: 'var(--p-on-surface-variant)' }}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
               <div className="flex-1 overflow-y-auto">
                 {isLoading ? (
                   <div className="flex justify-center py-10">
                     <Sym name="progress_activity" className="text-[24px] animate-spin" style={{ color: 'var(--p-on-surface-variant)' }} />
                   </div>
-                ) : filteredGroups.length === 0 ? (
+                ) : triagedGroups.length === 0 ? (
                   <p className="text-center text-[13px] py-10" style={{ color: 'var(--p-on-surface-variant)' }}>No clients found.</p>
-                ) : filteredGroups.map((g) => (
+                ) : triagedGroups.map((g) => (
                   <ListRow
                     key={g.key}
                     leading={<Avatar initials={initialsOf(g.name)} />}
                     title={g.name}
                     subtitle={`${g.projects.length} project${g.projects.length === 1 ? '' : 's'} · ${g.email}`}
                     unread={unreadCounts[g.email.toLowerCase()]}
-                    tag={customerTags[g.email.toLowerCase()]}
+                    tagChips={customerTagsByEmail[g.email.toLowerCase()]}
+                    statusBadge={<CustomerStatusBadge status={customerStatuses[g.email.toLowerCase()] as CustomerChatStatus} />}
                     active={(active.kind === 'customerGeneral' || active.kind === 'threadsGeneral') && active.customerKey === g.key}
                     onClick={() => openCustomer(g.key)}
                     onContextMenu={(e) => openCustomerTagMenu(e, g.email)}
@@ -1923,6 +2187,36 @@ export default function AdminClientWorkspacePreview() {
                 <div className="flex-1 overflow-y-auto p-5 sm:p-6">
                   <ProjectFilesPanel files={allProjectFiles} isLoading={attachmentsLoading} />
                 </div>
+              </>
+            ) : active.kind === 'resource' && activeResource?.key === 'links' && project ? (
+              <>
+                <div className="h-14 px-5 border-b flex items-center gap-3 shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+                  <MobileBackButton onClick={mobilePaneBack} />
+                  <Sym name={activeResource.icon} className="text-[20px]" style={{ color: activeResource.color }} />
+                  <p className="font-bold text-[14px]">{activeResource.label}</p>
+                </div>
+                <ProjectResourceLinksPanel
+                  links={resourceLinks}
+                  isLoading={resourceLinksLoading}
+                  onAdd={(label, url) => addResourceLinkMutation.mutateAsync({ label, url })}
+                  onDelete={(linkId) => deleteResourceLinkMutation.mutateAsync(linkId)}
+                />
+              </>
+            ) : active.kind === 'resource' && activeResource?.key === 'techpacks' && project ? (
+              <>
+                <div className="h-14 px-5 border-b flex items-center gap-3 shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+                  <MobileBackButton onClick={mobilePaneBack} />
+                  <Sym name={activeResource.icon} className="text-[20px]" style={{ color: activeResource.color }} />
+                  <p className="font-bold text-[14px]">{activeResource.label}</p>
+                </div>
+                <ProjectTechPacksPanel
+                  techPacks={projectTechPacks}
+                  isLoading={projectTechPacksLoading}
+                  editable
+                  onCreate={TECHPACK_BUILDER_URL
+                    ? () => window.open(`${TECHPACK_BUILDER_URL}/?projectId=${project.id}`, '_blank', 'noopener')
+                    : undefined}
+                />
               </>
             ) : active.kind === 'resource' && activeResource ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3" style={{ color: 'var(--p-on-surface-variant)' }}>
@@ -2229,6 +2523,21 @@ export default function AdminClientWorkspacePreview() {
                       </Fragment>
                       );
                     })}
+                    {activeAiStreamText != null && (
+                      <MessageBubble
+                        m={{
+                          id: -1,
+                          kind: 'text',
+                          author: 'Studio Sara',
+                          authorType: 'AI',
+                          aiGenerated: true,
+                          mine: false,
+                          time: '',
+                          text: activeAiStreamText || '…',
+                        }}
+                        showAvatar
+                      />
+                    )}
                     {typingVisible && (() => {
                       const who = active.kind === 'customerGeneral' ? generalTypingUser : channelTypingUser;
                       const dot = who?.isAi ? 'var(--p-ai-bubble)' : 'var(--p-on-surface-variant)';
@@ -2329,6 +2638,21 @@ export default function AdminClientWorkspacePreview() {
             onSave={(tag) => tagMenu?.onSave(tag)}
             onClose={() => setTagMenu(null)}
           />
+          <CustomerTagMenu
+            open={!!customerTagMenu}
+            position={customerTagMenu?.position ?? null}
+            tags={customerTagMenuTags}
+            knownTags={knownTags}
+            status={(customerTagMenu ? customerStatuses[customerTagMenu.customerEmail.toLowerCase()] : undefined) as CustomerChatStatus || 'OPEN'}
+            onAddTag={(tagText) => customerTagMenu && addCustomerTagMutation.mutate({ customerEmail: customerTagMenu.customerEmail, tagText })}
+            onRemoveTag={(tagId) => {
+              if (!customerTagMenu) return;
+              const tagText = customerTagMenuTags.find((t) => t.id === tagId)?.tagText;
+              removeCustomerTagMutation.mutate({ customerEmail: customerTagMenu.customerEmail, tagId, tagText });
+            }}
+            onSetStatus={(status) => customerTagMenu && setCustomerStatusMutation.mutate({ customerEmail: customerTagMenu.customerEmail, status })}
+            onClose={() => setCustomerTagMenu(null)}
+          />
 
           {/* Thread panel — right-side sliding drawer */}
           {thread && (
@@ -2390,6 +2714,22 @@ export default function AdminClientWorkspacePreview() {
                     />
                   </div>
                 ))}
+                {threadAiStreamText != null && (
+                  <div className="flex flex-col pl-3 border-l-2" style={{ borderColor: 'var(--p-outline-variant)' }}>
+                    <MessageBubble
+                      m={{
+                        id: -1,
+                        kind: 'text',
+                        author: 'Studio Sara',
+                        authorType: 'AI',
+                        aiGenerated: true,
+                        mine: false,
+                        time: '',
+                        text: threadAiStreamText || '…',
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               {(isGeneralChatThread || isChannelThread) && (

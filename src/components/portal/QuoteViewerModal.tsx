@@ -1,33 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import { toast } from 'sonner';
-import QuotePreview from '@/components/quote/QuotePreview';
+import QuotePrintPreview from '@/components/quote/QuotePrintPreview';
+import { exportQuotePdf } from '@/components/quote/exportQuotePdf';
 import { businessConfigToProfile, normalizeQuoteDoc, type QuoteDoc } from '@/components/quote/quoteDoc';
 import { businessConfigApi, clientProjectApi, projectApi, type ManufacturingQuoteDto } from '@/lib/api';
 import { Sym } from '@/components/portal/Sym';
-
-async function buildPdfFromCanvas(root: HTMLElement | null, filename: string) {
-  if (!root) return;
-  const nodes = Array.from(root.querySelectorAll<HTMLElement>('.quote-page'));
-  if (!nodes.length) return;
-  const pdf = new jsPDF('p', 'pt', 'a4');
-  const pw = pdf.internal.pageSize.getWidth();
-  const ph = pdf.internal.pageSize.getHeight();
-  for (let i = 0; i < nodes.length; i++) {
-    const canvas = await html2canvas(nodes[i], {
-      scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
-      ignoreElements: (el) => (el as HTMLElement).classList?.contains('no-print'),
-    });
-    const img = canvas.toDataURL('image/jpeg', 0.96);
-    let w = pw; let h = (canvas.height * pw) / canvas.width;
-    if (h > ph) { h = ph; w = (canvas.width * ph) / canvas.height; }
-    if (i > 0) pdf.addPage();
-    pdf.addImage(img, 'JPEG', (pw - w) / 2, 0, w, h);
-  }
-  pdf.save(filename);
-}
 
 export default function QuoteViewerModal({
   open,
@@ -77,7 +55,7 @@ export default function QuoteViewerModal({
   });
   const profile = useMemo(() => businessConfigToProfile(business), [business]);
 
-  const { data: quote, isLoading } = useQuery({
+  const { data: quote, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['quote-view', mode, projectCode, quoteId],
     queryFn: () => {
       if (fetchQuote) return fetchQuote();
@@ -87,6 +65,7 @@ export default function QuoteViewerModal({
         : projectApi.getQuote(projectCode, quoteId);
     },
     enabled: open && !!quoteId,
+    retry: false,
   });
 
   useEffect(() => {
@@ -99,9 +78,12 @@ export default function QuoteViewerModal({
   if (!open || !quoteId) return null;
 
   const download = async () => {
+    if (!doc) return;
     setExporting(true);
     try {
-      await buildPdfFromCanvas(canvasRef.current, `${reference || 'quotation'}.pdf`);
+      const pdf = await exportQuotePdf(doc, doc.accent || '#00676a', currency, reference);
+      if (!pdf) { toast.error('Nothing to export'); return; }
+      pdf.save(`${reference || 'quotation'}.pdf`);
     } catch (e) {
       toast.error((e as Error).message || 'PDF export failed');
     } finally {
@@ -124,7 +106,19 @@ export default function QuoteViewerModal({
         </div>
       </header>
       <div ref={scrollAreaRef} className="flex-1 overflow-y-auto py-8 px-4 flex justify-center" style={{ background: '#e5e7eb' }}>
-        {isLoading || !doc ? (
+        {isError ? (
+          <div className="flex flex-col items-center gap-3 text-center max-w-xs mt-16">
+            <Sym name="receipt_long" className="text-[40px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+            <p className="font-semibold text-[15px]" style={{ color: 'var(--p-on-surface)' }}>This quotation could not be found</p>
+            <p className="text-[13px]" style={{ color: 'var(--p-on-surface-variant)' }}>
+              {(error as Error)?.message || 'It may have been removed or the link is out of date.'}
+            </p>
+            <div className="flex gap-2 mt-1">
+              <button type="button" onClick={() => void refetch()} className="px-4 py-2 rounded-lg text-[13px] font-semibold" style={{ background: 'var(--p-surface-container-high)', color: 'var(--p-on-surface)' }}>Retry</button>
+              <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white" style={{ background: 'var(--p-primary)' }}>Close</button>
+            </div>
+          </div>
+        ) : isLoading || !doc ? (
           <Sym name="progress_activity" className="text-[32px] animate-spin" style={{ color: 'var(--p-primary)' }} />
         ) : (
           <div style={{ width: 794 * scale }}>
@@ -134,7 +128,7 @@ export default function QuoteViewerModal({
                 on-screen zoom level applied here for narrow viewports. */}
             <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
               <div ref={canvasRef} className="flex flex-col gap-8 items-center">
-                <QuotePreview doc={doc} accent={doc.accent || '#00676a'} currency={currency} reference={reference} />
+                <QuotePrintPreview doc={doc} accent={doc.accent || '#00676a'} currency={currency} reference={reference} />
               </div>
             </div>
           </div>

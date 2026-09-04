@@ -100,10 +100,13 @@ export default function PaymentPage() {
 
   const currency = target?.currency || 'INR';
   const amountEditable = target?.amountEditable ?? (target?.mode === 'OPEN');
-  // Client-picked links (mode CLIENT, or QUOTE when project-linked with a pre-filled
-  // contact) lock the email field since we already know who this is for — cosmetic
-  // only, doesn't restrict who can actually pay.
-  const clientLocked = (target?.mode === 'CLIENT' || target?.mode === 'QUOTE') && !!target?.clientEmail;
+  // Locks the email field whenever the link already carries a known client email — covers
+  // CLIENT/QUOTE links AND FIXED-mode ones (auto-created alongside an invoice, the most common
+  // real path). FIXED was missing here before: the field stayed editable, so a payer could
+  // (and evidently did) submit a different email than their actual account, which the client
+  // payment-history endpoint used to key off directly — see PaymentLinkService.listPaymentsForAccount.
+  // Cosmetic only even now — it doesn't restrict who can actually pay, just who a receipt says paid.
+  const clientLocked = (target?.mode === 'CLIENT' || target?.mode === 'QUOTE' || target?.mode === 'FIXED') && !!target?.clientEmail;
   const numericAmount = useMemo(() => parseFloat(amount) || 0, [amount]);
 
   const { data: methods } = useQuery({

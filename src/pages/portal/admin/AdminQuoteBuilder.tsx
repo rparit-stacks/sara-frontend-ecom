@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import { businessConfigApi, manufacturingApi, mediaApi } from '@/lib/api';
+import { exportQuotePdf } from '@/components/quote/exportQuotePdf';
+import QuotePdfPreviewModal from '@/components/quote/QuotePdfPreviewModal';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import {
   businessConfigToProfile,
@@ -70,6 +73,7 @@ export default function PortalAdminQuoteBuilder() {
   // a section on the page). Cleared shortly after so it can re-trigger.
   const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
   const [focusClientInfo, setFocusClientInfo] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const seeded = useRef(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -332,32 +336,12 @@ export default function PortalAdminQuoteBuilder() {
     }
   };
 
-  // Rasterise the .quote-page nodes into a jsPDF. Switches to split view first
-  // (the pages only render there). Returns null if nothing to render.
+  // Builds the PDF from the paginated print render (see exportQuotePdf) —
+  // no view switch needed, it mounts its own off-screen copy regardless of
+  // which view (wizard/split) is currently showing.
   const buildQuotePdf = async () => {
-    if (view === 'wizard') {
-      setView('split');
-      await new Promise((r) => setTimeout(r, 400)); // let the preview mount
-    }
-    const root = canvasRef.current;
-    if (!root) return null;
-    const nodes = Array.from(root.querySelectorAll<HTMLElement>('.quote-page'));
-    if (!nodes.length) return null;
-    const pdf = new jsPDF('p', 'pt', 'a4');
-    const pw = pdf.internal.pageSize.getWidth();
-    const ph = pdf.internal.pageSize.getHeight();
-    for (let i = 0; i < nodes.length; i++) {
-      const canvas = await html2canvas(nodes[i], {
-        scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
-        ignoreElements: (el) => (el as HTMLElement).classList?.contains('no-print'),
-      });
-      const img = canvas.toDataURL('image/jpeg', 0.96);
-      let w = pw; let h = (canvas.height * pw) / canvas.width;
-      if (h > ph) { h = ph; w = (canvas.width * ph) / canvas.height; }
-      if (i > 0) pdf.addPage();
-      pdf.addImage(img, 'JPEG', (pw - w) / 2, 0, w, h);
-    }
-    return pdf;
+    if (!doc) return null;
+    return exportQuotePdf(doc, doc.accent || '#00676a', currency, ref);
   };
 
   const downloadPdf = async () => {
@@ -426,15 +410,33 @@ export default function PortalAdminQuoteBuilder() {
           <select value={currency} onChange={(e) => { setCurrency(e.target.value); setDirty(true); }} className="h-9 px-2 rounded-lg border border-gray-200 text-[13px]">
             {Object.keys(CURRENCIES).map((c) => <option key={c} value={c}>{c} {CURRENCIES[c]}</option>)}
           </select>
-          <button onClick={downloadPdf} disabled={exporting} className="h-9 px-3 rounded-lg text-[13px] font-semibold border border-gray-200 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5" title="Download pixel-perfect PDF">
-            <i className={`fa-solid ${exporting ? 'fa-spinner fa-spin' : 'fa-file-pdf'} text-[12px]`} /> <span className="hidden sm:inline">{exporting ? 'Exporting…' : 'Download PDF'}</span>
+          <button onClick={() => setPreviewOpen(true)} className="h-9 px-3 rounded-lg text-[13px] font-semibold border border-gray-200 hover:bg-gray-50 flex items-center gap-1.5" title="Preview the paginated PDF before downloading">
+            <i className="fa-solid fa-eye text-[12px]" /> <span className="hidden sm:inline">Preview</span>
           </button>
-          <button onClick={saveAsTemplate} disabled={savingTemplate} className="h-9 px-3 rounded-lg text-[13px] font-semibold border border-gray-200 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5" title="Save a copy of this quote as a reusable template">
-            <i className={`fa-solid ${savingTemplate ? 'fa-spinner fa-spin' : 'fa-copy'} text-[12px]`} /> <span className="hidden sm:inline">{savingTemplate ? 'Saving…' : 'Save as template'}</span>
-          </button>
-          <button onClick={() => save()} disabled={saving} className="h-9 px-3 rounded-lg text-[13px] font-semibold border border-gray-200 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5">
-            <i className="fa-solid fa-floppy-disk text-[12px]" /> {saving ? 'Saving…' : 'Save'}
-          </button>
+          {/* Save + its secondary variants (Save as template, Download PDF) —
+              these three used to be three separate, similarly-styled buttons
+              that read as interchangeable. Save/Send are the only actions an
+              admin needs on every quote; the other two are occasional. */}
+          <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden">
+            <button onClick={() => save()} disabled={saving} className="h-9 px-3 text-[13px] font-semibold hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5">
+              <i className="fa-solid fa-floppy-disk text-[12px]" /> {saving ? 'Saving…' : 'Save'}
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="h-9 w-8 border-l border-gray-200 hover:bg-gray-50 flex items-center justify-center" title="More save options">
+                  <i className="fa-solid fa-chevron-down text-[10px] text-gray-500" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={downloadPdf} disabled={exporting}>
+                  <i className={`fa-solid ${exporting ? 'fa-spinner fa-spin' : 'fa-file-pdf'} w-4 text-center mr-2`} /> {exporting ? 'Exporting…' : 'Download PDF'}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={saveAsTemplate} disabled={savingTemplate}>
+                  <i className={`fa-solid ${savingTemplate ? 'fa-spinner fa-spin' : 'fa-copy'} w-4 text-center mr-2`} /> {savingTemplate ? 'Saving…' : 'Save as template'}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <button onClick={sendToClient} disabled={saving} className="h-9 px-4 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50 flex items-center gap-1.5" style={{ background: accent }} title={doc.meta.clientEmail ? `Email this quote to ${doc.meta.clientEmail}` : 'Add a client email to send'}>
             <i className="fa-solid fa-paper-plane text-[12px]" /> <span className="hidden sm:inline">Send to client</span>
           </button>
@@ -469,7 +471,6 @@ export default function PortalAdminQuoteBuilder() {
             onRemoveBlock={removeBlock}
             onReorder={reorderBlocks}
             onToggle={toggleBlock}
-            onAddPage={addPage}
             onRemovePage={removePage}
             onGenerate={() => setView('split')}
           />
@@ -529,6 +530,15 @@ export default function PortalAdminQuoteBuilder() {
           </ResizablePanelGroup>
         </div>
       )}
+
+      <QuotePdfPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        doc={doc}
+        accent={accent}
+        currency={currency}
+        reference={ref}
+      />
     </div>
   );
 }
