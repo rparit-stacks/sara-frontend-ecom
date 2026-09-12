@@ -1556,12 +1556,32 @@ export const shippingApi = {
 // ===============================
 // Admin Auth API
 // ===============================
+export interface CurrentAdminDto {
+  id: number;
+  username: string;
+  name?: string;
+  email: string;
+  whatsappNumber?: string | null;
+  notificationType?: string | null;
+  status: string;
+  lastLogin?: string;
+  portalAdminAccess: boolean;
+}
+
 export const adminAuthApi = {
-  login: (email: string, password: string) => 
+  login: (email: string, password: string) =>
     fetchApi<any>('/api/admin/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  signup: (email: string, password: string, name: string, authCode: string) => 
+  signup: (email: string, password: string, name: string, authCode: string) =>
     fetchApi<any>('/api/admin/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, name, authCode }) }),
-  getCurrentAdmin: () => fetchApi<any>('/api/admin/auth/me'),
+  getCurrentAdmin: () => fetchApi<CurrentAdminDto>('/api/admin/auth/me'),
+  /** Self-service — no super-admin permission needed, unlike adminUsersApi-style admin
+   *  management endpoints. Sets the number AdminNotificationRouter/WhatsAppAdminNotifier
+   *  actually sends this admin's notifications to. */
+  updateOwnWhatsappNumber: (whatsappNumber: string) =>
+    fetchApi<CurrentAdminDto>('/api/admin/auth/me/whatsapp-number', {
+      method: 'PUT',
+      body: JSON.stringify({ whatsappNumber }),
+    }),
 };
 
 // ===============================

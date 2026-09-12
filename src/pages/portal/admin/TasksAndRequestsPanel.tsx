@@ -51,17 +51,24 @@ export default function TasksAndRequestsPanel() {
   const admin = getStoredAdminUser();
   const superAdmin = isSuperAdmin(admin);
 
-  const { data: myTasks = [], isLoading: tasksLoading } = useQuery({
+  const { data: myTasks = [], isLoading: tasksLoading, isError: tasksErrored, error: tasksError, refetch: refetchTasks } = useQuery({
     queryKey: ['admin-my-tasks'],
     queryFn: () => manufacturingApi.myTasks(),
     refetchInterval: 30_000,
+    // A failed fetch must not read the same as "no tasks" — React Query's `isLoading` goes
+    // back to false on error, and `data` stays the destructured [] default, so without this
+    // the panel silently vanished on any failed request (401, network blip, 500) exactly
+    // like it had genuinely found zero tasks. retry:false so a real error surfaces promptly
+    // instead of looking like an extended loading spinner for 3 retries first.
+    retry: false,
   });
 
-  const { data: pending = [], isLoading: pendingLoading } = useQuery({
+  const { data: pending = [], isLoading: pendingLoading, isError: pendingErrored, error: pendingError, refetch: refetchPending } = useQuery({
     queryKey: ['admin-pending-handover-requests'],
     queryFn: () => manufacturingApi.pendingHandoverRequests(),
     enabled: superAdmin,
     refetchInterval: 30_000,
+    retry: false,
   });
 
   const claimPending = async (h: ProjectAiHandoverDto) => {
@@ -80,7 +87,12 @@ export default function TasksAndRequestsPanel() {
   };
 
   const loading = tasksLoading || (superAdmin && pendingLoading);
-  if (!loading && myTasks.length === 0 && pending.length === 0) return null;
+  const errored = tasksErrored || (superAdmin && pendingErrored);
+  // Only actually hide the panel on a confirmed, error-free empty result — a failed fetch
+  // must stay visible (as an error state below) rather than silently disappearing, which is
+  // exactly what "the task loads and then vanishes" was: a request that failed read as "zero
+  // tasks" because data defaults to [] on error too.
+  if (!loading && !errored && myTasks.length === 0 && pending.length === 0) return null;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
@@ -98,6 +110,15 @@ export default function TasksAndRequestsPanel() {
         </div>
         {tasksLoading ? (
           <div className="px-5 pb-6"><Sym name="progress_activity" className="text-[20px] animate-spin opacity-50" /></div>
+        ) : tasksErrored ? (
+          <div className="px-5 pb-6">
+            <p className="text-[13px]" style={{ color: 'var(--p-error, #b42318)' }}>
+              Couldn't load your tasks{tasksError instanceof Error ? `: ${tasksError.message}` : '.'}
+            </p>
+            <button type="button" onClick={() => void refetchTasks()} className="text-[12px] font-semibold mt-1" style={{ color: 'var(--p-primary)' }}>
+              Retry
+            </button>
+          </div>
         ) : myTasks.length === 0 ? (
           <div className="px-5 pb-6 text-[13px]" style={{ color: 'var(--p-on-surface-variant)' }}>Nothing needs your attention right now.</div>
         ) : (
@@ -146,6 +167,15 @@ export default function TasksAndRequestsPanel() {
           </div>
           {pendingLoading ? (
             <div className="px-5 pb-6"><Sym name="progress_activity" className="text-[20px] animate-spin opacity-50" /></div>
+          ) : pendingErrored ? (
+            <div className="px-5 pb-6">
+              <p className="text-[13px]" style={{ color: 'var(--p-error, #b42318)' }}>
+                Couldn't load pending requests{pendingError instanceof Error ? `: ${pendingError.message}` : '.'}
+              </p>
+              <button type="button" onClick={() => void refetchPending()} className="text-[12px] font-semibold mt-1" style={{ color: 'var(--p-primary)' }}>
+                Retry
+              </button>
+            </div>
           ) : pending.length === 0 ? (
             <div className="px-5 pb-6 text-[13px]" style={{ color: 'var(--p-on-surface-variant)' }}>None right now.</div>
           ) : (

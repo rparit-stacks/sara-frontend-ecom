@@ -4,7 +4,9 @@ import { Sym } from './Sym';
 import { adminAuthApi, getUserEmailFromToken } from '@/lib/api';
 import { getAdminChatDisplayName, getStoredAdminUser, isSuperAdmin } from '@/lib/adminAccess';
 import { useAdminNotificationCounts } from '@/hooks/useAdminNotificationCounts';
+import { useAdminActivityToast } from '@/hooks/useAdminActivityToast';
 import { AdminPresenceProvider } from '@/context/AdminPresenceContext';
+import WhatsAppNumberGate from './WhatsAppNumberGate';
 import '@/pages/portal/portal.css';
 
 type NavItem = { icon: string; label: string; to: string; badge?: number };
@@ -87,10 +89,13 @@ export default function AdminShell({
     });
   const email = getUserEmailFromToken() || 'admin@studiosara.com';
   const [displayName, setDisplayName] = useState(() => getAdminChatDisplayName());
+  // undefined = still checking (render nothing extra); false = confirmed missing, block entry.
+  const [needsWhatsapp, setNeedsWhatsapp] = useState<boolean | undefined>(undefined);
   const initials = (displayName || email).slice(0, 2).toUpperCase();
   const searchValue = search ?? localSearch;
   const setSearch = onSearchChange ?? setLocalSearch;
   const notifCounts = useAdminNotificationCounts();
+  useAdminActivityToast();
   const superAdmin = isSuperAdmin(getStoredAdminUser());
   const navGroups = buildNavGroups(notifCounts, superAdmin);
 
@@ -100,13 +105,19 @@ export default function AdminShell({
     return () => { document.body.style.overflow = prev; };
   }, []);
 
-  useEffect(() => {
+  const refreshCurrentAdmin = () => {
     adminAuthApi.getCurrentAdmin()
       .then((admin) => {
         localStorage.setItem('adminUser', JSON.stringify(admin));
         setDisplayName(admin.name?.trim() || admin.username?.trim() || getAdminChatDisplayName());
+        setNeedsWhatsapp(!admin.whatsappNumber || !admin.whatsappNumber.trim());
       })
       .catch(() => setDisplayName(getAdminChatDisplayName()));
+  };
+
+  useEffect(() => {
+    refreshCurrentAdmin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
   useEffect(() => {
@@ -149,6 +160,7 @@ export default function AdminShell({
 
   return (
     <AdminPresenceProvider>
+    {needsWhatsapp && <WhatsAppNumberGate onSaved={() => setNeedsWhatsapp(false)} />}
     <div className="portal-root">
       {/* top bar */}
       <header className="h-12 flex items-center justify-between px-4 shrink-0 z-40" style={{ background: 'var(--p-primary)' }}>

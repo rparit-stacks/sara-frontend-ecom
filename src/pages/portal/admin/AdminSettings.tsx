@@ -152,6 +152,8 @@ export default function PortalAdminSettings() {
   const qc = useQueryClient();
   const [identityName, setIdentityName] = useState('');
   const [identityEmail, setIdentityEmail] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [whatsappSaving, setWhatsappSaving] = useState(false);
   const [settings, setSettings] = useState<PortalAdminSettings>(DEFAULT_SETTINGS);
 
   const { data: savedSettings, isLoading } = useQuery({
@@ -171,11 +173,31 @@ export default function PortalAdminSettings() {
         localStorage.setItem('adminUser', JSON.stringify(admin));
         setIdentityName(admin.name?.trim() || admin.username || getAdminChatDisplayName());
         setIdentityEmail(admin.email || '');
+        setWhatsappNumber(admin.whatsappNumber || '');
       })
       .catch(() => {
         setIdentityName(getAdminChatDisplayName());
       });
   }, []);
+
+  const saveWhatsapp = async () => {
+    const digits = whatsappNumber.replace(/[^0-9]/g, '');
+    if (digits.length < 10) {
+      toast.error('Enter at least 10 digits.');
+      return;
+    }
+    setWhatsappSaving(true);
+    try {
+      const admin = await adminAuthApi.updateOwnWhatsappNumber(digits);
+      localStorage.setItem('adminUser', JSON.stringify(admin));
+      setWhatsappNumber(admin.whatsappNumber || '');
+      toast.success('WhatsApp number updated.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save that number.');
+    } finally {
+      setWhatsappSaving(false);
+    }
+  };
 
   const saveMutation = useMutation({
     mutationFn: () => manufacturingApi.savePortalSettings(settings),
@@ -227,6 +249,31 @@ export default function PortalAdminSettings() {
                   className="w-full mt-1 px-3 py-2 rounded-lg border outline-none text-[14px]"
                   style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-low)' }}
                 />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>WhatsApp number</label>
+                <p className="text-[11.5px] mb-1" style={{ color: 'var(--p-on-surface-variant)' }}>
+                  Where your admin notifications (new messages, requests to talk to a human) are sent.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="tel"
+                    value={whatsappNumber}
+                    onChange={(e) => setWhatsappNumber(e.target.value)}
+                    placeholder="e.g. 9876543210"
+                    className="flex-1 mt-1 px-3 py-2 rounded-lg border outline-none text-[14px]"
+                    style={{ borderColor: 'var(--p-outline-variant)' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void saveWhatsapp()}
+                    disabled={whatsappSaving}
+                    className="mt-1 px-3.5 rounded-lg text-[13px] font-semibold text-white disabled:opacity-60 shrink-0"
+                    style={{ background: 'var(--p-primary)' }}
+                  >
+                    {whatsappSaving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
               </div>
               <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>
                 To change your display name, ask the primary admin to update your profile under Store Admin → Admins.
