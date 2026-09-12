@@ -6,6 +6,7 @@ import { Sym } from '@/components/portal/Sym';
 import StatTile from '@/components/portal/StatTile';
 import { techPackApi, projectApi, type ManufacturingProjectDto } from '@/lib/api';
 import { formatInquiryDate } from '@/components/inquiry/inquiryUtils';
+import { openTechPackBuilder } from '@/lib/techPackBuilder';
 
 // The standalone Tech Pack Studio (deployed on Vercel). New/Edit open it in a
 // new tab; it reads/writes the SAME studio_sara rows via the shared API, so
@@ -56,8 +57,7 @@ export default function PortalAdminTechPacks() {
       toast.error('Tech Pack Studio URL not configured (VITE_TECHPACK_BUILDER_URL).');
       return;
     }
-    const url = docId ? `${BUILDER_URL}/?docId=${encodeURIComponent(docId)}` : `${BUILDER_URL}/`;
-    window.open(url, '_blank', 'noopener');
+    openTechPackBuilder(BUILDER_URL, docId ? { docId } : {});
   }
 
   async function remove(id: string) {

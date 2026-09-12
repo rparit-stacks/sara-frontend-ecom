@@ -1,5 +1,6 @@
 import { Sym } from '@/components/portal/Sym';
 import { formatInquiryDate } from '@/components/inquiry/inquiryUtils';
+import { openTechPackBuilder } from '@/lib/techPackBuilder';
 import type { ProjectTechPackSummary } from '@/lib/api';
 
 // The standalone Tech Pack Studio (deployed on Vercel) — same origin AdminTechPacks.tsx
@@ -36,7 +37,7 @@ export default function ProjectTechPacksPanel({
 }) {
   function openBuilder(id: string) {
     if (!BUILDER_URL) return;
-    window.open(`${BUILDER_URL}/?docId=${encodeURIComponent(id)}`, '_blank', 'noopener');
+    openTechPackBuilder(BUILDER_URL, { docId: id });
   }
 
   return (

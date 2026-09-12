@@ -22,6 +22,8 @@ import {
   type QuoteDoc,
 } from '@/components/quote/quoteDoc';
 import { computeTotals } from '@/components/quote/computeTotals';
+import { useQuotePagination } from '@/components/quote/useQuotePagination';
+import { layoutPagesToQuotePages } from '@/components/quote/paginateDoc';
 import QuoteFormPanel from '@/components/quote/QuoteFormPanel';
 import QuotePreview from '@/components/quote/QuotePreview';
 import QuoteWizard from '@/components/quote/QuoteWizard';
@@ -32,6 +34,8 @@ import StageStepper from '@/components/manufacturing/StageStepper';
 type ViewMode = 'wizard' | 'split';
 
 const CURRENCIES: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
+/** Floor on the Autoformat button's visible "working" state — see autoformatQuote(). */
+const MIN_AUTOFORMAT_MS = 600;
 
 export default function PortalAdminQuoteBuilder() {
   const navigate = useNavigate();
@@ -66,6 +70,7 @@ export default function PortalAdminQuoteBuilder() {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [autoformatting, setAutoformatting] = useState(false);
   // New quotes start in the guided multi-step wizard; existing quotes (already
   // have content) open straight in split view for editing.
   const [view, setView] = useState<ViewMode>(isNew ? 'wizard' : 'split');
@@ -280,12 +285,17 @@ export default function PortalAdminQuoteBuilder() {
         const pdf = await buildQuotePdf();
         if (pdf) {
           pdfBase64 = pdf.output('datauristring'); // "data:application/pdf;base64,...."
-          // Also upload to Cloudinary for a public URL — needed so WhatsApp's
-          // document-header template can attach the actual PDF (it fetches by
-          // URL, not raw bytes like the email attachment).
+          // Also upload for a public URL — needed so WhatsApp's document-header
+          // template can attach the actual PDF (it fetches by URL, not raw bytes
+          // like the email attachment). MUST be uploadFile, never mediaApi.upload:
+          // the plain image endpoint runs every file through Cloudinary's 800x800
+          // image/crop pipeline, which silently rasterizes a multi-page PDF down
+          // to a single cropped page — the exact "cut off, not paginated" copy
+          // that reached WhatsApp before this fix, even though this SAME pdf
+          // object (used for preview/download) was always generated correctly.
           const blob = pdf.output('blob');
           const file = new File([blob], `${saved.reference || 'quotation'}.pdf`, { type: 'application/pdf' });
-          pdfUrl = await mediaApi.upload(file, 'quotations');
+          pdfUrl = await mediaApi.uploadFile(file, 'quotations');
           await manufacturingApi.updateQuote(saved.id, { pdfUrl });
         }
       } catch { /* send without attachment rather than fail */ }
@@ -357,6 +367,12 @@ export default function PortalAdminQuoteBuilder() {
     }
   };
 
+  // Called unconditionally (before the loading guard below) so hook order
+  // never depends on `doc` going from null to non-null — falls back to an
+  // empty doc while loading; nothing reads `layoutPages` until after the
+  // guard, once `doc` is guaranteed real.
+  const layoutPages = useQuotePagination(doc ?? defaultQuoteDoc(null), doc?.accent || '#00676a', currency);
+
   if (isLoading || !doc) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500">
@@ -366,6 +382,45 @@ export default function PortalAdminQuoteBuilder() {
   }
 
   const accent = doc.accent || '#00676a';
+
+  /**
+   * "Autoformat" — always available, entirely optional, never runs on its own
+   * (no auto-trigger on save/load/export). Re-runs the SAME measurement-based
+   * packer the print/PDF path already uses on every export, and writes its
+   * result back into the editable `doc.pages` so the editor view matches
+   * exactly what will print — this never reorders content, it only regroups
+   * the SAME blocks, in the SAME order, into page-sized chunks.
+   *
+   * The short artificial delay is deliberate, not padding for its own sake:
+   * the measurement pass really is async (it mounts every block off-screen
+   * to read real DOM heights), but on a short/simple quote it can resolve
+   * in a single frame — with no minimum duration the button would flash and
+   * finish before a user register anything happened, which reads as broken
+   * ("I clicked and nothing happened") rather than as a background action
+   * that completed instantly.
+   */
+  const autoformatQuote = async () => {
+    if (autoformatting) return;
+    setAutoformatting(true);
+    const started = Date.now();
+    try {
+      if (!layoutPages) {
+        toast.info('Still measuring this quote\'s layout — try again in a moment.');
+        return;
+      }
+      const pages = layoutPagesToQuotePages(layoutPages);
+      const elapsed = Date.now() - started;
+      if (elapsed < MIN_AUTOFORMAT_MS) await new Promise((r) => setTimeout(r, MIN_AUTOFORMAT_MS - elapsed));
+      if (pages.length === doc.pages.length) {
+        toast.info('Already perfectly formatted — nothing to change.');
+        return;
+      }
+      update({ ...doc, pages });
+      toast.success(`Autoformatted into ${pages.length} page${pages.length === 1 ? '' : 's'} — same content, same order, repacked to fit A4 exactly.`);
+    } finally {
+      setAutoformatting(false);
+    }
+  };
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
@@ -410,6 +465,15 @@ export default function PortalAdminQuoteBuilder() {
           <select value={currency} onChange={(e) => { setCurrency(e.target.value); setDirty(true); }} className="h-9 px-2 rounded-lg border border-gray-200 text-[13px]">
             {Object.keys(CURRENCIES).map((c) => <option key={c} value={c}>{c} {CURRENCIES[c]}</option>)}
           </select>
+          <button
+            onClick={autoformatQuote}
+            disabled={autoformatting}
+            className="h-9 px-3 rounded-lg text-[13px] font-semibold border border-gray-200 hover:bg-gray-50 disabled:opacity-70 flex items-center gap-1.5"
+            title="Optional — repacks every section across pages so nothing overflows an A4 sheet. Same content, same order, just re-fit to the page. Never runs on its own."
+          >
+            <i className={`fa-solid ${autoformatting ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'} text-[12px]`} />
+            <span className="hidden sm:inline">{autoformatting ? 'Formatting…' : 'Autoformat'}</span>
+          </button>
           <button onClick={() => setPreviewOpen(true)} className="h-9 px-3 rounded-lg text-[13px] font-semibold border border-gray-200 hover:bg-gray-50 flex items-center gap-1.5" title="Preview the paginated PDF before downloading">
             <i className="fa-solid fa-eye text-[12px]" /> <span className="hidden sm:inline">Preview</span>
           </button>
@@ -524,6 +588,7 @@ export default function PortalAdminQuoteBuilder() {
                   onPatchBlock={patchBlock}
                   onUpdate={update}
                   onEditBlock={editBlock}
+                  onAddPage={addPage}
                 />
               </div>
             </ResizablePanel>

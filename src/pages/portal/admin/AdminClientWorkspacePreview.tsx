@@ -42,6 +42,7 @@ import { useCustomerChatStomp } from '@/hooks/useCustomerChatStomp';
 import { useProjectStomp } from '@/hooks/useProjectStomp';
 import { useAutoScrollChat } from '@/hooks/useAutoScrollChat';
 import { useResizableWidth } from '@/hooks/useResizableWidth';
+import { openTechPackBuilder } from '@/lib/techPackBuilder';
 
 /**
  * WhatsApp-style Customer → Project → (Design / Thread / Resource) drill-down
@@ -2239,7 +2240,7 @@ export default function AdminClientWorkspacePreview() {
                   isLoading={projectTechPacksLoading}
                   editable
                   onCreate={TECHPACK_BUILDER_URL
-                    ? () => window.open(`${TECHPACK_BUILDER_URL}/?projectId=${project.id}`, '_blank', 'noopener')
+                    ? () => openTechPackBuilder(TECHPACK_BUILDER_URL, { projectId: String(project.id) })
                     : undefined}
                 />
               </>

@@ -1028,7 +1028,49 @@ export const mediaApi = {
     const data = await response.json();
     return data.url;
   },
-  
+
+  /**
+   * For a non-image binary (PDF, etc.) — hits /api/admin/media/upload-file, which
+   * routes to CloudinaryService.uploadFile (resource_type "auto", no crop/resize
+   * transform), NOT the image pipeline `upload()` above uses. A generated quote
+   * PDF sent through the image endpoint was silently cropped/rasterized to a
+   * single 800x800 page by Cloudinary's image transform — this is what actually
+   * reaches WhatsApp/notifications, so it must never go through `upload()`.
+   */
+  uploadFile: async (file: File, folder: string = 'files'): Promise<string> => {
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error(`File size exceeds 10MB limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB. Maximum allowed: 10MB`);
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+
+    const token = localStorage.getItem('adminToken') || localStorage.getItem('authToken');
+
+    const response = await fetch(`${API_BASE_URL}/api/admin/media/upload-file`, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      let message = errorText || 'Upload failed';
+      try {
+        const parsed = JSON.parse(errorText) as { error?: string };
+        message = parsed.error || message;
+      } catch {
+        /* keep raw text */
+      }
+      throw new Error(message);
+    }
+
+    const data = await response.json();
+    return data.url;
+  },
+
   listAll: (folder?: string) => {
     const url = folder ? `/api/admin/media/list?folder=${folder}` : '/api/admin/media/list';
     return fetchApi<{ images: any[]; count: number }>(url);

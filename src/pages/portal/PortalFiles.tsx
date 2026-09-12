@@ -2,18 +2,13 @@ import { useState } from 'react';
 import PortalShell from '@/components/portal/PortalShell';
 import PortalEmptyInquiry from '@/components/portal/PortalEmptyInquiry';
 import { Sym } from '@/components/portal/Sym';
+import FilePreviewModal from '@/components/portal/FilePreviewModal';
+import FileTileGrid, { KIND_META, type FileTile } from '@/components/portal/FileTileGrid';
 import { fileKind } from '@/lib/clientPortalAggregate';
 import { useClientPortalAggregate } from '@/hooks/useClientPortalAggregate';
 
-const KIND_META = {
-  pdf: { icon: 'picture_as_pdf', bg: 'rgba(186,26,26,0.1)', fg: 'var(--p-error)' },
-  image: { icon: 'image', bg: 'rgba(0,103,106,0.1)', fg: 'var(--p-primary)' },
-  doc: { icon: 'description', bg: 'var(--p-secondary-container)', fg: 'var(--p-on-secondary-container)' },
-  video: { icon: 'movie', bg: 'var(--p-surface-container-high)', fg: 'var(--p-on-surface)' },
-  other: { icon: 'attach_file', bg: 'var(--p-surface-container-high)', fg: 'var(--p-on-surface)' },
-};
-
 export default function PortalFiles() {
+  const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [q, setQ] = useState('');
   const { projects, files, isLoading } = useClientPortalAggregate();
@@ -58,24 +53,10 @@ export default function PortalFiles() {
               <p className="mt-2 text-[14px]">No files shared yet across your projects.</p>
             </div>
           ) : view === 'grid' ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {shown.map((f) => {
-                const kind = fileKind(f.url);
-                const k = KIND_META[kind];
-                const isImg = kind === 'image';
-                return (
-                  <a key={f.id} href={f.url} target="_blank" rel="noreferrer" className="border rounded-xl overflow-hidden card-hover" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}>
-                    <div className="h-28 flex items-center justify-center" style={{ background: isImg ? undefined : k.bg }}>
-                      {isImg ? <img src={f.url} className="w-full h-full object-cover" alt="" /> : <Sym name={k.icon} className="text-[40px]" style={{ color: k.fg }} />}
-                    </div>
-                    <div className="p-3">
-                      <p className="font-semibold text-[13px] truncate">{f.name}</p>
-                      <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--p-on-surface-variant)' }}>{f.projectTitle}</p>
-                    </div>
-                  </a>
-                );
-              })}
-            </div>
+            <FileTileGrid
+              files={shown.map<FileTile>((f) => ({ key: f.id, url: f.url, name: f.name, meta: f.projectTitle }))}
+              onOpen={(f) => setPreview({ url: f.url, name: f.name })}
+            />
           ) : (
             <div className="max-w-4xl border rounded-xl overflow-hidden" style={{ borderColor: 'var(--p-outline-variant)' }}>
               {shown.map((f, i) => {
@@ -96,6 +77,13 @@ export default function PortalFiles() {
           )}
         </div>
       </main>
+
+      <FilePreviewModal
+        open={preview != null}
+        url={preview?.url ?? null}
+        fileName={preview?.name}
+        onClose={() => setPreview(null)}
+      />
     </PortalShell>
   );
 }

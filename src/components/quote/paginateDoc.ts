@@ -16,7 +16,8 @@
 // makes it synchronous, testable, and re-runnable without re-measuring
 // anything that didn't change.
 
-import type { QuoteBlock, QuoteDoc, ItemsBlock, TableBlock } from './quoteDoc';
+import type { QuoteBlock, QuoteDoc, QuotePage, ItemsBlock, TableBlock } from './quoteDoc';
+import { newId } from './quoteDoc';
 
 /** CSS px, A4 at 96dpi — same figures QuotePreview/the PDF export already use. */
 export const PAGE_WIDTH_PX = 794;
@@ -186,4 +187,32 @@ export function packLayoutPages(
   }
   if (current.length > 0 || pages.length === 0) flushPage();
   return pages;
+}
+
+/**
+ * Turns the DERIVED print/PDF layout back into the admin's authoring model —
+ * the "Repaginate" action for a quote whose manual page breaks no longer
+ * match its actual content (typically an older quote that had rows added
+ * since the pages were last arranged by hand, so it now overflows in the
+ * editor even though PDF export already reflows it correctly on its own).
+ *
+ * One authoring page per `LayoutPage`, each block from `LayoutPage.blocks`
+ * kept as its (possibly row-sliced) form. A block that pagination split
+ * across pages becomes several smaller blocks with fresh ids rather than a
+ * single block spanning pages — the authoring model has no cross-page block
+ * concept, and there is nothing to preserve by pretending otherwise: the
+ * NEXT repagination (or PDF export) re-derives the correct split from the
+ * content again regardless of how this pass happened to cut it.
+ *
+ * Hidden blocks are dropped from `flattenVisibleBlocks` already (pagination
+ * only ever sees visible blocks), so nothing here needs to re-attach them —
+ * callers that care should preserve `doc.pages` blocks with `hidden: true`
+ * separately rather than relying on this function to round-trip them.
+ */
+export function layoutPagesToQuotePages(layoutPages: LayoutPage[]): QuotePage[] {
+  if (layoutPages.length === 0) return [{ id: newId('p'), blocks: [] }];
+  return layoutPages.map((lp) => ({
+    id: newId('p'),
+    blocks: lp.blocks.map(({ block }) => ({ ...block, id: newId() })),
+  }));
 }

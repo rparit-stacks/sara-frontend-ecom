@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RichText, EditableText, alignClass } from './RichText';
 import { computeTotals } from './computeTotals';
+import { PAGE_HEIGHT_PX } from './paginateDoc';
 import type {
   QuoteDoc, QuoteBlock, ItemsBlock, TextBlock, ImageBlock, TableBlock,
   SummaryBlock, FieldsBlock, SignatureBlock,
@@ -17,7 +18,7 @@ const money = (n: number, currency: string) =>
  * editable, but the left form panel is the primary editing surface.
  */
 export default function QuotePreview({
-  doc, accent, currency, reference, onPatchMeta, onPatchBranding, onPatchBlock, onUpdate, onEditBlock,
+  doc, accent, currency, reference, onPatchMeta, onPatchBranding, onPatchBlock, onUpdate, onEditBlock, onAddPage,
 }: {
   doc: QuoteDoc;
   accent: string;
@@ -29,6 +30,9 @@ export default function QuotePreview({
   onUpdate?: (next: QuoteDoc) => void;
   /** Double-click a section on the page → open its form in the left panel. */
   onEditBlock?: (pageId: string, blockId: string) => void;
+  /** Wired up, an overflowing page's banner gets a one-click "Add page" button
+   *  instead of just a warning — see the overflow banner below. */
+  onAddPage?: () => void;
 }) {
   const totals = useMemo(() => computeTotals(doc), [doc]);
 
@@ -43,10 +47,10 @@ export default function QuotePreview({
   return (
     <>
       {doc.pages.map((page, pageIdx) => (
-        <div
+        <PageOverflowFrame
           key={page.id}
-          className="quote-page relative bg-white shadow-xl w-[794px] max-w-full min-h-[1123px] shrink-0 flex flex-col"
-          style={{ borderTop: `6px solid ${accent}` }}
+          accent={accent}
+          onAddPage={onAddPage}
         >
           {/* abstract background */}
           <div
@@ -156,9 +160,72 @@ export default function QuotePreview({
               <p className="text-center text-[10px] text-gray-300 mt-1">Page {pageIdx + 1} of {doc.pages.length}</p>
             </div>
           </div>
-        </div>
+        </PageOverflowFrame>
       ))}
     </>
+  );
+}
+
+/**
+ * Wraps one authoring page, watching its OWN rendered height against real A4
+ * content height. The authoring page is `min-h-[1123px]` (never clipped) so
+ * that admins can see everything they've placed rather than losing content
+ * silently — but that means a page that has been overloaded with items just
+ * grows taller and taller with no visual signal that it will no longer match
+ * a printed/exported A4 sheet. This is that signal: a banner appears the
+ * moment the page's actual content exceeds one A4 sheet, with a one-click
+ * "Add page" action (when wired) so the fix is as fast as the mistake.
+ *
+ * ResizeObserver (not a one-off measurement) because a page's height changes
+ * continuously while the admin is typing/adding items — the banner must
+ * appear and disappear live as content crosses the boundary, not only after
+ * a save.
+ */
+function PageOverflowFrame({
+  accent, onAddPage, children,
+}: {
+  accent: string;
+  onAddPage?: () => void;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [overflowPx, setOverflowPx] = useState(0);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // Full page height (border + padding included) vs. the A4 sheet height
+    // this will actually print/export at.
+    const observer = new ResizeObserver((entries) => {
+      const h = entries[0]?.contentRect.height ?? el.scrollHeight;
+      setOverflowPx(Math.max(0, Math.round(h - PAGE_HEIGHT_PX)));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className="quote-page relative bg-white shadow-xl w-[794px] max-w-full min-h-[1123px] shrink-0 flex flex-col"
+      style={{ borderTop: `6px solid ${accent}` }}
+    >
+      {children}
+      {overflowPx > 4 && (
+        <div className="no-print absolute -bottom-3 left-1/2 -translate-x-1/2 translate-y-full flex items-center gap-2 rounded-full bg-amber-50 border border-amber-300 text-amber-800 text-[12px] font-medium px-3 py-1.5 shadow-sm whitespace-nowrap z-20">
+          <i className="fa-solid fa-triangle-exclamation" />
+          <span>This page overflows an A4 sheet by ~{overflowPx}px — it will reflow onto more pages when printed/downloaded.</span>
+          {onAddPage && (
+            <button
+              onClick={onAddPage}
+              className="ml-1 rounded-full bg-amber-600 text-white px-2.5 py-0.5 text-[11px] font-semibold hover:bg-amber-700 transition-colors"
+            >
+              Add page
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
