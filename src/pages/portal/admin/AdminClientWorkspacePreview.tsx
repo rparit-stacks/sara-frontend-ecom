@@ -325,32 +325,32 @@ function DesignCard({ design, active, onClick, onContextMenu, onDoubleClick }: {
       onClick={onClick}
       onContextMenu={onContextMenu ? (e) => { e.preventDefault(); onContextMenu(e); } : undefined}
       onDoubleClick={onDoubleClick}
-      className="text-left rounded-xl border overflow-hidden transition-colors"
+      className="w-full flex items-center gap-3 text-left rounded-xl border p-2 transition-colors"
       style={{
         borderColor: active ? 'var(--p-primary)' : 'var(--p-outline-variant)',
         background: active ? 'rgba(0,103,106,0.06)' : 'var(--p-surface)',
         borderWidth: active ? 2 : 1,
       }}
     >
-      <div className="aspect-square w-full flex items-center justify-center" style={{ background: 'var(--p-surface-container-high)' }}>
+      <div className="w-11 h-11 rounded-lg shrink-0 flex items-center justify-center overflow-hidden" style={{ background: 'var(--p-surface-container-high)' }}>
         {design.imageUrl ? (
           <img src={design.imageUrl} alt={design.name} className="w-full h-full object-cover" />
         ) : (
-          <Sym name="palette" className="text-[28px]" style={{ color: 'var(--p-on-surface-variant)', opacity: 0.5 }} />
+          <Sym name="palette" className="text-[19px]" style={{ color: 'var(--p-on-surface-variant)', opacity: 0.5 }} />
         )}
       </div>
-      <div className="p-2">
-        <div className="flex items-center gap-1 flex-wrap">
-          <p className="font-semibold text-[12.5px] truncate flex-1 min-w-0" style={active ? { color: 'var(--p-primary)' } : undefined}>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p className="font-semibold text-[13.5px] truncate" style={active ? { color: 'var(--p-primary)' } : undefined}>
             {design.name}
           </p>
-          <UnreadDot count={design.unreadCount} />
+          <EntityTagPill tag={design.adminTag} />
         </div>
-        <p className="text-[10.5px] truncate mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>
+        <p className="text-[11.5px] truncate mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>
           {designStageLabel(design.stage)}
         </p>
-        <EntityTagPill tag={design.adminTag} />
       </div>
+      <UnreadDot count={design.unreadCount} />
     </button>
   );
 }
@@ -2123,7 +2123,7 @@ export default function AdminClientWorkspacePreview() {
                     <Sym name="add" className="text-[18px]" style={{ color: 'var(--p-primary)' }} />
                   </button>
                 </div>
-                <div className="px-2 pb-2 grid grid-cols-2 gap-2">
+                <div className="px-2 pb-2 flex flex-col gap-1.5">
                   {realDesigns.map((d) => {
                     const isActive = active.kind === 'design' && active.designId === d.id;
                     const canDelete = realDesigns.length > 1;
@@ -2140,7 +2140,7 @@ export default function AdminClientWorkspacePreview() {
                           type="button"
                           title="Rename design"
                           onClick={(e) => { e.stopPropagation(); setRenameDesignTarget({ id: d.id, name: d.name, imageUrl: d.imageUrl }); }}
-                          className={`absolute top-1.5 p-1 rounded bg-white/90 opacity-0 group-hover/design:opacity-100 hover:bg-white shadow-sm transition-all ${canDelete ? 'right-7' : 'right-1.5'}`}
+                          className={`absolute top-1/2 -translate-y-1/2 p-1 rounded bg-white/90 opacity-0 group-hover/design:opacity-100 hover:bg-white shadow-sm transition-all ${canDelete ? 'right-8' : 'right-2'}`}
                         >
                           <Sym name="edit" className="text-[14px]" style={{ color: 'var(--p-on-surface-variant)' }} />
                         </button>
@@ -2154,7 +2154,7 @@ export default function AdminClientWorkspacePreview() {
                                 deleteDesignMutation.mutate(d.id);
                               }
                             }}
-                            className="absolute right-1.5 top-1.5 p-1 rounded bg-white/90 opacity-0 group-hover/design:opacity-100 hover:bg-red-50 shadow-sm transition-all"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded bg-white/90 opacity-0 group-hover/design:opacity-100 hover:bg-red-50 shadow-sm transition-all"
                           >
                             <Sym name="delete" className="text-[14px]" style={{ color: '#b42318' }} />
                           </button>
