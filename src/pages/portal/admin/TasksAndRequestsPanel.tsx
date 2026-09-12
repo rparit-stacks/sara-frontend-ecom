@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Sym } from '@/components/portal/Sym';
-import { manufacturingApi, type ProjectAiHandoverDto } from '@/lib/api';
+import { projectApi, type ProjectAiHandoverDto } from '@/lib/api';
 import { getStoredAdminUser, isSuperAdmin } from '@/lib/adminAccess';
 
 /** "3h ago" / "2d ago" from an ISO timestamp — matches AdminDashboard's own formatUpdated. */
@@ -53,7 +53,7 @@ export default function TasksAndRequestsPanel() {
 
   const { data: myTasks = [], isLoading: tasksLoading, isError: tasksErrored, error: tasksError, refetch: refetchTasks } = useQuery({
     queryKey: ['admin-my-tasks'],
-    queryFn: () => manufacturingApi.myTasks(),
+    queryFn: () => projectApi.myTasks(),
     refetchInterval: 30_000,
     // A failed fetch must not read the same as "no tasks" — React Query's `isLoading` goes
     // back to false on error, and `data` stays the destructured [] default, so without this
@@ -65,7 +65,7 @@ export default function TasksAndRequestsPanel() {
 
   const { data: pending = [], isLoading: pendingLoading, isError: pendingErrored, error: pendingError, refetch: refetchPending } = useQuery({
     queryKey: ['admin-pending-handover-requests'],
-    queryFn: () => manufacturingApi.pendingHandoverRequests(),
+    queryFn: () => projectApi.pendingHandoverRequests(),
     enabled: superAdmin,
     refetchInterval: 30_000,
     retry: false,
@@ -77,7 +77,7 @@ export default function TasksAndRequestsPanel() {
       return;
     }
     try {
-      await manufacturingApi.assignHandoverRequest(h.id, admin.id);
+      await projectApi.assignHandoverRequest(h.id, admin.id);
       toast.success('Assigned to you.');
       void qc.invalidateQueries({ queryKey: ['admin-my-tasks'] });
       void qc.invalidateQueries({ queryKey: ['admin-pending-handover-requests'] });
