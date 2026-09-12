@@ -308,6 +308,53 @@ function SectionLabel({ children, collapsible, collapsed, onToggle }: {
   );
 }
 
+/** A design's sidebar entry as a proper card (cover thumbnail + name + stage), not a
+ *  plain list row — Designs is the primary thing an admin works with on a project, so
+ *  it gets a visual treatment that reads as "these are the designs" at a glance, the
+ *  same way the file/media grids elsewhere in the portal read as galleries rather than
+ *  file listings. */
+function DesignCard({ design, active, onClick, onContextMenu, onDoubleClick }: {
+  design: ProjectDesignDto;
+  active?: boolean;
+  onClick: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  onDoubleClick?: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      onContextMenu={onContextMenu ? (e) => { e.preventDefault(); onContextMenu(e); } : undefined}
+      onDoubleClick={onDoubleClick}
+      className="text-left rounded-xl border overflow-hidden transition-colors"
+      style={{
+        borderColor: active ? 'var(--p-primary)' : 'var(--p-outline-variant)',
+        background: active ? 'rgba(0,103,106,0.06)' : 'var(--p-surface)',
+        borderWidth: active ? 2 : 1,
+      }}
+    >
+      <div className="aspect-square w-full flex items-center justify-center" style={{ background: 'var(--p-surface-container-high)' }}>
+        {design.imageUrl ? (
+          <img src={design.imageUrl} alt={design.name} className="w-full h-full object-cover" />
+        ) : (
+          <Sym name="palette" className="text-[28px]" style={{ color: 'var(--p-on-surface-variant)', opacity: 0.5 }} />
+        )}
+      </div>
+      <div className="p-2">
+        <div className="flex items-center gap-1 flex-wrap">
+          <p className="font-semibold text-[12.5px] truncate flex-1 min-w-0" style={active ? { color: 'var(--p-primary)' } : undefined}>
+            {design.name}
+          </p>
+          <UnreadDot count={design.unreadCount} />
+        </div>
+        <p className="text-[10.5px] truncate mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>
+          {designStageLabel(design.stage)}
+        </p>
+        <EntityTagPill tag={design.adminTag} />
+      </div>
+    </button>
+  );
+}
+
 /** One chat message, rendered by "kind" — mirrors the real message-type inventory:
  *  text, image attachment, file attachment, product card, payment card, system/announcement. */
 type MockMessageKind = 'text' | 'image' | 'voice' | 'file' | 'system';
@@ -629,14 +676,14 @@ export default function AdminClientWorkspacePreview() {
   // full-screen; true = the chat/panel is open full-screen with a back button.
   // Desktop (md+) ignores this — sidebar and main pane are always side-by-side.
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
-  // Designs/Resources sidebar sections: collapsed by default for every project, but if
-  // the user expands one for a given project it's remembered (per-project, localStorage)
-  // — switching to a different project starts collapsed again unless that project was
-  // itself expanded before.
-  const [designsCollapsed, setDesignsCollapsed] = useState(true);
-  // Resources defaults OPEN (unlike Designs, which defaults collapsed) — it's the more
-  // frequently used section. Collapsing it is still remembered per-project in localStorage.
+  // Designs is the primary thing an admin works with on a project, so — unlike the
+  // secondary sections below — it defaults OPEN and is not even collapsible; it's always
+  // expanded. Resources/Announcements/Threads all default open too but stay collapsible,
+  // remembered per-project in localStorage (collapsing one on a project keeps it
+  // collapsed only for that project, not globally).
   const [resourcesCollapsed, setResourcesCollapsed] = useState(false);
+  const [announcementsCollapsed, setAnnouncementsCollapsed] = useState(false);
+  const [threadsCollapsed, setThreadsCollapsed] = useState(false);
   const [thread, setThread] = useState<{ root: MockMessage; channelLabel: string } | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
@@ -894,32 +941,40 @@ export default function AdminClientWorkspacePreview() {
   }, [level, active, urlResolved, allProjects, searchParams, setSearchParams]);
 
   // Re-derive collapse state whenever the selected project changes — read this
-  // project's own remembered state. Designs defaults collapsed (stored '1' means
-  // "explicitly opened"); Resources defaults OPEN, so its stored flag means the
-  // opposite — '1' means "explicitly collapsed" — a never-set key falls back to
-  // each section's own default instead of both reading as collapsed.
+  // project's own remembered state. All three sections default OPEN, so each stored
+  // flag means "explicitly collapsed" ('1') — a never-set key falls back to expanded.
   useEffect(() => {
     if (!project?.code) return;
     try {
-      setDesignsCollapsed(localStorage.getItem(`sara-sidebar-designs-open-${project.code}`) !== '1');
       setResourcesCollapsed(localStorage.getItem(`sara-sidebar-resources-collapsed-${project.code}`) === '1');
+      setAnnouncementsCollapsed(localStorage.getItem(`sara-sidebar-announcements-collapsed-${project.code}`) === '1');
+      setThreadsCollapsed(localStorage.getItem(`sara-sidebar-threads-collapsed-${project.code}`) === '1');
     } catch { /* ignore */ }
   }, [project?.code]);
 
-  const toggleDesignsCollapsed = () => {
-    setDesignsCollapsed((prev) => {
-      const next = !prev;
-      if (project?.code) {
-        try { localStorage.setItem(`sara-sidebar-designs-open-${project.code}`, next ? '0' : '1'); } catch { /* ignore */ }
-      }
-      return next;
-    });
-  };
   const toggleResourcesCollapsed = () => {
     setResourcesCollapsed((prev) => {
       const next = !prev;
       if (project?.code) {
         try { localStorage.setItem(`sara-sidebar-resources-collapsed-${project.code}`, next ? '1' : '0'); } catch { /* ignore */ }
+      }
+      return next;
+    });
+  };
+  const toggleAnnouncementsCollapsed = () => {
+    setAnnouncementsCollapsed((prev) => {
+      const next = !prev;
+      if (project?.code) {
+        try { localStorage.setItem(`sara-sidebar-announcements-collapsed-${project.code}`, next ? '1' : '0'); } catch { /* ignore */ }
+      }
+      return next;
+    });
+  };
+  const toggleThreadsCollapsed = () => {
+    setThreadsCollapsed((prev) => {
+      const next = !prev;
+      if (project?.code) {
+        try { localStorage.setItem(`sara-sidebar-threads-collapsed-${project.code}`, next ? '1' : '0'); } catch { /* ignore */ }
       }
       return next;
     });
@@ -1509,7 +1564,10 @@ export default function AdminClientWorkspacePreview() {
 
   const openProject = (customerKey: string, projectId: number) => {
     setLevel({ kind: 'project', customerKey, projectId });
-    setActive({ kind: 'customerGeneral', customerKey });
+    // No auto-selected pane here — General Chat used to open by default, which meant every
+    // project open silently jumped straight into that customer's chat rather than showing
+    // the project sidebar first. Land on the blank "select a conversation" state instead.
+    setActive({ kind: 'none' });
     setThread(null);
     setMobilePanelOpen(true);
   };
@@ -2055,80 +2113,56 @@ export default function AdminClientWorkspacePreview() {
                   pinned
                 />
 
-                <ListRow
-                  icon="list_alt"
-                  title="Threads"
-                  subtitle="All reply-threads across this project"
-                  active={active.kind === 'threads'}
-                  onClick={() => selectPane({ kind: 'threads', customerKey: customer.key, projectId: project.id })}
-                />
-
-                <SectionLabel>Communication</SectionLabel>
-                <ListRow
-                  icon="campaign"
-                  iconBg="rgba(0,103,106,0.12)"
-                  iconColor="var(--p-primary)"
-                  title="#announcements"
-                  subtitle="System updates · stage changes · read-only"
-                  active={active.kind === 'announcements'}
-                  onClick={() => selectPane({ kind: 'announcements', customerKey: customer.key, projectId: project.id })}
-                />
-
+                {/* Designs is the primary thing an admin works with here, so it comes right
+                    after General Chat, is always expanded (not collapsible), and each row
+                    uses a card treatment (cover thumbnail + stage) rather than a plain list
+                    row, so it reads as "these are the designs" at a glance. */}
                 <div className="flex items-center justify-between pr-2">
-                  <SectionLabel
-                    collapsible
-                    collapsed={designsCollapsed}
-                    onToggle={toggleDesignsCollapsed}
-                  >
-                    Designs · {realDesigns.length}
-                  </SectionLabel>
+                  <SectionLabel>Designs · {realDesigns.length}</SectionLabel>
                   <button type="button" onClick={() => setAddDesignOpen(true)} title="Add design" className="p-1 rounded hover:bg-black/5">
                     <Sym name="add" className="text-[18px]" style={{ color: 'var(--p-primary)' }} />
                   </button>
                 </div>
-                {!designsCollapsed && realDesigns.map((d) => {
-                  const isActive = active.kind === 'design' && active.designId === d.id;
-                  const canDelete = realDesigns.length > 1;
-                  return (
-                    <div key={d.id} className="relative group/design">
-                      <ListRow
-                        icon="palette"
-                        title={d.name}
-                        subtitle={`Stage: ${designStageLabel(d.stage)}`}
-                        active={isActive}
-                        unread={d.unreadCount}
-                        tag={d.adminTag}
-                        onClick={() => selectPane({ kind: 'design', customerKey: customer.key, projectId: project.id, designId: d.id })}
-                        onContextMenu={(e) => openDesignTagMenu(e, project.code, d.id, d.adminTag)}
-                        onDoubleClick={(e) => openDesignTagMenu(e, project.code, d.id, d.adminTag)}
-                        kindTag="design"
-                      />
-                      <button
-                        type="button"
-                        title="Rename design"
-                        onClick={(e) => { e.stopPropagation(); setRenameDesignTarget({ id: d.id, name: d.name, imageUrl: d.imageUrl }); }}
-                        className={`absolute top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover/design:opacity-100 hover:bg-black/5 transition-all ${canDelete ? 'right-8' : 'right-2'}`}
-                      >
-                        <Sym name="edit" className="text-[16px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-                      </button>
-                      {canDelete && (
+                <div className="px-2 pb-2 grid grid-cols-2 gap-2">
+                  {realDesigns.map((d) => {
+                    const isActive = active.kind === 'design' && active.designId === d.id;
+                    const canDelete = realDesigns.length > 1;
+                    return (
+                      <div key={d.id} className="relative group/design">
+                        <DesignCard
+                          design={d}
+                          active={isActive}
+                          onClick={() => selectPane({ kind: 'design', customerKey: customer.key, projectId: project.id, designId: d.id })}
+                          onContextMenu={(e) => openDesignTagMenu(e, project.code, d.id, d.adminTag)}
+                          onDoubleClick={(e) => openDesignTagMenu(e, project.code, d.id, d.adminTag)}
+                        />
                         <button
                           type="button"
-                          title="Delete design channel"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm(`Delete design channel "${d.name}"? All messages in this channel will be removed.`)) {
-                              deleteDesignMutation.mutate(d.id);
-                            }
-                          }}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover/design:opacity-100 hover:bg-red-50 transition-all"
+                          title="Rename design"
+                          onClick={(e) => { e.stopPropagation(); setRenameDesignTarget({ id: d.id, name: d.name, imageUrl: d.imageUrl }); }}
+                          className={`absolute top-1.5 p-1 rounded bg-white/90 opacity-0 group-hover/design:opacity-100 hover:bg-white shadow-sm transition-all ${canDelete ? 'right-7' : 'right-1.5'}`}
                         >
-                          <Sym name="delete" className="text-[16px]" style={{ color: '#b42318' }} />
+                          <Sym name="edit" className="text-[14px]" style={{ color: 'var(--p-on-surface-variant)' }} />
                         </button>
-                      )}
-                    </div>
-                  );
-                })}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            title="Delete design channel"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Delete design channel "${d.name}"? All messages in this channel will be removed.`)) {
+                                deleteDesignMutation.mutate(d.id);
+                              }
+                            }}
+                            className="absolute right-1.5 top-1.5 p-1 rounded bg-white/90 opacity-0 group-hover/design:opacity-100 hover:bg-red-50 shadow-sm transition-all"
+                          >
+                            <Sym name="delete" className="text-[14px]" style={{ color: '#b42318' }} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
 
                 <SectionLabel
                   collapsible
@@ -2148,6 +2182,44 @@ export default function AdminClientWorkspacePreview() {
                     onClick={() => selectPane({ kind: 'resource', customerKey: customer.key, projectId: project.id, resourceKey: r.key })}
                   />
                 ))}
+
+                {/* Announcements and Threads are the least important sections here — both
+                    collapsible, both default open, both after Designs/Resources. */}
+                <SectionLabel
+                  collapsible
+                  collapsed={announcementsCollapsed}
+                  onToggle={toggleAnnouncementsCollapsed}
+                >
+                  Announcements
+                </SectionLabel>
+                {!announcementsCollapsed && (
+                  <ListRow
+                    icon="campaign"
+                    iconBg="rgba(0,103,106,0.12)"
+                    iconColor="var(--p-primary)"
+                    title="#announcements"
+                    subtitle="System updates · stage changes · read-only"
+                    active={active.kind === 'announcements'}
+                    onClick={() => selectPane({ kind: 'announcements', customerKey: customer.key, projectId: project.id })}
+                  />
+                )}
+
+                <SectionLabel
+                  collapsible
+                  collapsed={threadsCollapsed}
+                  onToggle={toggleThreadsCollapsed}
+                >
+                  Threads
+                </SectionLabel>
+                {!threadsCollapsed && (
+                  <ListRow
+                    icon="list_alt"
+                    title="Threads"
+                    subtitle="All reply-threads across this project"
+                    active={active.kind === 'threads'}
+                    onClick={() => selectPane({ kind: 'threads', customerKey: customer.key, projectId: project.id })}
+                  />
+                )}
               </div>
             </>
           )}
@@ -2164,7 +2236,13 @@ export default function AdminClientWorkspacePreview() {
             {active.kind === 'none' ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3" style={{ color: 'var(--p-on-surface-variant)' }}>
                 <Sym name="forum" className="text-[56px]" style={{ opacity: 0.4 }} />
-                <p className="text-[14px]">{isLoading || !urlResolved ? 'Loading conversations…' : 'No clients yet'}</p>
+                <p className="text-[14px]">
+                  {isLoading || !urlResolved
+                    ? 'Loading conversations…'
+                    : level.kind !== 'customers'
+                      ? 'Select a chat, design or resource on the left to get started'
+                      : 'No clients yet'}
+                </p>
               </div>
             ) : active.kind === 'resource' && activeResource?.key === 'financials' && project ? (
               <>
