@@ -8,6 +8,7 @@ import { STAGE_TONE, type Stage } from '@/components/portal/adminData';
 import { STAGES, stageDef, statusLabelFor, type StageKey } from '@/components/manufacturing/stages';
 import { manufacturingApi, projectApi } from '@/lib/api';
 import { getStoredAdminUser, isSuperAdmin } from '@/lib/adminAccess';
+import TasksAndRequestsPanel from './TasksAndRequestsPanel';
 
 const ACTION_PREVIEW_LIMIT = 6;
 const RECENT_PREVIEW_LIMIT = 6;
@@ -93,6 +94,8 @@ export default function PortalAdminDashboard() {
               <h1 className="font-bold text-[26px] leading-tight">{greeting()}{adminName ? `, ${adminName}` : ''}</h1>
               <p className="text-[13px] mt-1" style={{ color: 'var(--p-on-surface-variant)' }}>Here's what's happening across your projects today.</p>
             </div>
+
+            <TasksAndRequestsPanel />
 
             {/* Stat tiles */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

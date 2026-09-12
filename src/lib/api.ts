@@ -2405,6 +2405,18 @@ export const projectApi = {
       `/api/admin/manufacturing/projects/${encodeURIComponent(code)}/ai-handovers/${id}/close`,
       { method: 'POST' },
     ),
+  /** "Your Tasks" — every open handover/admin-request currently assigned to the logged-in
+   *  admin, across every project and General Chat. Not scoped to one project's code. */
+  myTasks: () => fetchApi<ProjectAiHandoverDto[]>('/api/admin/manufacturing/projects/tasks'),
+  /** Requests nobody was available for at creation time — for the super-admin to hand-assign
+   *  once someone comes online. */
+  pendingHandoverRequests: () =>
+    fetchApi<ProjectAiHandoverDto[]>('/api/admin/manufacturing/projects/handover-requests/pending'),
+  assignHandoverRequest: (id: number, adminId: number) =>
+    fetchApi<ProjectAiHandoverDto>(`/api/admin/manufacturing/projects/handover-requests/${id}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ adminId }),
+    }),
 };
 
 /** Platform-wide notification settings — one switch per event, applying to every project.
@@ -2820,6 +2832,17 @@ export interface ProjectAiHandoverDto {
   claimedByAdminId?: number | null;
   createdAt?: string;
   claimedAt?: string;
+  /** SYSTEM's pick of who should handle this right now (an online admin at request time) —
+   *  distinct from claimedByAdminId, which is whichever admin actually opened it. Null means
+   *  nobody was available when this was created (a pending request). */
+  assignedAdminId?: number | null;
+  customerName?: string | null;
+  requestType?: 'GENERAL' | 'CALL' | 'APPOINTMENT' | string;
+  requirementSummary?: string | null;
+  preferredTime?: string | null;
+  /** Null for a General Chat request (no single project). */
+  projectCode?: string | null;
+  projectTitle?: string | null;
 }
 
 export interface PortalAggregateDto {
