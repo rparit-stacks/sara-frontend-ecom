@@ -349,49 +349,87 @@ function UploadField({
 }
 
 // Longest dial codes first, so e.g. "+1268" (Antigua) matches before "+1" (US/Canada).
-const SORTED_CODES = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length);
+const SORTED_CODES = [...COUNTRY_CODES].sort(
+  (a, b) => b.code.length - a.code.length
+);
 
 /** Split a combined "+<code><digits>" string into its country code + local digits. Defaults to +91 (India). */
 function splitPhone(value: string): { code: string; digits: string } {
-  const match = SORTED_CODES.find((c) => value.startsWith(c.code));
-  if (match) return { code: match.code, digits: value.slice(match.code.length).replace(/\D/g, '') };
-  return { code: '+91', digits: value.replace(/\D/g, '') };
+  const cleanValue = value.replace(/\D/g, '');
+
+  const match = SORTED_CODES.find((c) =>
+    cleanValue.startsWith(c.code.replace('+', ''))
+  );
+
+  if (match) {
+    return {
+      code: match.code,
+      digits: cleanValue
+        .slice(match.code.replace('+', '').length),
+    };
+  }
+
+  return {
+    code: '+91',
+    digits: cleanValue,
+  };
 }
 
 /** Phone field with a country-code dropdown (defaults to +91) — submits one combined "+<code><digits>" string. */
 function PhoneField({
-  value, placeholder, onChange,
+  value,
+  placeholder,
+  onChange,
 }: {
   value: string;
   placeholder?: string;
   onChange: (value: string) => void;
 }) {
-  const { code, digits } = splitPhone(value);
+  const { code: detectedCode, digits } = splitPhone(value);
+
+  const [selectedCode, setSelectedCode] = useState(detectedCode);
 
   const commit = (nextCode: string, nextDigits: string) => {
-    onChange(nextDigits ? `${nextCode}${nextDigits}` : '');
+    setSelectedCode(nextCode);
+
+    onChange(
+      nextDigits ? `${nextCode}${nextDigits}` : ''
+    );
   };
 
   return (
     <div className="flex gap-2">
-      <Select value={code} onValueChange={(v) => commit(v, digits)}>
+      <Select
+        value={selectedCode}
+        onValueChange={(v) => commit(v, digits)}
+      >
         <SelectTrigger className="w-[110px] shrink-0">
           <SelectValue placeholder="Code" />
         </SelectTrigger>
+
         <SelectContent className="max-h-[280px] overflow-y-auto">
           {COUNTRY_CODES.map((c) => (
-            <SelectItem key={c.code + c.country} value={c.code}>
+            <SelectItem
+              key={c.code + c.country}
+              value={c.code}
+            >
               {c.code} {c.country}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
+
       <Input
         type="tel"
         className="flex-1"
         placeholder={placeholder || '98765 43210'}
         value={digits}
-        onChange={(e) => commit(code, e.target.value.replace(/\D/g, '').slice(0, 15))}
+        onChange={(e) =>
+          commit(
+            selectedCode,
+            e.target.value.replace(/\D/g, '').slice(0, 15)
+          )
+        }
       />
     </div>
   );
