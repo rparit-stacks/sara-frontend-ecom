@@ -21,6 +21,7 @@ import {
   Sparkles,
   Wrench,
   Factory,
+  Bell,
 } from 'lucide-react';
 import { ChevronLeft, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -77,6 +78,7 @@ const adminMenuSections = [
     items: [
       { icon: MessageSquare, label: 'WhatsApp', path: '/admin-sara/whatsapp' },
       { icon: MessageSquare, label: 'Contact Submissions', path: '/admin-sara/contact-submissions' },
+      { icon: Bell, label: 'Notification Center', path: '/admin-sara/notifications' },
     ],
   },
   {

@@ -1527,6 +1527,43 @@ export const whatsappApi = {
   getCustomStatuses: () => fetchApi<any[]>('/api/admin/whatsapp/custom-statuses'),
 };
 
+// ===============================
+// Notification Center API (unified email/WhatsApp/push delivery history)
+// ===============================
+export interface NotificationLogDto {
+  id: number;
+  jobId: string;
+  channel: 'EMAIL' | 'WHATSAPP' | 'PUSH' | 'SMS';
+  recipient: string;
+  status: 'SUCCESS' | 'FAILED';
+  error: string | null;
+  title: string | null;
+  body: string | null;
+  senderApp: string | null;
+  createdAt: string;
+}
+
+export interface NotificationLogPage {
+  content: NotificationLogDto[];
+  totalElements: number;
+  totalPages: number;
+  number: number; // current page (0-based)
+  size: number;
+}
+
+export const notificationApi = {
+  getLogs: (params: { channel?: string; status?: string; recipient?: string; page?: number; size?: number }) => {
+    const q = new URLSearchParams();
+    if (params.channel) q.set('channel', params.channel);
+    if (params.status) q.set('status', params.status);
+    if (params.recipient) q.set('recipient', params.recipient);
+    q.set('page', String(params.page ?? 0));
+    q.set('size', String(params.size ?? 50));
+    return fetchApi<NotificationLogPage>(`/api/admin/notifications/logs?${q.toString()}`);
+  },
+  getLogsByJob: (jobId: string) => fetchApi<NotificationLogPage>(`/api/admin/notifications/logs/job/${encodeURIComponent(jobId)}`),
+};
+
 
 // ===============================
 // Coupon API

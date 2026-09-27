@@ -69,6 +69,7 @@ import AdminBusinessConfig from "./pages/admin/AdminBusinessConfig";
 import AdminPaymentConfig from "./pages/admin/AdminPaymentConfig";
 import AdminCurrencyMultipliers from "./pages/admin/AdminCurrencyMultipliers";
 import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
+import AdminNotificationCenter from "./pages/admin/AdminNotificationCenter";
 import AdminLogs from "./pages/admin/AdminLogs";
 import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
 import ProtectedPortalAdminRoute from "./components/admin/ProtectedPortalAdminRoute";
@@ -466,6 +467,14 @@ const App = () =>
             element={
               <ProtectedAdminRoute>
                 <AdminWhatsApp />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/notifications"
+            element={
+              <ProtectedAdminRoute>
+                <AdminNotificationCenter />
               </ProtectedAdminRoute>
             }
           />
