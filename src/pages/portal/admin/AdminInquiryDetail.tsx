@@ -31,16 +31,30 @@ function expandValues(value: unknown): unknown[] {
   );
 }
 
-function ValueDisplay({ value }: { value: unknown }) {
+/** Field keys expected to hold an uploaded file/image — a non-URL value under one of these
+ *  is never genuine free text, it's a pre-fix AI-chat submission that stored a hallucinated
+ *  placeholder instead of the real URL (see InquiryCreationTool.attachUploadedImages on the
+ *  backend). Showing that raw string reads as a confusing internal id, so it's replaced with
+ *  a plain "unavailable" note instead. */
+const MEDIA_FIELD_KEYS = new Set(['reference image', 'reference images']);
+
+function ValueDisplay({ fieldKey, value }: { fieldKey: string; value: unknown }) {
   const arr = expandValues(value);
   const images = arr.filter(isImageUrl);
   const files = arr.filter((v) => isFileUrl(v));
   const text = arr.filter((v) => !isImageUrl(v) && !isFileUrl(v) && v != null && v !== '');
+  const isMediaField = MEDIA_FIELD_KEYS.has(fieldKey.trim().toLowerCase());
 
   return (
     <div className="space-y-2">
       {text.length > 0 && (
-        <p className="text-[14px] text-foreground whitespace-pre-wrap">{text.map((v) => String(v)).join(', ')}</p>
+        isMediaField ? (
+          <p className="text-[13px] italic" style={{ color: 'var(--p-on-surface-variant)' }}>
+            Reference image unavailable — submitted before this could be captured correctly.
+          </p>
+        ) : (
+          <p className="text-[14px] text-foreground whitespace-pre-wrap">{text.map((v) => String(v)).join(', ')}</p>
+        )
       )}
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -195,7 +209,7 @@ export default function PortalAdminInquiryDetail() {
                     {valueEntries.map(([key, val]) => (
                       <div key={key} className="grid sm:grid-cols-[180px_1fr] gap-1 sm:gap-4">
                         <label className="text-[12px] font-semibold uppercase pt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>{humanize(key)}</label>
-                        <ValueDisplay value={val} />
+                        <ValueDisplay fieldKey={key} value={val} />
                       </div>
                     ))}
                   </div>
