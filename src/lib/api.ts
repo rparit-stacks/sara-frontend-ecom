@@ -1551,7 +1551,9 @@ export interface NotificationLogPage {
   size: number;
 }
 
-export const notificationApi = {
+// Named *Log*Api, not notificationApi — that name is already taken below by the
+// admin-header "New Inquiry/Order" alert-counts API (a different, older feature).
+export const notificationLogApi = {
   getLogs: (params: { channel?: string; status?: string; recipient?: string; page?: number; size?: number }) => {
     const q = new URLSearchParams();
     if (params.channel) q.set('channel', params.channel);

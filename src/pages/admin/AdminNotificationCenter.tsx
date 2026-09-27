@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { notificationApi } from '@/lib/api';
+import { notificationLogApi } from '@/lib/api';
 
 const CHANNELS = ['EMAIL', 'WHATSAPP', 'PUSH', 'SMS'] as const;
 const PAGE_SIZE = 50;
@@ -29,7 +29,7 @@ export default function AdminNotificationCenter() {
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['notificationLogs', channel, status, recipient, page],
     queryFn: () =>
-      notificationApi.getLogs({
+      notificationLogApi.getLogs({
         channel: channel === 'all' ? undefined : channel,
         status: status === 'all' ? undefined : status,
         recipient: recipient || undefined,
