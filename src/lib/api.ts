@@ -1566,6 +1566,63 @@ export const notificationLogApi = {
   getLogsByJob: (jobId: string) => fetchApi<NotificationLogPage>(`/api/admin/notifications/logs/job/${encodeURIComponent(jobId)}`),
 };
 
+// ===============================
+// Broadcast Composer API (admin-authored ad-hoc push+email blast)
+// ===============================
+export interface BroadcastPreview {
+  count: number;
+  sample: string[];
+}
+
+export interface BroadcastSendParams {
+  targetType: 'SINGLE' | 'TAG' | 'ALL';
+  targetValue?: string;
+  title: string;
+  body: string;
+  actionLabel?: string;
+  actionLink?: string;
+  image?: File | null;
+}
+
+export const broadcastApi = {
+  getTags: () => fetchApi<string[]>('/api/admin/notifications/broadcast/tags'),
+
+  preview: (targetType: string, targetValue?: string) => {
+    const q = new URLSearchParams({ targetType });
+    if (targetValue) q.set('targetValue', targetValue);
+    return fetchApi<BroadcastPreview>(`/api/admin/notifications/broadcast/preview?${q.toString()}`);
+  },
+
+  // Multipart upload — bypasses fetchApi entirely. fetchApi hardcodes
+  // Content-Type: application/json and JSON.parses the body for its console log, both of
+  // which break on a FormData body (the browser must set its own multipart boundary).
+  send: async (params: BroadcastSendParams) => {
+    const form = new FormData();
+    form.set('targetType', params.targetType);
+    if (params.targetValue) form.set('targetValue', params.targetValue);
+    form.set('title', params.title);
+    form.set('body', params.body);
+    if (params.actionLabel) form.set('actionLabel', params.actionLabel);
+    if (params.actionLink) form.set('actionLink', params.actionLink);
+    if (params.image) form.set('image', params.image);
+
+    const adminToken = localStorage.getItem('adminToken');
+    const authToken = localStorage.getItem('authToken');
+    const token = adminToken || authToken;
+
+    const res = await fetch(`${API_BASE_URL}/api/admin/notifications/broadcast/send`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || 'Broadcast send failed');
+    }
+    return res.json() as Promise<{ sent: number }>;
+  },
+};
+
 
 // ===============================
 // Coupon API

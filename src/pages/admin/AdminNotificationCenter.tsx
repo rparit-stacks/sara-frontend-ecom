@@ -5,9 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { notificationLogApi } from '@/lib/api';
+import { BroadcastComposer } from './BroadcastComposer';
 
 const CHANNELS = ['EMAIL', 'WHATSAPP', 'PUSH', 'SMS'] as const;
 const PAGE_SIZE = 50;
@@ -57,11 +59,22 @@ export default function AdminNotificationCenter() {
           </p>
         </motion.div>
 
+        <Tabs defaultValue="history">
+          <TabsList>
+            <TabsTrigger value="history">Delivery History</TabsTrigger>
+            <TabsTrigger value="broadcast">Broadcast Composer</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="broadcast" className="pt-6">
+            <BroadcastComposer />
+          </TabsContent>
+
+          <TabsContent value="history">
         <motion.section
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
-          className="space-y-4"
+          className="space-y-4 pt-6"
         >
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
@@ -203,6 +216,8 @@ export default function AdminNotificationCenter() {
             </div>
           )}
         </motion.section>
+          </TabsContent>
+        </Tabs>
       </div>
     </AdminLayout>
   );
