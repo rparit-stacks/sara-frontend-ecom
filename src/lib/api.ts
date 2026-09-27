@@ -799,6 +799,16 @@ export interface ManufacturingQuoteDto {
   doc: Record<string, unknown> | null;
   createdAt?: string;
   updatedAt?: string;
+  /** Only present on the response of sendQuote() — see DeliveryChannelStatusDto (backend). */
+  whatsapp?: DeliveryChannelStatusDto;
+}
+
+/** Result of a single "send quote"/"send invoice" WhatsApp attempt — see the backend's
+ *  DeliveryChannelStatusDto for the full attempted/sent/error contract. */
+export interface DeliveryChannelStatusDto {
+  attempted: boolean;
+  sent: boolean;
+  error?: string;
 }
 
 /** Real-time financial overview for a project: live quotation (reference only) + invoices. */
@@ -2929,6 +2939,8 @@ export interface ManufacturingInvoiceDto {
   /** Full value of the quote this invoice references — informational lineage only,
    *  never used to compute a balance (quotation and invoice are independent entities). */
   quoteTotal?: number;
+  /** Only present on the response of sendInvoice() — see DeliveryChannelStatusDto above. */
+  whatsapp?: DeliveryChannelStatusDto;
 }
 
 export const invoiceApi = {

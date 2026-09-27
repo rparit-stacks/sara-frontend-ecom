@@ -306,14 +306,25 @@ export default function PortalAdminQuoteBuilder() {
       setStatus(sent.status);
       setDirty(false);
 
-      if (hasEmail && hasPhone) {
-        toast.success(pdfBase64 ? `Quote + PDF sent to ${doc.meta.clientEmail}` : `Quote sent to ${doc.meta.clientEmail}`);
-      } else if (hasEmail) {
-        toast.success(`Quote emailed to ${doc.meta.clientEmail}`);
-        toast('No phone on file — WhatsApp notification skipped.');
+      // The email half has no return-status to check (fire-and-forget on the backend),
+      // so it's still reported optimistically from whether an address was on file.
+      // WhatsApp does have a real result now (sent.whatsapp) — report what actually
+      // happened rather than assuming success just because a phone number existed.
+      if (hasEmail) toast.success(pdfBase64 ? `Quote + PDF emailed to ${doc.meta.clientEmail}` : `Quote emailed to ${doc.meta.clientEmail}`);
+      if (hasPhone) {
+        if (sent.whatsapp?.sent) {
+          toast.success(`Quote sent via WhatsApp to ${doc.meta.clientPhone}`);
+        } else if (sent.whatsapp?.attempted) {
+          toast.error(`WhatsApp send failed: ${sent.whatsapp.error || 'unknown error'} — check the WhatsApp logs.`);
+        } else if (!hasEmail) {
+          // Notifications are off for this client, or something else suppressed the
+          // attempt entirely — surface it since it's the only channel being tried.
+          toast('WhatsApp was not sent — notifications may be turned off for this client.');
+        }
+      } else if (!hasEmail) {
+        toast('No email or phone on file — nothing was sent.');
       } else {
-        toast.success(`Quote sent via WhatsApp to ${doc.meta.clientPhone}`);
-        toast('No email on file — email skipped.');
+        toast('No phone on file — WhatsApp notification skipped.');
       }
       if (!quoteId) navigate(`/portal-admin/quote-editor/${sent.reference}`, { replace: true });
     } catch (e) {
