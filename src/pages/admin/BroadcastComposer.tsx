@@ -1,12 +1,67 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Send, Image as ImageIcon, X } from 'lucide-react';
-import { broadcastApi } from '@/lib/api';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Loader2, Send, Image as ImageIcon, X, ChevronsUpDown, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { broadcastApi, adminUsersApi, productsApi, categoriesApi } from '@/lib/api';
+
+interface AdminUser {
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+}
+
+interface PickerProduct {
+  id: number;
+  name: string;
+  slug?: string;
+  imageUrl?: string;
+}
+
+interface PickerCategory {
+  id: number;
+  name: string;
+  slug?: string;
+}
+
+type LinkPageType = 'PRODUCT' | 'CATEGORY' | 'CART' | 'WISHLIST' | 'STUDIO' | 'HOME' | 'CUSTOM';
+
+const LINK_PAGE_TYPES: { value: LinkPageType; label: string }[] = [
+  { value: 'PRODUCT', label: 'A specific product' },
+  { value: 'CATEGORY', label: 'A specific category' },
+  { value: 'CART', label: 'Cart' },
+  { value: 'WISHLIST', label: 'Wishlist' },
+  { value: 'STUDIO', label: 'Studio (custom orders)' },
+  { value: 'HOME', label: 'Home' },
+  { value: 'CUSTOM', label: 'Custom URL' },
+];
+
+/** Builds the same in-app-path shape openCmsLink() (sara-mobile) already parses — this is the
+ *  one string that travels in the push payload's content.link / data.url. */
+function buildLinkPath(pageType: LinkPageType, pickedSlug: string, customUrl: string): string {
+  switch (pageType) {
+    case 'PRODUCT':
+      return pickedSlug ? `/product/${pickedSlug}` : '';
+    case 'CATEGORY':
+      return pickedSlug ? `/categories/${pickedSlug}` : '';
+    case 'CART':
+      return '/cart';
+    case 'WISHLIST':
+      return '/wishlist';
+    case 'STUDIO':
+      return '/studio';
+    case 'HOME':
+      return '/';
+    case 'CUSTOM':
+      return customUrl.trim();
+  }
+}
 
 type TargetType = 'SINGLE' | 'TAG' | 'ALL';
 
@@ -25,14 +80,51 @@ export function BroadcastComposer() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [actionLabel, setActionLabel] = useState('');
-  const [actionLink, setActionLink] = useState('');
+  const [linkPageType, setLinkPageType] = useState<LinkPageType>('PRODUCT');
+  const [linkPickedSlug, setLinkPickedSlug] = useState('');
+  const [linkCustomUrl, setLinkCustomUrl] = useState('');
   const [image, setImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
+  const [linkItemPickerOpen, setLinkItemPickerOpen] = useState(false);
+
+  const actionLink = useMemo(
+    () => buildLinkPath(linkPageType, linkPickedSlug, linkCustomUrl),
+    [linkPageType, linkPickedSlug, linkCustomUrl],
+  );
+
+  const { data: pickerProducts } = useQuery({
+    queryKey: ['broadcastPickerProducts'],
+    queryFn: () => productsApi.getPicker() as Promise<PickerProduct[]>,
+    enabled: linkPageType === 'PRODUCT',
+  });
+
+  const { data: pickerCategories } = useQuery({
+    queryKey: ['broadcastPickerCategories'],
+    queryFn: () => categoriesApi.getLeafCategories() as Promise<PickerCategory[]>,
+    enabled: linkPageType === 'CATEGORY',
+  });
 
   const { data: tags } = useQuery({
     queryKey: ['broadcastTags'],
     queryFn: () => broadcastApi.getTags(),
   });
+
+  const { data: users } = useQuery({
+    queryKey: ['adminUsersForBroadcast'],
+    queryFn: () => adminUsersApi.getAll() as Promise<AdminUser[]>,
+    enabled: targetType === 'SINGLE',
+  });
+
+  const customerLabel = (u: AdminUser) => {
+    const name = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
+    return name ? `${name} (${u.email})` : u.email;
+  };
+
+  const selectedCustomer = useMemo(
+    () => (users ?? []).find((u) => u.email === targetValue),
+    [users, targetValue],
+  );
 
   const targetValueForPreview = targetType === 'ALL' ? undefined : targetValue || undefined;
   const canPreview = targetType === 'ALL' || !!targetValue;
@@ -99,19 +191,49 @@ export function BroadcastComposer() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="SINGLE">One customer (email)</SelectItem>
+              <SelectItem value="SINGLE">One customer</SelectItem>
               <SelectItem value="TAG">A tagged group</SelectItem>
               <SelectItem value="ALL">Every active user</SelectItem>
             </SelectContent>
           </Select>
 
           {targetType === 'SINGLE' && (
-            <Input
-              className="flex-1 min-w-[220px]"
-              placeholder="customer@email.com"
-              value={targetValue}
-              onChange={(e) => setTargetValue(e.target.value)}
-            />
+            <Popover open={customerPickerOpen} onOpenChange={setCustomerPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={customerPickerOpen}
+                  className="flex-1 min-w-[220px] justify-between font-normal"
+                >
+                  {selectedCustomer ? customerLabel(selectedCustomer) : 'Select a customer…'}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[320px] p-0">
+                <Command filter={(value, search) => (value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}>
+                  <CommandInput placeholder="Search by name or email…" />
+                  <CommandList>
+                    <CommandEmpty>No customer found.</CommandEmpty>
+                    <CommandGroup>
+                      {(users ?? []).map((u) => (
+                        <CommandItem
+                          key={u.email}
+                          value={`${customerLabel(u)} ${u.email}`}
+                          onSelect={() => {
+                            setTargetValue(u.email);
+                            setCustomerPickerOpen(false);
+                          }}
+                        >
+                          <Check className={cn('mr-2 h-4 w-4', targetValue === u.email ? 'opacity-100' : 'opacity-0')} />
+                          {customerLabel(u)}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           )}
 
           {targetType === 'TAG' && (
@@ -164,24 +286,114 @@ export function BroadcastComposer() {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-3 border rounded-lg p-4">
+        <p className="text-sm font-medium">Notification button (optional)</p>
+
         <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Button label (optional)</label>
-          <Input placeholder="e.g. Shop Now" value={actionLabel} onChange={(e) => setActionLabel(e.target.value)} />
+          <label className="text-xs font-medium text-muted-foreground">Button label</label>
+          <Select value={actionLabel} onValueChange={(v) => setActionLabel(v === 'NONE' ? '' : v)}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="No button" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="NONE">No button</SelectItem>
+              <SelectItem value="shop_now">Shop Now</SelectItem>
+              <SelectItem value="view_details">View Details</SelectItem>
+              <SelectItem value="open">Open</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground pt-1">
+            Shows as a tappable button on the notification itself (Android/iOS) — the label is one of a
+            fixed set of presets because the OS requires buttons to be registered ahead of time.
+          </p>
         </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Button link (optional)</label>
-          <Input
-            placeholder="https://… or studiosara://…"
-            value={actionLink}
-            onChange={(e) => setActionLink(e.target.value)}
-          />
-        </div>
+
+        {actionLabel && (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Opens</label>
+            <div className="flex flex-wrap gap-2">
+              <Select
+                value={linkPageType}
+                onValueChange={(v) => {
+                  setLinkPageType(v as LinkPageType);
+                  setLinkPickedSlug('');
+                }}
+              >
+                <SelectTrigger className="w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LINK_PAGE_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {linkPageType === 'PRODUCT' && (
+                <Popover open={linkItemPickerOpen} onOpenChange={setLinkItemPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="flex-1 min-w-[220px] justify-between font-normal">
+                      {linkPickedSlug
+                        ? pickerProducts?.find((p) => p.slug === linkPickedSlug)?.name ?? linkPickedSlug
+                        : 'Select a product…'}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[320px] p-0">
+                    <Command filter={(value, search) => (value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}>
+                      <CommandInput placeholder="Search products…" />
+                      <CommandList>
+                        <CommandEmpty>No product found.</CommandEmpty>
+                        <CommandGroup>
+                          {(pickerProducts ?? []).filter((p) => p.slug).map((p) => (
+                            <CommandItem
+                              key={p.id}
+                              value={p.name}
+                              onSelect={() => {
+                                setLinkPickedSlug(p.slug!);
+                                setLinkItemPickerOpen(false);
+                              }}
+                            >
+                              <Check className={cn('mr-2 h-4 w-4', linkPickedSlug === p.slug ? 'opacity-100' : 'opacity-0')} />
+                              {p.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
+
+              {linkPageType === 'CATEGORY' && (
+                <Select value={linkPickedSlug} onValueChange={setLinkPickedSlug}>
+                  <SelectTrigger className="flex-1 min-w-[220px]">
+                    <SelectValue placeholder="Select a category…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(pickerCategories ?? []).filter((c) => c.slug).map((c) => (
+                      <SelectItem key={c.id} value={c.slug!}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {linkPageType === 'CUSTOM' && (
+                <Input
+                  className="flex-1 min-w-[220px]"
+                  placeholder="https://… or /some/path"
+                  value={linkCustomUrl}
+                  onChange={(e) => setLinkCustomUrl(e.target.value)}
+                />
+              )}
+            </div>
+          </div>
+        )}
       </div>
-      <p className="text-xs text-muted-foreground -mt-4">
-        Tapping the notification opens this link — there's no separate on-notification action button on
-        Android/iOS, this is a tap-to-open target.
-      </p>
 
       <div className="space-y-1">
         <label className="text-xs font-medium text-muted-foreground">Image (optional)</label>
