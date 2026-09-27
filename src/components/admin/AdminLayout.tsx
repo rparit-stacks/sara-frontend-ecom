@@ -30,7 +30,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
     <div className="min-h-screen flex w-full overflow-x-hidden bg-muted/30">
       <WhatsNewDialog />
       <AdminSidebar />
-      <main className={cn('flex-1 min-h-screen transition-[margin] duration-300', collapsed ? 'lg:ml-20' : 'lg:ml-64')}>
+      <main className={cn('flex-1 min-w-0 min-h-screen transition-[margin] duration-300', collapsed ? 'lg:ml-20' : 'lg:ml-64')}>
         <motion.div
           key={location.pathname}
           initial="initial"

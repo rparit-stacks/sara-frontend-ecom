@@ -126,8 +126,17 @@ export default function AdminNotificationCenter() {
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : (
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full">
+            <div className="border rounded-lg overflow-x-auto bg-background">
+              <table className="w-full min-w-[960px] table-fixed">
+                <colgroup>
+                  <col className="w-[100px]" />
+                  <col className="w-[200px]" />
+                  <col />
+                  <col className="w-[120px]" />
+                  <col className="w-[90px]" />
+                  <col className="w-[200px]" />
+                  <col className="w-[160px]" />
+                </colgroup>
                 <thead className="bg-muted">
                   <tr>
                     <th className="p-3 text-left text-sm font-medium">Channel</th>
@@ -141,25 +150,25 @@ export default function AdminNotificationCenter() {
                 </thead>
                 <tbody>
                   {data?.content?.map((log) => (
-                    <tr key={log.id} className="border-t">
+                    <tr key={log.id} className="border-t align-top">
                       <td className="p-3 text-sm">
                         <Badge variant="secondary">{log.channel}</Badge>
                       </td>
-                      <td className="p-3 text-sm font-mono text-xs max-w-[220px] truncate" title={log.recipient}>
+                      <td className="p-3 font-mono text-xs truncate" title={log.recipient}>
                         {log.recipient}
                       </td>
-                      <td className="p-3 text-sm max-w-md">
-                        {log.title && <div className="font-medium truncate">{log.title}</div>}
-                        {log.body && <div className="text-muted-foreground truncate">{log.body}</div>}
+                      <td className="p-3 text-sm min-w-0">
+                        {log.title && <div className="font-medium truncate" title={log.title}>{log.title}</div>}
+                        {log.body && <div className="text-muted-foreground truncate" title={log.body}>{log.body}</div>}
                         {!log.title && !log.body && <span className="text-muted-foreground">—</span>}
                       </td>
-                      <td className="p-3 text-sm text-muted-foreground">{log.senderApp || '—'}</td>
+                      <td className="p-3 text-sm text-muted-foreground truncate">{log.senderApp || '—'}</td>
                       <td className="p-3 text-sm">
                         <Badge variant={log.status === 'SUCCESS' ? 'default' : 'destructive'}>
                           {log.status === 'SUCCESS' ? 'Sent' : 'Failed'}
                         </Badge>
                       </td>
-                      <td className="p-3 text-sm max-w-xs text-muted-foreground" title={log.error ?? undefined}>
+                      <td className="p-3 text-sm text-muted-foreground break-words" title={log.error ?? undefined}>
                         {log.error ? <span className="line-clamp-2">{log.error}</span> : '—'}
                       </td>
                       <td className="p-3 text-sm whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</td>
