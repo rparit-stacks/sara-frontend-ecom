@@ -20,6 +20,7 @@ const AdminAdmins = () => {
   const [editingAdmin, setEditingAdmin] = useState<any>(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [invitePortalAccess, setInvitePortalAccess] = useState(false);
+  const [inviteReadOnly, setInviteReadOnly] = useState(false);
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
@@ -29,6 +30,7 @@ const AdminAdmins = () => {
     whatsappNumber: '',
     status: 'ACTIVE',
     portalAdminAccess: false,
+    readOnly: false,
   });
   
   const { data: admins = [], isLoading, error } = useQuery({
@@ -37,14 +39,15 @@ const AdminAdmins = () => {
   });
   
   const sendInviteMutation = useMutation({
-    mutationFn: ({ email, portalAdminAccess }: { email: string; portalAdminAccess: boolean }) =>
-      adminManagementApi.sendInvite(email, portalAdminAccess),
+    mutationFn: ({ email, portalAdminAccess, readOnly }: { email: string; portalAdminAccess: boolean; readOnly: boolean }) =>
+      adminManagementApi.sendInvite(email, portalAdminAccess, readOnly),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminAdmins'] });
       toast.success('Invitation sent successfully!');
       setIsInviteDialogOpen(false);
       setInviteEmail('');
       setInvitePortalAccess(false);
+      setInviteReadOnly(false);
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to send invitation');
@@ -62,7 +65,7 @@ const AdminAdmins = () => {
         if (editingAdmin?.id === stored.id) {
           localStorage.setItem(
             'adminUser',
-            JSON.stringify({ ...stored, portalAdminAccess: formData.portalAdminAccess }),
+            JSON.stringify({ ...stored, portalAdminAccess: formData.portalAdminAccess, readOnly: formData.readOnly }),
           );
         }
       } catch { /* ignore */ }
@@ -106,9 +109,10 @@ const AdminAdmins = () => {
       whatsappNumber: '',
       status: 'ACTIVE',
       portalAdminAccess: false,
+      readOnly: false,
     });
   };
-  
+
   const handleSendInvite = () => {
     if (!inviteEmail.trim()) {
       toast.error('Please enter an email address');
@@ -117,6 +121,7 @@ const AdminAdmins = () => {
     sendInviteMutation.mutate({
       email: inviteEmail.trim(),
       portalAdminAccess: invitePortalAccess,
+      readOnly: inviteReadOnly,
     });
   };
   
@@ -130,6 +135,7 @@ const AdminAdmins = () => {
           whatsappNumber: formData.whatsappNumber.trim(),
           status: formData.status,
           portalAdminAccess: formData.portalAdminAccess,
+          readOnly: formData.readOnly,
         },
       });
     }
@@ -144,6 +150,7 @@ const AdminAdmins = () => {
       whatsappNumber: admin.whatsappNumber || '',
       status: admin.status || 'ACTIVE',
       portalAdminAccess: admin.portalAdminAccess === true,
+      readOnly: admin.readOnly === true,
     });
     setIsEditDialogOpen(true);
   };
@@ -200,6 +207,7 @@ const AdminAdmins = () => {
               if (!open) {
                 setInviteEmail('');
                 setInvitePortalAccess(false);
+                setInviteReadOnly(false);
               }
             }}
           >
@@ -240,6 +248,20 @@ const AdminAdmins = () => {
                     id="invite-portal-access"
                     checked={invitePortalAccess}
                     onCheckedChange={setInvitePortalAccess}
+                    disabled={sendInviteMutation.isPending}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <Label htmlFor="invite-read-only">Read-only access</Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Can view everything (including the Manufacturing Portal) but cannot create, edit, or delete anything.
+                    </p>
+                  </div>
+                  <Switch
+                    id="invite-read-only"
+                    checked={inviteReadOnly}
+                    onCheckedChange={setInviteReadOnly}
                     disabled={sendInviteMutation.isPending}
                   />
                 </div>
@@ -339,6 +361,7 @@ const AdminAdmins = () => {
                     <Badge variant={admin.portalAdminAccess ? 'outline' : 'secondary'}>
                       {admin.portalAdminAccess ? 'Portal access' : 'Store only'}
                     </Badge>
+                    {admin.readOnly && <Badge variant="secondary">Read-only</Badge>}
                     <Button
                       variant="outline"
                       size="sm"
@@ -436,6 +459,20 @@ const AdminAdmins = () => {
                   id="portal-admin-access"
                   checked={formData.portalAdminAccess}
                   onCheckedChange={(checked) => setFormData({ ...formData, portalAdminAccess: checked })}
+                  disabled={editingAdmin?.username === 'admin'}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div>
+                  <Label htmlFor="edit-read-only">Read-only access</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Can view everything (including the Manufacturing Portal) but cannot create, edit, or delete anything.
+                  </p>
+                </div>
+                <Switch
+                  id="edit-read-only"
+                  checked={formData.readOnly}
+                  onCheckedChange={(checked) => setFormData({ ...formData, readOnly: checked })}
                   disabled={editingAdmin?.username === 'admin'}
                 />
               </div>

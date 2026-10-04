@@ -1,6 +1,7 @@
 // API Configuration
 import type { InquiryPageContent } from '@/components/inquiry/inquiryContent';
 import { dispatchLoggedOut } from '@/lib/authEvents';
+import { toast } from 'sonner';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL as string;
 
@@ -210,7 +211,16 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit, isRetryAfter
       // unparsed response body as this Error's .message, which any
       // `toast.error((e as Error).message)` call site then showed verbatim.
       const parsedOther = parseApiErrorBody(error);
-      const friendly = new Error(parsedOther?.error || error || `API Error: ${response.status}`);
+      const friendlyMessage = parsedOther?.error || error || `API Error: ${response.status}`;
+
+      // ReadOnlyAdminFilter (sara-backend-ecom) 403s every mutation for a read-only admin with
+      // this exact message — surfaced once here so every single admin action site (100+ forms/
+      // buttons across the app) doesn't need its own read-only check or error handling.
+      if (response.status === 403 && isAdminRoute && friendlyMessage.toLowerCase().includes('read-only')) {
+        toast.error('Your admin account is read-only — this action is not allowed.');
+      }
+
+      const friendly = new Error(friendlyMessage);
       (friendly as Error & { status?: number; errorCode?: string; raw?: string }).status = response.status;
       (friendly as Error & { status?: number; errorCode?: string; raw?: string }).errorCode = parsedOther?.errorCode;
       (friendly as Error & { status?: number; errorCode?: string; raw?: string }).raw = error;
@@ -1878,10 +1888,10 @@ export const adminManagementApi = {
   updateStatus: (id: number, status: string) => 
     fetchApi<any>(`/api/admin/admins/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
   delete: (id: number) => fetchApi<void>(`/api/admin/admins/${id}`, { method: 'DELETE' }),
-  sendInvite: (email: string, portalAdminAccess = false) =>
+  sendInvite: (email: string, portalAdminAccess = false, readOnly = false) =>
     fetchApi<any>('/api/admin/admins/invite', {
       method: 'POST',
-      body: JSON.stringify({ email, portalAdminAccess }),
+      body: JSON.stringify({ email, portalAdminAccess, readOnly }),
     }),
   getInviteByToken: (token: string) => 
     fetchApi<any>(`/api/admin/admins/invite/${token}`),
