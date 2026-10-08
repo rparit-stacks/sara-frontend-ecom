@@ -40,6 +40,8 @@ import TestimonialSubmit from "./pages/TestimonialSubmit";
 import PaymentPage from "./pages/PaymentPage";
 import AuthCallback from "./pages/AuthCallback";
 import AdminInvite from "./pages/admin/AdminInvite";
+import AdminForgotPassword from "./pages/admin/AdminForgotPassword";
+import AdminResetPassword from "./pages/admin/AdminResetPassword";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
@@ -140,7 +142,10 @@ const AdminSiteWideChatWidget = () => {
   const path = location.pathname;
   const onAdminSara = path === '/admin-sara' || path.startsWith('/admin-sara/');
   const isAuthSurface =
-    path === '/admin-sara/login' || path.startsWith('/admin-sara/invite');
+    path === '/admin-sara/login'
+    || path === '/admin-sara/forgot-password'
+    || path.startsWith('/admin-sara/invite')
+    || path.startsWith('/admin-sara/reset-password');
   if (!onAdminSara || isAuthSurface) return null;
   if (!localStorage.getItem('adminToken')) return null;
   return <AdminAiChatWidget />;
@@ -253,6 +258,8 @@ const App = () =>
 
           {/* Admin Routes */}
           <Route path="/admin-sara/login" element={<AdminLogin />} />
+          <Route path="/admin-sara/forgot-password" element={<AdminForgotPassword />} />
+          <Route path="/admin-sara/reset-password/:token" element={<AdminResetPassword />} />
           <Route path="/admin-sara/invite/:token" element={<AdminInvite />} />
           <Route 
             path="/admin-sara" 

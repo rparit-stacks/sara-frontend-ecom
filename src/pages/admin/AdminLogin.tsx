@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff, Loader2, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,7 +76,7 @@ const AdminLogin = () => {
     
     try {
       console.log('[Admin Login] Attempting login with email:', email);
-      const response = await adminAuthApi.login(email, password);
+      const response = await adminAuthApi.login(email.trim(), password);
       localStorage.setItem('adminToken', response.token);
       // 30-day refresh token — api.ts spends this to silently renew the 24h access token.
       if (response.refreshToken) localStorage.setItem('adminRefreshToken', response.refreshToken);
@@ -90,10 +90,12 @@ const AdminLogin = () => {
       navigate(from, { replace: true });
     } catch (error: any) {
       console.error('[Admin Login] Login failed:', error);
-      // Show inline error instead of toast for wrong password
       const errorMsg = error.message || 'Invalid credentials';
-      if (errorMsg.toLowerCase().includes('password') || errorMsg.toLowerCase().includes('wrong') || errorMsg.toLowerCase().includes('invalid')) {
-        setErrorMessage('You have entered wrong password');
+      const lower = errorMsg.toLowerCase();
+      if (lower.includes('inactive')) {
+        setErrorMessage('Admin account is inactive');
+      } else if (lower.includes('invalid email or password') || lower.includes('wrong')) {
+        setErrorMessage('Wrong email or password');
       } else {
         setErrorMessage(errorMsg);
       }
@@ -186,6 +188,15 @@ const AdminLogin = () => {
                 {errorMessage}
               </div>
             )}
+
+            <div className="flex justify-end -mt-2">
+              <Link
+                to="/admin-sara/forgot-password"
+                className="text-sm text-primary hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
 
             <Button type="submit" className="w-full btn-primary h-12 text-base" disabled={isLoading}>
               {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Signing In...</> : 'Sign In'}

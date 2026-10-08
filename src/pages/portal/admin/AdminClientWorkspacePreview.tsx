@@ -9,6 +9,7 @@ import RenameDesignModal from '@/components/portal/RenameDesignModal';
 import MessageHoverActions from '@/components/portal/MessageHoverActions';
 import ChatSearchBar from '@/components/portal/ChatSearchBar';
 import PaymentCard, { parsePaymentCard } from '@/components/portal/PaymentCard';
+import AttachmentFileCard from '@/components/portal/AttachmentFileCard';
 import ProductCard, { parseProductCard, stripProductMarker } from '@/components/portal/ProductCard';
 import DesignStagePicker from '@/components/portal/DesignStagePicker';
 import Lightbox from '@/components/portal/Lightbox';
@@ -357,7 +358,7 @@ function DesignCard({ design, active, onClick, onContextMenu, onDoubleClick }: {
 
 /** One chat message, rendered by "kind" — mirrors the real message-type inventory:
  *  text, image attachment, file attachment, product card, payment card, system/announcement. */
-type MockMessageKind = 'text' | 'image' | 'voice' | 'file' | 'system';
+type MockMessageKind = 'text' | 'image' | 'voice' | 'video' | 'file' | 'system';
 type MockMessage = {
   id: number;
   kind: MockMessageKind;
@@ -538,17 +539,21 @@ function MessageBubble({
         );
       })()}
 
+      {m.kind === 'video' && (() => {
+        const url = m.attachmentUrls?.[0] || m.attachmentUrl;
+        if (!url) return null;
+        return (
+          <div className={`${radius} overflow-hidden border w-64`} style={{ borderColor: 'var(--p-outline-variant)' }}>
+            <video src={url} controls preload="metadata" className="w-full h-40 bg-black" />
+          </div>
+        );
+      })()}
       {m.kind === 'file' && (
-        <button
-          type="button"
-          onClick={() => m.attachmentUrl && onOpenFile?.(m.attachmentUrl, m.text)}
-          className={`${radius} flex items-center gap-2.5 px-3 py-2.5 border text-left`}
-          style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}
-        >
-          <Sym name="description" className="text-[22px]" style={{ color: 'var(--p-primary)' }} />
-          <span className="text-[13px] font-medium">{m.text}</span>
-          <Sym name="visibility" className="text-[16px] ml-2" style={{ color: 'var(--p-on-surface-variant)' }} />
-        </button>
+        <AttachmentFileCard
+          name={m.text || 'Attachment'}
+          url={m.attachmentUrl}
+          onOpen={() => m.attachmentUrl && onOpenFile?.(m.attachmentUrl, m.text)}
+        />
       )}
 
       {m.reactions && m.reactions.length > 0 && (
@@ -595,6 +600,12 @@ function isAudioUrl(url?: string): boolean {
   return !!url && /\.(m4a|mp3|wav|aac|ogg|webm)$/i.test(url.split('?')[0]);
 }
 
+// Checked after isAudioUrl so a `.webm` voice note (matched above) never double-classifies
+// as video — both mobile apps' own video bubbles use these three containers.
+function isVideoUrl(url?: string): boolean {
+  return !!url && /\.(mp4|mov|m4v)$/i.test(url.split('?')[0]);
+}
+
 function fileNameFromUrl(url?: string): string | undefined {
   if (!url) return undefined;
   try {
@@ -631,7 +642,7 @@ function toMockMessage(m: ChatMessageLike): MockMessage {
   // (join/leave/stage-change notices, etc.) get the pill.
   const hasCardMarker = !!m.body && (m.body.includes('[[payment:requested') || m.body.includes('[[product:'));
   const kind: MockMessageKind = m.authorType === 'SYSTEM' && !hasCardMarker ? 'system'
-    : firstUrl ? (isImageUrl(firstUrl) ? 'image' : isAudioUrl(firstUrl) ? 'voice' : 'file')
+    : firstUrl ? (isImageUrl(firstUrl) ? 'image' : isAudioUrl(firstUrl) ? 'voice' : isVideoUrl(firstUrl) ? 'video' : 'file')
     : 'text';
   return {
     id: m.id,
@@ -642,7 +653,7 @@ function toMockMessage(m: ChatMessageLike): MockMessage {
     mine,
     time: formatServerTime(m.createdAt),
     createdAt: m.createdAt,
-    text: kind === 'file' ? (fileNameFromUrl(firstUrl) || 'Attachment') : (m.body || undefined),
+    text: kind === 'file' || kind === 'video' ? (fileNameFromUrl(firstUrl) || 'Attachment') : (m.body || undefined),
     attachmentUrl: firstUrl,
     attachmentUrls: urls,
     replyCount: m.replyCount || undefined,

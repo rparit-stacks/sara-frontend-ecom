@@ -1687,6 +1687,18 @@ export interface CurrentAdminDto {
 export const adminAuthApi = {
   login: (email: string, password: string) =>
     fetchApi<any>('/api/admin/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  forgotPassword: (email: string) =>
+    fetchApi<{ message: string }>('/api/admin/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  getResetPassword: (token: string) =>
+    fetchApi<{ email: string; expiresAt: string }>(`/api/admin/auth/reset-password/${encodeURIComponent(token)}`),
+  resetPassword: (body: { token: string; password: string; confirmPassword: string }) =>
+    fetchApi<{ message: string }>('/api/admin/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   signup: (email: string, password: string, name: string, authCode: string) =>
     fetchApi<any>('/api/admin/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, name, authCode }) }),
   getCurrentAdmin: () => fetchApi<CurrentAdminDto>('/api/admin/auth/me'),
