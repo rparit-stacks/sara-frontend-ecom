@@ -22,6 +22,7 @@ import {
   Wrench,
   Factory,
   Bell,
+  KeyRound,
 } from 'lucide-react';
 import { ChevronLeft, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -30,8 +31,9 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
 import { useAdminNotificationCounts } from '@/hooks/useAdminNotificationCounts';
-import { adminAuthApi } from '@/lib/api';
-import { isSuperAdmin } from '@/lib/adminAccess';
+import { useQueryClient } from '@tanstack/react-query';
+import { ADMIN_MY_ROLE_QUERY_KEY, useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { resolveNavPermissionRule } from '@/lib/adminNavPermissions';
 
 // Sidebar grouped into sections, each with a heading.
 const adminMenuSections = [
@@ -90,6 +92,7 @@ const adminMenuSections = [
       { icon: CreditCard, label: 'Payment Settings', path: '/admin-sara/payment-config' },
       { icon: Percent, label: 'Currency Multipliers', path: '/admin-sara/currency-multipliers' },
       { icon: Shield, label: 'Admins', path: '/admin-sara/admins' },
+      { icon: KeyRound, label: 'Roles', path: '/admin-sara/roles' },
       { icon: Activity, label: 'Logs', path: '/admin-sara/logs' },
     ],
   },
@@ -98,14 +101,14 @@ const adminMenuSections = [
 export const AdminSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [collapsed, , toggleCollapsed] = useSidebarCollapsed();
   // Collapse only applies on desktop; mobile drawer is always full-width.
   const isCollapsed = collapsed && isDesktop;
   const notifCounts = useAdminNotificationCounts();
-  const [hasPortalAccess, setHasPortalAccess] = useState(true);
-  const [isSuperAdminUser, setIsSuperAdminUser] = useState(false);
+  const { ready, canAccessPath, isMainAdmin, hasPortalAccess } = useAdminPermissions();
   const badgeForPath: Record<string, number> = {
     '/admin-sara/orders': notifCounts.orders,
   };
@@ -138,11 +141,11 @@ export const AdminSidebar = () => {
   };
 
   const handleLogout = () => {
-    console.log('[Admin Logout] Logging out...');
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminRefreshToken');
     localStorage.removeItem('adminUser');
     localStorage.removeItem('adminLoginTime');
+    queryClient.removeQueries({ queryKey: ADMIN_MY_ROLE_QUERY_KEY });
     navigate('/admin-sara/login');
   };
 
@@ -155,41 +158,20 @@ export const AdminSidebar = () => {
     return () => window.removeEventListener('resize', checkDesktop);
   }, []);
 
-  useEffect(() => {
-    const loadPortalAccess = async () => {
-      if (!localStorage.getItem('adminToken')) {
-        setHasPortalAccess(false);
-        return;
-      }
-      try {
-        const admin = await adminAuthApi.getCurrentAdmin();
-        localStorage.setItem('adminUser', JSON.stringify(admin));
-        setHasPortalAccess(admin.portalAdminAccess === true);
-        setIsSuperAdminUser(isSuperAdmin(admin));
-      } catch {
-        try {
-          const stored = JSON.parse(localStorage.getItem('adminUser') || '{}');
-          setHasPortalAccess(stored.portalAdminAccess === true);
-          setIsSuperAdminUser(isSuperAdmin(stored));
-        } catch {
-          setHasPortalAccess(false);
-          setIsSuperAdminUser(false);
-        }
-      }
-    };
-    loadPortalAccess();
-  }, [location.pathname]);
-
   const visibleMenuSections = adminMenuSections
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
-        if (item.path === '/admin-sara/admins') return isSuperAdminUser;
-        return true;
+        // Portal entry: show only when role has any PORTAL_* permission (or main admin).
+        if (item.path === '/portal-admin') return !ready || hasPortalAccess;
+        const rule = resolveNavPermissionRule(item.path);
+        if (rule?.mainAdminOnly) return isMainAdmin;
+        if (!ready) return true;
+        return canAccessPath(item.path, rule);
       }),
     }))
     .filter((section) => {
-      if (section.title === 'Manufacturing') return hasPortalAccess;
+      if (section.title === 'Manufacturing') return !ready || hasPortalAccess;
       return section.items.length > 0;
     });
 

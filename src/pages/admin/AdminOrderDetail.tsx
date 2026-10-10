@@ -17,6 +17,9 @@ import { formatPrice } from '@/lib/currency';
 import { getPaymentStatusDisplay } from '@/lib/orderUtils';
 import { renderCustomValue } from '@/lib/renderCustomValue';
 import { OrderItemCustomFieldsModal } from '@/components/admin/OrderItemCustomFieldsModal';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 const LEDGER = {
   heading: '#1F3A5F',
@@ -240,6 +243,20 @@ const AdminOrderDetail = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const orderId = Number(id);
+  const { hasAny } = useAdminPermissions();
+  const canUpdateShippingAddress = hasAny(P.ORDERS_UPDATE_SHIPPING_ADDRESS);
+  const canUpdateBillingAddress = hasAny(P.ORDERS_UPDATE_BILLING_ADDRESS);
+  const canUpdateNotes = hasAny(P.ORDERS_UPDATE_NOTES);
+  const canUpdatePayment = hasAny(P.ORDERS_UPDATE_PAYMENT);
+  const canUpdatePricing = hasAny(P.ORDERS_UPDATE_PRICING);
+  const canUpdateItem = hasAny(P.ORDERS_UPDATE_ITEM);
+  const canRecalculate = hasAny(P.ORDERS_RECALCULATE);
+  const canUpdateStatus = hasAny(P.ORDERS_UPDATE_STATUS);
+  const canUpdateCustomStatus = hasAny(P.ORDERS_UPDATE_CUSTOM_STATUS);
+  const canUpdateAnyStatus = canUpdateStatus || canUpdateCustomStatus;
+  const canUpdateCancellation = hasAny(P.ORDERS_UPDATE_CANCELLATION);
+  const canUpdateRefund = hasAny(P.ORDERS_UPDATE_REFUND);
+  const canSwipeInvoice = hasAny(P.ORDERS_SWIPE_INVOICE);
 
   const {
     data: order,
@@ -687,9 +704,25 @@ const AdminOrderDetail = () => {
               <ArrowLeft className="w-4 h-4 mr-1" />
               Back to Orders
             </button>
-            <h1 className="font-semibold text-3xl lg:text-4xl mb-1">
-              Order <span className="text-primary">#{order.orderNumber}</span>
-            </h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="font-semibold text-3xl lg:text-4xl mb-1">
+                Order <span className="text-primary">#{order.orderNumber}</span>
+              </h1>
+              <AskAdminAiButton
+                size="sm"
+                variant="outline"
+                label="Ask AI"
+                entity={{
+                  kind: 'order',
+                  id: order.id,
+                  orderNumber: order.orderNumber,
+                  name: `#${order.orderNumber}`,
+                  pageKey: 'store.order-detail',
+                  userEmail: order.userEmail,
+                  extra: `Status=${order.status}, payment=${order.paymentStatus}. Summarize this order and suggest ops actions.`,
+                }}
+              />
+            </div>
             <p className="text-muted-foreground">
               Placed on{' '}
               {order.createdAt
@@ -737,31 +770,33 @@ const AdminOrderDetail = () => {
             <section className="bg-white border border-border rounded-xl p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-lg">Customer & Shipping</h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const sa = order.shippingAddress || {};
-                    const postalCode = sa.postalCode || sa.zipCode || '';
-                    setEditAddressForm({
-                      firstName: sa.firstName || '',
-                      lastName: sa.lastName || '',
-                      email: sa.email || order.userEmail || '',
-                      phone: sa.phone || sa.phoneNumber || '',
-                      address: sa.address || '',
-                      addressLine2: sa.addressLine2 || sa.address_line2 || '',
-                      city: sa.city || '',
-                      state: sa.state || '',
-                      postalCode,
-                      country: sa.country || 'IN',
-                      gstin: sa.gstin || '',
-                    });
-                  }}
-                  disabled={updateShippingAddressMutation.isPending}
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  Update Address
-                </Button>
+                {canUpdateShippingAddress && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const sa = order.shippingAddress || {};
+                      const postalCode = sa.postalCode || sa.zipCode || '';
+                      setEditAddressForm({
+                        firstName: sa.firstName || '',
+                        lastName: sa.lastName || '',
+                        email: sa.email || order.userEmail || '',
+                        phone: sa.phone || sa.phoneNumber || '',
+                        address: sa.address || '',
+                        addressLine2: sa.addressLine2 || sa.address_line2 || '',
+                        city: sa.city || '',
+                        state: sa.state || '',
+                        postalCode,
+                        country: sa.country || 'IN',
+                        gstin: sa.gstin || '',
+                      });
+                    }}
+                    disabled={updateShippingAddressMutation.isPending}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Update Address
+                  </Button>
+                )}
               </div>
               <div className="grid md:grid-cols-2 gap-4 text-sm">
                 <div className="space-y-1">
@@ -791,113 +826,117 @@ const AdminOrderDetail = () => {
                   )}
                 </div>
               </div>
-              <div className="mt-4 grid md:grid-cols-2 gap-3">
-                <Input
-                  placeholder="First Name *"
-                  value={editAddressForm.firstName}
-                  onChange={(e) => setEditAddressForm((p: any) => ({ ...p, firstName: e.target.value }))}
-                />
-                <Input
-                  placeholder="Last Name *"
-                  value={editAddressForm.lastName}
-                  onChange={(e) => setEditAddressForm((p: any) => ({ ...p, lastName: e.target.value }))}
-                />
-                <Input
-                  placeholder="Phone *"
-                  value={editAddressForm.phone}
-                  onChange={(e) => setEditAddressForm((p: any) => ({ ...p, phone: e.target.value }))}
-                />
-                <Input
-                  placeholder="Email"
-                  value={editAddressForm.email}
-                  onChange={(e) => setEditAddressForm((p: any) => ({ ...p, email: e.target.value }))}
-                />
-                <Input
-                  placeholder="Address Line 1 *"
-                  value={editAddressForm.address}
-                  onChange={(e) => setEditAddressForm((p: any) => ({ ...p, address: e.target.value }))}
-                  className="md:col-span-2"
-                />
-                <Input
-                  placeholder="Address Line 2"
-                  value={editAddressForm.addressLine2}
-                  onChange={(e) => setEditAddressForm((p: any) => ({ ...p, addressLine2: e.target.value }))}
-                  className="md:col-span-2"
-                />
-                <Input
-                  placeholder="City *"
-                  value={editAddressForm.city}
-                  onChange={(e) => setEditAddressForm((p: any) => ({ ...p, city: e.target.value }))}
-                />
-                <Input
-                  placeholder="State *"
-                  value={editAddressForm.state}
-                  onChange={(e) => setEditAddressForm((p: any) => ({ ...p, state: e.target.value }))}
-                />
-                <Input
-                  placeholder="Postal Code *"
-                  value={editAddressForm.postalCode}
-                  onChange={(e) => setEditAddressForm((p: any) => ({ ...p, postalCode: e.target.value }))}
-                />
-                <Input
-                  placeholder="Country *"
-                  value={editAddressForm.country}
-                  onChange={(e) => setEditAddressForm((p: any) => ({ ...p, country: e.target.value }))}
-                />
-                <Input
-                  placeholder="GSTIN (optional)"
-                  value={editAddressForm.gstin}
-                  onChange={(e) =>
-                    setEditAddressForm((p: any) => ({ ...p, gstin: e.target.value.toUpperCase() }))
-                  }
-                  className="md:col-span-2"
-                />
-              </div>
-              <div className="flex justify-end mt-3">
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    if (!editAddressForm.phone || !editAddressForm.address || !editAddressForm.city ||
-                      !editAddressForm.state || !editAddressForm.postalCode) {
-                      toast.error('Please fill all required fields');
-                      return;
-                    }
-                    updateShippingAddressMutation.mutate({
-                      id: orderId,
-                      shippingAddress: {
-                        firstName: editAddressForm.firstName,
-                        lastName: editAddressForm.lastName,
-                        email: editAddressForm.email,
-                        phone: editAddressForm.phone,
-                        address: editAddressForm.address,
-                        addressLine2: editAddressForm.addressLine2 || '',
-                        city: editAddressForm.city,
-                        state: editAddressForm.state,
-                        postalCode: editAddressForm.postalCode,
-                        country: editAddressForm.country,
-                        gstin: editAddressForm.gstin || undefined,
-                      },
-                    });
-                  }}
-                  disabled={updateShippingAddressMutation.isPending}
-                >
-                  {updateShippingAddressMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Address'
-                  )}
-                </Button>
-              </div>
+              {canUpdateShippingAddress && (
+                <>
+                  <div className="mt-4 grid md:grid-cols-2 gap-3">
+                    <Input
+                      placeholder="First Name *"
+                      value={editAddressForm.firstName}
+                      onChange={(e) => setEditAddressForm((p: any) => ({ ...p, firstName: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Last Name *"
+                      value={editAddressForm.lastName}
+                      onChange={(e) => setEditAddressForm((p: any) => ({ ...p, lastName: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Phone *"
+                      value={editAddressForm.phone}
+                      onChange={(e) => setEditAddressForm((p: any) => ({ ...p, phone: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Email"
+                      value={editAddressForm.email}
+                      onChange={(e) => setEditAddressForm((p: any) => ({ ...p, email: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Address Line 1 *"
+                      value={editAddressForm.address}
+                      onChange={(e) => setEditAddressForm((p: any) => ({ ...p, address: e.target.value }))}
+                      className="md:col-span-2"
+                    />
+                    <Input
+                      placeholder="Address Line 2"
+                      value={editAddressForm.addressLine2}
+                      onChange={(e) => setEditAddressForm((p: any) => ({ ...p, addressLine2: e.target.value }))}
+                      className="md:col-span-2"
+                    />
+                    <Input
+                      placeholder="City *"
+                      value={editAddressForm.city}
+                      onChange={(e) => setEditAddressForm((p: any) => ({ ...p, city: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="State *"
+                      value={editAddressForm.state}
+                      onChange={(e) => setEditAddressForm((p: any) => ({ ...p, state: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Postal Code *"
+                      value={editAddressForm.postalCode}
+                      onChange={(e) => setEditAddressForm((p: any) => ({ ...p, postalCode: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Country *"
+                      value={editAddressForm.country}
+                      onChange={(e) => setEditAddressForm((p: any) => ({ ...p, country: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="GSTIN (optional)"
+                      value={editAddressForm.gstin}
+                      onChange={(e) =>
+                        setEditAddressForm((p: any) => ({ ...p, gstin: e.target.value.toUpperCase() }))
+                      }
+                      className="md:col-span-2"
+                    />
+                  </div>
+                  <div className="flex justify-end mt-3">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (!editAddressForm.phone || !editAddressForm.address || !editAddressForm.city ||
+                          !editAddressForm.state || !editAddressForm.postalCode) {
+                          toast.error('Please fill all required fields');
+                          return;
+                        }
+                        updateShippingAddressMutation.mutate({
+                          id: orderId,
+                          shippingAddress: {
+                            firstName: editAddressForm.firstName,
+                            lastName: editAddressForm.lastName,
+                            email: editAddressForm.email,
+                            phone: editAddressForm.phone,
+                            address: editAddressForm.address,
+                            addressLine2: editAddressForm.addressLine2 || '',
+                            city: editAddressForm.city,
+                            state: editAddressForm.state,
+                            postalCode: editAddressForm.postalCode,
+                            country: editAddressForm.country,
+                            gstin: editAddressForm.gstin || undefined,
+                          },
+                        });
+                      }}
+                      disabled={updateShippingAddressMutation.isPending}
+                    >
+                      {updateShippingAddressMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Address'
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
             </section>
 
             {/* Billing Address */}
             <section className="bg-white border border-border rounded-xl p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-lg">Billing Address</h2>
-                {order.billingAddress && (
+                {canUpdateBillingAddress && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -969,152 +1008,164 @@ const AdminOrderDetail = () => {
               ) : (
                 <div className="text-sm text-muted-foreground italic">No billing address set</div>
               )}
-              <div className="mt-4 grid md:grid-cols-2 gap-3">
-                <Input
-                  placeholder="First Name *"
-                  value={editBillingAddressForm.firstName}
-                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, firstName: e.target.value }))}
-                />
-                <Input
-                  placeholder="Last Name *"
-                  value={editBillingAddressForm.lastName}
-                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, lastName: e.target.value }))}
-                />
-                <Input
-                  placeholder="Phone *"
-                  value={editBillingAddressForm.phone}
-                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, phone: e.target.value }))}
-                />
-                <Input
-                  placeholder="Email"
-                  value={editBillingAddressForm.email}
-                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, email: e.target.value }))}
-                />
-                <Input
-                  placeholder="Address Line 1 *"
-                  value={editBillingAddressForm.address}
-                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, address: e.target.value }))}
-                  className="md:col-span-2"
-                />
-                <Input
-                  placeholder="Address Line 2"
-                  value={editBillingAddressForm.addressLine2}
-                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, addressLine2: e.target.value }))}
-                  className="md:col-span-2"
-                />
-                <Input
-                  placeholder="City *"
-                  value={editBillingAddressForm.city}
-                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, city: e.target.value }))}
-                />
-                <Input
-                  placeholder="State *"
-                  value={editBillingAddressForm.state}
-                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, state: e.target.value }))}
-                />
-                <Input
-                  placeholder="Postal Code *"
-                  value={editBillingAddressForm.postalCode}
-                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, postalCode: e.target.value }))}
-                />
-                <Input
-                  placeholder="Country *"
-                  value={editBillingAddressForm.country}
-                  onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, country: e.target.value }))}
-                />
-                <Input
-                  placeholder="GSTIN (optional)"
-                  value={editBillingAddressForm.gstin}
-                  onChange={(e) =>
-                    setEditBillingAddressForm((p: any) => ({ ...p, gstin: e.target.value.toUpperCase() }))
-                  }
-                  className="md:col-span-2"
-                />
-              </div>
-              <div className="flex justify-end mt-3">
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    if (!editBillingAddressForm.phone || !editBillingAddressForm.address || !editBillingAddressForm.city ||
-                      !editBillingAddressForm.state || !editBillingAddressForm.postalCode) {
-                      toast.error('Please fill all required fields');
-                      return;
-                    }
-                    updateBillingAddressMutation.mutate({
-                      id: orderId,
-                      billingAddress: {
-                        firstName: editBillingAddressForm.firstName,
-                        lastName: editBillingAddressForm.lastName,
-                        email: editBillingAddressForm.email,
-                        phone: editBillingAddressForm.phone,
-                        address: editBillingAddressForm.address,
-                        addressLine2: editBillingAddressForm.addressLine2 || '',
-                        city: editBillingAddressForm.city,
-                        state: editBillingAddressForm.state,
-                        postalCode: editBillingAddressForm.postalCode,
-                        country: editBillingAddressForm.country,
-                        gstin: editBillingAddressForm.gstin || undefined,
-                      },
-                    });
-                  }}
-                  disabled={updateBillingAddressMutation.isPending}
-                >
-                  {updateBillingAddressMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Billing Address'
-                  )}
-                </Button>
-              </div>
+              {canUpdateBillingAddress && (
+                <>
+                  <div className="mt-4 grid md:grid-cols-2 gap-3">
+                    <Input
+                      placeholder="First Name *"
+                      value={editBillingAddressForm.firstName}
+                      onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, firstName: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Last Name *"
+                      value={editBillingAddressForm.lastName}
+                      onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, lastName: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Phone *"
+                      value={editBillingAddressForm.phone}
+                      onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, phone: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Email"
+                      value={editBillingAddressForm.email}
+                      onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, email: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Address Line 1 *"
+                      value={editBillingAddressForm.address}
+                      onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, address: e.target.value }))}
+                      className="md:col-span-2"
+                    />
+                    <Input
+                      placeholder="Address Line 2"
+                      value={editBillingAddressForm.addressLine2}
+                      onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, addressLine2: e.target.value }))}
+                      className="md:col-span-2"
+                    />
+                    <Input
+                      placeholder="City *"
+                      value={editBillingAddressForm.city}
+                      onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, city: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="State *"
+                      value={editBillingAddressForm.state}
+                      onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, state: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Postal Code *"
+                      value={editBillingAddressForm.postalCode}
+                      onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, postalCode: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Country *"
+                      value={editBillingAddressForm.country}
+                      onChange={(e) => setEditBillingAddressForm((p: any) => ({ ...p, country: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="GSTIN (optional)"
+                      value={editBillingAddressForm.gstin}
+                      onChange={(e) =>
+                        setEditBillingAddressForm((p: any) => ({ ...p, gstin: e.target.value.toUpperCase() }))
+                      }
+                      className="md:col-span-2"
+                    />
+                  </div>
+                  <div className="flex justify-end mt-3">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (!editBillingAddressForm.phone || !editBillingAddressForm.address || !editBillingAddressForm.city ||
+                          !editBillingAddressForm.state || !editBillingAddressForm.postalCode) {
+                          toast.error('Please fill all required fields');
+                          return;
+                        }
+                        updateBillingAddressMutation.mutate({
+                          id: orderId,
+                          billingAddress: {
+                            firstName: editBillingAddressForm.firstName,
+                            lastName: editBillingAddressForm.lastName,
+                            email: editBillingAddressForm.email,
+                            phone: editBillingAddressForm.phone,
+                            address: editBillingAddressForm.address,
+                            addressLine2: editBillingAddressForm.addressLine2 || '',
+                            city: editBillingAddressForm.city,
+                            state: editBillingAddressForm.state,
+                            postalCode: editBillingAddressForm.postalCode,
+                            country: editBillingAddressForm.country,
+                            gstin: editBillingAddressForm.gstin || undefined,
+                          },
+                        });
+                      }}
+                      disabled={updateBillingAddressMutation.isPending}
+                    >
+                      {updateBillingAddressMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Billing Address'
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
             </section>
 
             {/* Order Notes */}
             <section className="bg-white border border-border rounded-xl p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-lg">Order Notes</h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEditNotesForm(order.notes || '');
-                  }}
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit
-                </Button>
+                {canUpdateNotes && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditNotesForm(order.notes || '');
+                    }}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
               </div>
-              <div className="space-y-2">
-                <Textarea
-                  value={editNotesForm}
-                  onChange={(e) => setEditNotesForm(e.target.value)}
-                  placeholder="Add internal notes about this order..."
-                  rows={4}
-                  className="text-sm"
-                />
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    updateNotesMutation.mutate({
-                      id: orderId,
-                      notes: editNotesForm,
-                    });
-                  }}
-                  disabled={updateNotesMutation.isPending}
-                  className="w-full"
-                >
-                  {updateNotesMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Notes'
-                  )}
-                </Button>
-              </div>
+              {canUpdateNotes ? (
+                <div className="space-y-2">
+                  <Textarea
+                    value={editNotesForm}
+                    onChange={(e) => setEditNotesForm(e.target.value)}
+                    placeholder="Add internal notes about this order..."
+                    rows={4}
+                    className="text-sm"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      updateNotesMutation.mutate({
+                        id: orderId,
+                        notes: editNotesForm,
+                      });
+                    }}
+                    disabled={updateNotesMutation.isPending}
+                    className="w-full"
+                  >
+                    {updateNotesMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Notes'
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {order.notes?.trim() ? order.notes : 'No notes'}
+                </p>
+              )}
             </section>
           </div>
 
@@ -1135,17 +1186,19 @@ const AdminOrderDetail = () => {
                     <FileText className="w-4 h-4 mr-2" />
                     View in Detail
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      recalculateMutation.mutate(orderId);
-                    }}
-                    disabled={recalculateMutation.isPending}
-                  >
-                    <RefreshCw className={`w-4 h-4 mr-2 ${recalculateMutation.isPending ? 'animate-spin' : ''}`} />
-                    Recalculate Totals
-                  </Button>
+                  {canRecalculate && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        recalculateMutation.mutate(orderId);
+                      }}
+                      disabled={recalculateMutation.isPending}
+                    >
+                      <RefreshCw className={`w-4 h-4 mr-2 ${recalculateMutation.isPending ? 'animate-spin' : ''}`} />
+                      Recalculate Totals
+                    </Button>
+                  )}
                 </div>
               </div>
               <Dialog open={viewInDetailOpen} onOpenChange={setViewInDetailOpen}>
@@ -1334,25 +1387,27 @@ const AdminOrderDetail = () => {
                           <FileText className="w-4 h-4" />
                           View in Detail
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingItemId(item.id);
-                            setEditItemForm({
-                              quantity: item.quantity || 1,
-                              price: Number(item.price || 0),
-                              name: item.name || '',
-                              customData:
-                                item.customData && typeof item.customData === 'object'
-                                  ? { ...(item.customData as Record<string, unknown>) }
-                                  : undefined,
-                              customFieldLabels: (item as { customFieldLabels?: Record<string, string> }).customFieldLabels,
-                            });
-                          }}
-                        >
-                          <Edit className="w-3 h-3" />
-                        </Button>
+                        {canUpdateItem && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingItemId(item.id);
+                              setEditItemForm({
+                                quantity: item.quantity || 1,
+                                price: Number(item.price || 0),
+                                name: item.name || '',
+                                customData:
+                                  item.customData && typeof item.customData === 'object'
+                                    ? { ...(item.customData as Record<string, unknown>) }
+                                    : undefined,
+                                customFieldLabels: (item as { customFieldLabels?: Record<string, string> }).customFieldLabels,
+                              });
+                            }}
+                          >
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )
@@ -1409,20 +1464,22 @@ const AdminOrderDetail = () => {
             <section className="bg-white border border-border rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-lg">Payment Summary</h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEditPaymentForm({
-                      paymentStatus: order.paymentStatus || 'PENDING',
-                      paymentId: order.paymentId || '',
-                      paymentAmount: order.paymentAmount ? Number(order.paymentAmount) : order.total ? Number(order.total) : 0,
-                    });
-                  }}
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit
-                </Button>
+                {canUpdatePayment && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditPaymentForm({
+                        paymentStatus: order.paymentStatus || 'PENDING',
+                        paymentId: order.paymentId || '',
+                        paymentAmount: order.paymentAmount ? Number(order.paymentAmount) : order.total ? Number(order.total) : 0,
+                      });
+                    }}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
               </div>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -1435,73 +1492,80 @@ const AdminOrderDetail = () => {
                     {order.deliveryType === 'PORTER' ? 'Porter Delivery' : 'Standard Delivery'}
                   </span>
                 </div>
-                <div className="space-y-2 pt-2 border-t">
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Payment Status</label>
-                    <Select
-                      value={editPaymentForm.paymentStatus}
-                      onValueChange={(value) =>
-                        setEditPaymentForm((prev) => ({ ...prev, paymentStatus: value }))
-                      }
+                {canUpdatePayment ? (
+                  <div className="space-y-2 pt-2 border-t">
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Payment Status</label>
+                      <Select
+                        value={editPaymentForm.paymentStatus}
+                        onValueChange={(value) =>
+                          setEditPaymentForm((prev) => ({ ...prev, paymentStatus: value }))
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PENDING">Pending</SelectItem>
+                          <SelectItem value="PAID">Paid</SelectItem>
+                          <SelectItem value="FAILED">Failed</SelectItem>
+                          <SelectItem value="REFUNDED">Refunded</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Transaction ID</label>
+                      <Input
+                        value={editPaymentForm.paymentId}
+                        onChange={(e) =>
+                          setEditPaymentForm((prev) => ({ ...prev, paymentId: e.target.value }))
+                        }
+                        placeholder="Transaction ID"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Payment Amount ({paymentCurrency})</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editPaymentForm.paymentAmount}
+                        onChange={(e) =>
+                          setEditPaymentForm((prev) => ({ ...prev, paymentAmount: Number(e.target.value) }))
+                        }
+                        placeholder="0.00"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        updatePaymentMutation.mutate({
+                          id: orderId,
+                          paymentStatus: editPaymentForm.paymentStatus,
+                          paymentId: editPaymentForm.paymentId || undefined,
+                          paymentAmount: editPaymentForm.paymentAmount || undefined,
+                        });
+                      }}
+                      disabled={updatePaymentMutation.isPending}
+                      className="w-full"
                     >
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="PENDING">Pending</SelectItem>
-                        <SelectItem value="PAID">Paid</SelectItem>
-                        <SelectItem value="FAILED">Failed</SelectItem>
-                        <SelectItem value="REFUNDED">Refunded</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      {updatePaymentMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Payment Info'
+                      )}
+                    </Button>
                   </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Transaction ID</label>
-                    <Input
-                      value={editPaymentForm.paymentId}
-                      onChange={(e) =>
-                        setEditPaymentForm((prev) => ({ ...prev, paymentId: e.target.value }))
-                      }
-                      placeholder="Transaction ID"
-                      className="h-8 text-sm"
-                    />
+                ) : (
+                  <div className="flex justify-between pt-2 border-t">
+                    <span>Payment Status</span>
+                    {renderPaymentStatus(order)}
                   </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Payment Amount ({paymentCurrency})</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={editPaymentForm.paymentAmount}
-                      onChange={(e) =>
-                        setEditPaymentForm((prev) => ({ ...prev, paymentAmount: Number(e.target.value) }))
-                      }
-                      placeholder="0.00"
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      updatePaymentMutation.mutate({
-                        id: orderId,
-                        paymentStatus: editPaymentForm.paymentStatus,
-                        paymentId: editPaymentForm.paymentId || undefined,
-                        paymentAmount: editPaymentForm.paymentAmount || undefined,
-                      });
-                    }}
-                    disabled={updatePaymentMutation.isPending}
-                    className="w-full"
-                  >
-                    {updatePaymentMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      'Save Payment Info'
-                    )}
-                  </Button>
-                </div>
+                )}
                 {order.paymentId && (
                   <div className="flex justify-between pt-2 border-t">
                     <span>Current Transaction ID</span>
@@ -1542,112 +1606,113 @@ const AdminOrderDetail = () => {
                   </div>
                 )}
               </div>
-              <div className="mt-3 pt-3 border-t border-dashed space-y-2 text-xs">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span>Subtotal (INR)</span>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={editPricingForm.subtotal}
-                        onChange={(e) =>
-                          setEditPricingForm((prev) => ({ ...prev, subtotal: Number(e.target.value) }))
-                        }
-                        className="w-24 h-6 text-xs"
-                      />
-                      <span className="text-xs">({formatPrice(Number(order.subtotal || 0), 'INR')})</span>
+              {canUpdatePricing && (
+                <div className="mt-3 pt-3 border-t border-dashed space-y-2 text-xs">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span>Subtotal (INR)</span>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editPricingForm.subtotal}
+                          onChange={(e) =>
+                            setEditPricingForm((prev) => ({ ...prev, subtotal: Number(e.target.value) }))
+                          }
+                          className="w-24 h-6 text-xs"
+                        />
+                        <span className="text-xs">({formatPrice(Number(order.subtotal || 0), 'INR')})</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>GST (INR)</span>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={editPricingForm.gst}
-                        onChange={(e) =>
-                          setEditPricingForm((prev) => ({ ...prev, gst: Number(e.target.value) }))
-                        }
-                        className="w-24 h-6 text-xs"
-                      />
-                      <span className="text-xs">({formatPrice(Number(order.gst || 0), 'INR')})</span>
+                    <div className="flex items-center justify-between">
+                      <span>GST (INR)</span>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editPricingForm.gst}
+                          onChange={(e) =>
+                            setEditPricingForm((prev) => ({ ...prev, gst: Number(e.target.value) }))
+                          }
+                          className="w-24 h-6 text-xs"
+                        />
+                        <span className="text-xs">({formatPrice(Number(order.gst || 0), 'INR')})</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Shipping (INR)</span>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={editPricingForm.shipping}
-                        onChange={(e) =>
-                          setEditPricingForm((prev) => ({ ...prev, shipping: Number(e.target.value) }))
-                        }
-                        className="w-24 h-6 text-xs"
-                      />
-                      <span className="text-xs">({formatPrice(Number(order.shipping || 0), 'INR')})</span>
+                    <div className="flex items-center justify-between">
+                      <span>Shipping (INR)</span>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editPricingForm.shipping}
+                          onChange={(e) =>
+                            setEditPricingForm((prev) => ({ ...prev, shipping: Number(e.target.value) }))
+                          }
+                          className="w-24 h-6 text-xs"
+                        />
+                        <span className="text-xs">({formatPrice(Number(order.shipping || 0), 'INR')})</span>
+                      </div>
                     </div>
-                  </div>
-                  {order.couponDiscount && Number(order.couponDiscount) > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Discount (INR){order.couponCode ? ` (${order.couponCode})` : ''}</span>
-                      <span>-{formatPrice(Number(order.couponDiscount), 'INR')}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between font-semibold pt-2 border-t">
-                    <span>Total (INR)</span>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={editPricingForm.total}
-                        onChange={(e) =>
-                          setEditPricingForm((prev) => ({ ...prev, total: Number(e.target.value) }))
-                        }
-                        className="w-24 h-6 text-xs font-semibold"
-                      />
-                      <span className="text-xs">({formatPrice(Number(order.total || 0), 'INR')})</span>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      // Auto-calculate total if not manually set
-                      const calculatedTotal =
-                        editPricingForm.subtotal +
-                        editPricingForm.gst +
-                        editPricingForm.shipping -
-                        (order.couponDiscount ? Number(order.couponDiscount) : 0);
-                      
-                      updatePricingMutation.mutate({
-                        id: orderId,
-                        data: {
-                          subtotal: editPricingForm.subtotal,
-                          gst: editPricingForm.gst,
-                          shipping: editPricingForm.shipping,
-                          total: editPricingForm.total || calculatedTotal,
-                        },
-                      });
-                    }}
-                    disabled={updatePricingMutation.isPending}
-                    className="w-full mt-2"
-                  >
-                    {updatePricingMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      'Save Pricing'
+                    {order.couponDiscount && Number(order.couponDiscount) > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Discount (INR){order.couponCode ? ` (${order.couponCode})` : ''}</span>
+                        <span>-{formatPrice(Number(order.couponDiscount), 'INR')}</span>
+                      </div>
                     )}
-                  </Button>
+                    <div className="flex items-center justify-between font-semibold pt-2 border-t">
+                      <span>Total (INR)</span>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editPricingForm.total}
+                          onChange={(e) =>
+                            setEditPricingForm((prev) => ({ ...prev, total: Number(e.target.value) }))
+                          }
+                          className="w-24 h-6 text-xs font-semibold"
+                        />
+                        <span className="text-xs">({formatPrice(Number(order.total || 0), 'INR')})</span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const calculatedTotal =
+                          editPricingForm.subtotal +
+                          editPricingForm.gst +
+                          editPricingForm.shipping -
+                          (order.couponDiscount ? Number(order.couponDiscount) : 0);
+
+                        updatePricingMutation.mutate({
+                          id: orderId,
+                          data: {
+                            subtotal: editPricingForm.subtotal,
+                            gst: editPricingForm.gst,
+                            shipping: editPricingForm.shipping,
+                            total: editPricingForm.total || calculatedTotal,
+                          },
+                        });
+                      }}
+                      disabled={updatePricingMutation.isPending}
+                      className="w-full mt-2"
+                    >
+                      {updatePricingMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Pricing'
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </section>
 
             {/* Payment History */}
@@ -1728,6 +1793,7 @@ const AdminOrderDetail = () => {
                       placeholder="Enter reason for cancellation..."
                       rows={3}
                       className="text-sm"
+                      readOnly={!canUpdateCancellation}
                     />
                   </div>
                   <div>
@@ -1739,29 +1805,32 @@ const AdminOrderDetail = () => {
                       }
                       placeholder="Admin email or 'Customer'"
                       className="text-sm"
+                      readOnly={!canUpdateCancellation}
                     />
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      updateCancellationMutation.mutate({
-                        id: orderId,
-                        cancellationReason: editCancellationForm.cancellationReason,
-                        cancelledBy: editCancellationForm.cancelledBy,
-                      });
-                    }}
-                    disabled={updateCancellationMutation.isPending}
-                    className="w-full"
-                  >
-                    {updateCancellationMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      'Save Cancellation Info'
-                    )}
-                  </Button>
+                  {canUpdateCancellation && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        updateCancellationMutation.mutate({
+                          id: orderId,
+                          cancellationReason: editCancellationForm.cancellationReason,
+                          cancelledBy: editCancellationForm.cancelledBy,
+                        });
+                      }}
+                      disabled={updateCancellationMutation.isPending}
+                      className="w-full"
+                    >
+                      {updateCancellationMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Cancellation Info'
+                      )}
+                    </Button>
+                  )}
                 </div>
               </section>
             )}
@@ -1797,6 +1866,7 @@ const AdminOrderDetail = () => {
                       }
                       placeholder="0.00"
                       className="text-sm"
+                      readOnly={!canUpdateRefund}
                     />
                   </div>
                   <div>
@@ -1808,6 +1878,7 @@ const AdminOrderDetail = () => {
                         setEditRefundForm((prev) => ({ ...prev, refundDate: e.target.value }))
                       }
                       className="text-sm"
+                      readOnly={!canUpdateRefund}
                     />
                   </div>
                   <div>
@@ -1819,6 +1890,7 @@ const AdminOrderDetail = () => {
                       }
                       placeholder="Transaction ID"
                       className="text-sm"
+                      readOnly={!canUpdateRefund}
                     />
                   </div>
                   <div>
@@ -1831,38 +1903,42 @@ const AdminOrderDetail = () => {
                       placeholder="Enter reason for refund..."
                       rows={3}
                       className="text-sm"
+                      readOnly={!canUpdateRefund}
                     />
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      updateRefundMutation.mutate({
-                        id: orderId,
-                        data: {
-                          refundAmount: editRefundForm.refundAmount || undefined,
-                          refundDate: editRefundForm.refundDate || undefined,
-                          refundTransactionId: editRefundForm.refundTransactionId || undefined,
-                          refundReason: editRefundForm.refundReason || undefined,
-                        },
-                      });
-                    }}
-                    disabled={updateRefundMutation.isPending}
-                    className="w-full"
-                  >
-                    {updateRefundMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      'Save Refund Info'
-                    )}
-                  </Button>
+                  {canUpdateRefund && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        updateRefundMutation.mutate({
+                          id: orderId,
+                          data: {
+                            refundAmount: editRefundForm.refundAmount || undefined,
+                            refundDate: editRefundForm.refundDate || undefined,
+                            refundTransactionId: editRefundForm.refundTransactionId || undefined,
+                            refundReason: editRefundForm.refundReason || undefined,
+                          },
+                        });
+                      }}
+                      disabled={updateRefundMutation.isPending}
+                      className="w-full"
+                    >
+                      {updateRefundMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Refund Info'
+                      )}
+                    </Button>
+                  )}
                 </div>
               </section>
             )}
 
             {/* Status update */}
+            {canUpdateAnyStatus && (
             <section className="bg-white border border-border rounded-xl p-4 space-y-4">
               <h2 className="font-semibold text-lg">Update Status</h2>
               <div className="space-y-2">
@@ -1877,8 +1953,8 @@ const AdminOrderDetail = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="standard">Standard Status</SelectItem>
-                    <SelectItem value="custom">Custom Status</SelectItem>
+                    {canUpdateStatus && <SelectItem value="standard">Standard Status</SelectItem>}
+                    {canUpdateCustomStatus && <SelectItem value="custom">Custom Status</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -1978,6 +2054,7 @@ const AdminOrderDetail = () => {
                 </Button>
               </div>
             </section>
+            )}
 
             {/* Swipe Invoice */}
             <section className="bg-white border border-border rounded-xl p-4 space-y-3">
@@ -2033,19 +2110,21 @@ const AdminOrderDetail = () => {
                           Swipe invoice not created yet. You can retry creating it.
                         </div>
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRetrySwipe}
-                        disabled={retrySwipeMutation.isPending}
-                      >
-                        <RefreshCw
-                          className={`w-4 h-4 mr-2 ${
-                            retrySwipeMutation.isPending ? 'animate-spin' : ''
-                          }`}
-                        />
-                        Retry Invoice
-                      </Button>
+                      {canSwipeInvoice && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRetrySwipe}
+                          disabled={retrySwipeMutation.isPending}
+                        >
+                          <RefreshCw
+                            className={`w-4 h-4 mr-2 ${
+                              retrySwipeMutation.isPending ? 'animate-spin' : ''
+                            }`}
+                          />
+                          Retry Invoice
+                        </Button>
+                      )}
                     </div>
                   );
                 })()

@@ -5,6 +5,8 @@ import AdminShell from '@/components/portal/AdminShell';
 import { Sym } from '@/components/portal/Sym';
 import { adminAuthApi, manufacturingApi, notificationSettingsApi, adminNotificationSettingsApi, type PortalAdminSettings, type GlobalNotificationPreferenceDto } from '@/lib/api';
 import { getAdminChatDisplayName } from '@/lib/adminAccess';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const DEFAULT_SETTINGS: PortalAdminSettings = {
   projectCodePrefix: 'PRJ-',
@@ -49,7 +51,7 @@ function SettingsCard({ icon, title, description, children }: { icon: string; ti
  *  project event (rename, delete, stage change, etc.) — separate from "Notify the team
  *  about" above, which is about alerting internal staff. Registry-driven: every event
  *  the backend knows about (ProjectNotificationEvents) shows up here automatically. */
-function ClientNotificationSettings() {
+function ClientNotificationSettings({ canToggle }: { canToggle: boolean }) {
   const queryClient = useQueryClient();
   const { data: prefs, isLoading } = useQuery({
     queryKey: ['global-notification-preferences'],
@@ -88,7 +90,11 @@ function ClientNotificationSettings() {
               <p className="font-semibold text-[14px]">{ev.label}</p>
               <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{ev.description}</p>
             </div>
-            <Toggle on={ev.enabled} onClick={() => toggleMutation.mutate({ eventKey: ev.eventKey, enabled: !ev.enabled })} />
+            <Toggle
+              on={ev.enabled}
+              disabled={!canToggle}
+              onClick={() => toggleMutation.mutate({ eventKey: ev.eventKey, enabled: !ev.enabled })}
+            />
           </div>
         ))
       )}
@@ -101,7 +107,7 @@ function ClientNotificationSettings() {
  *  counterpart of ClientNotificationSettings above. Registry-driven the same way: every
  *  event AdminNotificationEvents knows about shows up here automatically. Replaces the old
  *  "Notify the team about" card, which persisted three toggles nothing ever read back. */
-function AdminNotificationSettings() {
+function AdminNotificationSettings({ canToggle }: { canToggle: boolean }) {
   const queryClient = useQueryClient();
   const { data: prefs, isLoading } = useQuery({
     queryKey: ['admin-notification-preferences'],
@@ -140,7 +146,11 @@ function AdminNotificationSettings() {
               <p className="font-semibold text-[14px]">{ev.label}</p>
               <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{ev.description}</p>
             </div>
-            <Toggle on={ev.enabled} onClick={() => toggleMutation.mutate({ eventKey: ev.eventKey, enabled: !ev.enabled })} />
+            <Toggle
+              on={ev.enabled}
+              disabled={!canToggle}
+              onClick={() => toggleMutation.mutate({ eventKey: ev.eventKey, enabled: !ev.enabled })}
+            />
           </div>
         ))
       )}
@@ -149,6 +159,11 @@ function AdminNotificationSettings() {
 }
 
 export default function PortalAdminSettings() {
+  const { hasAny } = useAdminPermissions();
+  const canUpdateSettings = hasAny(P.PORTAL_SETTINGS_UPDATE);
+  const canUpdateCompany = hasAny(P.PORTAL_SETTINGS_UPDATE_COMPANY);
+  const canToggleOrgNotifications = hasAny(P.PORTAL_SETTINGS_TOGGLE_ORG_NOTIFICATIONS);
+  const canToggleStaffNotifications = hasAny(P.PORTAL_SETTINGS_TOGGLE_STAFF_NOTIFICATIONS);
   const qc = useQueryClient();
   const [identityName, setIdentityName] = useState('');
   const [identityEmail, setIdentityEmail] = useState('');
@@ -216,16 +231,18 @@ export default function PortalAdminSettings() {
     <AdminShell
       title="Settings"
       actions={
-        <button
-          type="button"
-          disabled={saveMutation.isPending || isLoading}
-          onClick={() => saveMutation.mutate()}
-          className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white hover:brightness-110 flex items-center gap-2 disabled:opacity-60"
-          style={{ background: 'var(--p-primary)' }}
-        >
-          <Sym name="save" className="text-[16px]" />
-          {saveMutation.isPending ? 'Saving…' : 'Save changes'}
-        </button>
+        canUpdateSettings ? (
+          <button
+            type="button"
+            disabled={saveMutation.isPending || isLoading}
+            onClick={() => saveMutation.mutate()}
+            className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white hover:brightness-110 flex items-center gap-2 disabled:opacity-60"
+            style={{ background: 'var(--p-primary)' }}
+          >
+            <Sym name="save" className="text-[16px]" />
+            {saveMutation.isPending ? 'Saving…' : 'Save changes'}
+          </button>
+        ) : undefined
       }
     >
       <div className="p-5 sm:p-8 max-w-6xl">
@@ -264,15 +281,17 @@ export default function PortalAdminSettings() {
                     className="flex-1 mt-1 px-3 py-2 rounded-lg border outline-none text-[14px]"
                     style={{ borderColor: 'var(--p-outline-variant)' }}
                   />
-                  <button
-                    type="button"
-                    onClick={() => void saveWhatsapp()}
-                    disabled={whatsappSaving}
-                    className="mt-1 px-3.5 rounded-lg text-[13px] font-semibold text-white disabled:opacity-60 shrink-0"
-                    style={{ background: 'var(--p-primary)' }}
-                  >
-                    {whatsappSaving ? 'Saving…' : 'Save'}
-                  </button>
+                  {canUpdateCompany && (
+                    <button
+                      type="button"
+                      onClick={() => void saveWhatsapp()}
+                      disabled={whatsappSaving}
+                      className="mt-1 px-3.5 rounded-lg text-[13px] font-semibold text-white disabled:opacity-60 shrink-0"
+                      style={{ background: 'var(--p-primary)' }}
+                    >
+                      {whatsappSaving ? 'Saving…' : 'Save'}
+                    </button>
+                  )}
                 </div>
               </div>
               <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>
@@ -288,6 +307,7 @@ export default function PortalAdminSettings() {
                 <input
                   value={settings.projectCodePrefix}
                   onChange={(e) => setSettings((s) => ({ ...s, projectCodePrefix: e.target.value }))}
+                  readOnly={!canUpdateSettings}
                   className="w-full mt-1 px-3 py-2 rounded-lg border outline-none text-[14px]"
                   style={{ borderColor: 'var(--p-outline-variant)' }}
                 />
@@ -297,6 +317,7 @@ export default function PortalAdminSettings() {
                 <select
                   value={settings.defaultCurrency}
                   onChange={(e) => setSettings((s) => ({ ...s, defaultCurrency: e.target.value }))}
+                  disabled={!canUpdateSettings}
                   className="w-full mt-1 px-3 py-2 rounded-lg border outline-none text-[14px] bg-transparent"
                   style={{ borderColor: 'var(--p-outline-variant)' }}
                 >
@@ -311,14 +332,18 @@ export default function PortalAdminSettings() {
                   <p className="font-semibold text-[14px]">Auto-generate project codes</p>
                   <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>Assign next number on project creation.</p>
                 </div>
-                <Toggle on={settings.autoGenerateProjectCodes} onClick={() => setBool('autoGenerateProjectCodes')} />
+                <Toggle
+                  on={settings.autoGenerateProjectCodes}
+                  disabled={!canUpdateSettings}
+                  onClick={() => setBool('autoGenerateProjectCodes')}
+                />
               </div>
             </div>
           </SettingsCard>
 
-          <AdminNotificationSettings />
+          <AdminNotificationSettings canToggle={canToggleStaffNotifications} />
 
-          <ClientNotificationSettings />
+          <ClientNotificationSettings canToggle={canToggleOrgNotifications} />
         </div>
       </div>
     </AdminShell>

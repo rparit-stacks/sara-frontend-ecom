@@ -4,7 +4,9 @@ import { User, Lock, Eye, EyeOff, Loader2, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { adminAuthApi } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { adminAuthApi, adminRolesApi } from '@/lib/api';
+import { ADMIN_MY_ROLE_QUERY_KEY } from '@/hooks/useAdminPermissions';
 
 /** Reconstruct the full attempted path (pathname+search+hash) from the redirect state —
  *  pathname alone would drop a deep link's ?project=/?customer= and #msg-<id>. */
@@ -17,6 +19,7 @@ function fromLocation(location: ReturnType<typeof useLocation>): string {
 const AdminLogin = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -82,10 +85,12 @@ const AdminLogin = () => {
       if (response.refreshToken) localStorage.setItem('adminRefreshToken', response.refreshToken);
       localStorage.setItem('adminUser', JSON.stringify(response.admin));
       localStorage.setItem('adminLoginTime', Date.now().toString());
-      console.log('[Admin Login] Login successful, token saved, session started');
+      void queryClient.prefetchQuery({
+        queryKey: ADMIN_MY_ROLE_QUERY_KEY,
+        queryFn: () => adminRolesApi.mine(),
+      });
       toast.success('Login successful');
-      
-      // Redirect to the page they were trying to access, or dashboard
+
       const from = fromLocation(location);
       navigate(from, { replace: true });
     } catch (error: any) {

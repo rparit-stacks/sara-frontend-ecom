@@ -8,8 +8,12 @@ import { Loader2, MessageSquare, Save, FileText, ChevronDown, ChevronUp } from '
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { whatsappApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const AdminWhatsApp = () => {
+  const { hasAny } = useAdminPermissions();
+  const canUpdateTemplates = hasAny(P.WHATSAPP_UPDATE_TEMPLATES);
   const [logsPage, setLogsPage] = useState(0);
   const [editing, setEditing] = useState<Record<string, string>>({});
   const [expandedPayloadKey, setExpandedPayloadKey] = useState<string | null>(null);
@@ -124,6 +128,7 @@ const AdminWhatsApp = () => {
                             value={editing[row.key] ?? row.templateName}
                             onChange={(e) => setEditing((prev) => ({ ...prev, [row.key]: e.target.value }))}
                             placeholder="e.g. user_signup_welcome_v1"
+                            readOnly={!canUpdateTemplates}
                           />
                         </td>
                         <td className="p-3">
@@ -132,20 +137,22 @@ const AdminWhatsApp = () => {
                           </Badge>
                         </td>
                         <td className="p-3">
-                          <Button
-                            size="sm"
-                            onClick={() => handleSave(row.key, row.templateName)}
-                            disabled={updateMutation.isPending}
-                          >
-                            {updateMutation.isPending ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <>
-                                <Save className="w-4 h-4 mr-1" />
-                                Save
-                              </>
-                            )}
-                          </Button>
+                          {canUpdateTemplates && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleSave(row.key, row.templateName)}
+                              disabled={updateMutation.isPending}
+                            >
+                              {updateMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <Save className="w-4 h-4 mr-1" />
+                                  Save
+                                </>
+                              )}
+                            </Button>
+                          )}
                         </td>
                       </tr>
                       {expandedPayloadKey === row.key && (

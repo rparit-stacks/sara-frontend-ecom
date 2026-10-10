@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { TablePagination } from '@/components/admin/TablePagination';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ProductFormDialog from '@/components/admin/ProductFormDialog';
 import { AiCreateButton } from '@/components/admin/AiCreateButton';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 import { PlainProduct } from '@/components/admin/PlainProductSelector';
 import { ProductType } from '@/components/admin/ProductTypeSelector';
 import {
@@ -24,12 +26,29 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { productsApi, plainProductsApi, categoriesApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
+
+const PRODUCT_PAGE_SIZE = 10;
 
 const AdminProducts = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
+  const { hasAny } = useAdminPermissions();
+  const canAdd = hasAny(P.PRODUCTS_ADD_PLAIN, P.PRODUCTS_ADD_DESIGNED, P.PRODUCTS_ADD_DIGITAL);
+  const canEdit = hasAny(P.PRODUCTS_EDIT);
+  const canDelete = hasAny(P.PRODUCTS_DELETE);
+  const canBulkDelete = hasAny(P.PRODUCTS_BULK_DELETE);
+  const canToggle = hasAny(P.PRODUCTS_TOGGLE_STATUS);
+  const canBulkToggle = hasAny(P.PRODUCTS_BULK_TOGGLE_STATUS);
+  const canBulkCopy = hasAny(P.PRODUCTS_BULK_COPY);
+  const canBulkCategory = hasAny(P.PRODUCTS_BULK_CHANGE_CATEGORY);
+  const canExport = hasAny(P.PRODUCTS_EXPORT);
+  const canAiCreate = hasAny(P.PRODUCTS_AI_CREATE);
+  const showBulkBar =
+    canBulkDelete || canBulkToggle || canBulkCopy || canBulkCategory;
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [deleteProductId, setDeleteProductId] = useState<number | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
@@ -43,11 +62,26 @@ const AdminProducts = () => {
   
   const queryClient = useQueryClient();
 
-  // Fetch products from API (use admin endpoint to include products in personalized categories)
-  const { data: products = [], isLoading: productsLoading, error: productsError } = useQuery({
-    queryKey: ['products', 'admin', filterType],
-    queryFn: () => productsApi.getAllAdmin(filterType !== 'ALL' ? { type: filterType } : undefined),
+  // Server-side pagination (10 per page) + debounced search — only one page is fetched/rendered.
+  const [page, setPage] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(searchQuery.trim()); setPage(0); }, 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+  useEffect(() => { setPage(0); setSelectedProducts(new Set()); }, [filterType]);
+
+  const { data: productPage, isLoading: productsLoading, isFetching: productsFetching, error: productsError } = useQuery({
+    queryKey: ['products', 'admin', filterType, debouncedSearch, page],
+    queryFn: () => productsApi.getAdminPage({
+      page,
+      size: PRODUCT_PAGE_SIZE,
+      q: debouncedSearch || undefined,
+      type: filterType !== 'ALL' ? filterType : undefined,
+    }),
+    placeholderData: keepPreviousData,
   });
+  const filteredProducts: any[] = productPage?.content ?? [];
 
   // Fetch plain products (fabrics) for the form dialog
   const { data: plainProducts = [], isLoading: plainProductsLoading, error: plainProductsError } = useQuery({
@@ -364,19 +398,6 @@ const AdminProducts = () => {
     subcategories: [], // Leaf categories have no subcategories
   }));
 
-  // Filter and sort products by search (newest first)
-  const filteredProducts = products
-    .filter((product: any) => {
-      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
-    })
-    .sort((a: any, b: any) => {
-      // Sort by createdAt descending (newest first)
-      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return bDate - aDate;
-    });
-
   if (productsLoading) {
     return (
       <AdminLayout>
@@ -440,88 +461,104 @@ const AdminProducts = () => {
             </h1>
             <p className="text-muted-foreground text-lg">Create and manage all product types</p>
           </div>
-          <div className="flex gap-2">
-            {selectedProducts.size > 0 && (
+          <div className="flex gap-2 flex-wrap justify-end">
+            {showBulkBar && selectedProducts.size > 0 && (
               <motion.div 
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="flex gap-2"
+                className="flex gap-2 flex-wrap"
               >
+                {canBulkToggle && (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      className="gap-2"
+                      onClick={handleBulkPause}
+                      disabled={bulkToggleStatusMutation.isPending}
+                    >
+                      <Pause className="w-4 h-4" />
+                      Pause ({selectedProducts.size})
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="gap-2"
+                      onClick={handleBulkUnpause}
+                      disabled={bulkToggleStatusMutation.isPending}
+                    >
+                      <Play className="w-4 h-4" />
+                      Unpause ({selectedProducts.size})
+                    </Button>
+                  </>
+                )}
+                {canBulkDelete && (
+                  <Button 
+                    variant="destructive" 
+                    className="gap-2"
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleteMutation.isPending}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete ({selectedProducts.size})
+                  </Button>
+                )}
+                {canBulkCopy && (
+                  <Button 
+                    variant="outline" 
+                    className="gap-2"
+                    onClick={handleBulkCopy}
+                    disabled={bulkCopyMutation.isPending}
+                  >
+                    <Copy className="w-4 h-4" />
+                    Copy ({selectedProducts.size})
+                  </Button>
+                )}
+                {canBulkCategory && (
+                  <Button 
+                    variant="outline" 
+                    className="gap-2"
+                    onClick={handleBulkChangeCategory}
+                    disabled={bulkUpdateCategoryMutation.isPending}
+                  >
+                    <FolderInput className="w-4 h-4" />
+                    Change Category ({selectedProducts.size})
+                  </Button>
+                )}
+              </motion.div>
+            )}
+            {canExport && (
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button 
                   variant="outline" 
                   className="gap-2"
-                  onClick={handleBulkPause}
-                  disabled={bulkToggleStatusMutation.isPending}
+                  onClick={handleExport}
+                  disabled={exportMutation.isPending}
                 >
-                  <Pause className="w-4 h-4" />
-                  Pause ({selectedProducts.size})
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="gap-2"
-                  onClick={handleBulkUnpause}
-                  disabled={bulkToggleStatusMutation.isPending}
-                >
-                  <Play className="w-4 h-4" />
-                  Unpause ({selectedProducts.size})
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  className="gap-2"
-                  onClick={handleBulkDelete}
-                  disabled={bulkDeleteMutation.isPending}
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete ({selectedProducts.size})
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="gap-2"
-                  onClick={handleBulkCopy}
-                  disabled={bulkCopyMutation.isPending}
-                >
-                  <Copy className="w-4 h-4" />
-                  Copy ({selectedProducts.size})
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="gap-2"
-                  onClick={handleBulkChangeCategory}
-                  disabled={bulkUpdateCategoryMutation.isPending}
-                >
-                  <FolderInput className="w-4 h-4" />
-                  Change Category ({selectedProducts.size})
+                  <Download className="w-4 h-4" />
+                  {exportMutation.isPending ? 'Exporting...' : 'Export Excel'}
                 </Button>
               </motion.div>
             )}
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button 
-                variant="outline" 
-                className="gap-2"
-                onClick={handleExport}
-                disabled={exportMutation.isPending}
-              >
-                <Download className="w-4 h-4" />
-                {exportMutation.isPending ? 'Exporting...' : 'Export Excel'}
-              </Button>
-            </motion.div>
-            <AiCreateButton />
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button className="btn-primary gap-2" onClick={() => setIsAddDialogOpen(true)}>
-                <Plus className="w-4 h-4" />
-                Add New Product
-              </Button>
-            </motion.div>
+            {canAiCreate && <AiCreateButton />}
+            {canAdd && (
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button className="btn-primary gap-2" onClick={() => setIsAddDialogOpen(true)}>
+                  <Plus className="w-4 h-4" />
+                  Add New Product
+                </Button>
+              </motion.div>
+            )}
           </div>
           
-          <ProductFormDialog
-            open={isAddDialogOpen}
-            onOpenChange={setIsAddDialogOpen}
-            mode="create"
-            plainProducts={plainProductsForForm}
-            categories={categoriesForForm}
-            onSave={handleSaveProduct}
-          />
+          {canAdd && (
+            <ProductFormDialog
+              open={isAddDialogOpen}
+              onOpenChange={setIsAddDialogOpen}
+              mode="create"
+              plainProducts={plainProductsForForm}
+              categories={categoriesForForm}
+              onSave={handleSaveProduct}
+            />
+          )}
           {/* Edit is handled on /admin-sara/products/edit/:id page */}
         </motion.div>
 
@@ -570,18 +607,20 @@ const AdminProducts = () => {
             <table className="w-full">
               <thead className="bg-muted">
                 <tr>
-                  <th className="text-left p-4 font-semibold text-sm w-12">
-                    <button
-                      onClick={handleSelectAll}
-                      className="flex items-center justify-center"
-                    >
-                      {selectedProducts.size === filteredProducts.length && filteredProducts.length > 0 ? (
-                        <CheckSquare className="w-5 h-5 text-primary" />
-                      ) : (
-                        <Square className="w-5 h-5 text-muted-foreground" />
-                      )}
-                    </button>
-                  </th>
+                  {showBulkBar && (
+                    <th className="text-left p-4 font-semibold text-sm w-12">
+                      <button
+                        onClick={handleSelectAll}
+                        className="flex items-center justify-center"
+                      >
+                        {selectedProducts.size === filteredProducts.length && filteredProducts.length > 0 ? (
+                          <CheckSquare className="w-5 h-5 text-primary" />
+                        ) : (
+                          <Square className="w-5 h-5 text-muted-foreground" />
+                        )}
+                      </button>
+                    </th>
+                  )}
                   <th className="text-left p-4 font-semibold text-sm">Product</th>
                   <th className="text-left p-4 font-semibold text-sm">Type</th>
                   <th className="text-left p-4 font-semibold text-sm">Category</th>
@@ -593,7 +632,7 @@ const AdminProducts = () => {
               <tbody>
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={showBulkBar ? 7 : 6} className="p-8 text-center text-muted-foreground">
                       No products found. Create your first product!
                     </td>
                   </tr>
@@ -606,18 +645,20 @@ const AdminProducts = () => {
                       transition={{ delay: Math.min(index * 0.05, 0.5), duration: 0.3 }}
                       className={`border-t border-border hover:bg-muted/50 transition-colors ${selectedProducts.has(product.id) ? 'bg-primary/5' : ''}`}
                     >
-                      <td className="p-4">
-                        <button
-                          onClick={() => handleSelectProduct(product.id)}
-                          className="flex items-center justify-center"
-                        >
-                          {selectedProducts.has(product.id) ? (
-                            <CheckSquare className="w-5 h-5 text-primary" />
-                          ) : (
-                            <Square className="w-5 h-5 text-muted-foreground" />
-                          )}
-                        </button>
-                      </td>
+                      {showBulkBar && (
+                        <td className="p-4">
+                          <button
+                            onClick={() => handleSelectProduct(product.id)}
+                            className="flex items-center justify-center"
+                          >
+                            {selectedProducts.has(product.id) ? (
+                              <CheckSquare className="w-5 h-5 text-primary" />
+                            ) : (
+                              <Square className="w-5 h-5 text-muted-foreground" />
+                            )}
+                          </button>
+                        </td>
+                      )}
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           {product.images?.[0] ? (
@@ -662,49 +703,65 @@ const AdminProducts = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
-                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-9 w-9"
-                              onClick={() => handleToggleStatus(product.id)}
-                              disabled={toggleStatusMutation.isPending}
-                              title={product.status === 'ACTIVE' ? 'Pause' : 'Unpause'}
-                            >
-                              {toggleStatusMutation.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : product.status === 'ACTIVE' ? (
-                                <Pause className="w-4 h-4" />
-                              ) : (
-                                <Play className="w-4 h-4" />
-                              )}
-                            </Button>
-                          </motion.div>
-                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-9 w-9"
-                              onClick={() => handleEdit(product)}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          </motion.div>
-                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                            <Button
-                              variant="ghost"
-                              size="icon" 
-                              className="h-9 w-9 text-destructive hover:text-destructive"
-                              onClick={() => handleDelete(product.id)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              {deleteMutation.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-4 h-4" />
-                              )}
-                            </Button>
-                          </motion.div>
+                          <AskAdminAiButton
+                            className="h-9 w-9"
+                            entity={{
+                              kind: 'product',
+                              id: product.id,
+                              name: product.name,
+                              pageKey: 'store.products',
+                              extra: `Type=${product.type || 'n/a'}, status=${product.status}.`,
+                            }}
+                          />
+                          {canToggle && (
+                            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-9 w-9"
+                                onClick={() => handleToggleStatus(product.id)}
+                                disabled={toggleStatusMutation.isPending}
+                                title={product.status === 'ACTIVE' ? 'Pause' : 'Unpause'}
+                              >
+                                {toggleStatusMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : product.status === 'ACTIVE' ? (
+                                  <Pause className="w-4 h-4" />
+                                ) : (
+                                  <Play className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </motion.div>
+                          )}
+                          {canEdit && (
+                            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-9 w-9"
+                                onClick={() => handleEdit(product)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            </motion.div>
+                          )}
+                          {canDelete && (
+                            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                              <Button
+                                variant="ghost"
+                                size="icon" 
+                                className="h-9 w-9 text-destructive hover:text-destructive"
+                                onClick={() => handleDelete(product.id)}
+                                disabled={deleteMutation.isPending}
+                              >
+                                {deleteMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </motion.div>
+                          )}
                         </div>
                       </td>
                     </motion.tr>
@@ -713,6 +770,13 @@ const AdminProducts = () => {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={page}
+            size={PRODUCT_PAGE_SIZE}
+            totalElements={productPage?.totalElements ?? 0}
+            onPageChange={(p) => { setPage(p); setSelectedProducts(new Set()); }}
+            disabled={productsFetching}
+          />
         </div>
 
         {/* Delete Confirmation Dialog */}

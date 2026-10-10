@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { guestCart } from '@/lib/guestCart';
+import { dispatchLoggedIn } from '@/lib/authEvents';
 import { API_BASE_URL, authApi, cartApi } from '@/lib/api';
 import { COUNTRY_CODES } from '@/lib/countryCodes';
 
@@ -170,6 +171,8 @@ const Login = () => {
             ? 'Your account has been created and you are now logged in.'
             : 'You have been logged in successfully.'),
       });
+
+      dispatchLoggedIn();
 
       // Small delay to ensure token is properly stored before navigation
       await new Promise(resolve => setTimeout(resolve, 100));

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useIsLoggedIn } from '@/hooks/useIsLoggedIn';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, Calculator, ChevronDown, ChevronUp, Pencil, Heart, Sparkles } from 'lucide-react';
@@ -200,7 +201,7 @@ const Cart = () => {
   const [selectedItemForBreakdown, setSelectedItemForBreakdown] = useState<any>(null);
   const queryClient = useQueryClient();
   const { format } = usePrice();
-  const isLoggedIn = !!localStorage.getItem('authToken');
+  const isLoggedIn = useIsLoggedIn();
   
   // Fetch cart from API (coupons applied at checkout only)
   const { data: cartData, isLoading } = useQuery({

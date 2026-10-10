@@ -5,6 +5,8 @@ import { adminAuthApi, getUserEmailFromToken } from '@/lib/api';
 import { getAdminChatDisplayName, getStoredAdminUser, isSuperAdmin } from '@/lib/adminAccess';
 import { useAdminNotificationCounts } from '@/hooks/useAdminNotificationCounts';
 import { useAdminActivityToast } from '@/hooks/useAdminActivityToast';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { resolvePortalNavPermissionRule } from '@/lib/portalNavPermissions';
 import { AdminPresenceProvider } from '@/context/AdminPresenceContext';
 import WhatsAppNumberGate from './WhatsAppNumberGate';
 import '@/pages/portal/portal.css';
@@ -96,8 +98,25 @@ export default function AdminShell({
   const setSearch = onSearchChange ?? setLocalSearch;
   const notifCounts = useAdminNotificationCounts();
   useAdminActivityToast();
-  const superAdmin = isSuperAdmin(getStoredAdminUser());
-  const navGroups = buildNavGroups(notifCounts, superAdmin);
+  const { ready, canAccessPath, isMainAdmin } = useAdminPermissions();
+  const superAdmin = isSuperAdmin(getStoredAdminUser()) || isMainAdmin;
+  const navGroups = buildNavGroups(notifCounts, superAdmin)
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        const rule = resolvePortalNavPermissionRule(item.to);
+        if (rule?.mainAdminOnly) return superAdmin;
+        if (!ready) return true;
+        return canAccessPath(item.to, rule);
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  const bottomNav = NAV_BOTTOM.filter((item) => {
+    const rule = resolvePortalNavPermissionRule(item.to);
+    if (!ready) return true;
+    return canAccessPath(item.to, rule);
+  });
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -175,10 +194,12 @@ export default function AdminShell({
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {(!ready || canAccessPath('/portal-admin/inquiries', resolvePortalNavPermissionRule('/portal-admin/inquiries'))) && (
           <button onClick={() => navigate('/portal-admin/inquiries')} className="msym text-white/70 hover:text-white relative">
             inbox
             {notifCounts.inquiries > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white" />}
           </button>
+          )}
           <div className="relative">
             <button onClick={() => setMenuOpen((o) => !o)} className="flex items-center gap-2 group">
               <span className="text-white/90 text-[13px] font-semibold hidden sm:inline capitalize">{displayName}</span>
@@ -241,7 +262,7 @@ export default function AdminShell({
             ))}
           </nav>
           <div className="p-3 border-t space-y-1" style={{ borderColor: 'var(--p-outline-variant)' }}>
-            {NAV_BOTTOM.map((item) => <NavBtn key={item.to} item={item} />)}
+            {bottomNav.map((item) => <NavBtn key={item.to} item={item} />)}
           </div>
         </aside>
 

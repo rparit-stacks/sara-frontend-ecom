@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useIsLoggedIn } from '@/hooks/useIsLoggedIn';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -225,7 +226,7 @@ const Checkout = () => {
     enabled: !!localStorage.getItem('authToken'),
   });
   
-  const isLoggedIn = !!localStorage.getItem('authToken');
+  const isLoggedIn = useIsLoggedIn();
   
   // Find default address
   const defaultAddress = addresses.find((addr: any) => addr.isDefault === true);
@@ -442,33 +443,7 @@ const Checkout = () => {
         orderData.guestCartItems = toGuestOrderItems(items);
       }
       
-      try {
-        return await orderApi.createOrder(orderData);
-      } catch (error: any) {
-        // Better error handling for guest checkout
-        if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
-          // If unauthorized and doing guest checkout, retry without token
-          if (!isLoggedIn && orderData.guestEmail) {
-            // Remove any token from localStorage temporarily for this request
-            const tempToken = localStorage.getItem('authToken');
-            if (tempToken) {
-              localStorage.removeItem('authToken');
-              localStorage.removeItem('refreshToken');
-              try {
-                const result = await orderApi.createOrder(orderData);
-                // Restore token
-                if (tempToken) localStorage.setItem('authToken', tempToken);
-                return result;
-              } catch (retryError) {
-                // Restore token even on retry failure
-                if (tempToken) localStorage.setItem('authToken', tempToken);
-                throw retryError;
-              }
-            }
-          }
-        }
-        throw error;
-      }
+      return orderApi.createOrder(orderData);
     },
     onSuccess: (data) => {
       toast.success('Order placed successfully!');

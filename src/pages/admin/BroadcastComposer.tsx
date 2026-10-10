@@ -10,6 +10,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Loader2, Send, Image as ImageIcon, X, ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { broadcastApi, adminUsersApi, productsApi, categoriesApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 interface AdminUser {
   email: string;
@@ -72,6 +74,10 @@ type TargetType = 'SINGLE' | 'TAG' | 'ALL';
  * on that channel here (see AdminBroadcastController's javadoc on the backend).
  */
 export function BroadcastComposer() {
+  const { hasAny } = useAdminPermissions();
+  const canCompose = hasAny(P.NOTIFICATIONS_COMPOSE_BROADCAST);
+  const canPreviewBroadcast = hasAny(P.NOTIFICATIONS_PREVIEW_BROADCAST);
+  const canSendBroadcast = hasAny(P.NOTIFICATIONS_SEND_BROADCAST);
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -132,7 +138,7 @@ export function BroadcastComposer() {
   const { data: preview, isFetching: isPreviewLoading } = useQuery({
     queryKey: ['broadcastPreview', targetType, targetValueForPreview],
     queryFn: () => broadcastApi.preview(targetType, targetValueForPreview),
-    enabled: canPreview,
+    enabled: canPreviewBroadcast && canPreview,
   });
 
   const sendMutation = useMutation({
@@ -173,10 +179,17 @@ export function BroadcastComposer() {
     setImagePreviewUrl(URL.createObjectURL(file));
   };
 
-  const canSend = title.trim().length > 0 && body.trim().length > 0 && (targetType === 'ALL' || targetValue.trim().length > 0);
+  const sendReady = title.trim().length > 0 && body.trim().length > 0 && (targetType === 'ALL' || targetValue.trim().length > 0);
+
+  if (!canCompose && !canPreviewBroadcast && !canSendBroadcast) {
+    return (
+      <p className="text-sm text-muted-foreground">You do not have permission to compose or send broadcasts.</p>
+    );
+  }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <>
+    <fieldset disabled={!canCompose} className="space-y-6 max-w-2xl border-0 p-0 m-0 min-w-0">
       <div className="space-y-1">
         <label className="text-xs font-medium text-muted-foreground">Send to</label>
         <div className="flex flex-wrap gap-3">
@@ -254,7 +267,7 @@ export function BroadcastComposer() {
             </Select>
           )}
         </div>
-        {canPreview && (
+        {canPreviewBroadcast && canPreview && (
           <p className="text-xs text-muted-foreground pt-1">
             {isPreviewLoading ? (
               'Counting recipients…'
@@ -423,10 +436,12 @@ export function BroadcastComposer() {
           onChange={(e) => onPickImage(e.target.files?.[0])}
         />
       </div>
+    </fieldset>
 
+      {canSendBroadcast && (
       <Button
         onClick={() => sendMutation.mutate()}
-        disabled={!canSend || sendMutation.isPending}
+        disabled={!sendReady || sendMutation.isPending || !canCompose}
         className="w-full sm:w-auto"
       >
         {sendMutation.isPending ? (
@@ -436,6 +451,7 @@ export function BroadcastComposer() {
         )}
         Send broadcast
       </Button>
-    </div>
+      )}
+    </>
   );
 }

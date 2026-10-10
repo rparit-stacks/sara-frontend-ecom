@@ -7,6 +7,8 @@ import {
   faListCheck, faPlus, faTrash, faXmark, faCircleCheck,
 } from '@fortawesome/free-solid-svg-icons';
 import { maintenanceLogApi, type MaintenanceLogDto } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 // Free maintenance window: today (4 Jul 2026) → 4 Sep 2026.
 const START = new Date('2026-07-04T00:00:00+05:30');
@@ -104,6 +106,8 @@ export default function MaintenanceStatusBanner() {
 }
 
 function MaintenanceLogModal({ onClose }: { onClose: () => void }) {
+  const { hasAny } = useAdminPermissions();
+  const canManage = hasAny(P.MAINTENANCE_MANAGE);
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ title: '', detail: '', category: 'FIX', occurredAt: '' });
@@ -158,12 +162,14 @@ function MaintenanceLogModal({ onClose }: { onClose: () => void }) {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {canManage && (
             <button
               onClick={() => setAdding((v) => !v)}
               className="inline-flex items-center gap-1.5 rounded-lg bg-[#00676a] text-white px-3 py-1.5 text-[13px] font-semibold hover:bg-[#004d50]"
             >
               <FontAwesomeIcon icon={faPlus} /> Add entry
             </button>
+            )}
             <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-gray-100 text-gray-500">
               <FontAwesomeIcon icon={faXmark} />
             </button>
@@ -247,6 +253,7 @@ function MaintenanceLogModal({ onClose }: { onClose: () => void }) {
                         <p className="text-[14px] font-semibold text-gray-900 mt-1">{l.title}</p>
                         {l.detail && <p className="text-[13px] text-gray-600 mt-0.5 whitespace-pre-wrap">{l.detail}</p>}
                       </div>
+                      {canManage && (
                       <button
                         onClick={() => confirm('Delete this entry?') && deleteMut.mutate(l.id)}
                         className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 shrink-0"
@@ -254,6 +261,7 @@ function MaintenanceLogModal({ onClose }: { onClose: () => void }) {
                       >
                         <FontAwesomeIcon icon={faTrash} className="text-[13px]" />
                       </button>
+                      )}
                     </div>
                   </li>
                 );

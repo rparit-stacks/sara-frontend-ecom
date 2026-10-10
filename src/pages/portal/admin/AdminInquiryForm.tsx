@@ -13,6 +13,8 @@ import { parseFormFromDto, buildSchemaPayload } from '@/components/inquiry/inqui
 import { ensureSystemFields, isLockedField } from '@/components/inquiry/systemFields';
 import InquiryFormWidget from '@/components/inquiry/InquiryFormWidget';
 import { toast } from 'sonner';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 import '@/pages/portal/portal.css';
 
 const WIDTH_CLASS: Record<string, string> = {
@@ -95,6 +97,9 @@ const ROW_ADD_ITEMS: PaletteItem[] = INQUIRY_PALETTE
 type Tab = 'build' | 'preview';
 
 export default function AdminInquiryForm() {
+  const { hasAny } = useAdminPermissions();
+  const canEdit = hasAny(P.PORTAL_INQUIRY_FORM_EDIT);
+  const canPublish = hasAny(P.PORTAL_INQUIRY_FORM_PUBLISH);
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -367,22 +372,26 @@ export default function AdminInquiryForm() {
       >
         <Sym name="inbox" className="text-[16px]" /> Inquiries
       </button>
-      <button
-        onClick={() => saveMutation.mutate('DRAFT')}
-        disabled={saveMutation.isPending}
-        className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border flex items-center gap-1.5 disabled:opacity-50"
-        style={{ borderColor: 'var(--p-outline)', color: 'var(--p-on-surface)' }}
-      >
-        <Sym name="save" className="text-[16px]" /> Save draft
-      </button>
-      <button
-        onClick={() => saveMutation.mutate('PUBLISHED')}
-        disabled={saveMutation.isPending || fields.length === 0}
-        className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white flex items-center gap-1.5 hover:brightness-110 disabled:opacity-50"
-        style={{ background: 'var(--p-primary)' }}
-      >
-        <Sym name="publish" className="text-[16px]" /> Publish
-      </button>
+      {canEdit && (
+        <button
+          onClick={() => saveMutation.mutate('DRAFT')}
+          disabled={saveMutation.isPending}
+          className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border flex items-center gap-1.5 disabled:opacity-50"
+          style={{ borderColor: 'var(--p-outline)', color: 'var(--p-on-surface)' }}
+        >
+          <Sym name="save" className="text-[16px]" /> Save draft
+        </button>
+      )}
+      {canPublish && (
+        <button
+          onClick={() => saveMutation.mutate('PUBLISHED')}
+          disabled={saveMutation.isPending || fields.length === 0}
+          className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white flex items-center gap-1.5 hover:brightness-110 disabled:opacity-50"
+          style={{ background: 'var(--p-primary)' }}
+        >
+          <Sym name="publish" className="text-[16px]" /> Publish
+        </button>
+      )}
     </>
   );
 
@@ -417,6 +426,7 @@ export default function AdminInquiryForm() {
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
+            readOnly={!canEdit}
             className="font-semibold text-[15px] bg-transparent border-none outline-none flex-1 min-w-0"
             placeholder="Form name"
           />
@@ -452,7 +462,7 @@ export default function AdminInquiryForm() {
             </div>
           </div>
         ) : (
-          <div className="flex" style={{ minHeight: '60vh' }}>
+          <div className={`flex ${!canEdit ? 'pointer-events-none opacity-80' : ''}`} style={{ minHeight: '60vh' }}>
             {/* palette */}
             <aside
               className={`${collapsed ? 'w-12' : 'w-56'} border-r flex flex-col shrink-0 transition-[width] hidden md:flex`}

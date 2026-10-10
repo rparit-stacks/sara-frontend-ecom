@@ -44,6 +44,8 @@ import { useProjectStomp } from '@/hooks/useProjectStomp';
 import { useAutoScrollChat } from '@/hooks/useAutoScrollChat';
 import { useResizableWidth } from '@/hooks/useResizableWidth';
 import { openTechPackBuilder } from '@/lib/techPackBuilder';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 /**
  * WhatsApp-style Customer → Project → (Design / Thread / Resource) drill-down
@@ -718,6 +720,23 @@ export default function AdminClientWorkspacePreview() {
   const [payDescription, setPayDescription] = useState('');
   const [assignOpen, setAssignOpen] = useState(false);
   const superAdmin = isSuperAdmin(getStoredAdminUser());
+  const { hasAny } = useAdminPermissions();
+  const canDeleteProject = hasAny(P.PORTAL_PROJECTS_DELETE);
+  const canEditProject = hasAny(P.PORTAL_PROJECTS_EDIT);
+  const canUpdateProjectStage = hasAny(P.PORTAL_PROJECTS_UPDATE_STAGE);
+  const canAddDesign = hasAny(P.PORTAL_DESIGNS_ADD);
+  const canEditDesign = hasAny(P.PORTAL_DESIGNS_EDIT);
+  const canDeleteDesign = hasAny(P.PORTAL_DESIGNS_DELETE);
+  const canUpdateDesignStage = hasAny(P.PORTAL_DESIGNS_UPDATE_STAGE);
+  const canSendChat = hasAny(P.PORTAL_CHAT_SEND);
+  const canSendGeneralChat = hasAny(P.PORTAL_CHAT_SEND_GENERAL);
+  const canAddResourceLink = hasAny(P.PORTAL_RESOURCES_ADD_LINK);
+  const canDeleteResourceLink = hasAny(P.PORTAL_RESOURCES_DELETE_LINK);
+  const canCreateTechPack = hasAny(P.PORTAL_TECHPACKS_CREATE);
+  const canClaimHandover = hasAny(P.PORTAL_AI_CLAIM_HANDOVER);
+  const canManageClientTags = hasAny(P.PORTAL_CLIENTS_MANAGE_TAGS);
+  const canSendInActiveChat =
+    active.kind === 'customerGeneral' ? canSendGeneralChat : canSendChat;
 
   const { data: allProjects = [], isLoading } = useQuery({
     queryKey: ['admin-projects-all'],
@@ -1048,6 +1067,7 @@ export default function AdminClientWorkspacePreview() {
   const [customerTagMenu, setCustomerTagMenu] = useState<{ position: { x: number; y: number }; customerEmail: string } | null>(null);
 
   const openCustomerTagMenu = (e: React.MouseEvent, customerEmail: string) => {
+    if (!canManageClientTags) return;
     setCustomerTagMenu({ position: { x: e.clientX, y: e.clientY }, customerEmail });
   };
 
@@ -1826,7 +1846,7 @@ export default function AdminClientWorkspacePreview() {
                     <td className="px-4 py-3 font-bold text-[13px]">{p.valueDisplay || 'TBD'}</td>
                     <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{formatServerDate(p.updatedAt)}</td>
                     <td className="px-4 py-3 text-right">
-                      {superAdmin && (
+                      {canDeleteProject && (
                         <button
                           type="button"
                           title="Delete project"
@@ -1997,8 +2017,8 @@ export default function AdminClientWorkspacePreview() {
                     statusBadge={<CustomerStatusBadge status={customerStatuses[g.email.toLowerCase()] as CustomerChatStatus} />}
                     active={(active.kind === 'customerGeneral' || active.kind === 'threadsGeneral') && active.customerKey === g.key}
                     onClick={() => openCustomer(g.key)}
-                    onContextMenu={(e) => openCustomerTagMenu(e, g.email)}
-                    onDoubleClick={(e) => openCustomerTagMenu(e, g.email)}
+                    onContextMenu={canManageClientTags ? (e) => openCustomerTagMenu(e, g.email) : undefined}
+                    onDoubleClick={canManageClientTags ? (e) => openCustomerTagMenu(e, g.email) : undefined}
                   />
                 ))}
               </div>
@@ -2090,9 +2110,11 @@ export default function AdminClientWorkspacePreview() {
                   <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,103,106,0.12)', color: 'var(--p-primary)' }}>
                     Project stage: {stageDef(project.currentStage).label}
                   </span>
-                  <button onClick={(e) => { e.stopPropagation(); setSettingsOpen(true); setSettingsTitleDraft(project.title || ''); }} title="Project settings" className="p-1 rounded hover:bg-black/5">
-                    <Sym name="settings" className="text-[16px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-                  </button>
+                  {(canEditProject || canDeleteProject) && (
+                    <button onClick={(e) => { e.stopPropagation(); setSettingsOpen(true); setSettingsTitleDraft(project.title || ''); }} title="Project settings" className="p-1 rounded hover:bg-black/5">
+                      <Sym name="settings" className="text-[16px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+                    </button>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -2130,14 +2152,16 @@ export default function AdminClientWorkspacePreview() {
                     row, so it reads as "these are the designs" at a glance. */}
                 <div className="flex items-center justify-between pr-2">
                   <SectionLabel>Designs · {realDesigns.length}</SectionLabel>
-                  <button type="button" onClick={() => setAddDesignOpen(true)} title="Add design" className="p-1 rounded hover:bg-black/5">
-                    <Sym name="add" className="text-[18px]" style={{ color: 'var(--p-primary)' }} />
-                  </button>
+                  {canAddDesign && (
+                    <button type="button" onClick={() => setAddDesignOpen(true)} title="Add design" className="p-1 rounded hover:bg-black/5">
+                      <Sym name="add" className="text-[18px]" style={{ color: 'var(--p-primary)' }} />
+                    </button>
+                  )}
                 </div>
                 <div className="px-2 pb-2 flex flex-col gap-1.5">
                   {realDesigns.map((d) => {
                     const isActive = active.kind === 'design' && active.designId === d.id;
-                    const canDelete = realDesigns.length > 1;
+                    const canDelete = canDeleteDesign && realDesigns.length > 1;
                     return (
                       <div key={d.id} className="relative group/design">
                         <DesignCard
@@ -2147,14 +2171,16 @@ export default function AdminClientWorkspacePreview() {
                           onContextMenu={(e) => openDesignTagMenu(e, project.code, d.id, d.adminTag)}
                           onDoubleClick={(e) => openDesignTagMenu(e, project.code, d.id, d.adminTag)}
                         />
-                        <button
-                          type="button"
-                          title="Rename design"
-                          onClick={(e) => { e.stopPropagation(); setRenameDesignTarget({ id: d.id, name: d.name, imageUrl: d.imageUrl }); }}
-                          className={`absolute top-1/2 -translate-y-1/2 p-1 rounded bg-white/90 opacity-0 group-hover/design:opacity-100 hover:bg-white shadow-sm transition-all ${canDelete ? 'right-8' : 'right-2'}`}
-                        >
-                          <Sym name="edit" className="text-[14px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-                        </button>
+                        {canEditDesign && (
+                          <button
+                            type="button"
+                            title="Rename design"
+                            onClick={(e) => { e.stopPropagation(); setRenameDesignTarget({ id: d.id, name: d.name, imageUrl: d.imageUrl }); }}
+                            className={`absolute top-1/2 -translate-y-1/2 p-1 rounded bg-white/90 opacity-0 group-hover/design:opacity-100 hover:bg-white shadow-sm transition-all ${canDelete ? 'right-8' : 'right-2'}`}
+                          >
+                            <Sym name="edit" className="text-[14px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+                          </button>
+                        )}
                         {canDelete && (
                           <button
                             type="button"
@@ -2313,8 +2339,8 @@ export default function AdminClientWorkspacePreview() {
                 <ProjectResourceLinksPanel
                   links={resourceLinks}
                   isLoading={resourceLinksLoading}
-                  onAdd={(label, url) => addResourceLinkMutation.mutateAsync({ label, url })}
-                  onDelete={(linkId) => deleteResourceLinkMutation.mutateAsync(linkId)}
+                  onAdd={canAddResourceLink ? (label, url) => addResourceLinkMutation.mutateAsync({ label, url }) : undefined}
+                  onDelete={canDeleteResourceLink ? (linkId) => deleteResourceLinkMutation.mutateAsync(linkId) : undefined}
                 />
               </>
             ) : active.kind === 'resource' && activeResource?.key === 'techpacks' && project ? (
@@ -2327,8 +2353,8 @@ export default function AdminClientWorkspacePreview() {
                 <ProjectTechPacksPanel
                   techPacks={projectTechPacks}
                   isLoading={projectTechPacksLoading}
-                  editable
-                  onCreate={TECHPACK_BUILDER_URL
+                  editable={canCreateTechPack}
+                  onCreate={canCreateTechPack && TECHPACK_BUILDER_URL
                     ? () => openTechPackBuilder(TECHPACK_BUILDER_URL, { projectId: String(project.id) })
                     : undefined}
                 />
@@ -2545,7 +2571,7 @@ export default function AdminClientWorkspacePreview() {
                     <div className="px-5 pb-2 flex items-center gap-2 flex-wrap">
                       <DesignStagePicker
                         stage={activeDesign.stage}
-                        disabled={updateDesignStageMutation.isPending}
+                        disabled={!canUpdateDesignStage || updateDesignStageMutation.isPending}
                         onChange={(stage) => updateDesignStageMutation.mutate({ designId: activeDesign.id, stage })}
                       />
                       {activeDesign.description && (
@@ -2560,7 +2586,7 @@ export default function AdminClientWorkspacePreview() {
                       )}
                     </div>
                   )}
-                  {active.kind === 'announcements' && project && (
+                  {active.kind === 'announcements' && project && canUpdateProjectStage && (
                     <div className="px-5 pb-2">
                       <div className="flex items-center gap-1 overflow-x-auto py-1">
                         {STAGES.map((st, i) => {
@@ -2704,17 +2730,19 @@ export default function AdminClientWorkspacePreview() {
                       <Sym name="auto_awesome" className="text-[16px]" style={{ color: 'var(--p-ai-accent)' }} />
                       Sara AI is replying on your behalf right now.
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => joinChannelMutation.mutate()}
-                      disabled={joinChannelMutation.isPending}
-                      className="px-3 py-1.5 rounded-full text-[12px] font-semibold text-white shrink-0 disabled:opacity-60"
-                      style={{ background: 'var(--p-ai-accent)' }}
-                    >
-                      {joinChannelMutation.isPending ? 'Joining…' : 'Join chat'}
-                    </button>
+                    {canClaimHandover && (
+                      <button
+                        type="button"
+                        onClick={() => joinChannelMutation.mutate()}
+                        disabled={joinChannelMutation.isPending}
+                        className="px-3 py-1.5 rounded-full text-[12px] font-semibold text-white shrink-0 disabled:opacity-60"
+                        style={{ background: 'var(--p-ai-accent)' }}
+                      >
+                        {joinChannelMutation.isPending ? 'Joining…' : 'Join chat'}
+                      </button>
+                    )}
                   </div>
-                ) : (active.kind === 'customerGeneral' || active.kind === 'design') && (
+                ) : (active.kind === 'customerGeneral' || active.kind === 'design') && canSendInActiveChat && (
                   <div
                     className="px-3 pb-3 pt-2 shrink-0"
                     onKeyDown={() => {
@@ -2857,7 +2885,7 @@ export default function AdminClientWorkspacePreview() {
                 )}
               </div>
 
-              {(isGeneralChatThread || isChannelThread) && (
+              {((isGeneralChatThread && canSendGeneralChat) || (isChannelThread && canSendChat)) && (
                 <div className="p-3 border-t shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
                   <Composer
                     placeholder="Reply in thread…"
@@ -2900,17 +2928,20 @@ export default function AdminClientWorkspacePreview() {
                   <input
                     value={settingsTitleDraft}
                     onChange={(e) => setSettingsTitleDraft(e.target.value)}
+                    readOnly={!canEditProject}
                     placeholder={project.title || project.code}
                     className="flex-1 bg-transparent border-none outline-none text-[13px]"
                   />
-                  <button
-                    type="button"
-                    disabled={!settingsTitleDraft.trim() || settingsTitleDraft.trim() === project.title || renameProjectMutation.isPending}
-                    onClick={() => renameProjectMutation.mutate(settingsTitleDraft.trim())}
-                    title="Save name"
-                  >
-                    <Sym name={renameProjectMutation.isPending ? 'progress_activity' : 'save'} className={`text-[16px] ${renameProjectMutation.isPending ? 'animate-spin' : ''}`} style={{ color: 'var(--p-primary)' }} />
-                  </button>
+                  {canEditProject && (
+                    <button
+                      type="button"
+                      disabled={!settingsTitleDraft.trim() || settingsTitleDraft.trim() === project.title || renameProjectMutation.isPending}
+                      onClick={() => renameProjectMutation.mutate(settingsTitleDraft.trim())}
+                      title="Save name"
+                    >
+                      <Sym name={renameProjectMutation.isPending ? 'progress_activity' : 'save'} className={`text-[16px] ${renameProjectMutation.isPending ? 'animate-spin' : ''}`} style={{ color: 'var(--p-primary)' }} />
+                    </button>
+                  )}
                 </div>
               </div>
 

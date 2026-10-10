@@ -25,6 +25,7 @@ import {
 import { logsApi, ApiLogDetailDTO } from '@/lib/api';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 interface LogDetailModalProps {
   logId: number | null;
@@ -82,7 +83,7 @@ export const LogDetailModal = ({ logId, open, onClose }: LogDetailModalProps) =>
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-3xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
+          <DialogTitle className="flex items-center gap-3 flex-wrap">
             <Terminal className="w-5 h-5" />
             Log Details
             {log && (
@@ -95,6 +96,21 @@ export const LogDetailModal = ({ logId, open, onClose }: LogDetailModalProps) =>
               >
                 {log.statusCode}
               </Badge>
+            )}
+            {log && (
+              <AskAdminAiButton
+                size="sm"
+                variant="outline"
+                label="Ask AI"
+                title="Ask Ops AI about this API log"
+                entity={{
+                  kind: 'api_log',
+                  id: log.id,
+                  name: `${log.httpMethod} ${log.apiEndpoint}`,
+                  pageKey: 'store.logs',
+                  extra: `Status ${log.statusCode}, flag ${log.errorFlag}, responseTimeMs=${log.responseTimeMs ?? 'n/a'}. Explain the error and suggest a fix.`,
+                }}
+              />
             )}
           </DialogTitle>
         </DialogHeader>

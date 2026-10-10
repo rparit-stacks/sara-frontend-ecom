@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,19 +8,35 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { TablePagination } from '@/components/admin/TablePagination';
 import { adminUsersApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 const AdminUsers = () => {
+  const { hasAny } = useAdminPermissions();
+  const canToggleStatus = hasAny(P.USERS_TOGGLE_STATUS);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   
   // Fetch users from API
-  const { data: users = [], isLoading, error } = useQuery({
-    queryKey: ['adminUsers'],
-    queryFn: () => adminUsersApi.getAll(),
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(searchQuery.trim()); setPage(0); }, 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const { data: usersPage, isLoading, isFetching, error } = useQuery({
+    queryKey: ['adminUsers', debouncedSearch, page],
+    queryFn: () => adminUsersApi.getPage({ page, size: PAGE_SIZE, q: debouncedSearch || undefined }),
+    placeholderData: keepPreviousData,
   });
+  const filteredUsers: any[] = usersPage?.content ?? [];
   
   // Fetch detailed user data when dialog opens
   const { data: userDetails, isLoading: detailsLoading } = useQuery({
@@ -51,13 +67,6 @@ const AdminUsers = () => {
     setSelectedUser(user);
     setIsDetailDialogOpen(true);
   };
-  
-  // Filter users
-  const filteredUsers = users.filter((user: any) =>
-    user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.lastName?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
   
   if (isLoading) {
     return (
@@ -192,6 +201,17 @@ const AdminUsers = () => {
                           whileTap={{ scale: 0.9 }}
                           className="flex items-center gap-2"
                         >
+                          <AskAdminAiButton
+                            className="h-9 w-9"
+                            entity={{
+                              kind: 'user',
+                              id: user.id,
+                              name: user.name || user.email,
+                              userEmail: user.email,
+                              pageKey: 'store.users',
+                              extra: `Status=${user.status}.`,
+                            }}
+                          />
                           <Button 
                             variant="ghost" 
                             size="icon" 
@@ -201,20 +221,22 @@ const AdminUsers = () => {
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-9 w-9"
-                            onClick={() => toggleUserStatus(user)}
-                            disabled={updateStatusMutation.isPending}
-                            title={user.status === 'ACTIVE' ? 'Deactivate User' : 'Activate User'}
-                          >
-                            {user.status === 'ACTIVE' ? (
-                              <EyeOff className="w-4 h-4" />
-                            ) : (
-                              <Eye className="w-4 h-4" />
-                            )}
-                          </Button>
+                          {canToggleStatus && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-9 w-9"
+                              onClick={() => toggleUserStatus(user)}
+                              disabled={updateStatusMutation.isPending}
+                              title={user.status === 'ACTIVE' ? 'Deactivate User' : 'Activate User'}
+                            >
+                              {user.status === 'ACTIVE' ? (
+                                <EyeOff className="w-4 h-4" />
+                              ) : (
+                                <Eye className="w-4 h-4" />
+                              )}
+                            </Button>
+                          )}
                         </motion.div>
                       </td>
                     </motion.tr>
@@ -223,6 +245,13 @@ const AdminUsers = () => {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={page}
+            size={PAGE_SIZE}
+            totalElements={usersPage?.totalElements ?? 0}
+            onPageChange={setPage}
+            disabled={isFetching}
+          />
         </div>
         
         {/* User Detail Dialog */}

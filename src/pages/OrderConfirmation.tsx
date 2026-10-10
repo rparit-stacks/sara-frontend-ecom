@@ -1,4 +1,4 @@
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import Layout from '@/components/layout/Layout';
@@ -25,6 +25,8 @@ const OrderConfirmation = () => {
   const [breakdownItem, setBreakdownItem] = useState<any>(null);
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
   const stripeVerifyAttempted = useRef(false);
+  const [verifyError, setVerifyError] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   // Get order ID from URL params or location state.
   // Path `:id` may be numeric order id (logged-in) or opaque confirmationToken (guest).
@@ -61,15 +63,10 @@ const OrderConfirmation = () => {
     staleTime: 0,
   });
 
-  // When arriving from Stripe with paymentIntentId, verify and then refetch order so status becomes PAID
-  useEffect(() => {
+  const verifyStripePayment = () => {
     const resolvedOrderId = order?.id ?? orderId;
-    if (!resolvedOrderId || !order || stripeVerifyAttempted.current) return;
     const paymentIntentId = state.paymentIntentId;
-    if (!paymentIntentId) return;
-    const status = (order.paymentStatus || '').toUpperCase();
-    if (status !== 'PENDING') return;
-    stripeVerifyAttempted.current = true;
+    if (!resolvedOrderId || !paymentIntentId) return;
     const verifyPayload: any = {
       orderId: String(resolvedOrderId),
       paymentId: paymentIntentId,
@@ -79,6 +76,8 @@ const OrderConfirmation = () => {
     if (state.isPayRemaining && state.remainingAmount != null) {
       verifyPayload.amount = state.remainingAmount;
     }
+    setVerifying(true);
+    setVerifyError(false);
     paymentApi
       .verify(verifyPayload)
       .then(() => {
@@ -90,7 +89,23 @@ const OrderConfirmation = () => {
         }
         refetch();
       })
-      .catch(() => {});
+      .catch(() => {
+        setVerifyError(true);
+        toast.error("We couldn't confirm your payment yet. Please retry or contact support.");
+      })
+      .finally(() => setVerifying(false));
+  };
+
+  // When arriving from Stripe with paymentIntentId, verify and then refetch order so status becomes PAID
+  useEffect(() => {
+    const resolvedOrderId = order?.id ?? orderId;
+    if (!resolvedOrderId || !order || stripeVerifyAttempted.current) return;
+    const paymentIntentId = state.paymentIntentId;
+    if (!paymentIntentId) return;
+    const status = (order.paymentStatus || '').toUpperCase();
+    if (status !== 'PENDING') return;
+    stripeVerifyAttempted.current = true;
+    verifyStripePayment();
   }, [order, orderId, confirmationToken, state.paymentIntentId, state.isPayRemaining, state.remainingAmount, refetch, queryClient]);
 
   const { exchangeRates, multipliers, ratesToInr } = useCurrency();
@@ -194,6 +209,22 @@ const OrderConfirmation = () => {
       <section className="w-full py-14 lg:py-20">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
           <div className="max-w-3xl mx-auto space-y-6">
+            {verifyError && (
+              <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-3">
+                <p className="text-sm">
+                  We couldn't verify your payment. If you were charged, your order will be updated shortly, or you can retry below.
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button size="sm" onClick={verifyStripePayment} disabled={verifying}>
+                    {verifying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Retry verification
+                  </Button>
+                  <Link to="/contact" className="text-sm text-primary hover:underline">
+                    Contact support
+                  </Link>
+                </div>
+              </div>
+            )}
             {/* Order Summary Card */}
             <ScrollReveal>
               <Card>

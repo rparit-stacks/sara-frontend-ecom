@@ -71,9 +71,9 @@ export function AdminComposer({ onSend, disabled, placeholder }: Props) {
   };
 
   return (
-    <div className="border-t border-slate-100 bg-white p-3">
+    <div className="border-t border-slate-100 bg-white/95 px-3.5 py-3 backdrop-blur-sm">
       {images.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-2">
+        <div className="mb-2.5 flex flex-wrap gap-2">
           {images.map((img) => (
             <div key={img.id} className="relative h-14 w-14 overflow-hidden rounded-lg ring-1 ring-slate-200">
               <img src={img.previewUrl} alt="" className="h-full w-full object-cover" />
@@ -101,7 +101,7 @@ export function AdminComposer({ onSend, disabled, placeholder }: Props) {
           ))}
         </div>
       )}
-      <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 focus-within:border-amber-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-amber-100">
+      <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50/90 px-2 py-1.5 shadow-sm focus-within:border-amber-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-amber-100">
         <button
           type="button"
           disabled={disabled}
@@ -130,7 +130,7 @@ export function AdminComposer({ onSend, disabled, placeholder }: Props) {
           disabled={disabled}
           rows={1}
           placeholder={placeholder || 'Ask ops AI…'}
-          className="max-h-28 min-h-[40px] flex-1 resize-none bg-transparent py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+          className="max-h-32 min-h-[42px] flex-1 resize-none bg-transparent py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
         />
         <button
           type="button"

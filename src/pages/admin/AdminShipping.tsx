@@ -8,10 +8,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { shippingApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 type Slab = { id: number; minQuantity: number; maxQuantity: number | null; shippingPrice: number; displayOrder: number };
 
 const AdminShipping = () => {
+  const { hasAny } = useAdminPermissions();
+  const canAdd = hasAny(P.SHIPPING_ADD);
+  const canEdit = hasAny(P.SHIPPING_EDIT);
+  const canDelete = hasAny(P.SHIPPING_DELETE);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingSlab, setEditingSlab] = useState<Slab | null>(null);
@@ -153,10 +159,12 @@ const AdminShipping = () => {
               Set shipping cost by total cart quantity. Example: 1–5 qty → ₹50, 6–10 → ₹100, 11+ → free. Cart total quantity (sum of all item quantities) selects the slab; shipping updates when quantity changes.
             </p>
           </div>
-          <Button onClick={() => { resetForm(); setIsCreateDialogOpen(true); }} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Add slab
-          </Button>
+          {canAdd && (
+            <Button onClick={() => { resetForm(); setIsCreateDialogOpen(true); }} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Add slab
+            </Button>
+          )}
         </div>
 
         {isLoading ? (
@@ -191,23 +199,29 @@ const AdminShipping = () => {
                         <td className="p-4">₹{slab.shippingPrice}</td>
                         <td className="p-4 text-muted-foreground">{formatRange(slab.minQuantity, slab.maxQuantity)}</td>
                         <td className="p-4">
-                          <div className="flex gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleEdit(slab)}>
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => deleteMutation.mutate(slab.id)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              {deleteMutation.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-destructive" />
-                              ) : (
-                                <Trash2 className="w-4 h-4 text-destructive" />
+                          {(canEdit || canDelete) && (
+                            <div className="flex gap-2">
+                              {canEdit && (
+                                <Button variant="ghost" size="icon" onClick={() => handleEdit(slab)}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
                               )}
-                            </Button>
-                          </div>
+                              {canDelete && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => deleteMutation.mutate(slab.id)}
+                                  disabled={deleteMutation.isPending}
+                                >
+                                  {deleteMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin text-destructive" />
+                                  ) : (
+                                    <Trash2 className="w-4 h-4 text-destructive" />
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))

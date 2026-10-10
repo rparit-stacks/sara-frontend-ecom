@@ -8,3 +8,8 @@
 export function dispatchLoggedOut() {
   window.dispatchEvent(new CustomEvent('auth:loggedOut'));
 }
+
+/** Counterpart of dispatchLoggedOut — fired after a customer login stores its tokens. */
+export function dispatchLoggedIn() {
+  window.dispatchEvent(new CustomEvent('auth:loggedIn'));
+}

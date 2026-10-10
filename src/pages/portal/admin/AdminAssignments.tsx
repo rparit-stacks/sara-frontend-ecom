@@ -6,6 +6,9 @@ import { Sym } from '@/components/portal/Sym';
 import { portalAssignmentApi } from '@/lib/api';
 import { useAdminPresence } from '@/hooks/useAdminPresence';
 import PresenceDot from '@/components/admin/PresenceDot';
+import AdminAccessSummary from '@/components/portal/AdminAccessSummary';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 type DesignMap = Record<number, Set<number>>;
 const PROJECT_PAGE_SIZE = 20;
@@ -15,6 +18,8 @@ function designKey(projectId: number, designId: number) {
 }
 
 export default function PortalAdminAssignments() {
+  const { hasAny } = useAdminPermissions();
+  const canSave = hasAny(P.PORTAL_ASSIGNMENTS_SAVE);
   const qc = useQueryClient();
   const [adminId, setAdminId] = useState<number | ''>('');
   const [search, setSearch] = useState('');
@@ -131,13 +136,15 @@ export default function PortalAdminAssignments() {
       search={search}
       onSearchChange={setSearch}
       actions={
-        <AdminBtn
-          icon="save"
-          onClick={() => saveMutation.mutate()}
-          variant={dirty ? 'primary' : 'ghost'}
-        >
-          {saveMutation.isPending ? 'Saving…' : 'Save assignments'}
-        </AdminBtn>
+        canSave ? (
+          <AdminBtn
+            icon="save"
+            onClick={() => saveMutation.mutate()}
+            variant={dirty ? 'primary' : 'ghost'}
+          >
+            {saveMutation.isPending ? 'Saving…' : 'Save assignments'}
+          </AdminBtn>
+        ) : undefined
       }
     >
       <div className="p-5 sm:p-8 space-y-6">
@@ -147,6 +154,7 @@ export default function PortalAdminAssignments() {
         >
           <p className="font-semibold mb-1" style={{ color: 'var(--p-primary)' }}>How access works</p>
           <ul className="space-y-1" style={{ color: 'var(--p-on-surface-variant)' }}>
+            <li><strong>Role</strong> decides <em>what</em> an admin can do; <strong>assignment</strong> decides <em>which projects</em> they can do it on. They need both.</li>
             <li><strong>Full project</strong> — admin sees every design channel, brief, invoices &amp; quotations for that inquiry.</li>
             <li><strong>Selected designs only</strong> — project appears on their dashboard; they get <strong>Announcements</strong> + <strong>General Chat</strong> plus only the checked design channels.</li>
             <li>Quotations &amp; billing follow the linked inquiry when the admin has any access to that project.</li>
@@ -246,6 +254,14 @@ export default function PortalAdminAssignments() {
               </div>
             ) : (
               <>
+              <AdminAccessSummary
+                adminId={Number(adminId)}
+                adminName={selectedAdmin?.name || selectedAdmin?.email || 'Admin'}
+                catalog={catalog}
+                fullProjects={fullProjects}
+                partialDesigns={partialDesigns}
+                dirty={dirty}
+              />
               {filteredCatalog.length > PROJECT_PAGE_SIZE && (
                 <p className="text-[12px] px-1" style={{ color: 'var(--p-on-surface-variant)' }}>
                   Showing {Math.min(visibleCount, filteredCatalog.length)} of {filteredCatalog.length} projects

@@ -11,12 +11,17 @@ import StatTile from '@/components/portal/StatTile';
 import { manufacturingApi, invoiceApi, mediaApi, type ManufacturingInvoiceDto } from '@/lib/api';
 import { formatInquiryDate } from '@/components/inquiry/inquiryUtils';
 import InvoiceDocument from '@/components/quote/InvoiceDocument';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const CUR: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
 const money = (n: number, c = 'INR') => `${CUR[c] ?? ''}${(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const PAGE_SIZE = 25;
 
 export default function PortalAdminInvoices() {
+  const { hasAny } = useAdminPermissions();
+  const canCancel = hasAny(P.PORTAL_INVOICES_CANCEL);
+  const canUpdatePdf = hasAny(P.PORTAL_INVOICES_UPDATE_PDF);
   const qc = useQueryClient();
   const [params] = useSearchParams();
   const quoteFilter = params.get('quote');
@@ -182,7 +187,7 @@ export default function PortalAdminInvoices() {
                           className="text-[13px] font-bold hover:underline mr-3" style={{ color: 'var(--p-primary)' }}
                         >Copy pay link</button>
                       )}
-                      {inv.status === 'PENDING' && (
+                      {inv.status === 'PENDING' && canCancel && (
                         <button
                           type="button"
                           disabled={cancelInvoice.isPending}
@@ -232,12 +237,12 @@ export default function PortalAdminInvoices() {
         )}
       </div>
 
-      {viewing && <InvoiceViewModal invoice={viewing} onClose={() => setViewing(null)} onSaved={() => qc.invalidateQueries({ queryKey: ['admin-invoices'] })} />}
+      {viewing && <InvoiceViewModal invoice={viewing} canUpdatePdf={canUpdatePdf} onClose={() => setViewing(null)} onSaved={() => qc.invalidateQueries({ queryKey: ['admin-invoices'] })} />}
     </AdminShell>
   );
 }
 
-function InvoiceViewModal({ invoice, onClose, onSaved }: { invoice: ManufacturingInvoiceDto; onClose: () => void; onSaved: () => void }) {
+function InvoiceViewModal({ invoice, canUpdatePdf, onClose, onSaved }: { invoice: ManufacturingInvoiceDto; canUpdatePdf: boolean; onClose: () => void; onSaved: () => void }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState<'' | 'download' | 'save'>('');
 
@@ -294,7 +299,9 @@ function InvoiceViewModal({ invoice, onClose, onSaved }: { invoice: Manufacturin
         {invoice.pdfUrl && <a href={invoice.pdfUrl} target="_blank" rel="noreferrer" className="text-[12px] font-semibold" style={{ color: 'var(--p-primary)' }}>Saved PDF ↗</a>}
         <div className="ml-auto flex items-center gap-2">
           <button onClick={download} disabled={!!busy} className="h-9 px-3 rounded-lg text-[13px] font-semibold border disabled:opacity-50" style={{ borderColor: 'var(--p-outline-variant)' }}>{busy === 'download' ? 'Rendering…' : 'Download PDF'}</button>
-          <button onClick={generateAndSave} disabled={!!busy} className="h-9 px-3 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50" style={{ background: 'var(--p-primary)' }}>{busy === 'save' ? 'Saving…' : 'Generate & save PDF'}</button>
+          {canUpdatePdf && (
+            <button onClick={generateAndSave} disabled={!!busy} className="h-9 px-3 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50" style={{ background: 'var(--p-primary)' }}>{busy === 'save' ? 'Saving…' : 'Generate & save PDF'}</button>
+          )}
           <button onClick={onClose} className="h-9 w-9 rounded-lg hover:bg-black/[0.04]"><Sym name="close" /></button>
         </div>
       </div>

@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import { Sym } from '@/components/portal/Sym';
 import { projectApi, type ProjectAiHandoverDto } from '@/lib/api';
 import { getStoredAdminUser, isSuperAdmin } from '@/lib/adminAccess';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 /** "3h ago" / "2d ago" from an ISO timestamp — matches AdminDashboard's own formatUpdated. */
 function timeAgo(iso?: string): string {
@@ -46,6 +48,8 @@ function destinationFor(h: ProjectAiHandoverDto): string {
  * visual clutter to the top of the dashboard.
  */
 export default function TasksAndRequestsPanel() {
+  const { hasAny } = useAdminPermissions();
+  const canClaimHandover = hasAny(P.PORTAL_AI_CLAIM_HANDOVER);
   const navigate = useNavigate();
   const qc = useQueryClient();
   const admin = getStoredAdminUser();
@@ -199,14 +203,16 @@ export default function TasksAndRequestsPanel() {
                       {h.createdAt ? timeAgo(h.createdAt) : ''}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void claimPending(h)}
-                    className="px-3 py-1.5 rounded-lg text-[12px] font-semibold shrink-0"
-                    style={{ background: 'var(--p-primary)', color: 'var(--p-on-primary)' }}
-                  >
-                    Assign to me
-                  </button>
+                  {canClaimHandover && (
+                    <button
+                      type="button"
+                      onClick={() => void claimPending(h)}
+                      className="px-3 py-1.5 rounded-lg text-[12px] font-semibold shrink-0"
+                      style={{ background: 'var(--p-primary)', color: 'var(--p-on-primary)' }}
+                    >
+                      Assign to me
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

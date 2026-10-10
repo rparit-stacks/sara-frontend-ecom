@@ -9,6 +9,8 @@ import { STAGES, stageDef, statusLabelFor, type StageKey } from '@/components/ma
 import { manufacturingApi, projectApi } from '@/lib/api';
 import { getStoredAdminUser, isSuperAdmin } from '@/lib/adminAccess';
 import TasksAndRequestsPanel from './TasksAndRequestsPanel';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const ACTION_PREVIEW_LIMIT = 6;
 const RECENT_PREVIEW_LIMIT = 6;
@@ -38,6 +40,8 @@ function greeting() {
 }
 
 export default function PortalAdminDashboard() {
+  const { hasAny } = useAdminPermissions();
+  const canViewActions = hasAny(P.PORTAL_DASHBOARD_VIEW_ACTIONS);
   const navigate = useNavigate();
   const admin = getStoredAdminUser();
   const superAdmin = isSuperAdmin(admin);
@@ -95,29 +99,35 @@ export default function PortalAdminDashboard() {
               <p className="text-[13px] mt-1" style={{ color: 'var(--p-on-surface-variant)' }}>Here's what's happening across your projects today.</p>
             </div>
 
-            <TasksAndRequestsPanel />
+            {canViewActions && <TasksAndRequestsPanel />}
 
             {/* Stat tiles */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              {stats.map((s) => (
-                <button
-                  key={s.label}
-                  type="button"
-                  onClick={() => navigate(s.to)}
-                  className="text-left border rounded-2xl p-5 transition-shadow hover:shadow-md"
-                  style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}
-                >
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: `${s.color}17`, color: s.color }}>
-                    <Sym name={s.icon} className="text-[20px]" />
-                  </div>
-                  <p className="font-bold text-[30px] leading-none">{s.value}</p>
-                  <p className="text-[12px] font-semibold mt-2" style={{ color: 'var(--p-on-surface-variant)' }}>{s.label}</p>
-                </button>
-              ))}
+              {stats.map((s) => {
+                const isActionTile = s.label === 'Needs your action';
+                const clickable = !isActionTile || canViewActions;
+                const Tag = clickable ? 'button' : 'div';
+                return (
+                  <Tag
+                    key={s.label}
+                    type={clickable ? 'button' : undefined}
+                    onClick={clickable ? () => navigate(s.to) : undefined}
+                    className={`text-left border rounded-2xl p-5 ${clickable ? 'transition-shadow hover:shadow-md' : ''}`}
+                    style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}
+                  >
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: `${s.color}17`, color: s.color }}>
+                      <Sym name={s.icon} className="text-[20px]" />
+                    </div>
+                    <p className="font-bold text-[30px] leading-none">{s.value}</p>
+                    <p className="text-[12px] font-semibold mt-2" style={{ color: 'var(--p-on-surface-variant)' }}>{s.label}</p>
+                  </Tag>
+                );
+              })}
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               {/* Needs your action */}
+              {canViewActions && (
               <div className="xl:col-span-2 border rounded-2xl overflow-hidden flex flex-col" style={{ borderColor: 'var(--p-outline-variant)' }}>
                 <div className="px-5 py-4 flex items-center justify-between shrink-0">
                   <div>
@@ -161,6 +171,7 @@ export default function PortalAdminDashboard() {
                   </button>
                 )}
               </div>
+              )}
 
               {/* Pipeline */}
               <div className="border rounded-2xl p-5" style={{ borderColor: 'var(--p-outline-variant)' }}>

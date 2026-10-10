@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { TablePagination } from '@/components/admin/TablePagination';
+import { useClientPagination } from '@/hooks/useClientPagination';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -28,6 +30,9 @@ import { Switch } from '@/components/ui/switch';
 import RichTextEditor from '@/components/admin/RichTextEditor';
 import { toast } from 'sonner';
 import { faqApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 import {
   DndContext,
   closestCenter,
@@ -49,7 +54,7 @@ import { CSS } from '@dnd-kit/utilities';
 const categories = ['All', 'Shipping', 'Returns', 'Payment', 'Customization', 'Products', 'General'];
 
 // Sortable FAQ Item Component
-const SortableFAQItem = ({ faq, index, onEdit, onDelete, onMoveUp, onMoveDown, totalItems }: any) => {
+const SortableFAQItem = ({ faq, index, onEdit, onDelete, onMoveUp, onMoveDown, totalItems, canEdit, canDelete }: any) => {
   const {
     attributes,
     listeners,
@@ -92,6 +97,16 @@ const SortableFAQItem = ({ faq, index, onEdit, onDelete, onMoveUp, onMoveDown, t
             </div>
             
             <div className="flex items-center gap-2 flex-shrink-0">
+              <AskAdminAiButton
+                entity={{
+                  kind: 'faq',
+                  id: faq.id,
+                  name: faq.question,
+                  pageKey: 'store.faq',
+                  extra: `Status=${faq.status}.`,
+                }}
+              />
+              {canEdit && (
               <div className="flex flex-col gap-1">
                 <Button
                   variant="ghost"
@@ -112,8 +127,10 @@ const SortableFAQItem = ({ faq, index, onEdit, onDelete, onMoveUp, onMoveDown, t
                   <ChevronDown className="w-4 h-4" />
                 </Button>
               </div>
+              )}
               
               <div className="flex gap-2">
+                {canEdit && (
                 <Button
                   variant="outline"
                   size="icon"
@@ -122,6 +139,8 @@ const SortableFAQItem = ({ faq, index, onEdit, onDelete, onMoveUp, onMoveDown, t
                 >
                   <Edit className="w-4 h-4" />
                 </Button>
+                )}
+                {canDelete && (
                 <Button
                   variant="outline"
                   size="icon"
@@ -130,12 +149,13 @@ const SortableFAQItem = ({ faq, index, onEdit, onDelete, onMoveUp, onMoveDown, t
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
+                )}
               </div>
             </div>
           </div>
         </div>
         
-        {/* Drag Handle */}
+        {canEdit && (
         <div 
           className="absolute left-0 top-0 bottom-0 flex items-center cursor-grab active:cursor-grabbing z-10 p-2 text-muted-foreground hover:text-foreground"
           {...attributes}
@@ -143,12 +163,17 @@ const SortableFAQItem = ({ faq, index, onEdit, onDelete, onMoveUp, onMoveDown, t
         >
           <GripVertical className="w-5 h-5" />
         </div>
+        )}
       </motion.div>
     </div>
   );
 };
 
 const AdminFAQ = () => {
+  const { hasAny } = useAdminPermissions();
+  const canAdd = hasAny(P.FAQ_ADD);
+  const canEdit = hasAny(P.FAQ_EDIT);
+  const canDelete = hasAny(P.FAQ_DELETE);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -348,6 +373,7 @@ const AdminFAQ = () => {
                          faq.answer?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   }).sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0));
+  const { pageItems: pagedFAQs, page, setPage, total } = useClientPagination(filteredFAQs, 10, searchQuery + '|' + selectedCategory);
   
   if (isLoading) {
     return (
@@ -385,15 +411,17 @@ const AdminFAQ = () => {
             </h1>
             <p className="text-muted-foreground text-lg">Create and manage frequently asked questions</p>
           </div>
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button className="btn-primary gap-2" onClick={() => {
-              handleResetForm();
-              setIsAddDialogOpen(true);
-            }}>
-              <Plus className="w-4 h-4" />
-              Add New FAQ
-            </Button>
-          </motion.div>
+          {canAdd && (
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button className="btn-primary gap-2" onClick={() => {
+                handleResetForm();
+                setIsAddDialogOpen(true);
+              }}>
+                <Plus className="w-4 h-4" />
+                Add New FAQ
+              </Button>
+            </motion.div>
+          )}
         </motion.div>
 
         {/* Search & Category Filter */}
@@ -429,23 +457,26 @@ const AdminFAQ = () => {
 
         {/* FAQs List */}
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={filteredFAQs.map((faq) => faq.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext items={pagedFAQs.map((faq) => faq.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-4">
-              {filteredFAQs.map((faq, index) => (
+              {pagedFAQs.map((faq, index) => (
                 <SortableFAQItem
                   key={faq.id}
                   faq={faq}
-                  index={index}
+                  index={page * 10 + index}
                   totalItems={filteredFAQs.length}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onMoveUp={handleMoveUp}
                   onMoveDown={handleMoveDown}
+                  canEdit={canEdit}
+                  canDelete={canDelete}
                 />
               ))}
             </div>
           </SortableContext>
         </DndContext>
+        <TablePagination page={page} size={10} totalElements={total} onPageChange={setPage} />
 
         {filteredFAQs.length === 0 && (
           <div className="text-center py-20 bg-white rounded-xl border border-border">
@@ -543,6 +574,7 @@ const AdminFAQ = () => {
               }}>
                 Cancel
               </Button>
+              {(editingFAQ ? canEdit : canAdd) && (
               <Button 
                 className="btn-primary gap-2" 
                 onClick={handleSave}
@@ -560,6 +592,7 @@ const AdminFAQ = () => {
                   </>
                 )}
               </Button>
+              )}
             </div>
           </DialogContent>
         </Dialog>

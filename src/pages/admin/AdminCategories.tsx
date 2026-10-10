@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { TablePagination } from '@/components/admin/TablePagination';
+import { useClientPagination } from '@/hooks/useClientPagination';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
@@ -9,11 +11,18 @@ import { Plus, FolderTree, Search, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { categoriesApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const AdminCategories = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { hasAny } = useAdminPermissions();
+  const canAdd = hasAny(P.CATEGORIES_ADD);
+  const canAddSub = hasAny(P.CATEGORIES_ADD_SUB, P.CATEGORIES_ADD);
+  const canEdit = hasAny(P.CATEGORIES_EDIT);
+  const canDelete = hasAny(P.CATEGORIES_DELETE);
   
   // Fetch categories from admin API (includes personalised categories; uses admin token)
   const { data: apiCategories = [], isLoading, error } = useQuery({
@@ -57,6 +66,7 @@ const AdminCategories = () => {
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (c.subcategories && c.subcategories.some(s => s.name.toLowerCase().includes(searchQuery.toLowerCase())))
   );
+  const { pageItems: pagedCategories, page, setPage, total } = useClientPagination(filteredCategories, 10, searchQuery);
   
   if (isLoading) {
     return (
@@ -93,12 +103,14 @@ const AdminCategories = () => {
             </h1>
             <p className="text-muted-foreground text-lg">Organize your products with hierarchical categories</p>
           </div>
-          <Link to="/admin-sara/categories/new">
-            <Button className="btn-primary gap-2 self-start sm:self-center">
-              <Plus className="w-4 h-4" />
-              Add Main Category
-            </Button>
-          </Link>
+          {canAdd && (
+            <Link to="/admin-sara/categories/new">
+              <Button className="btn-primary gap-2 self-start sm:self-center">
+                <Plus className="w-4 h-4" />
+                Add Main Category
+              </Button>
+            </Link>
+          )}
         </motion.div>
 
         <motion.div
@@ -124,11 +136,14 @@ const AdminCategories = () => {
                 Category Hierarchy
               </h2>
               <CategoryTree 
-                categories={filteredCategories}
-                onEdit={(cat) => navigate('/admin-sara/categories/edit/' + cat.id)}
-                onDelete={handleDelete}
-                onAddSubcategory={(parentId) => navigate('/admin-sara/categories/new/' + parentId)}
+                categories={pagedCategories}
+                onEdit={canEdit ? (cat) => navigate('/admin-sara/categories/edit/' + cat.id) : undefined}
+                onDelete={canDelete ? handleDelete : undefined}
+                onAddSubcategory={
+                  canAddSub ? (parentId) => navigate('/admin-sara/categories/new/' + parentId) : undefined
+                }
               />
+              <TablePagination page={page} size={10} totalElements={total} onPageChange={setPage} />
             </div>
           </div>
 

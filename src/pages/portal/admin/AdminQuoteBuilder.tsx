@@ -30,6 +30,8 @@ import QuoteWizard from '@/components/quote/QuoteWizard';
 import InquiryImport from '@/components/quote/InquiryImport';
 import InquiryPicker from '@/components/quote/InquiryPicker';
 import StageStepper from '@/components/manufacturing/StageStepper';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 type ViewMode = 'wizard' | 'split';
 
@@ -42,6 +44,10 @@ export default function PortalAdminQuoteBuilder() {
   const { reference } = useParams();
   const [params] = useSearchParams();
   const isNew = !reference;
+  const { hasAny } = useAdminPermissions();
+  const canSave = isNew ? hasAny(P.PORTAL_QUOTES_CREATE) : hasAny(P.PORTAL_QUOTES_SAVE);
+  const canSend = hasAny(P.PORTAL_QUOTES_SEND);
+  const canSaveAsTemplate = hasAny(P.PORTAL_QUOTES_CREATE);
 
   const { data: business } = useQuery({
     queryKey: ['business-config'],
@@ -492,29 +498,42 @@ export default function PortalAdminQuoteBuilder() {
               these three used to be three separate, similarly-styled buttons
               that read as interchangeable. Save/Send are the only actions an
               admin needs on every quote; the other two are occasional. */}
-          <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden">
-            <button onClick={() => save()} disabled={saving} className="h-9 px-3 text-[13px] font-semibold hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5">
-              <i className="fa-solid fa-floppy-disk text-[12px]" /> {saving ? 'Saving…' : 'Save'}
-            </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="h-9 w-8 border-l border-gray-200 hover:bg-gray-50 flex items-center justify-center" title="More save options">
-                  <i className="fa-solid fa-chevron-down text-[10px] text-gray-500" />
+          {(canSave || canSaveAsTemplate) && (
+            <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden">
+              {canSave && (
+                <button onClick={() => save()} disabled={saving} className="h-9 px-3 text-[13px] font-semibold hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5">
+                  <i className="fa-solid fa-floppy-disk text-[12px]" /> {saving ? 'Saving…' : 'Save'}
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={downloadPdf} disabled={exporting}>
-                  <i className={`fa-solid ${exporting ? 'fa-spinner fa-spin' : 'fa-file-pdf'} w-4 text-center mr-2`} /> {exporting ? 'Exporting…' : 'Download PDF'}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={saveAsTemplate} disabled={savingTemplate}>
-                  <i className={`fa-solid ${savingTemplate ? 'fa-spinner fa-spin' : 'fa-copy'} w-4 text-center mr-2`} /> {savingTemplate ? 'Saving…' : 'Save as template'}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          <button onClick={sendToClient} disabled={saving} className="h-9 px-4 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50 flex items-center gap-1.5" style={{ background: accent }} title={doc.meta.clientEmail ? `Email this quote to ${doc.meta.clientEmail}` : 'Add a client email to send'}>
-            <i className="fa-solid fa-paper-plane text-[12px]" /> <span className="hidden sm:inline">Send to client</span>
-          </button>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className={`h-9 w-8 hover:bg-gray-50 flex items-center justify-center ${canSave ? 'border-l border-gray-200' : ''}`} title="More save options">
+                    <i className="fa-solid fa-chevron-down text-[10px] text-gray-500" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={downloadPdf} disabled={exporting}>
+                    <i className={`fa-solid ${exporting ? 'fa-spinner fa-spin' : 'fa-file-pdf'} w-4 text-center mr-2`} /> {exporting ? 'Exporting…' : 'Download PDF'}
+                  </DropdownMenuItem>
+                  {canSaveAsTemplate && (
+                    <DropdownMenuItem onClick={saveAsTemplate} disabled={savingTemplate}>
+                      <i className={`fa-solid ${savingTemplate ? 'fa-spinner fa-spin' : 'fa-copy'} w-4 text-center mr-2`} /> {savingTemplate ? 'Saving…' : 'Save as template'}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
+          {!canSave && !canSaveAsTemplate && (
+            <button onClick={downloadPdf} disabled={exporting} className="h-9 px-3 rounded-lg text-[13px] font-semibold border border-gray-200 hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5">
+              <i className={`fa-solid ${exporting ? 'fa-spinner fa-spin' : 'fa-file-pdf'} text-[12px]`} /> <span className="hidden sm:inline">{exporting ? 'Exporting…' : 'Download PDF'}</span>
+            </button>
+          )}
+          {canSend && (
+            <button onClick={sendToClient} disabled={saving} className="h-9 px-4 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50 flex items-center gap-1.5" style={{ background: accent }} title={doc.meta.clientEmail ? `Email this quote to ${doc.meta.clientEmail}` : 'Add a client email to send'}>
+              <i className="fa-solid fa-paper-plane text-[12px]" /> <span className="hidden sm:inline">Send to client</span>
+            </button>
+          )}
         </div>
       </header>
 

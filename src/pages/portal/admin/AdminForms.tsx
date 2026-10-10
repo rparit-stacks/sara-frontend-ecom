@@ -6,6 +6,8 @@ import { Pill } from '@/components/portal/Pill';
 import { Sym } from '@/components/portal/Sym';
 import { FORM_CATEGORIES } from '@/components/portal/formbuilder/registry';
 import { manufacturingApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const STATUS_TONE: Record<string, { bg: string; fg: string }> = {
   published: { bg: 'var(--p-secondary-container)', fg: 'var(--p-on-secondary-container)' },
@@ -35,6 +37,8 @@ function normalizeStatus(status?: string): 'published' | 'draft' | 'archived' {
 }
 
 export default function PortalAdminForms() {
+  const { hasAny } = useAdminPermissions();
+  const canOpenBuilder = hasAny(P.PORTAL_FORMS_OPEN_BUILDER);
   const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [cat, setCat] = useState<string>('All');
@@ -75,9 +79,11 @@ export default function PortalAdminForms() {
     <AdminShell
       title="Forms"
       actions={
-        <AdminBtn icon="edit" onClick={() => navigate('/portal-admin/inquiry-form')}>
-          Edit inquiry form
-        </AdminBtn>
+        canOpenBuilder ? (
+          <AdminBtn icon="edit" onClick={() => navigate('/portal-admin/inquiry-form')}>
+            Edit inquiry form
+          </AdminBtn>
+        ) : undefined
       }
     >
       <div className="p-5 sm:p-8">
@@ -132,23 +138,43 @@ export default function PortalAdminForms() {
                   </div>
                 </div>
 
-                <button onClick={() => navigate('/portal-admin/inquiry-form')} className="text-left w-full">
-                  <h3 className="font-bold text-[15px] mb-1">{f.name}</h3>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Pill label={f.status} tone={STATUS_TONE[f.status]} />
-                    <span className="text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}>{f.category} · v{f.version}</span>
+                {canOpenBuilder ? (
+                  <button type="button" onClick={() => navigate('/portal-admin/inquiry-form')} className="text-left w-full">
+                    <h3 className="font-bold text-[15px] mb-1">{f.name}</h3>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Pill label={f.status} tone={STATUS_TONE[f.status]} />
+                      <span className="text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}>{f.category} · v{f.version}</span>
+                    </div>
+                    <p className="text-[12px] mb-3" style={{ color: 'var(--p-on-surface-variant)' }}>
+                      Public manufacturing inquiry form — used on the /inquiry page.
+                    </p>
+                    <div className="flex items-center gap-4 text-[12px] pt-3 border-t" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>
+                      <span className="flex items-center gap-1">
+                        <Sym name="task_alt" className="text-[14px]" />
+                        {f.submissions} submission{f.submissions === 1 ? '' : 's'}
+                      </span>
+                      <span className="ml-auto">{f.updatedAt}</span>
+                    </div>
+                  </button>
+                ) : (
+                  <div className="text-left w-full">
+                    <h3 className="font-bold text-[15px] mb-1">{f.name}</h3>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Pill label={f.status} tone={STATUS_TONE[f.status]} />
+                      <span className="text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}>{f.category} · v{f.version}</span>
+                    </div>
+                    <p className="text-[12px] mb-3" style={{ color: 'var(--p-on-surface-variant)' }}>
+                      Public manufacturing inquiry form — used on the /inquiry page.
+                    </p>
+                    <div className="flex items-center gap-4 text-[12px] pt-3 border-t" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>
+                      <span className="flex items-center gap-1">
+                        <Sym name="task_alt" className="text-[14px]" />
+                        {f.submissions} submission{f.submissions === 1 ? '' : 's'}
+                      </span>
+                      <span className="ml-auto">{f.updatedAt}</span>
+                    </div>
                   </div>
-                  <p className="text-[12px] mb-3" style={{ color: 'var(--p-on-surface-variant)' }}>
-                    Public manufacturing inquiry form — used on the /inquiry page.
-                  </p>
-                  <div className="flex items-center gap-4 text-[12px] pt-3 border-t" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>
-                    <span className="flex items-center gap-1">
-                      <Sym name="task_alt" className="text-[14px]" />
-                      {f.submissions} submission{f.submissions === 1 ? '' : 's'}
-                    </span>
-                    <span className="ml-auto">{f.updatedAt}</span>
-                  </div>
-                </button>
+                )}
               </div>
             ))}
           </div>
@@ -159,14 +185,16 @@ export default function PortalAdminForms() {
             <Sym name="dynamic_form" className="text-[40px] opacity-40" />
             <p className="mt-2 text-[14px] font-semibold">No forms found</p>
             <p className="text-[13px] mt-1">Set up your inquiry form to start collecting manufacturing requests.</p>
-            <button
-              type="button"
-              onClick={() => navigate('/portal-admin/inquiry-form')}
-              className="mt-4 px-4 py-2 rounded-lg text-[13px] font-semibold text-white"
-              style={{ background: 'var(--p-primary)' }}
-            >
-              Open inquiry form editor
-            </button>
+            {canOpenBuilder && (
+              <button
+                type="button"
+                onClick={() => navigate('/portal-admin/inquiry-form')}
+                className="mt-4 px-4 py-2 rounded-lg text-[13px] font-semibold text-white"
+                style={{ background: 'var(--p-primary)' }}
+              >
+                Open inquiry form editor
+              </button>
+            )}
           </div>
         )}
       </div>

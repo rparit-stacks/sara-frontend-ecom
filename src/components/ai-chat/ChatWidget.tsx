@@ -8,7 +8,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { aiChatApi, type AiChatTurnResponse, type PageContextDto } from '@/lib/api';
+import { guestCart } from '@/lib/guestCart';
+import { dispatchLoggedIn } from '@/lib/authEvents';
+import { aiChatApi, cartApi, type AiChatTurnResponse, type PageContextDto } from '@/lib/api';
 import { useChatPageContext } from '@/context/ChatPageContext';
 import { MessageBubble } from './MessageBubble';
 import { OptionChips } from './OptionChips';
@@ -579,8 +581,15 @@ export function ChatWidget() {
     try {
       const result = await aiChatApi.verifyOtp(email, otp, threadIdRef.current);
       localStorage.setItem('authToken', result.token);
+      if (result.refreshToken) localStorage.setItem('refreshToken', result.refreshToken);
       localStorage.setItem('authEmail', result.email);
       setIsLoggedIn(true);
+      try {
+        await guestCart.migrateToBackend(cartApi);
+      } catch (error) {
+        console.error('Failed to migrate cart:', error);
+      }
+      dispatchLoggedIn();
       threadIdRef.current = result.threadId;
       saveThreadId(result.threadId);
       setAuthStage({ stage: 'none' });

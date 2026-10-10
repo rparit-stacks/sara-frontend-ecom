@@ -24,6 +24,9 @@ import RichTextEditor from '@/components/admin/RichTextEditor';
 import PlainProductSelector, { PlainProduct } from '@/components/admin/PlainProductSelector';
 import { toast } from 'sonner';
 import { productsApi, plainProductsApi, categoriesApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 // ─── Sortable helpers (same as ProductFormDialog) ───────────────────────
 const SortableVariantItem: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
@@ -179,6 +182,8 @@ const AdminProductEdit = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { hasAny } = useAdminPermissions();
+  const canEdit = hasAny(P.PRODUCTS_EDIT);
   const productId = id ? Number(id) : null;
 
   // ─── Form State ────────────────────────────────────────────────────────
@@ -673,6 +678,20 @@ const AdminProductEdit = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {productData && (
+              <AskAdminAiButton
+                size="sm"
+                variant="outline"
+                label="Ask AI"
+                entity={{
+                  kind: 'product',
+                  id: productData.id,
+                  name: productData.name,
+                  pageKey: 'store.product-edit',
+                  extra: `Type=${productData.type || 'n/a'}, status=${productData.status}. Review this product and suggest improvements.`,
+                }}
+              />
+            )}
             {productData?.slug && (
               <a href={`/product/${productData.slug}`} target="_blank" rel="noopener noreferrer">
                 <Button variant="outline" size="sm" className="gap-2"><ExternalLink className="w-4 h-4" />View Product</Button>
@@ -1120,10 +1139,17 @@ const AdminProductEdit = () => {
               if (formData.hsnCode) payload.hsnCode = formData.hsnCode;
               updateMutation.mutate({ id: productId!, data: payload });
               toast.success('Product saved as draft');
-            }} className="gap-2 h-11 px-6">Save as Draft</Button>
-            <Button className="btn-primary gap-2 h-11 px-8" onClick={handleSubmit} disabled={isUploadingDigitalFile || updateMutation.isPending}>
+            }} className="gap-2 h-11 px-6" disabled={!canEdit || isUploadingDigitalFile || updateMutation.isPending}>
+              Save as Draft
+            </Button>
+            <Button
+              className="btn-primary gap-2 h-11 px-8"
+              onClick={handleSubmit}
+              disabled={!canEdit || isUploadingDigitalFile || updateMutation.isPending}
+              title={!canEdit ? 'Missing STORE_PRODUCTS_EDIT' : undefined}
+            >
               <Save className="w-4 h-4" />
-              {updateMutation.isPending ? 'Updating...' : 'Update Product'}
+              {updateMutation.isPending ? 'Updating...' : canEdit ? 'Update Product' : 'View only'}
             </Button>
           </div>
         </div>

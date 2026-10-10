@@ -8,6 +8,9 @@ import { Sym } from '@/components/portal/Sym';
 import StatTile from '@/components/portal/StatTile';
 import { manufacturingApi, type ManufacturingQuoteDto } from '@/lib/api';
 import { formatInquiryDate, portalDateKey, portalDateSearchText } from '@/components/inquiry/inquiryUtils';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 const CUR: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
 const money = (n: number, c: string) => `${CUR[c] ?? ''}${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -244,6 +247,11 @@ function NewQuotationChooserModal({
 }
 
 export default function PortalAdminQuotations() {
+  const { hasAny } = useAdminPermissions();
+  const canCreate = hasAny(P.PORTAL_QUOTES_CREATE);
+  const canEdit = hasAny(P.PORTAL_QUOTES_EDIT);
+  const canDelete = hasAny(P.PORTAL_QUOTES_DELETE);
+  const canDuplicate = hasAny(P.PORTAL_QUOTES_DUPLICATE);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
@@ -372,7 +380,7 @@ export default function PortalAdminQuotations() {
   return (
     <AdminShell
       title={inquiryFilter ? 'Quotations · Project' : 'Quotations'}
-      actions={<AdminBtn icon="add" onClick={() => setShowEntryChooser(true)}>New quotation</AdminBtn>}
+      actions={canCreate ? <AdminBtn icon="add" onClick={() => setShowEntryChooser(true)}>New quotation</AdminBtn> : undefined}
     >
       <div className="p-5 sm:p-8">
         {inquiryFilter && (
@@ -523,7 +531,7 @@ export default function PortalAdminQuotations() {
               >
                 Clear filters
               </button>
-            ) : tab === 'quotes' ? (
+            ) : tab === 'quotes' && canCreate ? (
               <button onClick={() => setShowEntryChooser(true)} className="mt-4 px-4 py-2 rounded-lg text-[13px] font-semibold text-white inline-flex items-center gap-1.5" style={{ background: 'var(--p-primary)' }}>
                 <Sym name="add" className="text-[16px]" /> New quotation
               </button>
@@ -565,22 +573,36 @@ export default function PortalAdminQuotations() {
                     <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{q.createdAt ? formatInquiryDate(q.createdAt) : '—'}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-1">
+                        <AskAdminAiButton
+                          entity={{
+                            kind: 'quote',
+                            id: q.id,
+                            name: q.reference || q.title,
+                            pageKey: 'portal.quotes',
+                            userEmail: q.clientEmail,
+                            extra: `Status=${q.status}, total=${q.total} ${q.currency || ''}.`,
+                          }}
+                        />
                         {tab === 'templates' ? (
-                          <button
-                            onClick={() => setTemplateModal(q)}
-                            className="text-[13px] font-bold px-2 py-1"
-                            style={{ color: 'var(--p-primary)' }}
-                          >
-                            Use template
-                          </button>
+                          canDuplicate && (
+                            <button
+                              onClick={() => setTemplateModal(q)}
+                              className="text-[13px] font-bold px-2 py-1"
+                              style={{ color: 'var(--p-primary)' }}
+                            >
+                              Use template
+                            </button>
+                          )
                         ) : (
-                          <button
-                            onClick={() => navigate(`/portal-admin/quote-editor/${q.reference}`)}
-                            className="text-[13px] font-bold px-2 py-1"
-                            style={{ color: 'var(--p-primary)' }}
-                          >
-                            Edit
-                          </button>
+                          canEdit && (
+                            <button
+                              onClick={() => navigate(`/portal-admin/quote-editor/${q.reference}`)}
+                              className="text-[13px] font-bold px-2 py-1"
+                              style={{ color: 'var(--p-primary)' }}
+                            >
+                              Edit
+                            </button>
+                          )
                         )}
                         <div className="relative">
                           <button
@@ -609,16 +631,18 @@ export default function PortalAdminQuotations() {
                                     {convertToProject.isPending && convertToProject.variables === q.id ? 'Creating…' : 'Convert to project'}
                                   </button>
                                 )}
-                                <button
-                                  type="button"
-                                  disabled={deleteQuote.isPending}
-                                  onClick={() => { setMenu(null); confirmDelete(q); }}
-                                  className="w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 hover:bg-black/5 disabled:opacity-50"
-                                  style={{ color: '#b42318' }}
-                                >
-                                  <Sym name="delete" className="text-[16px]" />
-                                  {tab === 'templates' ? 'Delete template' : 'Delete quotation'}
-                                </button>
+                                {canDelete && (
+                                  <button
+                                    type="button"
+                                    disabled={deleteQuote.isPending}
+                                    onClick={() => { setMenu(null); confirmDelete(q); }}
+                                    className="w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 hover:bg-black/5 disabled:opacity-50"
+                                    style={{ color: '#b42318' }}
+                                  >
+                                    <Sym name="delete" className="text-[16px]" />
+                                    {tab === 'templates' ? 'Delete template' : 'Delete quotation'}
+                                  </button>
+                                )}
                               </div>
                             </>
                           )}

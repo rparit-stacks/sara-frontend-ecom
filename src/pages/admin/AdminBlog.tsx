@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { TablePagination } from '@/components/admin/TablePagination';
+import { useClientPagination } from '@/hooks/useClientPagination';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -30,8 +32,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import RichTextEditor from '@/components/admin/RichTextEditor';
 import { toast } from 'sonner';
 import { blogApi, mediaApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 const AdminBlog = () => {
+  const { hasAny } = useAdminPermissions();
+  const canAdd = hasAny(P.BLOG_ADD);
+  const canEdit = hasAny(P.BLOG_EDIT);
+  const canDelete = hasAny(P.BLOG_DELETE);
+  const canPublish = hasAny(P.BLOG_PUBLISH);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -232,6 +242,7 @@ const AdminBlog = () => {
     blog.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     blog.excerpt?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const { pageItems: paged, page, setPage, total } = useClientPagination(filteredBlogs, 10, searchQuery);
   
   if (isLoading) {
     return (
@@ -269,15 +280,17 @@ const AdminBlog = () => {
             </h1>
             <p className="text-muted-foreground text-lg">Create and manage blog posts</p>
           </div>
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button className="btn-primary gap-2" onClick={() => {
-              handleResetForm();
-              setIsAddDialogOpen(true);
-            }}>
-              <Plus className="w-4 h-4" />
-              Add New Blog
-            </Button>
-          </motion.div>
+          {canAdd && (
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button className="btn-primary gap-2" onClick={() => {
+                handleResetForm();
+                setIsAddDialogOpen(true);
+              }}>
+                <Plus className="w-4 h-4" />
+                Add New Blog
+              </Button>
+            </motion.div>
+          )}
         </motion.div>
 
         {/* Search */}
@@ -303,7 +316,7 @@ const AdminBlog = () => {
               No blog posts found. Create your first blog!
             </div>
           ) : (
-            filteredBlogs.map((blog: any, index: number) => (
+            paged.map((blog: any, index: number) => (
               <motion.div
                 key={blog.id}
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -346,38 +359,52 @@ const AdminBlog = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleEdit(blog)}
-                        className="flex-1"
-                      >
-                        <Edit className="w-4 h-4 mr-1" />
-                        Edit
-                      </Button>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleDelete(blog.id)}
-                        className="text-destructive hover:text-destructive"
-                        disabled={deleteMutation.isPending}
-                      >
-                        {deleteMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </motion.div>
+                    <AskAdminAiButton
+                      entity={{
+                        kind: 'blog',
+                        id: blog.id,
+                        name: blog.title,
+                        pageKey: 'store.blog',
+                        extra: `Status=${blog.status || 'n/a'}, views=${blog.views || 0}.`,
+                      }}
+                    />
+                    {canEdit && (
+                      <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleEdit(blog)}
+                          className="flex-1"
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Edit
+                        </Button>
+                      </motion.div>
+                    )}
+                    {canDelete && (
+                      <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleDelete(blog.id)}
+                          className="text-destructive hover:text-destructive"
+                          disabled={deleteMutation.isPending}
+                        >
+                          {deleteMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </motion.div>
+                    )}
                   </div>
                 </div>
               </motion.div>
             ))
           )}
         </div>
+        <TablePagination page={page} size={10} totalElements={total} onPageChange={setPage} />
 
         {/* Add/Edit Dialog */}
         <Dialog
@@ -650,10 +677,14 @@ const AdminBlog = () => {
                     {formData.status === 'ACTIVE' ? 'Blog will be visible to visitors' : 'Blog will be hidden'}
                   </p>
                 </div>
-                <Switch
-                  checked={formData.status === 'ACTIVE'}
-                  onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'ACTIVE' : 'INACTIVE' })}
-                />
+                {canPublish ? (
+                  <Switch
+                    checked={formData.status === 'ACTIVE'}
+                    onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'ACTIVE' : 'INACTIVE' })}
+                  />
+                ) : (
+                  <Badge variant="secondary">{formData.status?.toLowerCase() || 'active'}</Badge>
+                )}
               </div>
             </div>
             )}
@@ -671,23 +702,25 @@ const AdminBlog = () => {
               >
                 Cancel
               </Button>
-              <Button 
-                className="btn-primary gap-2" 
-                onClick={handleSave}
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
-                {(createMutation.isPending || updateMutation.isPending) ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    {editingBlog ? 'Update Blog' : 'Create Blog'}
-                  </>
-                )}
-              </Button>
+              {(editingBlog ? canEdit : canAdd) && (
+                <Button 
+                  className="btn-primary gap-2" 
+                  onClick={handleSave}
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                >
+                  {(createMutation.isPending || updateMutation.isPending) ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      {editingBlog ? 'Update Blog' : 'Create Blog'}
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </DialogContent>
         </Dialog>

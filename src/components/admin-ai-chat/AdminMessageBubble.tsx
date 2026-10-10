@@ -44,7 +44,7 @@ export function AdminMessageBubble({ message }: Props) {
         </span>
       )}
 
-      <div className={`flex max-w-[85%] flex-col gap-2 ${isUser ? 'items-end' : 'items-start'}`}>
+      <div className={`flex max-w-[min(85%,36rem)] flex-col gap-2 ${isUser ? 'items-end' : 'items-start'}`}>
         {message.imageUrls && message.imageUrls.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {message.imageUrls.map((url, i) => (

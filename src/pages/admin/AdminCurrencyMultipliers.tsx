@@ -15,6 +15,8 @@ import {
 import { Trash2, Edit, Plus, Loader2, Globe2, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 import { currencyMultiplierAdminApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 // Currencies that admins are allowed to add a multiplier for via the dropdown.
 // Keeping this short matches the storefront which only exposes INR (.in) and GBP (.uk).
@@ -31,6 +33,9 @@ type Multiplier = {
 };
 
 const AdminCurrencyMultipliers = () => {
+  const { hasAny } = useAdminPermissions();
+  const canEdit = hasAny(P.CURRENCY_EDIT);
+  const canDelete = hasAny(P.CURRENCY_DELETE);
   const queryClient = useQueryClient();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -152,10 +157,12 @@ const AdminCurrencyMultipliers = () => {
               </p>
             </div>
           </div>
-          <Button onClick={openCreate} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Add Multiplier
-          </Button>
+          {canEdit && (
+            <Button onClick={openCreate} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Add Multiplier
+            </Button>
+          )}
         </div>
 
         {/* GBP is the active customer-facing currency on studiosara.uk. Surface this here so admins always configure it. */}
@@ -238,13 +245,16 @@ const AdminCurrencyMultipliers = () => {
                             </td>
                             <td className="p-4">
                               <div className="flex gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => openEdit(item)}
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </Button>
+                                {canEdit && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openEdit(item)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {canDelete && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -267,6 +277,7 @@ const AdminCurrencyMultipliers = () => {
                                     />
                                   )}
                                 </Button>
+                                )}
                               </div>
                             </td>
                           </tr>

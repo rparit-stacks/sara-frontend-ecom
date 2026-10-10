@@ -11,6 +11,8 @@ import { Loader2, Save, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { businessConfigApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const INDIAN_STATES = [
   'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
@@ -24,6 +26,8 @@ const INDIAN_STATES = [
 ];
 
 const AdminBusinessConfig = () => {
+  const { hasAny } = useAdminPermissions();
+  const canUpdate = hasAny(P.BUSINESS_CONFIG_UPDATE);
   const [formData, setFormData] = useState({
     businessGstin: '',
     businessName: '',
@@ -289,26 +293,27 @@ const AdminBusinessConfig = () => {
             </div>
           </div>
           
-          {/* Submit Button */}
-          <div className="flex justify-end pt-4 border-t">
-            <Button
-              type="submit"
-              disabled={updateMutation.isPending}
-              className="min-w-[120px]"
-            >
-              {updateMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Configuration
-                </>
-              )}
-            </Button>
-          </div>
+          {canUpdate && (
+            <div className="flex justify-end pt-4 border-t">
+              <Button
+                type="submit"
+                disabled={updateMutation.isPending}
+                className="min-w-[120px]"
+              >
+                {updateMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Configuration
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </motion.form>
       </div>
     </AdminLayout>

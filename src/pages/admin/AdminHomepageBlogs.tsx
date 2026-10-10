@@ -6,8 +6,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { blogApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const AdminHomepageBlogs = () => {
+  const { hasAny } = useAdminPermissions();
+  const canManageHomepage = hasAny(P.HOMEPAGE_BLOGS_ASSIGN, P.HOMEPAGE_BLOGS_REORDER);
   const [selectedBlogIds, setSelectedBlogIds] = useState<number[]>([]);
   const queryClient = useQueryClient();
 
@@ -81,23 +85,25 @@ const AdminHomepageBlogs = () => {
               Select exactly 4 blogs to display on the homepage
             </p>
           </div>
-          <Button
-            onClick={handleSave}
-            disabled={selectedBlogIds.length !== 4 || setHomepageBlogsMutation.isPending}
-            className="gap-2"
-          >
-            {setHomepageBlogsMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                Save Selection
-              </>
-            )}
-          </Button>
+          {canManageHomepage && (
+            <Button
+              onClick={handleSave}
+              disabled={selectedBlogIds.length !== 4 || setHomepageBlogsMutation.isPending}
+              className="gap-2"
+            >
+              {setHomepageBlogsMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  Save Selection
+                </>
+              )}
+            </Button>
+          )}
         </div>
 
         <div className="bg-card rounded-lg border border-border p-6">
@@ -125,19 +131,21 @@ const AdminHomepageBlogs = () => {
                 return (
                   <div
                     key={blog.id}
-                    className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                    className={`border-2 rounded-lg p-4 transition-all ${
                       isSelected
                         ? 'border-primary bg-primary/5'
                         : 'border-border hover:border-primary/50'
-                    }`}
-                    onClick={() => handleBlogToggle(blog.id)}
+                    } ${canManageHomepage ? 'cursor-pointer' : ''}`}
+                    onClick={canManageHomepage ? () => handleBlogToggle(blog.id) : undefined}
                   >
                     <div className="flex items-start gap-3">
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => handleBlogToggle(blog.id)}
-                        className="mt-1"
-                      />
+                      {canManageHomepage && (
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => handleBlogToggle(blog.id)}
+                          className="mt-1"
+                        />
+                      )}
                       <div className="flex-1 min-w-0">
                         {position && (
                           <div className="mb-2">

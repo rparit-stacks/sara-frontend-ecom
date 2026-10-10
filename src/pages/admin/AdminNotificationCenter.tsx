@@ -10,6 +10,8 @@ import { Loader2, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { notificationLogApi } from '@/lib/api';
 import { BroadcastComposer } from './BroadcastComposer';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const CHANNELS = ['EMAIL', 'WHATSAPP', 'PUSH', 'SMS'] as const;
 const PAGE_SIZE = 50;
@@ -22,6 +24,13 @@ const PAGE_SIZE = 50;
  * via sara-backend-ecom's proxy (see AdminNotificationLogController on both sides).
  */
 export default function AdminNotificationCenter() {
+  const { hasAny } = useAdminPermissions();
+  const canFilterLogs = hasAny(P.NOTIFICATIONS_FILTER_LOGS);
+  const canUseBroadcast = hasAny(
+    P.NOTIFICATIONS_COMPOSE_BROADCAST,
+    P.NOTIFICATIONS_PREVIEW_BROADCAST,
+    P.NOTIFICATIONS_SEND_BROADCAST,
+  );
   const [channel, setChannel] = useState<string>('all');
   const [status, setStatus] = useState<string>('all');
   const [recipient, setRecipient] = useState('');
@@ -62,7 +71,9 @@ export default function AdminNotificationCenter() {
         <Tabs defaultValue="history">
           <TabsList>
             <TabsTrigger value="history">Delivery History</TabsTrigger>
-            <TabsTrigger value="broadcast">Broadcast Composer</TabsTrigger>
+            {canUseBroadcast && (
+              <TabsTrigger value="broadcast">Broadcast Composer</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="broadcast" className="pt-6">
@@ -77,6 +88,8 @@ export default function AdminNotificationCenter() {
           className="space-y-4 pt-6"
         >
           <div className="flex flex-wrap items-end gap-3">
+            {canFilterLogs && (
+            <>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Channel</label>
               <Select
@@ -132,6 +145,8 @@ export default function AdminNotificationCenter() {
                 </Button>
               </div>
             </div>
+            </>
+            )}
           </div>
 
           {isLoading ? (

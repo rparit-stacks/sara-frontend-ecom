@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useIsLoggedIn } from '@/hooks/useIsLoggedIn';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
@@ -26,7 +27,7 @@ export const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const profileMenuRef = useRef<HTMLDivElement>(null);
-  const isAuthenticated = typeof window !== 'undefined' && !!localStorage.getItem('authToken');
+  const isAuthenticated = useIsLoggedIn();
 
   useEffect(() => {
     setIsOpen(false);

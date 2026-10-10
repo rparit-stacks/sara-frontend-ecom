@@ -10,6 +10,8 @@ import {
   type ManufacturingProjectDto,
 } from '@/lib/api';
 import { useMarkNavRead } from '@/hooks/useAdminNotificationCounts';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const PAYMENT_STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   PAID: { bg: '#2e7d3220', color: '#2e7d32', label: 'Paid' },
@@ -45,6 +47,9 @@ const payUrl = (code: string) => `${window.location.origin}/pay/${code}`;
 const PAGE_SIZE = 25;
 
 export default function PortalAdminPaymentLinks() {
+  const { hasAny } = useAdminPermissions();
+  const canCreate = hasAny(P.PORTAL_PAYMENT_LINKS_CREATE);
+  const canToggle = hasAny(P.PORTAL_PAYMENT_LINKS_TOGGLE);
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [historyForId, setHistoryForId] = useState<number | null>(null);
@@ -91,7 +96,7 @@ export default function PortalAdminPaymentLinks() {
   const copy = (code: string) => { navigator.clipboard.writeText(payUrl(code)); toast.success('Link copied'); };
 
   return (
-    <AdminShell title="Payment Links" actions={<AdminBtn icon="add" onClick={() => setOpen(true)}>New link</AdminBtn>}>
+    <AdminShell title="Payment Links" actions={canCreate ? <AdminBtn icon="add" onClick={() => setOpen(true)}>New link</AdminBtn> : undefined}>
       <div className="p-5 sm:p-8">
         {!isLoading && links.length > 0 && (
           <div className="grid grid-cols-2 gap-4 mb-6 max-w-sm">
@@ -180,17 +185,19 @@ export default function PortalAdminPaymentLinks() {
                       >
                         {historyForId === l.id ? 'Hide history' : 'Show history for this'}
                       </button>
-                      <button
-                        onClick={() => {
-                          if (l.active && !window.confirm(`Revoke this payment link? "${payUrl(l.code)}" will stop working immediately — this does not affect any payment already made.`)) return;
-                          activeMut.mutate({ id: l.id, active: !l.active });
-                        }}
-                        disabled={activeMut.isPending}
-                        className="text-[13px] font-bold disabled:opacity-50"
-                        style={{ color: l.active ? '#b42318' : 'var(--p-primary)' }}
-                      >
-                        {l.active ? 'Revoke' : 'Reactivate'}
-                      </button>
+                      {canToggle && (
+                        <button
+                          onClick={() => {
+                            if (l.active && !window.confirm(`Revoke this payment link? "${payUrl(l.code)}" will stop working immediately — this does not affect any payment already made.`)) return;
+                            activeMut.mutate({ id: l.id, active: !l.active });
+                          }}
+                          disabled={activeMut.isPending}
+                          className="text-[13px] font-bold disabled:opacity-50"
+                          style={{ color: l.active ? '#b42318' : 'var(--p-primary)' }}
+                        >
+                          {l.active ? 'Revoke' : 'Reactivate'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                   {historyForId === l.id && <LinkHistoryRow linkId={l.id} />}
@@ -231,7 +238,7 @@ export default function PortalAdminPaymentLinks() {
         )}
       </div>
 
-      {open && <CreateModal onClose={() => setOpen(false)} onCreate={(d) => createMut.mutate(d)} saving={createMut.isPending} />}
+      {open && canCreate && <CreateModal onClose={() => setOpen(false)} onCreate={(d) => createMut.mutate(d)} saving={createMut.isPending} />}
     </AdminShell>
   );
 }

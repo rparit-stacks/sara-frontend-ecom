@@ -14,8 +14,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FormBuilder, { FormField } from '@/components/admin/FormBuilder';
 import { toast } from 'sonner';
 import { customConfigApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const AdminCustomConfig = () => {
+  const { hasAny } = useAdminPermissions();
+  const canUpdateConfig = hasAny(P.CUSTOM_CONFIG_UPDATE);
+  const canManageFields = hasAny(
+    P.CUSTOM_CONFIG_ADD_FIELD,
+    P.CUSTOM_CONFIG_EDIT_FIELD,
+    P.CUSTOM_CONFIG_DELETE_FIELD,
+  );
+  const canUpdateRequest = hasAny(P.CUSTOM_CONFIG_UPDATE_REQUEST);
   const queryClient = useQueryClient();
   
   const [formFields, setFormFields] = useState<FormField[]>([]);
@@ -274,10 +284,12 @@ const AdminCustomConfig = () => {
 
           <TabsContent value="config" className="space-y-6">
             <div className="flex justify-end mb-4">
+              {canUpdateConfig && (
               <Button onClick={handleSave} className="btn-primary gap-2 h-11 px-8" disabled={updateMutation.isPending}>
                 <Save className="w-4 h-4" />
                 {updateMutation.isPending ? 'Saving...' : 'Save Configuration'}
               </Button>
+              )}
             </div>
 
             <div className="grid lg:grid-cols-3 gap-8">
@@ -451,10 +463,14 @@ const AdminCustomConfig = () => {
                     Define the custom fields that users will fill after uploading their design. 
                     These fields will appear on the product page along with fabric selection.
                   </p>
+                  {canManageFields ? (
                   <FormBuilder 
                     fields={formFields}
                     onChange={setFormFields}
                   />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">You can view field definitions but cannot edit them.</p>
+                  )}
                 </section>
 
                 {/* Variants Configuration */}
@@ -464,6 +480,7 @@ const AdminCustomConfig = () => {
                       <Type className="w-5 h-5 text-primary" />
                       Product Variants
                     </h2>
+                    {canUpdateConfig && (
                     <Button 
                       type="button" 
                       variant="outline" 
@@ -473,6 +490,7 @@ const AdminCustomConfig = () => {
                       <Plus className="w-4 h-4 mr-2" />
                       Add Variant
                     </Button>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Define variants (e.g., Size, Color) that will be available for all custom products.
@@ -482,6 +500,7 @@ const AdminCustomConfig = () => {
                       <div key={idx} className="p-4 border rounded-lg space-y-4">
                         <div className="flex items-center justify-between">
                           <h3 className="font-medium">Variant {idx + 1}</h3>
+                          {canUpdateConfig && (
                           <Button
                             type="button"
                             variant="ghost"
@@ -490,6 +509,7 @@ const AdminCustomConfig = () => {
                           >
                             <Trash2 className="w-4 h-4 text-destructive" />
                           </Button>
+                          )}
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
@@ -1048,10 +1068,13 @@ const AdminCustomConfig = () => {
                     onChange={(e) => setAdminNotes(e.target.value)}
                     placeholder="Add notes about this request..."
                     className="min-h-[100px]"
+                    readOnly={!canUpdateRequest}
                   />
                 </div>
                 
                 <div className="flex gap-2 flex-wrap">
+                  {canUpdateRequest && (
+                  <>
                   <Button
                     variant="outline"
                     onClick={() => handleUpdateStatus('PENDING')}
@@ -1112,6 +1135,8 @@ const AdminCustomConfig = () => {
                       'Cancel Request'
                     )}
                   </Button>
+                  </>
+                  )}
                   <Button
                     variant="outline"
                     onClick={() => {

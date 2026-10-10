@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Edit, Trash2, User, Mail, Calendar, Loader2, Mail as MailIcon, Phone } from 'lucide-react';
+import { Search, Edit, Trash2, User, Mail, Calendar, Loader2, Mail as MailIcon, Phone, KeyRound, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -11,7 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { adminManagementApi } from '@/lib/api';
+import { adminManagementApi, adminRolesApi, type AdminRoleDto } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { cn } from '@/lib/utils';
+
+const TEMPLATE_ORDER = ['store_ops', 'portal_sales', 'readonly_support'] as const;
 
 const AdminAdmins = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -19,9 +24,12 @@ const AdminAdmins = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState<any>(null);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [invitePortalAccess, setInvitePortalAccess] = useState(false);
   const [inviteReadOnly, setInviteReadOnly] = useState(false);
+  /** Empty string = no role on invite (optional). */
+  const [inviteRoleId, setInviteRoleId] = useState<string>('');
+  const [editRoleId, setEditRoleId] = useState<string>('');
   const queryClient = useQueryClient();
+  const { isMainAdmin: mainAdmin } = useAdminPermissions();
 
   const [formData, setFormData] = useState({
     username: '',
@@ -29,7 +37,6 @@ const AdminAdmins = () => {
     email: '',
     whatsappNumber: '',
     status: 'ACTIVE',
-    portalAdminAccess: false,
     readOnly: false,
   });
   
@@ -37,17 +44,52 @@ const AdminAdmins = () => {
     queryKey: ['adminAdmins'],
     queryFn: () => adminManagementApi.getAll(),
   });
+
+  const { data: roles = [] } = useQuery({
+    queryKey: ['adminRoles'],
+    queryFn: () => adminRolesApi.list(),
+    enabled: isInviteDialogOpen || isEditDialogOpen || !!mainAdmin,
+  });
+  const activeRoles = roles.filter((r) => r.active);
+
+  const templateRoles = useMemo(() => {
+    const byKey = new Map(
+      activeRoles.filter((r) => r.templateKey).map((r) => [r.templateKey as string, r]),
+    );
+    return TEMPLATE_ORDER.map((key) => byKey.get(key)).filter(Boolean) as AdminRoleDto[];
+  }, [activeRoles]);
+
+  const { data: waitingPayload } = useQuery({
+    queryKey: ['adminsWaitingForRole'],
+    queryFn: () => adminRolesApi.waitingForRole(),
+    enabled: !!mainAdmin,
+    refetchInterval: 60_000,
+  });
+  const waitingAdmins = waitingPayload?.admins ?? [];
   
   const sendInviteMutation = useMutation({
-    mutationFn: ({ email, portalAdminAccess, readOnly }: { email: string; portalAdminAccess: boolean; readOnly: boolean }) =>
-      adminManagementApi.sendInvite(email, portalAdminAccess, readOnly),
-    onSuccess: () => {
+    mutationFn: ({
+      email,
+      readOnly,
+      roleId,
+    }: {
+      email: string;
+      readOnly: boolean;
+      roleId: number | null;
+    }) => adminManagementApi.sendInvite(email, readOnly, roleId),
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['adminAdmins'] });
-      toast.success('Invitation sent successfully!');
+      queryClient.invalidateQueries({ queryKey: ['adminsWaitingForRole'] });
+      queryClient.invalidateQueries({ queryKey: ['adminRbacAudit'] });
+      toast.success(
+        vars.roleId == null
+          ? 'Invitation sent. Assign a role after they join.'
+          : 'Invitation sent successfully!',
+      );
       setIsInviteDialogOpen(false);
       setInviteEmail('');
-      setInvitePortalAccess(false);
       setInviteReadOnly(false);
+      setInviteRoleId('');
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to send invitation');
@@ -55,17 +97,24 @@ const AdminAdmins = () => {
   });
   
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => 
-      adminManagementApi.update(id, data),
+    mutationFn: async ({ id, data, roleId }: { id: number; data: any; roleId: number | null }) => {
+      await adminManagementApi.update(id, data);
+      const isMain = editingAdmin?.mainAdmin || editingAdmin?.username === 'admin';
+      if (!isMain) {
+        await adminRolesApi.setAssignment(id, roleId);
+      }
+    },
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['adminAdmins'] });
+      queryClient.invalidateQueries({ queryKey: ['adminsWaitingForRole'] });
+      queryClient.invalidateQueries({ queryKey: ['adminRbacAudit'] });
       toast.success('Admin updated successfully!');
       try {
         const stored = JSON.parse(localStorage.getItem('adminUser') || '{}');
         if (editingAdmin?.id === stored.id) {
           localStorage.setItem(
             'adminUser',
-            JSON.stringify({ ...stored, portalAdminAccess: formData.portalAdminAccess, readOnly: formData.readOnly }),
+            JSON.stringify({ ...stored, readOnly: formData.readOnly }),
           );
         }
       } catch { /* ignore */ }
@@ -108,9 +157,9 @@ const AdminAdmins = () => {
       email: '',
       whatsappNumber: '',
       status: 'ACTIVE',
-      portalAdminAccess: false,
       readOnly: false,
     });
+    setEditRoleId('');
   };
 
   const handleSendInvite = () => {
@@ -120,8 +169,8 @@ const AdminAdmins = () => {
     }
     sendInviteMutation.mutate({
       email: inviteEmail.trim(),
-      portalAdminAccess: invitePortalAccess,
       readOnly: inviteReadOnly,
+      roleId: inviteRoleId ? Number(inviteRoleId) : null,
     });
   };
   
@@ -134,9 +183,9 @@ const AdminAdmins = () => {
           email: formData.email,
           whatsappNumber: formData.whatsappNumber.trim(),
           status: formData.status,
-          portalAdminAccess: formData.portalAdminAccess,
           readOnly: formData.readOnly,
         },
+        roleId: editRoleId ? Number(editRoleId) : null,
       });
     }
   };
@@ -149,9 +198,9 @@ const AdminAdmins = () => {
       email: admin.email || '',
       whatsappNumber: admin.whatsappNumber || '',
       status: admin.status || 'ACTIVE',
-      portalAdminAccess: admin.portalAdminAccess === true,
       readOnly: admin.readOnly === true,
     });
+    setEditRoleId(admin.role?.id != null ? String(admin.role.id) : '');
     setIsEditDialogOpen(true);
   };
   
@@ -200,14 +249,21 @@ const AdminAdmins = () => {
             <h1 className="font-cursive text-3xl sm:text-4xl">Admin Users</h1>
             <p className="text-muted-foreground mt-1">Manage admin accounts and permissions</p>
           </div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" className="gap-2">
+              <Link to="/admin-sara/roles">
+                <KeyRound className="w-4 h-4" />
+                Roles & Permissions
+              </Link>
+            </Button>
           <Dialog
             open={isInviteDialogOpen}
             onOpenChange={(open) => {
               setIsInviteDialogOpen(open);
               if (!open) {
                 setInviteEmail('');
-                setInvitePortalAccess(false);
                 setInviteReadOnly(false);
+                setInviteRoleId('');
               }
             }}
           >
@@ -221,7 +277,7 @@ const AdminAdmins = () => {
               <DialogHeader>
                 <DialogTitle>Send Admin Invitation</DialogTitle>
                 <DialogDescription>
-                  Enter the email address to send an admin invitation. The recipient will set their own password when accepting the invite.
+                  Email them an invite link. Role is optional — you can assign it after they join.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-4">
@@ -237,25 +293,64 @@ const AdminAdmins = () => {
                     disabled={sendInviteMutation.isPending}
                   />
                 </div>
-                <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                {templateRoles.length > 0 && (
                   <div>
-                    <Label htmlFor="invite-portal-access">Manufacturing Portal access</Label>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Grant access to /portal-admin when they accept the invite.
-                    </p>
+                    <Label className="text-xs text-muted-foreground">Quick templates</Label>
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {templateRoles.map((role) => (
+                        <button
+                          key={role.id}
+                          type="button"
+                          disabled={sendInviteMutation.isPending}
+                          onClick={() => {
+                            setInviteRoleId(String(role.id));
+                            if (role.templateKey === 'readonly_support') {
+                              setInviteReadOnly(true);
+                            }
+                          }}
+                          className={cn(
+                            'rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors',
+                            inviteRoleId === String(role.id)
+                              ? 'border-primary bg-primary/10 text-foreground'
+                              : 'border-border hover:border-primary/40 text-muted-foreground',
+                          )}
+                        >
+                          <span className="font-medium text-foreground block">{role.name}</span>
+                          <span className="line-clamp-1 opacity-80">{role.permissionCount} permissions</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <Switch
-                    id="invite-portal-access"
-                    checked={invitePortalAccess}
-                    onCheckedChange={setInvitePortalAccess}
+                )}
+                <div>
+                  <Label>Role <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Select
+                    value={inviteRoleId || 'none'}
+                    onValueChange={(v) => setInviteRoleId(v === 'none' ? '' : v)}
                     disabled={sendInviteMutation.isPending}
-                  />
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="No role yet" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No role yet — assign later</SelectItem>
+                      {activeRoles.map((role) => (
+                        <SelectItem key={role.id} value={String(role.id)}>
+                          {role.name}
+                          {role.templateKey ? ' · template' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Without a role they can accept the invite but stay locked until you assign one.
+                  </p>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-border p-3">
                   <div>
                     <Label htmlFor="invite-read-only">Read-only access</Label>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Can view everything (including the Manufacturing Portal) but cannot create, edit, or delete anything.
+                      Can view pages their role allows, but cannot create, edit, or delete anything.
                     </p>
                   </div>
                   <Switch
@@ -286,7 +381,8 @@ const AdminAdmins = () => {
                     onClick={() => {
                       setIsInviteDialogOpen(false);
                       setInviteEmail('');
-                      setInvitePortalAccess(false);
+                      setInviteReadOnly(false);
+                      setInviteRoleId('');
                     }}
                     disabled={sendInviteMutation.isPending}
                   >
@@ -296,7 +392,45 @@ const AdminAdmins = () => {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
+
+        {mainAdmin && waitingAdmins.length > 0 && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/8 px-4 py-3 flex flex-col sm:flex-row sm:items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">
+                {waitingAdmins.length === 1
+                  ? `${waitingAdmins[0].name || waitingAdmins[0].email || waitingAdmins[0].username} waiting for role`
+                  : `${waitingAdmins.length} admins waiting for a role`}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                They can sign in but see a locked screen until you assign a role.
+              </p>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {waitingAdmins.map((a) => (
+                  <li key={a.id}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        const full = admins.find((x: any) => x.id === a.id);
+                        if (full) handleEdit(full);
+                      }}
+                    >
+                      Assign · {a.name || a.email || a.username}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <Button asChild variant="ghost" size="sm" className="shrink-0 self-start">
+              <Link to="/admin-sara/roles">Open roles</Link>
+            </Button>
+          </div>
+        )}
         
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -358,10 +492,14 @@ const AdminAdmins = () => {
                     <Badge variant={admin.status === 'ACTIVE' ? 'default' : 'secondary'}>
                       {admin.status}
                     </Badge>
-                    <Badge variant={admin.portalAdminAccess ? 'outline' : 'secondary'}>
-                      {admin.portalAdminAccess ? 'Portal access' : 'Store only'}
-                    </Badge>
                     {admin.readOnly && <Badge variant="secondary">Read-only</Badge>}
+                    {admin.mainAdmin || admin.username === 'admin' ? (
+                      <Badge variant="default">Main admin</Badge>
+                    ) : admin.role?.name ? (
+                      <Badge variant="outline">{admin.role.name}</Badge>
+                    ) : (
+                      <Badge variant="secondary">No role</Badge>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -394,9 +532,12 @@ const AdminAdmins = () => {
         </div>
         
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Edit Admin</DialogTitle>
+              <DialogDescription>
+                Profile, role, and read-only. Portal access comes from any PORTAL_* permission on the role.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 mt-4">
               <div>
@@ -428,9 +569,6 @@ const AdminAdmins = () => {
                   onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
                   placeholder="e.g. 919810167696"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Used for admin WhatsApp alerts. Leave blank to clear.
-                </p>
               </div>
               <div>
                 <Label>Status</Label>
@@ -448,25 +586,32 @@ const AdminAdmins = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+              {editingAdmin?.username !== 'admin' && !editingAdmin?.mainAdmin && (
                 <div>
-                  <Label htmlFor="portal-admin-access">Manufacturing Portal access</Label>
+                  <Label>Role</Label>
+                  <Select value={editRoleId || 'none'} onValueChange={(v) => setEditRoleId(v === 'none' ? '' : v)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="No role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No role</SelectItem>
+                      {activeRoles.map((role) => (
+                        <SelectItem key={role.id} value={String(role.id)}>
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Allow this admin to open /portal-admin (inquiries, quotes, projects).
+                    You can also assign roles from Roles &amp; Permissions.
                   </p>
                 </div>
-                <Switch
-                  id="portal-admin-access"
-                  checked={formData.portalAdminAccess}
-                  onCheckedChange={(checked) => setFormData({ ...formData, portalAdminAccess: checked })}
-                  disabled={editingAdmin?.username === 'admin'}
-                />
-              </div>
+              )}
               <div className="flex items-center justify-between rounded-lg border border-border p-3">
                 <div>
                   <Label htmlFor="edit-read-only">Read-only access</Label>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Can view everything (including the Manufacturing Portal) but cannot create, edit, or delete anything.
+                    Can view pages their role allows, but cannot create, edit, or delete anything.
                   </p>
                 </div>
                 <Switch
@@ -476,23 +621,6 @@ const AdminAdmins = () => {
                   disabled={editingAdmin?.username === 'admin'}
                 />
               </div>
-              {editingAdmin?.username !== 'admin' && formData.portalAdminAccess && (
-                <div className="rounded-lg border border-border p-3 space-y-1.5">
-                  <Label>Manufacturing project assignments</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Full or partial (per-design) project access for this admin is managed from one place —
-                    the Portal assignments page inside the manufacturing portal.
-                  </p>
-                  <a
-                    href="/portal-admin/assignments"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs font-semibold text-primary hover:underline inline-block pt-0.5"
-                  >
-                    Open Portal assignments →
-                  </a>
-                </div>
-              )}
               <div className="flex gap-2 pt-2">
                 <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="flex-1">
                   {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update'}

@@ -3,6 +3,7 @@ import { ChevronRight, ChevronDown, Edit, Trash2, Plus, FolderTree } from 'lucid
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 export interface Category {
   id: string;
@@ -14,17 +15,17 @@ export interface Category {
 
 interface CategoryTreeProps {
   categories: Category[];
-  onEdit: (category: Category) => void;
-  onDelete: (id: string) => void;
-  onAddSubcategory: (parentId: string) => void;
+  onEdit?: (category: Category) => void;
+  onDelete?: (id: string) => void;
+  onAddSubcategory?: (parentId: string) => void;
 }
 
 const CategoryNode: React.FC<{
   category: Category;
   level: number;
-  onEdit: (category: Category) => void;
-  onDelete: (id: string) => void;
-  onAddSubcategory: (parentId: string) => void;
+  onEdit?: (category: Category) => void;
+  onDelete?: (id: string) => void;
+  onAddSubcategory?: (parentId: string) => void;
 }> = ({ category, level, onEdit, onDelete, onAddSubcategory }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasSubcategories = category.subcategories && category.subcategories.length > 0;
@@ -73,33 +74,48 @@ const CategoryNode: React.FC<{
         </div>
 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
-            onClick={() => onAddSubcategory(category.id)}
-            title="Add Subcategory"
-          >
-            <Plus className="w-4 h-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            onClick={() => onEdit(category)}
-            title="Edit Category"
-          >
-            <Edit className="w-4 h-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={() => onDelete(category.id)}
-            title="Delete Category"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          <AskAdminAiButton
+            entity={{
+              kind: 'category',
+              id: category.id,
+              name: category.name,
+              pageKey: 'store.categories',
+              extra: `Status=${category.status}.`,
+            }}
+          />
+          {onAddSubcategory && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+              onClick={() => onAddSubcategory(category.id)}
+              title="Add Subcategory"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+          )}
+          {onEdit && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={() => onEdit(category)}
+              title="Edit Category"
+            >
+              <Edit className="w-4 h-4" />
+            </Button>
+          )}
+          {onDelete && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => onDelete(category.id)}
+              title="Delete Category"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </div>
 

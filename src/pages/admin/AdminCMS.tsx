@@ -10,8 +10,21 @@ import { motion } from 'framer-motion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { cmsApi, productsApi, mediaApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const AdminCMS = () => {
+  const { hasAny } = useAdminPermissions();
+  const canAnnouncement = hasAny(P.CMS_ANNOUNCEMENT);
+  const canBestSellers = hasAny(P.CMS_BEST_SELLERS);
+  const canNewArrivals = hasAny(P.CMS_NEW_ARRIVALS);
+  const canTestimonials = hasAny(P.CMS_TESTIMONIALS);
+  const canTestimonialLinks = hasAny(P.CMS_TESTIMONIAL_LINKS);
+  const canOffers = hasAny(P.CMS_OFFERS);
+  const canInstagram = hasAny(P.CMS_INSTAGRAM);
+  const canContact = hasAny(P.CMS_EDIT_CONTACT);
+  const canBanners = hasAny(P.CMS_BANNERS);
+  const canUploadImages = hasAny(P.CMS_UPLOAD_IMAGES);
   const queryClient = useQueryClient();
   
   // Fetch CMS data from API
@@ -657,6 +670,7 @@ const AdminCMS = () => {
                       <Input
                         value={announcementText}
                         onChange={(e) => setAnnouncementText(e.target.value)}
+                        readOnly={!canAnnouncement}
                         className="h-11"
                         placeholder="e.g., Made to order. Dispatch takes 5–6 days (India)"
                       />
@@ -690,6 +704,7 @@ const AdminCMS = () => {
                     </div>
                   </div>
 
+                  {canAnnouncement && (
                   <Button 
                     className="btn-primary gap-2 mt-6" 
                     onClick={() => saveAnnouncementMutation.mutate(announcementText)} 
@@ -707,6 +722,7 @@ const AdminCMS = () => {
                       </>
                     )}
                   </Button>
+                  )}
                 </div>
               </motion.div>
             </TabsContent>
@@ -723,6 +739,7 @@ const AdminCMS = () => {
                   <h3 className="text-lg font-semibold mb-4">Manage Best Sellers</h3>
                   <p className="text-sm text-muted-foreground mb-6">Select products to display in the Best Sellers section on the homepage.</p>
                   
+                  {canBestSellers && (
                   <div className="mb-6">
                     <label className="text-sm font-medium mb-2 block">Add Product</label>
                     <Select onValueChange={addBestSeller}>
@@ -740,6 +757,7 @@ const AdminCMS = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                  )}
 
                   <div className="space-y-4">
                     <h4 className="text-sm font-medium">
@@ -789,6 +807,7 @@ const AdminCMS = () => {
                                 <p className="text-xs text-muted-foreground">₹{product.price.toLocaleString('en-IN')}</p>
                                 <p className="text-xs text-primary mt-1 font-medium">✓ Active on homepage</p>
                               </div>
+                              {canBestSellers && (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -797,6 +816,7 @@ const AdminCMS = () => {
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
+                              )}
                             </div>
                           );
                         })}
@@ -804,6 +824,7 @@ const AdminCMS = () => {
                     )}
                   </div>
 
+                  {canBestSellers && (
                   <Button className="btn-primary gap-2" onClick={saveBestSellers} disabled={saveBestSellersMutation.isPending}>
                     {saveBestSellersMutation.isPending ? (
                       <>
@@ -817,6 +838,7 @@ const AdminCMS = () => {
                       </>
                     )}
                   </Button>
+                  )}
                 </div>
               </motion.div>
             </TabsContent>
@@ -833,6 +855,7 @@ const AdminCMS = () => {
                   <h3 className="text-lg font-semibold mb-4">Manage New Arrivals</h3>
                   <p className="text-sm text-muted-foreground mb-6">Select products to display in the New Arrivals section on the homepage.</p>
                   
+                  {canNewArrivals && (
                   <div className="mb-6">
                     <label className="text-sm font-medium mb-2 block">Add Product</label>
                     <Select onValueChange={addNewArrival}>
@@ -850,6 +873,7 @@ const AdminCMS = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                  )}
 
                   <div className="space-y-4">
                     <h4 className="text-sm font-medium">
@@ -874,6 +898,7 @@ const AdminCMS = () => {
                                   <p className="font-medium text-sm text-destructive">Product ID: {productId}</p>
                                   <p className="text-xs text-muted-foreground">Product not found in catalog</p>
                                 </div>
+                                {canNewArrivals && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -882,6 +907,7 @@ const AdminCMS = () => {
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
+                                )}
                               </div>
                             );
                           }
@@ -899,6 +925,7 @@ const AdminCMS = () => {
                                 <p className="text-xs text-muted-foreground">₹{product.price.toLocaleString('en-IN')}</p>
                                 <p className="text-xs text-primary mt-1 font-medium">✓ Active on homepage</p>
                               </div>
+                              {canNewArrivals && (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -907,6 +934,7 @@ const AdminCMS = () => {
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
+                              )}
                             </div>
                           );
                         })}
@@ -914,6 +942,7 @@ const AdminCMS = () => {
                     )}
                   </div>
 
+                  {canNewArrivals && (
                   <Button className="btn-primary gap-2" onClick={saveNewArrivals} disabled={saveNewArrivalsMutation.isPending}>
                     {saveNewArrivalsMutation.isPending ? (
                       <>
@@ -927,6 +956,7 @@ const AdminCMS = () => {
                       </>
                     )}
                   </Button>
+                  )}
                 </div>
               </motion.div>
             </TabsContent>
@@ -977,6 +1007,7 @@ const AdminCMS = () => {
                       </div>
                     )}
                     
+                    {canTestimonialLinks && (
                     <Button 
                       onClick={generateTestimonialLink} 
                       className="btn-primary gap-2" 
@@ -994,6 +1025,7 @@ const AdminCMS = () => {
                         </>
                       )}
                     </Button>
+                    )}
                   </div>
 
                   {/* Testimonials List */}
@@ -1020,6 +1052,7 @@ const AdminCMS = () => {
                                 ))}
                               </div>
                             </div>
+                            {canTestimonials && (
                             <div className="flex gap-2">
                               <Button
                                 variant="ghost"
@@ -1045,6 +1078,7 @@ const AdminCMS = () => {
                                 </Button>
                               )}
                             </div>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1101,6 +1135,7 @@ const AdminCMS = () => {
                             />
                             <span className="text-sm">Active (visible on homepage)</span>
                           </label>
+                          {canOffers && (
                           <div className="flex gap-2">
                             {offer.id && typeof offer.id === 'number' && (
                               <Button
@@ -1166,11 +1201,13 @@ const AdminCMS = () => {
                               </>
                             )}
                           </div>
+                          )}
                         </div>
                       </div>
                     ))}
                   </div>
 
+                  {canOffers && (
                   <Button
                     onClick={() => setOffers([...offers, { id: `new-${Date.now()}`, title: '', description: '', isActive: true }])}
                     variant="outline"
@@ -1179,6 +1216,7 @@ const AdminCMS = () => {
                     <Plus className="w-4 h-4" />
                     Add New Offer
                   </Button>
+                  )}
                   
                   {offers.some(o => !o.id || typeof o.id !== 'number') && (
                     <div className="text-sm text-muted-foreground mt-4">
@@ -1217,6 +1255,7 @@ const AdminCMS = () => {
                             className="hidden"
                             disabled={isUploadingInstagram}
                           />
+                          {canUploadImages && canInstagram && (
                           <Button
                             type="button"
                             variant="outline"
@@ -1236,6 +1275,7 @@ const AdminCMS = () => {
                               </>
                             )}
                           </Button>
+                          )}
                         </div>
                         {newInstagramImage && (
                           <p className="text-xs text-muted-foreground mt-1.5">Selected: {newInstagramImage.length > 50 ? newInstagramImage.substring(0, 50) + '...' : newInstagramImage}</p>
@@ -1265,6 +1305,7 @@ const AdminCMS = () => {
                         <p className="text-xs text-muted-foreground mt-1">Supports posts, reels, and all Instagram links</p>
                       </div>
                       
+                      {canInstagram && (
                       <Button
                         onClick={() => {
                           if (newInstagramImage.trim()) {
@@ -1284,6 +1325,7 @@ const AdminCMS = () => {
                         <Plus className="w-4 h-4" />
                         Add Post
                       </Button>
+                      )}
                     </div>
                   </div>
 
@@ -1350,6 +1392,7 @@ const AdminCMS = () => {
                     )}
                   </div>
 
+                  {canInstagram && (
                   <Button className="btn-primary gap-2" onClick={saveInstagram} disabled={saveInstagramMutation.isPending}>
                     {saveInstagramMutation.isPending ? (
                       <>
@@ -1363,6 +1406,7 @@ const AdminCMS = () => {
                       </>
                     )}
                   </Button>
+                  )}
                 </div>
               </motion.div>
             </TabsContent>
@@ -1400,6 +1444,7 @@ const AdminCMS = () => {
                     className="w-full min-h-[100px] px-3 py-2 border border-border rounded-lg resize-none"
                   />
                 </div>
+                {canContact && (
                 <Button className="btn-primary gap-2" onClick={saveContactContent} disabled={saveContactContentMutation.isPending}>
                   {saveContactContentMutation.isPending ? (
                     <>
@@ -1413,6 +1458,7 @@ const AdminCMS = () => {
                     </>
                   )}
                 </Button>
+                )}
               </motion.div>
             </TabsContent>
 
@@ -1533,6 +1579,7 @@ const AdminCMS = () => {
                             </div>
                           </div>
                         </div>
+                        {canBanners && (
                         <div className="flex gap-2">
                           <Button
                             variant="outline"
@@ -1590,9 +1637,11 @@ const AdminCMS = () => {
                             </Button>
                           )}
                         </div>
+                        )}
                       </div>
                     ))}
                     
+                    {canBanners && (
                     <Button
                       variant="outline"
                       className="w-full gap-2"
@@ -1601,6 +1650,7 @@ const AdminCMS = () => {
                       <Plus className="w-4 h-4" />
                       Add New Banner
                     </Button>
+                    )}
                   </div>
                 </div>
               </motion.div>

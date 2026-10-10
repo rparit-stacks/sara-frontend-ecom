@@ -9,6 +9,9 @@ import { manufacturingApi } from '@/lib/api';
 import { formatInquiryDate, statusLabel } from '@/components/inquiry/inquiryUtils';
 import StageStepper from '@/components/manufacturing/StageStepper';
 import { defaultStatusFor, type StageKey } from '@/components/manufacturing/stages';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 const humanize = (k: string) => k.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -75,6 +78,9 @@ function ValueDisplay({ fieldKey, value }: { fieldKey: string; value: unknown })
 }
 
 export default function PortalAdminInquiryDetail() {
+  const { hasAny } = useAdminPermissions();
+  const canUpdateStatus = hasAny(P.PORTAL_INQUIRIES_UPDATE_STATUS);
+  const canUpdateStage = hasAny(P.PORTAL_INQUIRIES_UPDATE_STAGE);
   const { id } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -119,7 +125,7 @@ export default function PortalAdminInquiryDetail() {
       clientName: inq.clientName || inq.brand || '',
       clientEmail: inq.clientEmail || '',
     });
-    if (inq.status === 'NEW') statusMutation.mutate({ status: 'REVIEWING' });
+    if (inq.status === 'NEW' && canUpdateStatus) statusMutation.mutate({ status: 'REVIEWING' });
     navigate(`/portal-admin/quote-editor/new?${params.toString()}`);
   };
 
@@ -164,6 +170,19 @@ export default function PortalAdminInquiryDetail() {
                       Received {formatInquiryDate(inq.createdAt)}
                     </p>
                   </div>
+                  <AskAdminAiButton
+                    size="sm"
+                    variant="outline"
+                    label="Ask AI"
+                    entity={{
+                      kind: 'inquiry',
+                      id: inq.id,
+                      name: inq.brand || inq.clientName || inq.reference,
+                      pageKey: 'portal.inquiry-detail',
+                      userEmail: inq.clientEmail,
+                      extra: `Reference=${inq.reference}, status=${inq.status}. Summarize this inquiry and suggest next ops steps.`,
+                    }}
+                  />
                 </div>
 
                 <div className="grid sm:grid-cols-3 gap-4 mt-5 pt-5 border-t" style={{ borderColor: 'var(--p-outline-variant)' }}>
@@ -193,7 +212,7 @@ export default function PortalAdminInquiryDetail() {
                 <StageStepper
                   stage={inq.currentStage}
                   status={inq.currentStatus}
-                  editable
+                  editable={canUpdateStage}
                   onStageChange={(stage: StageKey) => stageMutation.mutate({ stage, status: defaultStatusFor(stage) })}
                   onStatusChange={(status) => stageMutation.mutate({ status })}
                 />
@@ -235,17 +254,19 @@ export default function PortalAdminInquiryDetail() {
                   <button onClick={replyEmail} className="w-full py-2.5 rounded-lg text-[14px] font-semibold border flex items-center justify-center gap-2" style={{ borderColor: 'var(--p-outline)', color: 'var(--p-on-surface)' }}>
                     <Sym name="mail" className="text-[18px]" /> Reply by email
                   </button>
-                  {inq.status === 'NEW' && (
+                  {canUpdateStatus && inq.status === 'NEW' && (
                     <button onClick={() => statusMutation.mutate({ status: 'REVIEWING' })} className="w-full py-2.5 rounded-lg text-[14px] font-semibold border flex items-center justify-center gap-2" style={{ borderColor: 'var(--p-outline)', color: 'var(--p-on-surface)' }}>
                       <Sym name="visibility" className="text-[18px]" /> Mark as reviewing
                     </button>
                   )}
-                  <button onClick={() => { setReason(inq.adminNote || ''); setDeclineOpen((o) => !o); }} className="w-full py-2.5 rounded-lg text-[14px] font-semibold border flex items-center justify-center gap-2" style={{ borderColor: 'var(--p-outline)', color: 'var(--p-error)' }}>
-                    <Sym name="block" className="text-[18px]" /> Decline with answer
-                  </button>
+                  {canUpdateStatus && (
+                    <button onClick={() => { setReason(inq.adminNote || ''); setDeclineOpen((o) => !o); }} className="w-full py-2.5 rounded-lg text-[14px] font-semibold border flex items-center justify-center gap-2" style={{ borderColor: 'var(--p-outline)', color: 'var(--p-error)' }}>
+                      <Sym name="block" className="text-[18px]" /> Decline with answer
+                    </button>
+                  )}
                 </div>
 
-                {declineOpen && (
+                {canUpdateStatus && declineOpen && (
                   <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--p-outline-variant)' }}>
                     <label className="text-[12px] font-semibold uppercase" style={{ color: 'var(--p-on-surface-variant)' }}>Reason for the client</label>
                     <textarea

@@ -8,6 +8,9 @@ import { manufacturingApi, ManufacturingInquiryDto } from '@/lib/api';
 import { formatInquiryDate, statusLabel } from '@/components/inquiry/inquiryUtils';
 import { useMarkNavRead } from '@/hooks/useAdminNotificationCounts';
 import { toast } from 'sonner';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 const TABS: { key: string; label: string; status?: string }[] = [
   { key: 'open', label: 'Open' },
@@ -18,6 +21,8 @@ const TABS: { key: string; label: string; status?: string }[] = [
 ];
 
 export default function PortalAdminInquiries() {
+  const { hasAny } = useAdminPermissions();
+  const canUpdateStatus = hasAny(P.PORTAL_INQUIRIES_UPDATE_STATUS);
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
@@ -216,7 +221,20 @@ export default function PortalAdminInquiries() {
                     </span>
                   </div>
                 )}
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <AskAdminAiButton
+                    size="sm"
+                    variant="outline"
+                    label="Ask AI"
+                    entity={{
+                      kind: 'inquiry',
+                      id: inq.id,
+                      name: inq.brand || inq.clientName || inq.reference,
+                      pageKey: 'portal.inquiries',
+                      userEmail: inq.clientEmail,
+                      extra: `Reference=${inq.reference}, status=${inq.status}, source=${inq.source || 'n/a'}.`,
+                    }}
+                  />
                   <button
                     onClick={() => navigate(`/portal-admin/inquiries/${inq.id}`)}
                     className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white hover:brightness-110"
@@ -224,7 +242,7 @@ export default function PortalAdminInquiries() {
                   >
                     View details
                   </button>
-                  {inq.status === 'NEW' && (
+                  {canUpdateStatus && inq.status === 'NEW' && (
                     <button
                       onClick={() => statusMutation.mutate({ id: inq.id, status: 'REVIEWING' })}
                       className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border"
@@ -233,13 +251,15 @@ export default function PortalAdminInquiries() {
                       Mark reviewing
                     </button>
                   )}
-                  <button
-                    onClick={() => statusMutation.mutate({ id: inq.id, status: 'DECLINED' })}
-                    className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border"
-                    style={{ borderColor: 'var(--p-outline)', color: 'var(--p-error)' }}
-                  >
-                    Decline
-                  </button>
+                  {canUpdateStatus && (
+                    <button
+                      onClick={() => statusMutation.mutate({ id: inq.id, status: 'DECLINED' })}
+                      className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border"
+                      style={{ borderColor: 'var(--p-outline)', color: 'var(--p-error)' }}
+                    >
+                      Decline
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

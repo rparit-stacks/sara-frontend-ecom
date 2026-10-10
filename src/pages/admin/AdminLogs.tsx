@@ -29,6 +29,8 @@ import {
 import { motion } from 'framer-motion';
 import { logsApi, ApiLogDTO } from '@/lib/api';
 import { LogDetailModal } from '@/components/admin/LogDetailModal';
+import { SystemHealthPanel } from '@/components/admin/SystemHealthPanel';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,10 +42,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from 'sonner';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 
 const AdminLogs = () => {
+  const { hasAny } = useAdminPermissions();
+  const canSearch = hasAny(P.LOGS_SEARCH);
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   
@@ -274,6 +280,8 @@ const AdminLogs = () => {
           </div>
         </motion.div>
         
+        <SystemHealthPanel />
+
         {/* Stats Cards */}
         {stats && (
           <motion.div
@@ -325,6 +333,8 @@ const AdminLogs = () => {
           className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-4"
         >
           <div className="flex flex-col lg:flex-row gap-4">
+            {canSearch && (
+            <>
             {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -363,9 +373,12 @@ const AdminLogs = () => {
                 ))}
               </SelectContent>
             </Select>
+            </>
+            )}
           </div>
           
           {/* Date Range */}
+          {canSearch && (
           <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex-1 sm:flex-initial">
               <label className="text-sm font-medium text-muted-foreground mb-1.5 block">From Date</label>
@@ -411,6 +424,7 @@ const AdminLogs = () => {
               </Button>
             )}
           </div>
+          )}
         </motion.div>
         
         {/* Logs Table */}
@@ -530,13 +544,24 @@ const AdminLogs = () => {
                             {log.ipAddress || 'N/A'}
                           </td>
                           <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedLogId(log.id)}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <AskAdminAiButton
+                                entity={{
+                                  kind: 'api_log',
+                                  id: log.id,
+                                  name: `${log.httpMethod} ${log.apiEndpoint}`,
+                                  pageKey: 'store.logs',
+                                  extra: `Status ${log.statusCode}, flag ${log.errorFlag}. Dig into this failure.`,
+                                }}
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedLogId(log.id)}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </td>
                         </motion.tr>
                       ))

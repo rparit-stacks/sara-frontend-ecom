@@ -7,6 +7,8 @@ import StatTile from '@/components/portal/StatTile';
 import { techPackApi, projectApi, type ManufacturingProjectDto } from '@/lib/api';
 import { formatInquiryDate } from '@/components/inquiry/inquiryUtils';
 import { openTechPackBuilder } from '@/lib/techPackBuilder';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 // The standalone Tech Pack Studio (deployed on Vercel). New/Edit open it in a
 // new tab; it reads/writes the SAME studio_sara rows via the shared API, so
@@ -15,6 +17,12 @@ const BUILDER_URL = (import.meta.env.VITE_TECHPACK_BUILDER_URL as string | undef
 const PAGE_SIZE = 24;
 
 export default function PortalAdminTechPacks() {
+  const { hasAny } = useAdminPermissions();
+  const canCreate = hasAny(P.PORTAL_TECHPACKS_CREATE);
+  const canEdit = hasAny(P.PORTAL_TECHPACKS_EDIT);
+  const canUpdate = hasAny(P.PORTAL_TECHPACKS_UPDATE);
+  const canDuplicate = hasAny(P.PORTAL_TECHPACKS_DUPLICATE);
+  const canDelete = hasAny(P.PORTAL_TECHPACKS_DELETE);
   const qc = useQueryClient();
   const [tab, setTab] = useState<'saved' | 'templates'>('saved');
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -140,9 +148,11 @@ export default function PortalAdminTechPacks() {
           <AdminBtn icon="refresh" variant="ghost" onClick={() => qc.invalidateQueries({ queryKey: ['tech-packs'] })}>
             Refresh
           </AdminBtn>
-          <AdminBtn icon="add" onClick={() => openBuilder()}>
-            New Tech Pack
-          </AdminBtn>
+          {canCreate && (
+            <AdminBtn icon="add" onClick={() => openBuilder()}>
+              New Tech Pack
+            </AdminBtn>
+          )}
         </div>
       }
     >
@@ -188,7 +198,7 @@ export default function PortalAdminTechPacks() {
             <p className="text-[14px]">
               {q ? `No ${tab === 'templates' ? 'templates' : 'tech packs'} match "${query}".` : `No ${tab === 'templates' ? 'templates' : 'tech packs'} yet.`}
             </p>
-            {!q && (
+            {!q && canCreate && (
               <button onClick={() => openBuilder()} className="text-[13px] font-bold hover:underline mt-2" style={{ color: 'var(--p-primary)' }}>
                 + Create one
               </button>
@@ -208,12 +218,16 @@ export default function PortalAdminTechPacks() {
                     <Sym name={it.isTemplate ? 'bookmark' : 'description'} className="text-[20px]" />
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setRenaming(it.id)} className="p-1 rounded hover:bg-black/5" style={{ color: 'var(--p-on-surface-variant)' }} title="Rename">
-                      <Sym name="edit" className="text-[17px]" />
-                    </button>
-                    <button onClick={() => remove(it.id)} className="p-1 rounded hover:bg-black/5" style={{ color: 'var(--p-on-surface-variant)' }} title="Delete">
-                      <Sym name="delete" className="text-[18px]" />
-                    </button>
+                    {canEdit && (
+                      <button onClick={() => setRenaming(it.id)} className="p-1 rounded hover:bg-black/5" style={{ color: 'var(--p-on-surface-variant)' }} title="Rename">
+                        <Sym name="edit" className="text-[17px]" />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => remove(it.id)} className="p-1 rounded hover:bg-black/5" style={{ color: 'var(--p-on-surface-variant)' }} title="Delete">
+                        <Sym name="delete" className="text-[18px]" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -251,16 +265,18 @@ export default function PortalAdminTechPacks() {
                     >
                       <Sym name="link" className="text-[13px]" />
                       <span className="truncate max-w-[140px]">{linkedProjectLabel[it.id] ?? `Project #${it.projectId}`}</span>
-                      <button
-                        type="button"
-                        onClick={() => void unlinkProject(it.id)}
-                        className="hover:opacity-70"
-                        title="Unlink project"
-                      >
-                        <Sym name="close" className="text-[13px]" />
-                      </button>
+                      {canUpdate && (
+                        <button
+                          type="button"
+                          onClick={() => void unlinkProject(it.id)}
+                          className="hover:opacity-70"
+                          title="Unlink project"
+                        >
+                          <Sym name="close" className="text-[13px]" />
+                        </button>
+                      )}
                     </div>
-                  ) : (
+                  ) : canUpdate ? (
                     <button
                       type="button"
                       onClick={() => setLinkingId(linkingId === it.id ? null : it.id)}
@@ -269,7 +285,7 @@ export default function PortalAdminTechPacks() {
                     >
                       <Sym name="add_link" className="text-[14px]" /> Link to project
                     </button>
-                  )}
+                  ) : null}
                   {linkingId === it.id && (
                     <ProjectLinkPicker
                       onPick={(project) => void linkProject(it.id, project)}
@@ -283,34 +299,44 @@ export default function PortalAdminTechPacks() {
                 <div className="mt-4 space-y-1.5">
                   {it.isTemplate ? (
                     <>
-                      <button
-                        onClick={() => useTemplate(it.id)}
-                        className="w-full py-2 rounded-lg text-white text-[13px] font-medium flex items-center justify-center gap-1.5"
-                        style={{ background: 'var(--p-primary)' }}
-                      >
-                        <Sym name="add" className="text-[16px]" /> Use template
-                      </button>
+                      {canDuplicate && (
+                        <button
+                          onClick={() => useTemplate(it.id)}
+                          className="w-full py-2 rounded-lg text-white text-[13px] font-medium flex items-center justify-center gap-1.5"
+                          style={{ background: 'var(--p-primary)' }}
+                        >
+                          <Sym name="add" className="text-[16px]" /> Use template
+                        </button>
+                      )}
                       <div className="flex gap-1.5">
-                        <button onClick={() => openBuilder(it.id)} className="flex-1 py-1.5 rounded-lg border text-[12px]" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>Edit template</button>
-                        <button onClick={() => toggleTemplate(it.id, false)} className="flex-1 py-1.5 rounded-lg border text-[12px]" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>Make document</button>
+                        {canEdit && (
+                          <button onClick={() => openBuilder(it.id)} className="flex-1 py-1.5 rounded-lg border text-[12px]" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>Edit template</button>
+                        )}
+                        {canUpdate && (
+                          <button onClick={() => toggleTemplate(it.id, false)} className="flex-1 py-1.5 rounded-lg border text-[12px]" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>Make document</button>
+                        )}
                       </div>
                     </>
                   ) : (
                     <>
-                      <button
-                        onClick={() => openBuilder(it.id)}
-                        className="w-full py-2 rounded-lg text-white text-[13px] font-medium"
-                        style={{ background: 'var(--p-primary)' }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => toggleTemplate(it.id, true)}
-                        className="w-full py-1.5 rounded-lg border text-[12px] flex items-center justify-center gap-1.5"
-                        style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}
-                      >
-                        <Sym name="bookmark" className="text-[15px]" /> Save as template
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => openBuilder(it.id)}
+                          className="w-full py-2 rounded-lg text-white text-[13px] font-medium"
+                          style={{ background: 'var(--p-primary)' }}
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {canUpdate && (
+                        <button
+                          onClick={() => toggleTemplate(it.id, true)}
+                          className="w-full py-1.5 rounded-lg border text-[12px] flex items-center justify-center gap-1.5"
+                          style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}
+                        >
+                          <Sym name="bookmark" className="text-[15px]" /> Save as template
+                        </button>
+                      )}
                     </>
                   )}
                 </div>

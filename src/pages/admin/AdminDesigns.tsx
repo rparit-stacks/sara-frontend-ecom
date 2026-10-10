@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { TablePagination } from '@/components/admin/TablePagination';
+import { useClientPagination } from '@/hooks/useClientPagination';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -28,8 +30,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import FabricSelector, { Fabric } from '@/components/admin/FabricSelector';
 import { designsApi, plainProductsApi, categoriesApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 const AdminDesigns = () => {
+  const { hasAny } = useAdminPermissions();
+  const canAdd = hasAny(P.DESIGNS_ADD);
+  const canEdit = hasAny(P.DESIGNS_EDIT);
+  const canDelete = hasAny(P.DESIGNS_DELETE);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -163,6 +172,7 @@ const AdminDesigns = () => {
     const matchesCategory = selectedCategory === 'all' || design.category?.toLowerCase() === selectedCategory.toLowerCase();
     return matchesSearch && matchesCategory;
   });
+  const { pageItems: paged, page, setPage, total } = useClientPagination(filteredDesigns, 10, searchQuery + "|" + selectedCategory);
   
   if (isLoading) {
     return (
@@ -200,6 +210,7 @@ const AdminDesigns = () => {
             </h1>
             <p className="text-muted-foreground text-lg">Manage design library and assign available fabrics</p>
           </div>
+          {canAdd && (
           <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
             setIsAddDialogOpen(open);
             if (!open) handleResetForm();
@@ -317,8 +328,10 @@ const AdminDesigns = () => {
               </div>
             </DialogContent>
           </Dialog>
+          )}
           
           {/* Edit Dialog */}
+          {canEdit && (
           <Dialog open={!!editingDesign} onOpenChange={(open) => { if (!open) { setEditingDesign(null); handleResetForm(); } }}>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl">
               <div className="sticky top-0 bg-white z-10 px-6 py-4 border-b border-border flex items-center justify-between">
@@ -421,6 +434,7 @@ const AdminDesigns = () => {
               </div>
             </DialogContent>
           </Dialog>
+          )}
         </motion.div>
 
         {/* Search & Filter */}
@@ -460,7 +474,7 @@ const AdminDesigns = () => {
               No designs found. Create your first design!
             </div>
           ) : (
-            filteredDesigns.map((design: any, index: number) => (
+            paged.map((design: any, index: number) => (
               <motion.div
                 key={design.id}
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -488,12 +502,14 @@ const AdminDesigns = () => {
                       {design.status?.toLowerCase() || 'active'}
                     </Badge>
                   </div>
+                  {canEdit && (
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Button variant="secondary" size="sm" className="gap-2" onClick={() => handleEdit(design)}>
                       <Edit className="w-4 h-4" />
                       Edit Design
                     </Button>
                   </div>
+                  )}
                 </div>
                 <div className="p-4">
                   <div className="flex items-start justify-between mb-2">
@@ -505,11 +521,24 @@ const AdminDesigns = () => {
                     <span>{design.fabricIds?.length || 0} Fabrics Available</span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <AskAdminAiButton
+                      className="h-9 w-9"
+                      entity={{
+                        kind: 'page',
+                        id: design.id,
+                        name: design.name,
+                        pageKey: 'store.designs',
+                        extra: `Design category=${design.category}, status=${design.status}.`,
+                      }}
+                    />
+                    {canEdit && (
                     <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                       <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleEdit(design)}>
                         <Edit className="w-4 h-4" />
                       </Button>
                     </motion.div>
+                    )}
+                    {canDelete && (
                     <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                       <Button 
                         variant="ghost" 
@@ -521,12 +550,14 @@ const AdminDesigns = () => {
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </motion.div>
+                    )}
                   </div>
                 </div>
               </motion.div>
             ))
           )}
         </div>
+        <TablePagination page={page} size={10} totalElements={total} onPageChange={setPage} />
         
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={deleteDesignId !== null} onOpenChange={(open) => !open && setDeleteDesignId(null)}>

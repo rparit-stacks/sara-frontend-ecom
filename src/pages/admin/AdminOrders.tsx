@@ -12,11 +12,16 @@ import { orderApi } from '@/lib/api';
 import { formatPrice } from '@/lib/currency';
 import { getPaymentStatusDisplay } from '@/lib/orderUtils';
 import { useMarkNavRead } from '@/hooks/useAdminNotificationCounts';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 const AdminOrders = () => {
   const navigate = useNavigate();
+  const { hasAny } = useAdminPermissions();
+  const canViewDetail = hasAny(P.ORDERS_VIEW_DETAIL);
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Get initial values from URL params
@@ -405,14 +410,28 @@ const AdminOrders = () => {
                             })()}
                           </td>
                           <td className="px-6 py-4">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(`/admin-sara/orders/${order.id}`)}
-                            >
-                              <Eye className="w-4 h-4 mr-2" />
-                              View
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <AskAdminAiButton
+                                entity={{
+                                  kind: 'order',
+                                  id: order.id,
+                                  orderNumber: order.orderNumber,
+                                  name: order.orderNumber ? `#${order.orderNumber}` : undefined,
+                                  pageKey: 'store.orders',
+                                  extra: `Status=${order.status}, payment=${order.paymentStatus}.`,
+                                }}
+                              />
+                              {canViewDetail && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => navigate(`/admin-sara/orders/${order.id}`)}
+                                >
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  View
+                                </Button>
+                              )}
+                            </div>
                           </td>
                         </motion.tr>
                       ))

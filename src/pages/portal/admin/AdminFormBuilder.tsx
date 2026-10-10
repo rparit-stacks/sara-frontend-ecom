@@ -7,6 +7,8 @@ import FieldSettings from '@/components/portal/formbuilder/FieldSettings';
 import { PALETTE, makeField, isDisplay, isLayout } from '@/components/portal/formbuilder/registry';
 import { FormField, FieldType } from '@/components/portal/formbuilder/types';
 import '@/pages/portal/portal.css';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 type Tab = 'build' | 'logic' | 'steps' | 'settings' | 'workflow' | 'notifications' | 'permissions' | 'preview' | 'responses' | 'analytics';
 const TABS: { key: Tab; label: string; icon: string }[] = [
@@ -25,6 +27,8 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 const WIDTH_CLASS: Record<string, string> = { '25': 'w-full sm:w-[calc(25%-9px)]', '50': 'w-full sm:w-[calc(50%-6px)]', '75': 'w-full sm:w-[calc(75%-3px)]', '100': 'w-full' };
 
 export default function PortalAdminFormBuilder() {
+  const { hasAny } = useAdminPermissions();
+  const canEditForm = hasAny(P.PORTAL_FORMS_OPEN_BUILDER);
   const navigate = useNavigate();
   const { id } = useParams();
   const [sp] = useSearchParams();
@@ -62,13 +66,17 @@ export default function PortalAdminFormBuilder() {
       <header className="h-12 flex items-center justify-between px-4 shrink-0 z-40 gap-3" style={{ background: 'var(--p-primary)' }}>
         <div className="flex items-center gap-2 min-w-0">
           <button onClick={() => navigate('/portal-admin/forms')} className="msym text-white/80 hover:text-white">arrow_back</button>
-          <input value={name} onChange={(e) => setName(e.target.value)} className="bg-transparent border-none outline-none text-white font-semibold text-[15px] min-w-0 max-w-[40vw]" />
+          <input value={name} readOnly={!canEditForm} onChange={(e) => canEditForm && setName(e.target.value)} className="bg-transparent border-none outline-none text-white font-semibold text-[15px] min-w-0 max-w-[40vw]" />
           <Pill label="Draft" tone={{ bg: 'rgba(255,255,255,0.2)', fg: '#fff' }} />
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setTab('preview')} className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white/90 border border-white/30 hover:bg-white/10 flex items-center gap-1.5"><span className="msym text-[16px]">visibility</span><span className="hidden sm:inline">Preview</span></button>
-          <button className="px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-white hover:bg-white/90 flex items-center gap-1.5" style={{ color: 'var(--p-primary)' }}><span className="msym text-[16px]">save</span><span className="hidden sm:inline">Save</span></button>
-          <button className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-white/30 text-white hover:bg-white/10 hidden sm:flex items-center gap-1.5"><span className="msym text-[16px]">publish</span>Publish</button>
+          {canEditForm && (
+            <>
+              <button className="px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-white hover:bg-white/90 flex items-center gap-1.5" style={{ color: 'var(--p-primary)' }}><span className="msym text-[16px]">save</span><span className="hidden sm:inline">Save</span></button>
+              <button className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border border-white/30 text-white hover:bg-white/10 hidden sm:flex items-center gap-1.5"><span className="msym text-[16px]">publish</span>Publish</button>
+            </>
+          )}
         </div>
       </header>
 
@@ -100,7 +108,8 @@ export default function PortalAdminFormBuilder() {
                           draggable
                           onDragStart={() => setDragType(it.type)}
                           onDragEnd={() => setDragType(null)}
-                          onClick={() => addField(it.type)}
+                          onClick={() => canEditForm && addField(it.type)}
+                          disabled={!canEditForm}
                           title={it.label}
                           className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg border text-center hover:border-current transition-colors cursor-grab"
                           style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}
@@ -120,7 +129,7 @@ export default function PortalAdminFormBuilder() {
               className="flex-1 overflow-y-auto p-4 sm:p-8"
               style={{ background: 'var(--p-surface-container-lowest)' }}
               onDragOver={(e) => e.preventDefault()}
-              onDrop={() => { if (dragType) { addField(dragType); setDragType(null); } }}
+              onDrop={() => { if (canEditForm && dragType) { addField(dragType); setDragType(null); } }}
             >
               <div className="max-w-2xl mx-auto">
                 <div className="border rounded-xl p-5 sm:p-8 min-h-[60vh]" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}>
@@ -149,8 +158,12 @@ export default function PortalAdminFormBuilder() {
                           {/* hover toolbar */}
                           <div className="absolute -top-3 right-2 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 border rounded-lg px-1 py-0.5 shadow-sm" style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}>
                             <span className="msym text-[16px] cursor-grab p-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>drag_indicator</span>
-                            <button onClick={(e) => { e.stopPropagation(); dupField(f.id); }} className="p-0.5 hover:bg-black/5 rounded"><Sym name="content_copy" className="text-[15px]" style={{ color: 'var(--p-on-surface-variant)' }} /></button>
-                            <button onClick={(e) => { e.stopPropagation(); removeField(f.id); }} className="p-0.5 hover:bg-black/5 rounded"><Sym name="delete" className="text-[15px]" style={{ color: 'var(--p-error)' }} /></button>
+                            {canEditForm && (
+                              <>
+                                <button onClick={(e) => { e.stopPropagation(); dupField(f.id); }} className="p-0.5 hover:bg-black/5 rounded"><Sym name="content_copy" className="text-[15px]" style={{ color: 'var(--p-on-surface-variant)' }} /></button>
+                                <button onClick={(e) => { e.stopPropagation(); removeField(f.id); }} className="p-0.5 hover:bg-black/5 rounded"><Sym name="delete" className="text-[15px]" style={{ color: 'var(--p-error)' }} /></button>
+                              </>
+                            )}
                           </div>
                           {f.required && <span className="absolute top-1 left-2 text-[9px] font-bold" style={{ color: 'var(--p-error)' }}>required</span>}
                         </div>
@@ -163,7 +176,7 @@ export default function PortalAdminFormBuilder() {
 
             {/* settings */}
             <aside className="w-80 border-l shrink-0 hidden lg:block" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}>
-              {sel ? (
+              {sel && canEditForm ? (
                 <FieldSettings field={sel} allFields={fields} onChange={patch} onClose={() => setSelected(null)} />
               ) : (
                 <div className="h-full flex flex-col items-center justify-center p-8 text-center" style={{ color: 'var(--p-on-surface-variant)' }}>

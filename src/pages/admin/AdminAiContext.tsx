@@ -7,6 +7,8 @@ import { Switch } from '@/components/ui/switch';
 import { Plus, Trash2, Loader2, ArrowUp, ArrowDown, Sparkles, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { aiContextApi, type AiPromptDirectiveDto } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 /**
  * "AI Context" — extra prompt points the business maintains for each AI, without a deploy.
@@ -16,6 +18,12 @@ import { aiContextApi, type AiPromptDirectiveDto } from '@/lib/api';
  * wherever the two conflict. Each AI is configured independently.
  */
 const AdminAiContext = () => {
+  const { hasAny } = useAdminPermissions();
+  const canAdd = hasAny(P.AI_CONTEXT_ADD);
+  const canEdit = hasAny(P.AI_CONTEXT_EDIT);
+  const canDelete = hasAny(P.AI_CONTEXT_DELETE);
+  const canReorder = hasAny(P.AI_CONTEXT_REORDER);
+  const canToggle = hasAny(P.AI_CONTEXT_TOGGLE);
   const queryClient = useQueryClient();
   const [personaId, setPersonaId] = useState<string>('');
   const [draft, setDraft] = useState('');
@@ -130,8 +138,10 @@ const AdminAiContext = () => {
                     placeholder="e.g. Always mention that bulk orders above 500 units get a dedicated account manager."
                     rows={2}
                     className="resize-none"
+                    readOnly={!canAdd}
                   />
                 </div>
+                {canAdd && (
                 <Button
                   onClick={() => draft.trim() && createMut.mutate(draft.trim())}
                   disabled={!draft.trim() || createMut.isPending}
@@ -139,6 +149,7 @@ const AdminAiContext = () => {
                   {createMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   <span className="ml-1">Add point</span>
                 </Button>
+                )}
               </div>
               <p className="text-xs text-muted-foreground mt-1.5">
                 {activeCount} active {activeCount === 1 ? 'point' : 'points'} for this AI
@@ -161,6 +172,7 @@ const AdminAiContext = () => {
                     key={d.id}
                     className={`border rounded-xl p-3 flex items-start gap-3 ${d.active ? '' : 'opacity-60'}`}
                   >
+                    {canReorder && (
                     <div className="flex flex-col gap-0.5 pt-0.5">
                       <button
                         type="button"
@@ -181,23 +193,29 @@ const AdminAiContext = () => {
                         <ArrowDown className="h-3.5 w-3.5" />
                       </button>
                     </div>
+                    )}
 
                     <Textarea
                       defaultValue={d.body}
                       rows={2}
                       className="flex-1 resize-none border-0 shadow-none focus-visible:ring-0 p-0 text-sm"
+                      readOnly={!canEdit}
                       onBlur={(e) => {
+                        if (!canEdit) return;
                         const next = e.target.value.trim();
                         if (next && next !== d.body) updateMut.mutate({ id: d.id, patch: { body: next } });
                       }}
                     />
 
                     <div className="flex items-center gap-2 shrink-0">
+                      {canToggle && (
                       <Switch
                         checked={d.active}
                         onCheckedChange={(checked) => updateMut.mutate({ id: d.id, patch: { active: checked } })}
                         title={d.active ? 'Active — sent to the AI' : 'Turned off — kept but not sent'}
                       />
+                      )}
+                      {canDelete && (
                       <button
                         type="button"
                         onClick={() => {
@@ -208,6 +226,7 @@ const AdminAiContext = () => {
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
+                      )}
                     </div>
                   </div>
                 ))}

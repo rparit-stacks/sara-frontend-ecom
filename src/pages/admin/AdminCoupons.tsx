@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { TablePagination } from '@/components/admin/TablePagination';
+import { useClientPagination } from '@/hooks/useClientPagination';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -10,8 +12,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { couponApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 const AdminCoupons = () => {
+  const { hasAny } = useAdminPermissions();
+  const canAdd = hasAny(P.COUPONS_ADD);
+  const canEdit = hasAny(P.COUPONS_EDIT);
+  const canDelete = hasAny(P.COUPONS_DELETE);
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -160,6 +169,7 @@ const AdminCoupons = () => {
   const filteredCoupons = coupons.filter((coupon: any) =>
     coupon.code?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const { pageItems: pagedCoupons, page, setPage, total } = useClientPagination(filteredCoupons, 10, searchQuery);
 
   return (
     <AdminLayout>
@@ -169,10 +179,12 @@ const AdminCoupons = () => {
             <h1 className="text-3xl font-bold">Coupons</h1>
             <p className="text-muted-foreground mt-1">Manage discount coupons</p>
           </div>
-          <Button onClick={() => { resetForm(); setIsCreateDialogOpen(true); }} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Create Coupon
-          </Button>
+          {canAdd && (
+            <Button onClick={() => { resetForm(); setIsCreateDialogOpen(true); }} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Create Coupon
+            </Button>
+          )}
         </div>
 
         <div className="flex gap-4">
@@ -209,7 +221,7 @@ const AdminCoupons = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCoupons.map((coupon: any) => (
+                  {pagedCoupons.map((coupon: any) => (
                     <tr key={coupon.id} className="border-b hover:bg-secondary/50">
                       <td className="p-4 font-medium">{coupon.code}</td>
                       <td className="p-4">
@@ -247,21 +259,34 @@ const AdminCoupons = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(coupon)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => deleteMutation.mutate(coupon.id)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            {deleteMutation.isPending ? (
-                              <Loader2 className="w-4 h-4 animate-spin text-destructive" />
-                            ) : (
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            )}
-                          </Button>
+                          <AskAdminAiButton
+                            entity={{
+                              kind: 'coupon',
+                              id: coupon.id,
+                              name: coupon.code,
+                              pageKey: 'store.coupons',
+                              extra: `Active=${coupon.isActive}, type=${coupon.discountType || 'n/a'}.`,
+                            }}
+                          />
+                          {canEdit && (
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(coupon)}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deleteMutation.mutate(coupon.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              {deleteMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-destructive" />
+                              ) : (
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              )}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -269,6 +294,7 @@ const AdminCoupons = () => {
                 </tbody>
               </table>
             </div>
+            <TablePagination page={page} size={10} totalElements={total} onPageChange={setPage} />
           </div>
         )}
 

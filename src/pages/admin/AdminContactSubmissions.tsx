@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { TablePagination } from '@/components/admin/TablePagination';
+import { useClientPagination } from '@/hooks/useClientPagination';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -11,8 +13,14 @@ import { Plus, Search, Mail, Phone, MessageSquare, Calendar, Eye, Trash2, Loader
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { contactApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 const AdminContactSubmissions = () => {
+  const { hasAny } = useAdminPermissions();
+  const canUpdateStatus = hasAny(P.CONTACT_UPDATE_STATUS);
+  const canDelete = hasAny(P.CONTACT_DELETE);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
@@ -81,6 +89,7 @@ const AdminContactSubmissions = () => {
       submission.message?.toLowerCase().includes(searchLower)
     );
   });
+  const { pageItems: paged, page, setPage, total } = useClientPagination(filteredSubmissions, 10, searchQuery + "|" + statusFilter);
   
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; className: string }> = {
@@ -158,7 +167,7 @@ const AdminContactSubmissions = () => {
               No contact submissions found.
             </div>
           ) : (
-            filteredSubmissions.map((submission: any, index: number) => (
+            paged.map((submission: any, index: number) => (
               <motion.div
                 key={submission.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -210,6 +219,19 @@ const AdminContactSubmissions = () => {
                     </div>
                   </div>
                   <div className="flex gap-2 lg:flex-col">
+                    <AskAdminAiButton
+                      size="sm"
+                      variant="outline"
+                      label="Ask AI"
+                      entity={{
+                        kind: 'contact',
+                        id: submission.id,
+                        name: submission.subject || `${submission.firstName || ''} ${submission.lastName || ''}`.trim(),
+                        pageKey: 'store.contact',
+                        userEmail: submission.email,
+                        extra: `Status=${submission.status}. Suggest a reply.`,
+                      }}
+                    />
                     <Button
                       variant="outline"
                       size="sm"
@@ -219,37 +241,57 @@ const AdminContactSubmissions = () => {
                       <Eye className="w-4 h-4" />
                       View Details
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteMutation.mutate(submission.id)}
-                      disabled={deleteMutation.isPending}
-                      className="text-destructive hover:text-destructive gap-2"
-                    >
-                      {deleteMutation.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Deleting...
-                        </>
-                      ) : (
-                        <>
-                          <Trash2 className="w-4 h-4" />
-                          Delete
-                        </>
-                      )}
-                    </Button>
+                    {canDelete && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteMutation.mutate(submission.id)}
+                        disabled={deleteMutation.isPending}
+                        className="text-destructive hover:text-destructive gap-2"
+                      >
+                        {deleteMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="w-4 h-4" />
+                            Delete
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </motion.div>
             ))
           )}
         </div>
+        <TablePagination page={page} size={10} totalElements={total} onPageChange={setPage} />
         
         {/* Detail Dialog */}
         <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
           <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-2xl">Contact Submission Details</DialogTitle>
+              <DialogTitle className="text-2xl flex items-center gap-3 flex-wrap">
+                Contact Submission Details
+                {selectedSubmission && (
+                  <AskAdminAiButton
+                    size="sm"
+                    variant="outline"
+                    label="Ask AI"
+                    entity={{
+                      kind: 'contact',
+                      id: selectedSubmission.id,
+                      name: selectedSubmission.subject || `${selectedSubmission.firstName || ''} ${selectedSubmission.lastName || ''}`.trim(),
+                      pageKey: 'store.contact',
+                      userEmail: selectedSubmission.email,
+                      extra: `Status=${selectedSubmission.status}. Draft a helpful reply.`,
+                    }}
+                  />
+                )}
+              </DialogTitle>
             </DialogHeader>
             
             {selectedSubmission && (
@@ -311,10 +353,13 @@ const AdminContactSubmissions = () => {
                     onChange={(e) => setAdminNotes(e.target.value)}
                     placeholder="Add notes about this submission..."
                     className="min-h-[100px]"
+                    readOnly={!canUpdateStatus}
                   />
                 </div>
                 
                 <div className="flex gap-2 flex-wrap">
+                  {canUpdateStatus && (
+                    <>
                   <Button
                     variant="outline"
                     onClick={() => handleUpdateStatus('READ')}
@@ -360,6 +405,8 @@ const AdminContactSubmissions = () => {
                       'Archive'
                     )}
                   </Button>
+                    </>
+                  )}
                   <Button
                     variant="outline"
                     onClick={() => {

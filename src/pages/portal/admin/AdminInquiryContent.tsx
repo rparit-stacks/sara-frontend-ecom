@@ -12,8 +12,12 @@ import {
   type InquiryPageContent,
   type InquirySectionType,
 } from '@/components/inquiry/inquiryContent';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 export default function PortalAdminInquiryContent() {
+  const { hasAny } = useAdminPermissions();
+  const canSave = hasAny(P.PORTAL_INQUIRY_CONTENT_SAVE);
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [content, setContent] = useState<InquiryPageContent>(DEFAULT_INQUIRY_CONTENT);
@@ -84,14 +88,16 @@ export default function PortalAdminInquiryContent() {
             <i className="fa-solid fa-up-right-from-square text-[12px]" />
             <span className="hidden sm:inline">View live</span>
           </a>
-          <button
-            onClick={() => saveMutation.mutate(content)}
-            disabled={saveMutation.isPending}
-            className="h-9 px-4 rounded-lg text-[13px] font-semibold text-white bg-primary hover:brightness-110 disabled:opacity-50 transition-all flex items-center gap-1.5"
-          >
-            <i className="fa-solid fa-cloud-arrow-up text-[12px]" />
-            {saveMutation.isPending ? 'Publishing…' : 'Publish'}
-          </button>
+          {canSave && (
+            <button
+              onClick={() => saveMutation.mutate(content)}
+              disabled={saveMutation.isPending}
+              className="h-9 px-4 rounded-lg text-[13px] font-semibold text-white bg-primary hover:brightness-110 disabled:opacity-50 transition-all flex items-center gap-1.5"
+            >
+              <i className="fa-solid fa-cloud-arrow-up text-[12px]" />
+              {saveMutation.isPending ? 'Publishing…' : 'Publish'}
+            </button>
+          )}
         </div>
       </header>
 
@@ -101,17 +107,19 @@ export default function PortalAdminInquiryContent() {
           <i className="fa-solid fa-spinner fa-spin text-2xl" />
         </div>
       ) : (
-        <InquiryPageView content={content} editable onChange={change} />
+        <InquiryPageView content={content} editable={canSave} onChange={change} />
       )}
 
       {/* Floating "Add section" button */}
-      <button
-        onClick={() => setPanelOpen(true)}
-        className="fixed bottom-6 right-6 z-50 h-12 px-5 rounded-full bg-primary text-white font-semibold text-[14px] shadow-xl hover:brightness-110 hover:scale-105 transition-all flex items-center gap-2"
-        title="Add a section"
-      >
-        <i className="fa-solid fa-plus" /> Add section
-      </button>
+      {canSave && (
+        <button
+          onClick={() => setPanelOpen(true)}
+          className="fixed bottom-6 right-6 z-50 h-12 px-5 rounded-full bg-primary text-white font-semibold text-[14px] shadow-xl hover:brightness-110 hover:scale-105 transition-all flex items-center gap-2"
+          title="Add a section"
+        >
+          <i className="fa-solid fa-plus" /> Add section
+        </button>
+      )}
 
       {/* Slide-over panel of pre-built sections */}
       {panelOpen && (
@@ -146,14 +154,16 @@ export default function PortalAdminInquiryContent() {
                 </button>
               ))}
             </div>
-            <div className="p-4 border-t border-primary/10 shrink-0">
-              <button
-                onClick={() => { change(DEFAULT_INQUIRY_CONTENT); setPanelOpen(false); toast.message('Reset to default layout'); }}
-                className="w-full h-10 rounded-lg text-[13px] font-semibold border border-primary/20 text-muted-foreground hover:bg-primary/5 flex items-center justify-center gap-1.5"
-              >
-                <i className="fa-solid fa-rotate-left" /> Reset to default
-              </button>
-            </div>
+            {canSave && (
+              <div className="p-4 border-t border-primary/10 shrink-0">
+                <button
+                  onClick={() => { change(DEFAULT_INQUIRY_CONTENT); setPanelOpen(false); toast.message('Reset to default layout'); }}
+                  className="w-full h-10 rounded-lg text-[13px] font-semibold border border-primary/20 text-muted-foreground hover:bg-primary/5 flex items-center justify-center gap-1.5"
+                >
+                  <i className="fa-solid fa-rotate-left" /> Reset to default
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

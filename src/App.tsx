@@ -13,6 +13,7 @@ import { ChatPageContextProvider } from "@/context/ChatPageContext";
 import ScrollToTop from "./components/ScrollToTop";
 import AuthSessionListener from "./components/AuthSessionListener";
 import VisitTracker from "./components/VisitTracker";
+import ErrorBoundary from "@/components/common/ErrorBoundary";
 import Index from "./pages/Index";
 import Categories from "./pages/Categories";
 import CategoryProducts from "./pages/CategoryProducts";
@@ -73,9 +74,11 @@ import AdminCurrencyMultipliers from "./pages/admin/AdminCurrencyMultipliers";
 import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
 import AdminNotificationCenter from "./pages/admin/AdminNotificationCenter";
 import AdminLogs from "./pages/admin/AdminLogs";
+import AdminRoles from "./pages/admin/AdminRoles";
 import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
 import ProtectedPortalAdminRoute from "./components/admin/ProtectedPortalAdminRoute";
 import ProtectedSuperAdminRoute from "./components/admin/ProtectedSuperAdminRoute";
+import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import MaintenancePlan from "./pages/admin/MaintenancePlan";
 import PortalGuard from "./components/portal/PortalGuard";
 import PortalHome from "./pages/portal/PortalHome";
@@ -136,18 +139,27 @@ const SiteWideChatWidget = () => {
   return <ChatWidget />;
 };
 
-/** Admin Ops AI — only on /admin-sara (not login/invite). Outside AdminLayout so nav keeps the thread. */
+/** Ops AI — /admin-sara + /portal-admin (not login/invite). Outside layout so nav keeps the thread. */
 const AdminSiteWideChatWidget = () => {
   const location = useLocation();
   const path = location.pathname;
   const onAdminSara = path === '/admin-sara' || path.startsWith('/admin-sara/');
+  const onPortalAdmin = path === '/portal-admin' || path.startsWith('/portal-admin/');
   const isAuthSurface =
     path === '/admin-sara/login'
     || path === '/admin-sara/forgot-password'
     || path.startsWith('/admin-sara/invite')
     || path.startsWith('/admin-sara/reset-password');
-  if (!onAdminSara || isAuthSurface) return null;
+  if ((!onAdminSara && !onPortalAdmin) || isAuthSurface) return null;
   if (!localStorage.getItem('adminToken')) return null;
+  return <AdminAiChatPermissionGate />;
+};
+
+/** Hide Ops AI FAB when the admin lacks STORE_ADMIN_AI_OPEN (main/unscoped still see it). */
+const AdminAiChatPermissionGate = () => {
+  const { ready, hasAny, isMainAdmin, unscopedFullAccess } = useAdminPermissions();
+  if (!ready) return null;
+  if (!isMainAdmin && !unscopedFullAccess && !hasAny('STORE_ADMIN_AI_OPEN')) return null;
   return <AdminAiChatWidget />;
 };
 
@@ -165,10 +177,17 @@ const RedirectToClientWorkspaceProject = () => {
   return <Navigate to={`/portal/workspace-preview?project=${encodeURIComponent(code ?? '')}`} replace />;
 };
 
+/** Route outlet boundary: a render error in one page resets on navigation instead of whitescreening. */
+const RouteErrorBoundary = ({ children }: { children: React.ReactNode }) => {
+  const location = useLocation();
+  return <ErrorBoundary resetKey={location.pathname}>{children}</ErrorBoundary>;
+};
+
 const App = () =>
   SITE_UNDER_MAINTENANCE ? (
     <Maintenance />
   ) : (
+  <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <CurrencyProvider>
     <LoadingProvider>
@@ -182,6 +201,7 @@ const App = () =>
         <VisitTracker />
         <SiteWideChatWidget />
         <AdminSiteWideChatWidget />
+        <RouteErrorBoundary>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/categories" element={<Categories />} />
@@ -405,6 +425,14 @@ const App = () =>
               </ProtectedSuperAdminRoute>
             } 
           />
+          <Route
+            path="/admin-sara/roles"
+            element={
+              <ProtectedSuperAdminRoute>
+                <AdminRoles />
+              </ProtectedSuperAdminRoute>
+            }
+          />
           <Route 
             path="/admin-sara/coupons" 
             element={
@@ -496,12 +524,14 @@ const App = () =>
 
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </RouteErrorBoundary>
         </ChatPageContextProvider>
       </BrowserRouter>
     </TooltipProvider>
     </LoadingProvider>
     </CurrencyProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
   );
 
 export default App;

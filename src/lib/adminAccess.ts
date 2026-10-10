@@ -1,4 +1,5 @@
 export const SUPER_ADMIN_USERNAME = 'admin';
+export const SUPER_ADMIN_EMAIL = 'admin@studiosara.com';
 
 export type StoredAdminUser = {
   id?: number;
@@ -6,6 +7,9 @@ export type StoredAdminUser = {
   name?: string;
   email?: string;
   portalAdminAccess?: boolean;
+  mainAdmin?: boolean;
+  readOnly?: boolean;
+  role?: { id: number; name: string; description?: string; active?: boolean } | null;
 };
 
 export function getStoredAdminUser(): StoredAdminUser | null {
@@ -17,8 +21,12 @@ export function getStoredAdminUser(): StoredAdminUser | null {
   }
 }
 
+/** Main admin — roles do not apply; only this user manages roles/admins. */
 export function isSuperAdmin(admin?: StoredAdminUser | null): boolean {
-  return admin?.username === SUPER_ADMIN_USERNAME;
+  if (!admin) return false;
+  if (admin.mainAdmin === true) return true;
+  if (admin.username === SUPER_ADMIN_USERNAME) return true;
+  return (admin.email || '').trim().toLowerCase() === SUPER_ADMIN_EMAIL;
 }
 
 /** Name shown in manufacturing portal project chat for the logged-in admin. */

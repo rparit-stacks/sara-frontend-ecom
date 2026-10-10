@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { TablePagination } from '@/components/admin/TablePagination';
+import { useClientPagination } from '@/hooks/useClientPagination';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -27,8 +29,15 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { plainProductsApi, categoriesApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
+import { AskAdminAiButton } from '@/components/admin-ai-chat';
 
 const AdminFabrics = () => {
+  const { hasAny } = useAdminPermissions();
+  const canAdd = hasAny(P.FABRICS_ADD);
+  const canEdit = hasAny(P.FABRICS_EDIT);
+  const canDelete = hasAny(P.FABRICS_DELETE);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingFabric, setEditingFabric] = useState<any>(null);
@@ -146,6 +155,7 @@ const AdminFabrics = () => {
   const filteredFabrics = fabrics.filter((fabric: any) =>
     fabric.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const { pageItems: paged, page, setPage, total } = useClientPagination(filteredFabrics, 10, searchQuery);
   
   if (isLoading) {
     return (
@@ -183,6 +193,7 @@ const AdminFabrics = () => {
             </h1>
             <p className="text-muted-foreground text-lg">Manage fabric images and assignments</p>
           </div>
+          {canAdd && (
           <Dialog open={isAddDialogOpen} onOpenChange={(open) => { setIsAddDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <motion.div
@@ -294,8 +305,10 @@ const AdminFabrics = () => {
               </form>
             </DialogContent>
           </Dialog>
+          )}
           
           {/* Edit Dialog */}
+          {canEdit && (
           <Dialog open={!!editingFabric} onOpenChange={(open) => { if (!open) { setEditingFabric(null); resetForm(); } }}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
@@ -396,6 +409,7 @@ const AdminFabrics = () => {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </motion.div>
 
         {/* Search */}
@@ -421,7 +435,7 @@ const AdminFabrics = () => {
               No fabrics found. Create your first fabric!
             </div>
           ) : (
-            filteredFabrics.map((fabric: any, index: number) => (
+            paged.map((fabric: any, index: number) => (
               <motion.div
                 key={fabric.id}
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -459,6 +473,17 @@ const AdminFabrics = () => {
                     {fabric.categoryName || 'Uncategorized'}
                   </p>
                   <div className="flex items-center gap-2">
+                    <AskAdminAiButton
+                      className="h-9 w-9"
+                      entity={{
+                        kind: 'page',
+                        id: fabric.id,
+                        name: fabric.name,
+                        pageKey: 'store.fabrics',
+                        extra: `Fabric category=${fabric.categoryName || 'n/a'}.`,
+                      }}
+                    />
+                    {canEdit && (
                     <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                       <Button 
                         variant="ghost" 
@@ -469,6 +494,8 @@ const AdminFabrics = () => {
                         <Edit className="w-4 h-4" />
                       </Button>
                     </motion.div>
+                    )}
+                    {canDelete && (
                     <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                       <Button 
                         variant="ghost" 
@@ -480,12 +507,14 @@ const AdminFabrics = () => {
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </motion.div>
+                    )}
                   </div>
                 </div>
               </motion.div>
             ))
           )}
         </div>
+        <TablePagination page={page} size={10} totalElements={total} onPageChange={setPage} />
         
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={deleteFabricId !== null} onOpenChange={(open) => !open && setDeleteFabricId(null)}>

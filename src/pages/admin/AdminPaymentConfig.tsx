@@ -9,8 +9,12 @@ import { Loader2, Save, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { paymentConfigApi } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 
 const AdminPaymentConfig = () => {
+  const { hasAny } = useAdminPermissions();
+  const canUpdate = hasAny(P.PAYMENT_CONFIG_UPDATE);
   const [formData, setFormData] = useState({
     razorpayKeyId: '',
     razorpayKeySecret: '',
@@ -337,31 +341,32 @@ const AdminPaymentConfig = () => {
             </ul>
           </motion.div>
           
-          {/* Submit Button */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.5 }}
-            className="flex justify-end"
-          >
-            <Button
-              type="submit"
-              disabled={updateMutation.isPending}
-              className="min-w-[120px]"
+          {canUpdate && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.5 }}
+              className="flex justify-end"
             >
-              {updateMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Configuration
-                </>
-              )}
-            </Button>
-          </motion.div>
+              <Button
+                type="submit"
+                disabled={updateMutation.isPending}
+                className="min-w-[120px]"
+              >
+                {updateMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Configuration
+                  </>
+                )}
+              </Button>
+            </motion.div>
+          )}
         </form>
       </div>
     </AdminLayout>

@@ -99,15 +99,22 @@ function parseApiErrorBody(rawBody: string): { error?: string; errorCode?: strin
 }
 
 // Helper function for API calls
-async function fetchApi<T>(endpoint: string, options?: RequestInit, isRetryAfterRefresh = false): Promise<T> {
+// `skipAuth: true` sends the request anonymously (no Authorization header, no refresh/logout
+// handling) without touching localStorage — used for guest checkout.
+type FetchApiOptions = RequestInit & { skipAuth?: boolean };
+
+async function fetchApi<T>(endpoint: string, fetchOptions?: FetchApiOptions, isRetryAfterRefresh = false): Promise<T> {
+  const { skipAuth, ...options } = fetchOptions ?? {};
   // Check if it's an admin route – use adminToken ONLY for admin routes
   const isAdminRoute = endpoint.startsWith('/api/admin');
   const adminToken = localStorage.getItem('adminToken');
   const authToken = localStorage.getItem('authToken');
   // User endpoints use authToken; admin endpoints use adminToken.
-  const token = isAdminRoute
-    ? (adminToken || authToken)
-    : authToken;
+  const token = skipAuth
+    ? null
+    : isAdminRoute
+      ? (adminToken || authToken)
+      : authToken;
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -188,7 +195,7 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit, isRetryAfter
         const newToken = await refreshAccessTokenShared(isAdminRoute);
         if (newToken) {
           if (shouldShowLoading) setGlobalLoading(false);
-          return fetchApi<T>(endpoint, options, true);
+          return fetchApi<T>(endpoint, fetchOptions, true);
         }
       }
 
@@ -283,6 +290,15 @@ export const productsApi = {
     return fetchApi<any[]>(`/api/products?${searchParams}`);
   },
   /** Admin: get all products including those in personalized categories */
+  /** Server-side paginated admin list (0-based page). */
+  getAdminPage: (params: { page: number; size: number; q?: string; type?: string; status?: string; categoryId?: number }) => {
+    const sp = new URLSearchParams({ page: String(params.page), size: String(params.size) });
+    if (params.q) sp.set('q', params.q);
+    if (params.type) sp.set('type', params.type);
+    if (params.status) sp.set('status', params.status);
+    if (params.categoryId) sp.set('categoryId', String(params.categoryId));
+    return fetchApi<PagedResponse<any>>(`/api/admin/products/page?${sp}`);
+  },
   getAllAdmin: (params?: { status?: string; type?: string; categoryId?: number }) => {
     const searchParams = new URLSearchParams();
     if (params?.status) searchParams.set('status', params.status);
@@ -1352,21 +1368,13 @@ export const wishlistApi = {
 // Order API
 // ===============================
 export const orderApi = {
-  createOrder: (data: any) => {
-    // For guest checkout, don't send Authorization header even if token exists
-    // The backend will handle guest checkout based on guestEmail field
-    const token = localStorage.getItem('authToken');
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    // Only add Authorization header if user is logged in AND not doing guest checkout
-    if (token && !data.guestEmail) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    return fetchApi<any>('/api/orders', { 
-      method: 'POST', 
+  createOrder: (data: any) =>
+    // Guest checkout (guestEmail present) is sent anonymously; the backend keys off guestEmail.
+    fetchApi<any>('/api/orders', {
+      method: 'POST',
       body: JSON.stringify(data),
-      headers: headers as any
-    });
-  },
+      skipAuth: !!data.guestEmail,
+    }),
   getUserOrders: () => fetchApi<any[]>('/api/orders'),
   getOrderById: (id: number) => fetchApi<any>(`/api/orders/${id}`),
   getOrderByConfirmationToken: (token: string) =>
@@ -1681,7 +1689,10 @@ export interface CurrentAdminDto {
   notificationType?: string | null;
   status: string;
   lastLogin?: string;
-  portalAdminAccess: boolean;
+  readOnly?: boolean;
+  mainAdmin?: boolean;
+  /** Single assigned role (id/name). Permissions load via adminRolesApi.mine(). */
+  role?: { id: number; name: string; description?: string; active?: boolean } | null;
 }
 
 export const adminAuthApi = {
@@ -1717,6 +1728,12 @@ export const adminAuthApi = {
 // ===============================
 export const adminUsersApi = {
   getAll: (status?: string) => fetchApi<any[]>(`/api/admin/users${status ? `?status=${status}` : ''}`),
+  getPage: (params: { page: number; size: number; q?: string; status?: string }) => {
+    const sp = new URLSearchParams({ page: String(params.page), size: String(params.size) });
+    if (params.q) sp.set('q', params.q);
+    if (params.status) sp.set('status', params.status);
+    return fetchApi<PagedResponse<any>>(`/api/admin/users/page?${sp}`);
+  },
   getByEmail: (email: string) => fetchApi<any>(`/api/admin/users/${encodeURIComponent(email)}`),
   updateStatus: (email: string, status: string) => 
     fetchApi<any>(`/api/admin/users/${encodeURIComponent(email)}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
@@ -1900,15 +1917,113 @@ export const adminManagementApi = {
   updateStatus: (id: number, status: string) => 
     fetchApi<any>(`/api/admin/admins/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
   delete: (id: number) => fetchApi<void>(`/api/admin/admins/${id}`, { method: 'DELETE' }),
-  sendInvite: (email: string, portalAdminAccess = false, readOnly = false) =>
+  sendInvite: (email: string, readOnly = false, roleId: number | null = null) =>
     fetchApi<any>('/api/admin/admins/invite', {
       method: 'POST',
-      body: JSON.stringify({ email, portalAdminAccess, readOnly }),
+      body: JSON.stringify({ email, readOnly, roleId }),
     }),
   getInviteByToken: (token: string) => 
     fetchApi<any>(`/api/admin/admins/invite/${token}`),
   acceptInvite: (data: { token: string; name: string; password: string; confirmPassword: string }) =>
     fetchApi<any>('/api/admin/admins/invite/accept', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+// ===============================
+// Admin permissions (read-only catalog) + roles
+// ===============================
+export type AdminPermissionDto = {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  module: string;
+  feature: string;
+  sortOrder: number;
+  active: boolean;
+};
+
+export type AdminRoleSummaryDto = {
+  id: number;
+  name: string;
+  description?: string;
+  active: boolean;
+};
+
+export type AdminRoleDto = {
+  id: number;
+  name: string;
+  description?: string;
+  active: boolean;
+  createdBy?: string;
+  /** Prebuilt: store_ops | portal_sales | readonly_support */
+  templateKey?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  permissionCount: number;
+  permissionIds: number[];
+  permissions?: AdminPermissionDto[];
+  assignedAdminCount: number;
+};
+
+export type AdminRbacAuditDto = {
+  id: number;
+  action: string;
+  actorEmail?: string | null;
+  targetAdminId?: number | null;
+  targetAdminEmail?: string | null;
+  roleId?: number | null;
+  roleName?: string | null;
+  details?: string | null;
+  createdAt?: string;
+};
+
+export const adminPermissionsApi = {
+  list: (params?: { module?: string; feature?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.module) q.set('module', params.module);
+    if (params?.feature) q.set('feature', params.feature);
+    const qs = q.toString();
+    return fetchApi<AdminPermissionDto[]>(`/api/admin/permissions${qs ? `?${qs}` : ''}`);
+  },
+  getById: (id: number) => fetchApi<AdminPermissionDto>(`/api/admin/permissions/${id}`),
+  getByCode: (code: string) => fetchApi<AdminPermissionDto>(`/api/admin/permissions/by-code/${encodeURIComponent(code)}`),
+};
+
+export const adminRolesApi = {
+  list: () => fetchApi<AdminRoleDto[]>('/api/admin/roles'),
+  get: (id: number) => fetchApi<AdminRoleDto>(`/api/admin/roles/${id}`),
+  create: (data: { name: string; description?: string; active?: boolean; permissionIds: number[] }) =>
+    fetchApi<AdminRoleDto>('/api/admin/roles', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: { name?: string; description?: string; active?: boolean; permissionIds?: number[] }) =>
+    fetchApi<AdminRoleDto>(`/api/admin/roles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) => fetchApi<void>(`/api/admin/roles/${id}`, { method: 'DELETE' }),
+  /** Current admin's role + permissions (for FE gating). Main admin → role null. */
+  mine: () =>
+    fetchApi<{ adminId: number; mainAdmin: boolean; role: AdminRoleDto | null }>('/api/admin/roles/mine'),
+  getAssignment: (adminId: number) =>
+    fetchApi<{ role: AdminRoleSummaryDto | null }>(`/api/admin/roles/assignments/${adminId}`),
+  /** Assign exactly one role; pass null to clear. */
+  setAssignment: (adminId: number, roleId: number | null) =>
+    fetchApi<{ role: AdminRoleSummaryDto | null }>(`/api/admin/roles/assignments/${adminId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ roleId }),
+    }),
+  effectivePermissions: (adminId: number) =>
+    fetchApi<{
+      adminId: number;
+      mainAdmin: boolean;
+      role: AdminRoleSummaryDto | null;
+      permissionCodes: string[];
+    }>(`/api/admin/roles/effective-permissions/${adminId}`),
+  /** Role / assignment change trail (main admin). */
+  audit: (limit = 50) =>
+    fetchApi<AdminRbacAuditDto[]>(`/api/admin/roles/audit?limit=${limit}`),
+  /** Admins with no role yet (main admin reminder). */
+  waitingForRole: () =>
+    fetchApi<{
+      count: number;
+      admins: Array<{ id: number; name?: string; email?: string; username?: string }>;
+    }>('/api/admin/roles/waiting-for-role'),
 };
 
 // ===============================
@@ -3235,6 +3350,86 @@ export interface BulkDeleteRequest {
   deleteAll?: boolean;
 }
 
+/** Envelope returned by backend PagedResponse. */
+export interface PagedResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  page: number;
+  size: number;
+}
+
+export interface SystemHealthBrief {
+  windowHours: number;
+  from: string;
+  to: string;
+  healthPercent: number;
+  requestsPerMinute: number;
+  totalRequests: number;
+  okCount: number;
+  serverErrorCount: number;
+  clientErrorCount: number;
+  authNoiseSuppressed: number;
+  slowCount: number;
+  serverErrorRatePercent: number;
+  slowRatePercent: number;
+  avgResponseMs: number;
+  maxResponseMs: number;
+  incidentCount: number;
+  incidents: { from: string; to: string; serverErrors: number }[];
+  topFailingEndpoints: {
+    method: string;
+    endpoint: string;
+    failures: number;
+    serverErrors: number;
+    sampleError?: string;
+  }[];
+  notes: string[];
+}
+
+export interface HealthAlertRecipient {
+  id: number;
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  notifyEmail: boolean;
+  notifyWhatsapp: boolean;
+  dailyDigest: boolean;
+  enabled: boolean;
+}
+
+export type HealthAlertRecipientInput = Partial<Omit<HealthAlertRecipient, 'id'>>;
+
+export interface ApiLogIngestSettings {
+  successSampleRate: number;
+  slowThresholdMs: number;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+}
+
+export interface JobHealthBrief {
+  windowHours: number;
+  from: string;
+  to: string;
+  localFailureCount: number;
+  failuresByType: Record<string, number>;
+  recentFailures: Array<{
+    id: number;
+    jobType: string;
+    source?: string;
+    message?: string;
+    createdAt?: string;
+  }>;
+  notificationDelivery?: {
+    available: boolean;
+    successCount: number;
+    failedCount: number;
+    failedByChannel?: Record<string, number>;
+    error?: string;
+  } | null;
+  notes?: string[];
+}
+
 export const logsApi = {
   getLogs: (params: {
     page?: number;
@@ -3271,6 +3466,29 @@ export const logsApi = {
   getLogById: (id: number) => fetchApi<ApiLogDetailDTO>(`/api/admin/logs/${id}`),
   
   getStats: () => fetchApi<ApiLogStatsDTO>('/api/admin/logs/stats'),
+
+  getAlertRecipients: () => fetchApi<HealthAlertRecipient[]>('/api/admin/system-health/recipients'),
+  createAlertRecipient: (data: HealthAlertRecipientInput) =>
+    fetchApi<HealthAlertRecipient>('/api/admin/system-health/recipients', { method: 'POST', body: JSON.stringify(data) }),
+  updateAlertRecipient: (id: number, data: HealthAlertRecipientInput) =>
+    fetchApi<HealthAlertRecipient>(`/api/admin/system-health/recipients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteAlertRecipient: (id: number) =>
+    fetchApi<void>(`/api/admin/system-health/recipients/${id}`, { method: 'DELETE' }),
+
+  getHealthBrief: (windowHours = 24) =>
+    fetchApi<SystemHealthBrief>(`/api/admin/system-health/brief?windowHours=${windowHours}`),
+
+  getJobHealth: (windowHours = 24) =>
+    fetchApi<JobHealthBrief>(`/api/admin/system-health/jobs?windowHours=${windowHours}`),
+
+  getLogIngestSettings: () =>
+    fetchApi<ApiLogIngestSettings>('/api/admin/system-health/log-ingest'),
+
+  updateLogIngestSettings: (data: { successSampleRate: number; slowThresholdMs: number }) =>
+    fetchApi<ApiLogIngestSettings>('/api/admin/system-health/log-ingest', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
   
   getEndpoints: () => fetchApi<string[]>('/api/admin/logs/endpoints'),
   
@@ -3472,6 +3690,7 @@ export interface AiChatTurnResponse {
 
 export interface ChatAuthResultDto {
   token: string;
+  refreshToken?: string;
   email: string;
   threadId: string;
 }
@@ -3664,11 +3883,24 @@ export type AdminPageType =
 export interface AdminPageContextDto {
   pageType: AdminPageType;
   route?: string | null;
+  /** Stable Ops AI page key, e.g. store.roles / store.product-edit */
+  pageKey?: string | null;
   orderId?: number | null;
   orderNumber?: string | null;
   productId?: number | null;
   userEmail?: string | null;
   cmsTab?: string | null;
+  /** Background Ask-AI focus — system prompt only, not shown in the chat bubble. */
+  focusHint?: string | null;
+}
+
+export interface AdminPageBriefDto {
+  key: string;
+  title: string;
+  purpose: string;
+  mainApis: string[];
+  permissionCodes: string[];
+  tips: string[];
 }
 
 export interface AdminAiChatTurnRequest {
@@ -3731,6 +3963,15 @@ export const adminAiChatApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  /** Fetch Ops AI page brief when the widget opens (or page key changes). */
+  getPageBrief: (params: { key?: string; route?: string }) => {
+    const qs = new URLSearchParams();
+    if (params.key) qs.set('key', params.key);
+    if (params.route) qs.set('route', params.route);
+    return fetchApi<AdminPageBriefDto>(`/api/admin/ai-chat/page-brief?${qs.toString()}`, {
+      method: 'GET',
+    });
+  },
   getHistory: (threadId: string) =>
     fetchApi<ChatHistoryResponseDto>(`/api/admin/ai-chat/thread/${threadId}/history`, {
       method: 'GET',
