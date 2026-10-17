@@ -18,6 +18,28 @@ export const getUserEmailFromToken = (): string | null => {
   }
 };
 
+// Builds a readable Error from a failed upload response. The body is read exactly ONCE as text and
+// parsed afterwards: reading it with json() and then falling back to text() throws "Body is
+// disturbed or locked" (Safari) / "body stream already read" (Chrome) whenever the server replies
+// with non-JSON (nginx 413 page, 502/504 timeout), which hid the real error on mobile uploads.
+async function uploadErrorFrom(response: Response, fallback: string): Promise<Error> {
+  if (response.status === 413) {
+    return new Error('This file is too large for the server. Please pick a smaller photo.');
+  }
+  if (response.status === 502 || response.status === 503 || response.status === 504) {
+    return new Error('Server timed out while uploading. Please check your connection and try again.');
+  }
+  const text = await response.text().catch(() => '');
+  try {
+    const data = JSON.parse(text) as { source?: string; error?: string };
+    if (data.source === 'cloudinary') return new Error(`Cloudinary error: ${data.error || fallback}`);
+    if (data.source === 'validation') return new Error(`File validation error: ${data.error || fallback}`);
+    return new Error(`Upload failed: ${data.error || 'Unknown error'}`);
+  } catch {
+    return new Error(text.trim().startsWith('<') || !text.trim() ? fallback : text);
+  }
+}
+
 // Global loading state management
 let loadingCallbacks: Set<(loading: boolean, message?: string) => void> = new Set();
 
@@ -630,26 +652,18 @@ export const categoriesApi = {
     formData.append('file', file);
     const token = localStorage.getItem('adminToken');
     console.log('[Category Image Upload] Uploading to:', `${API_BASE_URL}/api/admin/categories/upload-image`);
-    const response = await fetch(`${API_BASE_URL}/api/admin/categories/upload-image`, {
-      method: 'POST',
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      body: formData,
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}/api/admin/categories/upload-image`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData,
+      });
+    } catch {
+      throw new Error('Upload failed. Please check your connection and try again.');
+    }
     if (!response.ok) {
-      try {
-        const errorData = await response.json();
-        if (errorData.source === 'cloudinary') {
-          throw new Error(`Cloudinary error: ${errorData.error || 'Upload failed'}`);
-        } else if (errorData.source === 'validation') {
-          throw new Error(`File validation error: ${errorData.error || 'File validation failed'}`);
-        } else {
-          throw new Error(`Upload failed: ${errorData.error || 'Unknown error'}`);
-        }
-      } catch (e) {
-        const errorText = await response.text();
-        console.error('[Category Image Upload] Error:', errorText);
-        throw new Error(errorText || 'Failed to upload image');
-      }
+      throw await uploadErrorFrom(response, 'Failed to upload image');
     }
     const data = await response.json();
     console.log('[Category Image Upload] Success:', data.url);
@@ -1038,27 +1052,19 @@ export const mediaApi = {
     
     const token = localStorage.getItem('adminToken') || localStorage.getItem('authToken');
     
-    const response = await fetch(`${API_BASE_URL}/api/admin/media/upload`, {
-      method: 'POST',
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      body: formData,
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}/api/admin/media/upload`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData,
+      });
+    } catch {
+      throw new Error('Upload failed. Please check your connection and try again.');
+    }
     
     if (!response.ok) {
-      try {
-        const errorData = await response.json();
-        if (errorData.source === 'cloudinary') {
-          throw new Error(`Cloudinary error: ${errorData.error || 'Upload failed'}`);
-        } else if (errorData.source === 'validation') {
-          throw new Error(`File validation error: ${errorData.error || 'File validation failed'}`);
-        } else {
-          throw new Error(`Upload failed: ${errorData.error || 'Unknown error'}`);
-        }
-      } catch (e) {
-        // If response is not JSON, try text
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to upload image');
-      }
+      throw await uploadErrorFrom(response, 'Failed to upload image');
     }
     
     const data = await response.json();
