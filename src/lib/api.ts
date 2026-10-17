@@ -40,6 +40,30 @@ async function uploadErrorFrom(response: Response, fallback: string): Promise<Er
   }
 }
 
+/**
+ * Upload for guests and customers (inquiry form, custom designs, payment proof, client chat).
+ * Goes to the narrow public endpoint, not /api/admin/*, which needs an admin login.
+ */
+async function uploadPublicFile(file: File, folder: string): Promise<string> {
+  const MAX_FILE_SIZE = file.type.startsWith('image/') ? 10 * 1024 * 1024 : 25 * 1024 * 1024;
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maximum ${MAX_FILE_SIZE / (1024 * 1024)}MB.`);
+  }
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('folder', folder);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/public/uploads`, { method: 'POST', body: formData });
+  } catch {
+    throw new Error('Upload failed. Please check your connection and try again.');
+  }
+  if (!response.ok) throw await uploadErrorFrom(response, 'Upload failed');
+  const data = (await response.json()) as { url?: string };
+  if (!data.url) throw new Error('Upload failed');
+  return data.url;
+}
+
 // Global loading state management
 let loadingCallbacks: Set<(loading: boolean, message?: string) => void> = new Set();
 
@@ -407,182 +431,13 @@ export const productsApi = {
   },
   createFromUpload: (data: any) => fetchApi<any>('/api/products/create-from-upload', { method: 'POST', body: JSON.stringify(data) }),
   uploadMedia: async (files: File[], folder: string = 'products'): Promise<any[]> => {
-    const CLOUDINARY_10MB_MSG = 'Upload failed: Cloudinary supports max 10MB. Please adjust file size or upgrade Cloudinary limits.';
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    // Customers use this (custom product designs), so it must not hit the admin-only endpoint.
+    const uploaded: Array<{ url: string; type: string; filename: string }> = [];
     for (const file of files) {
-      if (file.size > MAX_FILE_SIZE) {
-        throw new Error(CLOUDINARY_10MB_MSG);
-      }
+      const url = await uploadPublicFile(file, folder);
+      uploaded.push({ url, type: file.type.startsWith('video/') ? 'video' : 'image', filename: file.name });
     }
-    
-    const formData = new FormData();
-    files.forEach(file => {
-      formData.append('files', file);
-    });
-    formData.append('folder', folder);
-    
-    const token = localStorage.getItem('adminToken');
-    console.log('[Product Media Upload] Uploading', files.length, 'files to:', `${API_BASE_URL}/api/admin/products/upload-media`);
-    
-    let response: Response;
-    try {
-      response = await fetch(`${API_BASE_URL}/api/admin/products/upload-media`, {
-        method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        body: formData,
-      });
-    } catch (e) {
-      throw new Error('Upload failed. Please check your connection and try again.');
-    }
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Product Media Upload] Error:', errorText);
-      try {
-        const errorData = JSON.parse(errorText);
-        if (errorData.source === 'cloudinary' || errorData.source === 'validation') {
-          throw new Error(CLOUDINARY_10MB_MSG);
-        }
-        throw new Error(errorData.userMessage || errorData.error || 'Upload failed');
-      } catch (err: any) {
-        if (err instanceof Error && err.message === CLOUDINARY_10MB_MSG) throw err;
-        if (err instanceof SyntaxError) throw new Error(errorText || 'Upload failed');
-        throw err;
-      }
-    }
-    
-    const data = await response.json();
-    if (data.errors && data.errors.length > 0) {
-      const first = data.errors[0];
-      const msg = typeof first === 'object' && first?.userMessage
-        ? first.userMessage
-        : (typeof first === 'object' && first?.source && (first.source === 'cloudinary' || first.source === 'validation'))
-          ? CLOUDINARY_10MB_MSG
-          : Array.isArray(data.errors)
-            ? data.errors.map((e: any) => typeof e === 'object' ? (e.userMessage || e.error) : e).filter(Boolean).join(', ')
-            : String(data.errors);
-      throw new Error(msg || CLOUDINARY_10MB_MSG);
-    }
-    console.log('[Product Media Upload] Success:', data);
-    return data.files || [];
-  },
-  
-  // Upload digital file to S3. Returns { success: true, downloadUrl: "https://..." }
-  uploadDigitalFile: async (file: File, productName?: string): Promise<{ success: boolean; downloadUrl: string }> => {
-    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-    if (file.size > MAX_FILE_SIZE) {
-      throw new Error('Upload failed: File size exceeds 50MB limit.');
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-    if (productName && productName.trim() !== '') {
-      formData.append('productName', productName.trim());
-    }
-
-    const token = localStorage.getItem('adminToken');
-
-    const response = await fetch(`${API_BASE_URL}/api/admin/products/upload-digital-file`, {
-      method: 'POST',
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      try {
-        const errorData = JSON.parse(errorText);
-        throw new Error(errorData.error || 'Upload failed');
-      } catch (err: any) {
-        if (err instanceof SyntaxError) throw new Error(errorText || 'Upload failed');
-        throw err;
-      }
-    }
-
-    return await response.json();
-  },
-};
-
-// ===============================
-// Custom Products API (Make Your Own)
-// ===============================
-export const customProductsApi = {
-  create: (data: any) => fetchApi<any>('/api/custom-products', { method: 'POST', body: JSON.stringify(data) }),
-  getById: (id: number, userEmail?: string) => {
-    const url = userEmail 
-      ? `/api/custom-products/${id}?userEmail=${encodeURIComponent(userEmail)}`
-      : `/api/custom-products/${id}`;
-    return fetchApi<any>(url);
-  },
-  getSaved: () => fetchApi<any[]>('/api/custom-products/saved'),
-  getAll: () => fetchApi<any[]>('/api/custom-products'),
-  save: (id: number) => fetchApi<any>(`/api/custom-products/${id}/save`, { method: 'POST' }),
-  delete: (id: number) => fetchApi<void>(`/api/custom-products/${id}`, { method: 'DELETE' }),
-  deleteUnsaved: (id: number, userEmail?: string) => {
-    const url = userEmail 
-      ? `/api/custom-products/unsaved/${id}?userEmail=${encodeURIComponent(userEmail)}`
-      : `/api/custom-products/unsaved/${id}`;
-    return fetchApi<void>(url, { method: 'DELETE' });
-  },
-  uploadMedia: async (files: File[], folder: string = 'products'): Promise<any[]> => {
-    const CLOUDINARY_10MB_MSG = 'Upload failed: Cloudinary supports max 10MB. Please adjust file size or upgrade Cloudinary limits.';
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-    for (const file of files) {
-      if (file.size > MAX_FILE_SIZE) {
-        throw new Error(CLOUDINARY_10MB_MSG);
-      }
-    }
-    
-    const formData = new FormData();
-    files.forEach(file => {
-      formData.append('files', file);
-    });
-    formData.append('folder', folder);
-    
-    const token = localStorage.getItem('authToken') || localStorage.getItem('adminToken');
-    console.log('[Custom Product Media Upload] Uploading', files.length, 'files to:', `${API_BASE_URL}/api/admin/products/upload-media`);
-    
-    let response: Response;
-    try {
-      response = await fetch(`${API_BASE_URL}/api/admin/products/upload-media`, {
-        method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        body: formData,
-      });
-    } catch {
-      throw new Error('Upload failed. Please check your connection and try again.');
-    }
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Custom Product Media Upload] Error:', errorText);
-      try {
-        const errorData = JSON.parse(errorText);
-        if (errorData.source === 'cloudinary' || errorData.source === 'validation') {
-          throw new Error(CLOUDINARY_10MB_MSG);
-        }
-        throw new Error(errorData.userMessage || errorData.error || 'Upload failed');
-      } catch (err: any) {
-        if (err instanceof Error && err.message === CLOUDINARY_10MB_MSG) throw err;
-        if (err instanceof SyntaxError) throw new Error(errorText || 'Upload failed');
-        throw err;
-      }
-    }
-    
-    const data = await response.json();
-    if (data.errors && data.errors.length > 0) {
-      const first = data.errors[0];
-      const msg = typeof first === 'object' && first?.userMessage
-        ? first.userMessage
-        : (typeof first === 'object' && first?.source && (first.source === 'cloudinary' || first.source === 'validation'))
-          ? CLOUDINARY_10MB_MSG
-          : Array.isArray(data.errors)
-            ? data.errors.map((e: any) => typeof e === 'object' ? (e.userMessage || e.error) : e).filter(Boolean).join(', ')
-            : String(data.errors);
-      throw new Error(msg || CLOUDINARY_10MB_MSG);
-    }
-    console.log('[Custom Product Media Upload] Success:', data);
-    return data.files || [];
+    return uploaded;
   },
 };
 
@@ -1039,6 +894,8 @@ export interface LinkPreview {
 }
 
 export const mediaApi = {
+  /** Guests/customers: public endpoint, no admin login needed. */
+  uploadPublic: (file: File, folder: string = 'public-uploads') => uploadPublicFile(file, folder),
   upload: async (file: File, folder: string = 'banners'): Promise<string> => {
     // Client-side file size validation (10MB)
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB

@@ -81,7 +81,7 @@ export default function PaymentPage() {
       }
       const blob = pdf.output('blob');
       const file = new File([blob], `${invoice.reference}-paid.pdf`, { type: 'application/pdf' });
-      const url = await mediaApi.upload(file, 'invoices');
+      const url = await mediaApi.uploadPublic(file, 'invoices');
       await paymentLinkApi.savePaidPdf(linkCode, url);
     } catch (e) {
       console.error('Paid-PDF regeneration failed:', e);

@@ -297,7 +297,7 @@ function UploadField({
     if (!files.length) return;
     setUploading(true);
     try {
-      const uploaded = await Promise.all(files.map((f) => mediaApi.upload(f, 'inquiries')));
+      const uploaded = await Promise.all(files.map((f) => mediaApi.uploadPublic(f, 'inquiries')));
       onChange(field.key, multiple ? [...urls, ...uploaded] : uploaded[0]);
     } catch (e) {
       toast.error((e as Error).message || 'Upload failed — please try again');

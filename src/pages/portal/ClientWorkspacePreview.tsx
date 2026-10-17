@@ -845,7 +845,7 @@ export default function ClientWorkspacePreview() {
       await send(body);
       return;
     }
-    const urls = await Promise.all(attachments.map(async (a) => mediaApi.upload(await toFile(a), 'projects')));
+    const urls = await Promise.all(attachments.map(async (a) => mediaApi.uploadPublic(await toFile(a), 'projects')));
     const body = text.trim() || '(attachment)';
     await send(body, urls);
   }
