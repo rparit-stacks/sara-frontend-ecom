@@ -19,7 +19,6 @@ import {
   Percent,
   Activity,
   Sparkles,
-  Wrench,
   Factory,
   Bell,
   KeyRound,
@@ -43,7 +42,6 @@ const adminMenuSections = [
     items: [
       { icon: LayoutDashboard, label: 'Dashboard', path: '/admin-sara' },
       { icon: IndianRupee, label: 'Payments', path: '/admin-sara/payments' },
-      { icon: Wrench, label: 'Maintenance', path: '/admin-sara/maintenance' },
     ],
   },
   {
