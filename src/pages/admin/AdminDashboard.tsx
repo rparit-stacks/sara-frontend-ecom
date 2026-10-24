@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { dashboardApi } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { DashboardModeToggle, DashboardMode } from '@/components/admin/analytics/DashboardModeToggle';
+import { PlatformPaymentDueBanner } from '@/components/admin/PlatformPaymentDueBanner';
 
 // Lazy-load the 3D dashboard so the heavy Three.js bundle is only fetched
 // when the user actually switches to Advanced mode.
@@ -113,6 +114,8 @@ const AdminDashboard = () => {
           </div>
           <DashboardModeToggle mode={mode} onChange={changeMode} />
         </div>
+
+        <PlatformPaymentDueBanner />
 
         {mode === 'advanced' ? (
           <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}>

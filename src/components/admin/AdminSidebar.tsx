@@ -23,6 +23,7 @@ import {
   Factory,
   Bell,
   KeyRound,
+  IndianRupee,
 } from 'lucide-react';
 import { ChevronLeft, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -41,6 +42,7 @@ const adminMenuSections = [
     title: 'Overview',
     items: [
       { icon: LayoutDashboard, label: 'Dashboard', path: '/admin-sara' },
+      { icon: IndianRupee, label: 'Payments', path: '/admin-sara/payments' },
       { icon: Wrench, label: 'Maintenance', path: '/admin-sara/maintenance' },
     ],
   },

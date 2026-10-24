@@ -72,6 +72,7 @@ import AdminBusinessConfig from "./pages/admin/AdminBusinessConfig";
 import AdminPaymentConfig from "./pages/admin/AdminPaymentConfig";
 import AdminCurrencyMultipliers from "./pages/admin/AdminCurrencyMultipliers";
 import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
+import AdminPlatformPayments from "./pages/admin/AdminPlatformPayments";
 import AdminNotificationCenter from "./pages/admin/AdminNotificationCenter";
 import AdminLogs from "./pages/admin/AdminLogs";
 import AdminRoles from "./pages/admin/AdminRoles";
@@ -288,6 +289,14 @@ const App = () =>
                 <AdminDashboard />
               </ProtectedAdminRoute>
             } 
+          />
+          <Route
+            path="/admin-sara/payments"
+            element={
+              <ProtectedAdminRoute mainAdminOnly>
+                <AdminPlatformPayments />
+              </ProtectedAdminRoute>
+            }
           />
           <Route 
             path="/admin-sara/products" 

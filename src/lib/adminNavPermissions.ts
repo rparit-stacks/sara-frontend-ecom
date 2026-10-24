@@ -43,6 +43,8 @@ export const ADMIN_NAV_PERMISSIONS: NavPermissionRule[] = [
   { pathPrefix: '/admin-sara/fabrics', anyOf: [P.FABRICS_VIEW] },
   { pathPrefix: '/admin-sara/admins', mainAdminOnly: true },
   { pathPrefix: '/admin-sara/roles', mainAdminOnly: true },
+  // Internal platform payment ledger (dev / project dues) — main admin only.
+  { pathPrefix: '/admin-sara/payments', mainAdminOnly: true },
   // Dashboard home — any authenticated admin (widgets still respect API permissions).
   { pathPrefix: '/admin-sara' },
 ];
