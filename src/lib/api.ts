@@ -1691,8 +1691,6 @@ export const adminAuthApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  signup: (email: string, password: string, name: string, authCode: string) =>
-    fetchApi<any>('/api/admin/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, name, authCode }) }),
   getCurrentAdmin: () => fetchApi<CurrentAdminDto>('/api/admin/auth/me'),
   /** Self-service — no super-admin permission needed, unlike adminUsersApi-style admin
    *  management endpoints. Sets the number AdminNotificationRouter/WhatsAppAdminNotifier
