@@ -94,6 +94,7 @@ const adminMenuSections = [
       { icon: Shield, label: 'Admins', path: '/admin-sara/admins' },
       { icon: KeyRound, label: 'Roles', path: '/admin-sara/roles' },
       { icon: Activity, label: 'Logs', path: '/admin-sara/logs' },
+      { icon: Settings, label: 'Runtime Config', path: '/admin-sara/runtime-config' },
     ],
   },
 ];

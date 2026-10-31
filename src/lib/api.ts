@@ -3982,3 +3982,27 @@ export const adminAiChatApi = {
 // ===============================
 // WhatsApp API
 // ===============================
+
+// ===============================
+// Runtime config (DB-backed settings, main admin only)
+// ===============================
+export interface RuntimeConfigItem {
+  key: string;
+  category: string;
+  secret: boolean;
+  /** Plain value, or `••••last4` for secrets. */
+  value: string | null;
+  set: boolean;
+  source: 'DB' | 'FILE';
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export const runtimeConfigApi = {
+  list: () => fetchApi<RuntimeConfigItem[]>('/api/admin/runtime-config'),
+  update: (key: string, value: string) =>
+    fetchApi<void>(`/api/admin/runtime-config/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    }),
+};

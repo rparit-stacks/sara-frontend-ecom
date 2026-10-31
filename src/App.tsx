@@ -75,6 +75,7 @@ import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
 import AdminPlatformPayments from "./pages/admin/AdminPlatformPayments";
 import AdminNotificationCenter from "./pages/admin/AdminNotificationCenter";
 import AdminLogs from "./pages/admin/AdminLogs";
+import AdminRuntimeConfig from "./pages/admin/AdminRuntimeConfig";
 import AdminRoles from "./pages/admin/AdminRoles";
 import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
 import ProtectedPortalAdminRoute from "./components/admin/ProtectedPortalAdminRoute";
@@ -527,6 +528,14 @@ const App = () =>
             element={
               <ProtectedAdminRoute>
                 <AdminLogs />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/runtime-config"
+            element={
+              <ProtectedAdminRoute>
+                <AdminRuntimeConfig />
               </ProtectedAdminRoute>
             }
           />
