@@ -29,6 +29,7 @@ import About from "./pages/About";
 import FAQ from "./pages/FAQ";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
+import DataDeletion from "./pages/DataDeletion";
 import Shipping from "./pages/Shipping";
 import NotFound from "./pages/NotFound";
 import Customize from "./pages/Customize";
@@ -226,6 +227,7 @@ const App = () =>
           <Route path="/faq" element={<FAQ />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
+          <Route path="/data-deletion" element={<DataDeletion />} />
           <Route path="/shipping" element={<Shipping />} />
           <Route path="/customize" element={<Customize />} />
           <Route path="/custom-design" element={<CustomDesign />} />

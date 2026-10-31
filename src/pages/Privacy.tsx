@@ -49,6 +49,13 @@ const Privacy = () => {
               </div>
 
               <div>
+                <h2 className="font-cursive text-3xl mb-4">WhatsApp Messages</h2>
+                <p className="text-muted-foreground">
+                  If you give us your phone number, we may message you on WhatsApp about your account and orders, such as login verification codes, order confirmations and status updates, design request updates, and invoices or quotations. If you have agreed to receive offers, we may also send announcements. These messages are sent through the WhatsApp Business Platform provided by Meta. We keep your WhatsApp number, the messages we send, whether they were delivered or read, and any replies you send us, so that we can support your order. Reply STOP to any message to stop receiving messages from us on WhatsApp.
+                </p>
+              </div>
+
+              <div>
                 <h2 className="font-cursive text-3xl mb-4">Data Security</h2>
                 <p className="text-muted-foreground">
                   We implement industry-standard security measures to protect your personal information from unauthorized access, alteration, disclosure, or destruction. However, no method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.
@@ -72,7 +79,7 @@ const Privacy = () => {
               <div>
                 <h2 className="font-cursive text-3xl mb-4">Contact Us</h2>
                 <p className="text-muted-foreground">
-                  For privacy concerns or questions about this policy, please contact us through our <a href="/contact" className="text-primary hover:underline">contact page</a>.
+                  For privacy concerns or questions about this policy, email us at <a href="mailto:sara01haqqq@gmail.com" className="text-primary hover:underline">sara01haqqq@gmail.com</a> or use our <a href="/contact" className="text-primary hover:underline">contact page</a>. To have your data deleted, see <a href="/data-deletion" className="text-primary hover:underline">how to delete your data</a>.
                 </p>
               </div>
             </div>
