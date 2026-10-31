@@ -28,7 +28,7 @@ const DataDeletion = () => {
               <div>
                 <h2 className="font-cursive text-3xl mb-4">How to request deletion</h2>
                 <p className="text-muted-foreground">
-                  Send an email to <a href="mailto:sara01haqqq@gmail.com" className="text-primary hover:underline">sara01haqqq@gmail.com</a> with the subject "Delete my data". Write from the email address on your Studio Sara account, and include the phone number you use on WhatsApp so that we can find your records.
+                  Send an email to <a href="mailto:noreply@studiosara.in" className="text-primary hover:underline">noreply@studiosara.in</a> with the subject "Delete my data". Write from the email address on your Studio Sara account, and include the phone number you use on WhatsApp so that we can find your records.
                 </p>
               </div>
 

@@ -79,7 +79,7 @@ const Privacy = () => {
               <div>
                 <h2 className="font-cursive text-3xl mb-4">Contact Us</h2>
                 <p className="text-muted-foreground">
-                  For privacy concerns or questions about this policy, email us at <a href="mailto:sara01haqqq@gmail.com" className="text-primary hover:underline">sara01haqqq@gmail.com</a> or use our <a href="/contact" className="text-primary hover:underline">contact page</a>. To have your data deleted, see <a href="/data-deletion" className="text-primary hover:underline">how to delete your data</a>.
+                  For privacy concerns or questions about this policy, email us at <a href="mailto:noreply@studiosara.in" className="text-primary hover:underline">noreply@studiosara.in</a> or use our <a href="/contact" className="text-primary hover:underline">contact page</a>. To have your data deleted, see <a href="/data-deletion" className="text-primary hover:underline">how to delete your data</a>.
                 </p>
               </div>
             </div>
