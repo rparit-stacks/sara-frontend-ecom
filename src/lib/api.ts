@@ -3998,8 +3998,32 @@ export interface RuntimeConfigItem {
   updatedBy: string | null;
 }
 
+export interface RuntimeConfigAuditItem {
+  id: number;
+  key: string;
+  category: string | null;
+  secret: boolean;
+  action: string;
+  oldValue: string | null;
+  newValue: string | null;
+  changedBy: string | null;
+  changedAt: string;
+}
+
+export interface RuntimeConfigAuditPage {
+  content: RuntimeConfigAuditItem[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
 export const runtimeConfigApi = {
   list: () => fetchApi<RuntimeConfigItem[]>('/api/admin/runtime-config'),
+  audit: (q: string, page: number, size = 20) =>
+    fetchApi<RuntimeConfigAuditPage>(
+      `/api/admin/runtime-config/audit?q=${encodeURIComponent(q)}&page=${page}&size=${size}`,
+    ),
   update: (key: string, value: string) =>
     fetchApi<void>(`/api/admin/runtime-config/${encodeURIComponent(key)}`, {
       method: 'PUT',
