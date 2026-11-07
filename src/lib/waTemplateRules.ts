@@ -401,3 +401,119 @@ export const validateSend = (parts: TemplateParts, v: SendValues): string[] => {
 
 export const fillText = (text: string, values: Record<string, string>) =>
   text.replace(VARIABLE, (_, n) => (values[n]?.trim() ? values[n].trim() : `{{${n}}}`));
+
+// ---------- guidance for the template wizard ----------
+
+export interface Starter {
+  id: string;
+  label: string;
+  category: Category;
+  description: string;
+  name: string;
+  body: string;
+  examples: Record<number, string>;
+  footer?: string;
+}
+
+/** Ready-made wording that already follows every rule. Each one is checked by the rules in a test. */
+export const STARTERS: Starter[] = [
+  {
+    id: 'order_shipped', label: 'Order shipped', category: 'UTILITY', name: 'order_shipped',
+    description: 'Tells a customer their order is on the way.',
+    body: 'Hello {{1}}, your order #{{2}} has been shipped and will reach you by {{3}}. Thank you for shopping with Studio Sara.',
+    examples: { 1: 'Rohit', 2: '1042', 3: '10 Nov' },
+  },
+  {
+    id: 'payment_received', label: 'Payment received', category: 'UTILITY', name: 'payment_received',
+    description: 'Confirms a payment for an order.',
+    body: 'Hello {{1}}, we have received your payment of {{2}} for order #{{3}}. Your order is now being prepared by our team.',
+    examples: { 1: 'Rohit', 2: 'Rs 1,500', 3: '1042' },
+  },
+  {
+    id: 'design_ready', label: 'Design ready for review', category: 'UTILITY', name: 'design_ready',
+    description: 'Lets a customer know their custom design is ready to look at.',
+    body: 'Hello {{1}}, the design for your request #{{2}} is ready. Please open your Studio Sara account to review it and tell us if you want any changes.',
+    examples: { 1: 'Rohit', 2: '42' },
+  },
+  {
+    id: 'new_collection', label: 'New collection', category: 'MARKETING', name: 'new_collection',
+    description: 'Announces a new collection to customers who agreed to hear from you.',
+    body: 'Hello {{1}}, our new {{2}} collection is now live at Studio Sara. Visit our store to see the new designs and place your order today.',
+    examples: { 1: 'Rohit', 2: 'festive' },
+    footer: 'Reply STOP to opt out',
+  },
+  {
+    id: 'festival_offer', label: 'Festival offer', category: 'MARKETING', name: 'festival_offer',
+    description: 'A time-limited offer.',
+    body: 'Hello {{1}}, enjoy {{2}} off on all custom prints at Studio Sara until {{3}}. Order now and make your festival special.',
+    examples: { 1: 'Rohit', 2: '15%', 3: '30 Nov' },
+    footer: 'Reply STOP to opt out',
+  },
+  {
+    id: 'cart_reminder', label: 'Cart reminder', category: 'MARKETING', name: 'cart_reminder',
+    description: 'Reminds someone about items they left in their cart.',
+    body: 'Hello {{1}}, you left {{2}} in your cart at Studio Sara. Open our website to complete your order whenever you are ready.',
+    examples: { 1: 'Rohit', 2: 'a custom shirt' },
+    footer: 'Reply STOP to opt out',
+  },
+];
+
+export const draftFromStarter = (s: Starter, language: string): Draft => ({
+  ...emptyDraft(), name: s.name, language, category: s.category, body: s.body, bodyExamples: { ...s.examples }, footer: s.footer ?? '',
+});
+
+export interface CategoryInfo {
+  id: 'UTILITY' | 'MARKETING' | 'AUTHENTICATION';
+  title: string;
+  tagline: string;
+  useFor: string[];
+  examples: string[];
+  watchOut: string[];
+  approval: string;
+}
+
+export const CATEGORY_INFO: CategoryInfo[] = [
+  {
+    id: 'UTILITY', title: 'Utility', tagline: 'Updates about something the customer did or asked for',
+    useFor: ['Order placed, shipped, delivered', 'Payment received or refunded', 'Booking, design or quote updates', 'Account changes'],
+    examples: ['Your order #1042 has shipped.', 'We received your payment of Rs 1,500.'],
+    watchOut: ['No offers, discounts or "shop now" wording, even a small one', 'It must be about that customer’s own order or request', 'If it reads like promotion, WhatsApp moves it to Marketing and it costs more'],
+    approval: 'Usually minutes to a few hours',
+  },
+  {
+    id: 'MARKETING', title: 'Marketing', tagline: 'Offers, new arrivals and reminders to come back',
+    useFor: ['New collections and launches', 'Sales and festival offers', 'Cart and wishlist reminders', 'Greetings with a promotion'],
+    examples: ['Our festive collection is live.', '15% off custom prints this week.'],
+    watchOut: ['Only for customers who agreed to receive messages from you', 'It costs more per message than Utility', 'Include a way to opt out, such as "Reply STOP"'],
+    approval: 'Usually minutes to a few hours',
+  },
+  {
+    id: 'AUTHENTICATION', title: 'Login code (OTP)', tagline: 'A one-time code with a Copy Code button',
+    useFor: ['Login and sign-up codes', 'Confirming a phone number'],
+    examples: ['123456 is your verification code.'],
+    watchOut: ['WhatsApp fixes the wording, so you only choose the expiry and the security line', 'No links, images or emoji', 'The code can be up to 15 letters or numbers'],
+    approval: 'Usually approved straight away',
+  },
+];
+
+export interface RuleCheck {
+  id: string;
+  label: string;
+  why: string;
+  ok: boolean;
+}
+
+const has = (issues: Issue[], field: IssueField, re?: RegExp) =>
+  issues.some((i) => i.field === field && (!re || re.test(i.message)));
+
+/** The rules a template is checked against, each with whether it passes right now. */
+export const ruleChecklist = (d: Draft, issues: Issue[]): RuleCheck[] => [
+  { id: 'name', label: 'Name uses lowercase letters, numbers and underscores', why: 'WhatsApp only accepts this format, and it is how the platform finds the template.', ok: !!d.name && !has(issues, 'name') },
+  { id: 'body', label: 'Message is written and within 1024 characters', why: 'WhatsApp rejects an empty message or one that is too long.', ok: !!d.body.trim() && !has(issues, 'body', /message|characters|blank line|emoji/i) },
+  { id: 'variables', label: 'Variables are numbered in order, not first, last or side by side', why: 'WhatsApp refuses a template where a variable opens or closes the text, or two sit together.', ok: !has(issues, 'body', /variable|number|start or end|next to each other|more text/i) },
+  { id: 'examples', label: 'Every variable has an example', why: 'WhatsApp reviews the template with your sample values. They are never sent to customers.', ok: !has(issues, 'body', /example/i) && !has(issues, 'header', /example/i) },
+  { id: 'header', label: 'Header follows the limits', why: 'A text header is one short line with no emoji or formatting. Media needs a sample file.', ok: !has(issues, 'header') },
+  { id: 'footer', label: 'Footer follows the limits', why: 'A footer is one short line, with no variables or emoji.', ok: !has(issues, 'footer') },
+  { id: 'buttons', label: 'Buttons follow the limits', why: 'Labels up to 25 characters, https links, and the allowed number of each kind.', ok: !has(issues, 'buttons') },
+  { id: 'fit', label: 'Wording fits the type you chose', why: 'Promotion in a Utility template, a login code outside the Login code type, or asking for passwords and card details gets a template rejected.', ok: !has(issues, 'general') },
+];

@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Loader2, Phone, Search, Send, UserRound, X } from 'lucide-react';
+import { AlertTriangle, Loader2, Search, Send, UserRound, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { adminUsersApi, whatsappCloudApi } from '@/lib/api';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { P } from '@/lib/adminPermissionCodes';
@@ -14,6 +13,8 @@ import { LIMITS, SendValues, describeTemplate, validateSend } from '@/lib/waTemp
 import { cn } from '@/lib/utils';
 import { CategoryBadge, ErrorNote, failureHint, formatPhone, useDebounced } from './shared';
 import { TemplatePreview } from './TemplatePreview';
+import { PhoneInput, PhoneValue, emptyPhone, phoneResult } from './PhoneInput';
+import { parsePhone } from '@/lib/phone';
 
 interface Customer {
   email: string;
@@ -26,14 +27,15 @@ const cleanPhone = (raw?: string | null) => (raw ?? '').replace(/[^\d+]/g, '');
 const newId = () =>
   (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`).slice(0, 60);
 
-export const SendMessageDialog = ({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) => {
+export const SendMessagePanel = ({ onDone }: { onDone?: () => void }) => {
+  const open = true;
   const queryClient = useQueryClient();
   const { hasAny } = useAdminPermissions();
   const canSearchCustomers = hasAny(P.USERS_VIEW);
 
   const [search, setSearch] = useState('');
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [manualPhone, setManualPhone] = useState('');
+  const [manualPhone, setManualPhone] = useState<PhoneValue>(emptyPhone());
   const [templateKey, setTemplateKey] = useState('');
   const [vars, setVars] = useState<Record<string, string>>({});
   const [headerText, setHeaderText] = useState('');
@@ -56,17 +58,18 @@ export const SendMessageDialog = ({ open, onOpenChange }: { open: boolean; onOpe
   const template = approved.find((t) => t.key === templateKey);
   const parts = useMemo(() => (template ? describeTemplate(template.category, template.components) : null), [template]);
   const hasContent = !!template?.components && template.components.length > 0;
-  const phone = customer ? cleanPhone(customer.phone) : cleanPhone(manualPhone);
+  const manualResult = phoneResult(manualPhone);
+  const phone = customer ? parsePhone(customer.phone, '+91').digits || cleanPhone(customer.phone).replace(/^\+/, '') : manualResult.digits;
 
   const values: SendValues = { variables: vars, headerText, headerLink, buttons: btnValues };
   const problems: string[] = [];
-  if (!phone || phone.replace(/\D/g, '').length < 8) problems.push('Choose a customer, or type a phone number');
+  if (customer ? !parsePhone(customer.phone, '+91').ok : !manualResult.ok) problems.push(customer ? 'This customer\u2019s phone number is not valid. Type the number below instead.' : (manualResult.reason && manualPhone.national ? manualResult.reason : 'Choose a customer, or type a phone number'));
   if (!template) problems.push('Choose a template');
   if (parts && hasContent) problems.push(...validateSend(parts, values));
   else if (template && template.bodyParameters.some((p) => !(vars[p] ?? '').trim())) problems.push('Fill in every variable');
 
   const reset = () => {
-    setSearch(''); setCustomer(null); setManualPhone(''); setTemplateKey(''); setVars({}); setHeaderText(''); setHeaderLink(''); setBtnValues({});
+    setSearch(''); setCustomer(null); setManualPhone(emptyPhone()); setTemplateKey(''); setVars({}); setHeaderText(''); setHeaderLink(''); setBtnValues({});
   };
 
   const send = useMutation({
@@ -100,7 +103,7 @@ export const SendMessageDialog = ({ open, onOpenChange }: { open: boolean; onOpe
       }
       toast.success(`Message to ${formatPhone(m.to)} is on its way. Check the Messages tab for the delivery status.`);
       reset();
-      onOpenChange(false);
+      onDone?.();
     },
     onError: (e: any) => toast.error(e?.message || 'Could not send the message'),
   });
@@ -114,12 +117,12 @@ export const SendMessageDialog = ({ open, onOpenChange }: { open: boolean; onOpe
   const bodyVars = parts?.bodyVariables ?? template?.bodyParameters ?? [];
 
   return (
-    <Dialog open={open} onOpenChange={(o) => onOpenChange(o)}>
-      <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Send a message</DialogTitle>
-          <DialogDescription>Pick a customer and a template. WhatsApp only allows approved templates when you message first.</DialogDescription>
-        </DialogHeader>
+    <div className="rounded-2xl border bg-background shadow-sm">
+      <div className="border-b bg-muted/30 px-6 py-4">
+        <h2 className="text-xl font-semibold">Send a message to one customer</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Pick a customer and an approved template, fill in the details, and send. WhatsApp only lets you message a customer first with an approved template.</p>
+      </div>
+      <div className="p-6">
 
         <div className="grid gap-6 md:grid-cols-[1fr_300px]">
           <div className="space-y-4">
@@ -171,11 +174,7 @@ export const SendMessageDialog = ({ open, onOpenChange }: { open: boolean; onOpe
                   )}
                   <div className="mt-3">
                     <Label className="text-xs text-muted-foreground">{canSearchCustomers ? 'Or type a number' : 'Phone number'}</Label>
-                    <div className="relative mt-1">
-                      <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input value={manualPhone} onChange={(e) => setManualPhone(e.target.value)} placeholder="+91 98765 43210" className="pl-9" />
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">Without a country code, India (+91) is assumed.</p>
+                    <PhoneInput value={manualPhone} onChange={setManualPhone} className="mt-1" />
                   </div>
                 </>
               )}
@@ -242,7 +241,7 @@ export const SendMessageDialog = ({ open, onOpenChange }: { open: boolean; onOpe
               </div>
             )}
 
-            {problems.length > 0 && (customer || manualPhone || templateKey) && (
+            {problems.length > 0 && (customer || manualPhone.national || templateKey) && (
               <ul className="list-disc space-y-0.5 pl-5 text-xs text-amber-700">{Array.from(new Set(problems)).map((p) => <li key={p}>{p}</li>)}</ul>
             )}
           </div>
@@ -259,14 +258,14 @@ export const SendMessageDialog = ({ open, onOpenChange }: { open: boolean; onOpe
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => send.mutate()} disabled={problems.length > 0 || send.isPending} className="gap-2">
-            {send.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            Send message
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </div>
+      <div className="flex justify-end gap-2 border-t px-6 py-3">
+        <Button variant="outline" onClick={() => { reset(); onDone?.(); }}>Cancel</Button>
+        <Button onClick={() => send.mutate()} disabled={problems.length > 0 || send.isPending} className="gap-2">
+          {send.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Send message
+        </Button>
+      </div>
+    </div>
   );
 };

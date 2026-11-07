@@ -72,7 +72,14 @@ import AdminOrderDetail from "./pages/admin/AdminOrderDetail";
 import AdminBusinessConfig from "./pages/admin/AdminBusinessConfig";
 import AdminPaymentConfig from "./pages/admin/AdminPaymentConfig";
 import AdminCurrencyMultipliers from "./pages/admin/AdminCurrencyMultipliers";
-import AdminWhatsAppCloud from "./pages/admin/AdminWhatsAppCloud";
+import WhatsAppOverview from "./pages/admin/whatsapp/WhatsAppOverview";
+import WhatsAppSend from "./pages/admin/whatsapp/WhatsAppSend";
+import WhatsAppMessages from "./pages/admin/whatsapp/WhatsAppMessages";
+import WhatsAppBroadcasts from "./pages/admin/whatsapp/WhatsAppBroadcasts";
+import WhatsAppBroadcastNew from "./pages/admin/whatsapp/WhatsAppBroadcastNew";
+import WhatsAppBroadcastDetail from "./pages/admin/whatsapp/WhatsAppBroadcastDetail";
+import WhatsAppTemplates from "./pages/admin/whatsapp/WhatsAppTemplates";
+import WhatsAppTemplateEditor from "./pages/admin/whatsapp/WhatsAppTemplateEditor";
 import AdminPlatformPayments from "./pages/admin/AdminPlatformPayments";
 import AdminNotificationCenter from "./pages/admin/AdminNotificationCenter";
 import AdminLogs from "./pages/admin/AdminLogs";
@@ -510,13 +517,78 @@ const App = () =>
             }
           />
           <Route
-            path="/admin-sara/whatsapp-cloud"
+            path="/admin-sara/whatsapp"
             element={
               <ProtectedAdminRoute>
-                <AdminWhatsAppCloud />
+                <WhatsAppOverview />
               </ProtectedAdminRoute>
             }
           />
+          <Route
+            path="/admin-sara/whatsapp/send"
+            element={
+              <ProtectedAdminRoute>
+                <WhatsAppSend />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/whatsapp/messages"
+            element={
+              <ProtectedAdminRoute>
+                <WhatsAppMessages />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/whatsapp/broadcasts"
+            element={
+              <ProtectedAdminRoute>
+                <WhatsAppBroadcasts />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/whatsapp/broadcasts/new"
+            element={
+              <ProtectedAdminRoute>
+                <WhatsAppBroadcastNew />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/whatsapp/broadcasts/:id"
+            element={
+              <ProtectedAdminRoute>
+                <WhatsAppBroadcastDetail />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/whatsapp/templates"
+            element={
+              <ProtectedAdminRoute>
+                <WhatsAppTemplates />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/whatsapp/templates/new"
+            element={
+              <ProtectedAdminRoute>
+                <WhatsAppTemplateEditor />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/whatsapp/templates/:key/edit"
+            element={
+              <ProtectedAdminRoute>
+                <WhatsAppTemplateEditor />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route path="/admin-sara/whatsapp-cloud" element={<Navigate to="/admin-sara/whatsapp" replace />} />
           <Route
             path="/admin-sara/notifications"
             element={

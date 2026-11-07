@@ -84,7 +84,7 @@ const MessageDrawer = ({
 
   return (
     <Sheet open={!!message} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-3xl">
         {message && (
           <>
             <SheetHeader>
@@ -101,7 +101,9 @@ const MessageDrawer = ({
               </div>
             )}
 
-            <dl className="mt-4 divide-y rounded-lg border text-sm">
+            <div className="mt-4 grid gap-6 md:grid-cols-2">
+            <div>
+            <dl className="divide-y rounded-lg border text-sm">
               {rows.map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-4 px-3 py-2">
                   <dt className="text-muted-foreground">{k}</dt>
@@ -109,8 +111,9 @@ const MessageDrawer = ({
                 </div>
               ))}
             </dl>
-
-            <h4 className="mt-6 mb-2 text-sm font-semibold">Timeline</h4>
+            </div>
+            <div>
+            <h4 className="mb-2 text-sm font-semibold">Timeline</h4>
             {events.isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : events.isError ? (
@@ -130,6 +133,9 @@ const MessageDrawer = ({
                 {(events.data ?? []).length === 0 && <li className="text-sm text-muted-foreground">No events yet.</li>}
               </ol>
             )}
+
+            </div>
+            </div>
 
             {canEdit && message.status === 'FAILED' && (
               <Button className="mt-6 w-full gap-2" onClick={() => retry.mutate()} disabled={retry.isPending}>

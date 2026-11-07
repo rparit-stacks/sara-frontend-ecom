@@ -1692,6 +1692,7 @@ export const whatsappCloudApi = {
     fetchApi<WaCloudPage<WaCloudBroadcast>>(`${waCloud}/broadcasts${waQuery({ page, size })}`),
   createBroadcast: (data: WaCloudCreateBroadcast) =>
     fetchApi<WaCloudBroadcast>(`${waCloud}/broadcasts`, { method: 'POST', body: JSON.stringify(data) }),
+  getBroadcast: (id: string) => fetchApi<WaCloudBroadcast>(`${waCloud}/broadcasts/${id}`),
   broadcastAction: (id: string, action: 'start' | 'pause' | 'resume' | 'cancel') =>
     fetchApi<WaCloudBroadcast>(`${waCloud}/broadcasts/${id}/${action}`, { method: 'POST' }),
   broadcastRecipients: (id: string, page = 0, size = 15, status?: string) =>
