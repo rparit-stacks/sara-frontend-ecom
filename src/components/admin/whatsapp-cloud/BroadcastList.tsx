@@ -61,7 +61,7 @@ export const BroadcastList = ({ canEdit }: { canEdit: boolean }) => {
       {query.isLoading && <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
 
       {!query.isLoading && shown.length === 0 && (
-        <div className="rounded-2xl border border-dashed p-12 text-center">
+        <div className="rounded-xl border border-dashed p-12 text-center">
           <Megaphone className="mx-auto h-8 w-8 text-muted-foreground" />
           <p className="mt-3 font-semibold">{lane === 'ALL' ? 'No broadcasts yet' : 'Nothing here'}</p>
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
@@ -75,7 +75,7 @@ export const BroadcastList = ({ canEdit }: { canEdit: boolean }) => {
         {shown.map((b: WaCloudBroadcast) => {
           const p = progressOf(b);
           return (
-            <Link key={b.id} to={`/admin-sara/whatsapp/broadcasts/${b.id}`} className="flex flex-col gap-3 rounded-2xl border bg-background p-4 transition hover:border-primary/50 hover:shadow-sm">
+            <Link key={b.id} to={`/admin-sara/whatsapp/broadcasts/${b.id}`} className="flex flex-col gap-3 rounded-xl border bg-background p-4 transition hover:border-primary/50">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate font-semibold">{b.name}</p>

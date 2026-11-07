@@ -68,14 +68,14 @@ export const TemplateGallery = ({ canEdit }: { canEdit: boolean }) => {
     </div>
   );
   const platformBadge = (t: WaCloudTemplate) => isPlatform(t) && (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800" title={`Used by the platform: ${platformByName.get(t.key)!.label}`}><Lock className="h-3 w-3" /> Used by platform</span>
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title={`Used by the platform: ${platformByName.get(t.key)!.label}`}><Lock className="h-3 w-3" /> Used by platform</span>
   );
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[['all', 'All templates', counts.total, ''], ['APPROVED', 'Approved', counts.approved, 'text-emerald-700'], ['PENDING', 'In review', counts.pending, 'text-amber-700'], ['REJECTED', 'Need attention', counts.rejected, 'text-red-700']].map(([v, l, n, c]) => (
-          <button key={v as string} type="button" onClick={() => setStatus(v as string)} className={cn('rounded-2xl border bg-background p-4 text-left transition hover:border-primary/50', status === v && 'border-primary bg-primary/5')}>
+          <button key={v as string} type="button" onClick={() => setStatus(v as string)} className={cn('rounded-xl border bg-background p-4 text-left transition hover:border-primary/50', status === v && 'border-primary bg-primary/5')}>
             <p className="text-sm text-muted-foreground">{l}</p><p className={cn('mt-1 text-3xl font-semibold tabular-nums', c as string)}>{n}</p>
           </button>
         ))}
@@ -110,12 +110,12 @@ export const TemplateGallery = ({ canEdit }: { canEdit: boolean }) => {
 
       {query.isError && <ErrorNote error={query.error} />}
       {query.isLoading && <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
-      {!query.isLoading && rows.length === 0 && <p className="rounded-2xl border border-dashed p-12 text-center text-sm text-muted-foreground">{all.length === 0 ? 'No templates yet. Create one, or refresh to pull the ones already on WhatsApp.' : 'No templates match these filters.'}</p>}
+      {!query.isLoading && rows.length === 0 && <p className="rounded-xl border border-dashed p-12 text-center text-sm text-muted-foreground">{all.length === 0 ? 'No templates yet. Create one, or refresh to pull the ones already on WhatsApp.' : 'No templates match these filters.'}</p>}
 
       {view === 'cards' ? (
         <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
           {rows.map((t) => (
-            <div key={t.id} onClick={() => setViewing(t)} className="flex cursor-pointer flex-col gap-3 rounded-2xl border bg-background p-4 transition hover:border-primary/50 hover:shadow-sm">
+            <div key={t.id} onClick={() => setViewing(t)} className="flex cursor-pointer flex-col gap-3 rounded-xl border bg-background p-4 transition hover:border-primary/50">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0"><code className="block truncate text-sm font-semibold">{t.key}</code><p className="text-xs text-muted-foreground">{t.language} · {t.bodyParameters?.length ?? 0} variable{(t.bodyParameters?.length ?? 0) === 1 ? '' : 's'} · {timeAgo(t.updatedAt || t.syncedAt)}</p></div>
                 <TemplateStatusBadge status={t.status} />

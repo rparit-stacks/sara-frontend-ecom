@@ -11,6 +11,7 @@ import ScrollReveal from '@/components/animations/ScrollReveal';
 import AnimatedWaveBackground from '@/components/animations/AnimatedWaveBackground';
 import { toast } from 'sonner';
 import { customConfigApi } from '@/lib/api';
+import { MarketingConsentCheckbox, recordMarketingConsent } from '@/components/MarketingConsent';
 
 const steps = [
   {
@@ -88,6 +89,7 @@ const CustomDesign = () => {
     description: '',
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
@@ -113,6 +115,9 @@ const CustomDesign = () => {
   const submitMutation = useMutation({
     mutationFn: customConfigApi.submitDesignRequest,
     onSuccess: () => {
+      if (marketingOptIn) {
+        void recordMarketingConsent({ email: formData.email, phone: formData.phone, name: formData.fullName, source: 'design-request' });
+      }
       setIsSubmitted(true);
       toast.success('Request submitted successfully!');
     },
@@ -601,6 +606,8 @@ const CustomDesign = () => {
                       </div>
                     )}
                   </div>
+
+                  <MarketingConsentCheckbox id="design-marketing" checked={marketingOptIn} onChange={setMarketingOptIn} className="mb-4" />
 
                   <Button 
                     type="submit" 

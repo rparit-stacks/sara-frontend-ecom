@@ -1614,6 +1614,10 @@ export interface WaCloudCreateBroadcast {
   scheduledAt?: string;
 }
 
+export interface WaCloudCustomer { name?: string; email?: string; phone: string; source: string; }
+export interface WaCloudCustomerAudience {
+  customers: WaCloudCustomer[]; sources: Record<string, number>; withoutPhone: number; unsubscribed: number;
+}
 const waCloud = '/api/admin/whatsapp-cloud';
 const waQuery = (params: Record<string, string | number | undefined>) => {
   const qs = new URLSearchParams();
@@ -1686,6 +1690,14 @@ export const whatsappCloudApi = {
   },
   deleteTemplate: (key: string) =>
     fetchApi<{ deleted: string }>(`${waCloud}/templates/${encodeURIComponent(key)}`, { method: 'DELETE' }),
+
+  // Customers from the platform (store accounts and manufacturing portal), one row per phone
+  getCustomerAudience: (source = 'ALL') =>
+    fetchApi<WaCloudCustomerAudience>(`${waCloud}/customers${waQuery({ source })}`),
+  importContacts: (contacts: Array<{ phone: string; name?: string; optIn?: boolean }>, source = 'broadcast') =>
+    fetchApi<{ created: number; updated: number; skipped: number }>(`${waCloud}/contacts/import`, {
+      method: 'POST', body: JSON.stringify({ contacts, source }),
+    }),
 
   // Broadcasts
   listBroadcasts: (page = 0, size = 15) =>
@@ -2357,6 +2369,16 @@ export const submitTestimonial = (linkId: string, data: any) =>
 // Email subscription
 export const subscribeEmail = (email: string) => 
   fetchApi<{ message: string }>(`/api/subscribe`, { method: 'POST', body: JSON.stringify({ email }) });
+
+// Marketing consent: the checkbox on forms, and the unsubscribe link in emails
+export const marketingApi = {
+  recordConsent: (data: { email?: string; phone?: string; name?: string; source: string }) =>
+    fetchApi<{ subscribed: boolean }>('/api/marketing/consent', { method: 'POST', body: JSON.stringify(data) }),
+  previewUnsubscribe: (token: string) =>
+    fetchApi<{ email: string }>(`/api/marketing/unsubscribe?t=${encodeURIComponent(token)}`),
+  unsubscribe: (token: string) =>
+    fetchApi<{ unsubscribed: boolean; email: string }>('/api/marketing/unsubscribe', { method: 'POST', body: JSON.stringify({ token }) }),
+};
 
 // Get Instagram thumbnail
 export const getInstagramThumbnail = (url: string) => 

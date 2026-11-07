@@ -51,7 +51,7 @@ const categoryTone: Record<string, keyof typeof tone> = {
 };
 
 const Pill = ({ label, color }: { label: string; color: keyof typeof tone }) => (
-  <Badge variant="outline" className={cn('font-medium text-[11px] px-2 py-0.5', tone[color])}>
+  <Badge variant="outline" className={cn('font-medium text-xs px-2 py-0.5', tone[color])}>
     {label}
   </Badge>
 );

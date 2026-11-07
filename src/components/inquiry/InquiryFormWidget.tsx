@@ -8,6 +8,7 @@ import { isDisplay, isLayout } from '@/components/portal/formbuilder/registry';
 import { parseFormFromDto, WIDTH_CLASS } from './inquiryUtils';
 import WebsiteInquiryField from './WebsiteInquiryField';
 import { toast } from 'sonner';
+import { MarketingConsentCheckbox, recordMarketingConsent } from '@/components/MarketingConsent';
 
 interface Props {
   /** When true, fetches the live published form. When false, uses admin preview data. */
@@ -33,6 +34,7 @@ function collectInputFields(fields: FormField[]): FormField[] {
 export default function InquiryFormWidget({ published = true, previewForm, compact }: Props) {
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [submitted, setSubmitted] = useState<{ reference: string } | null>(null);
 
   const { data: publishedDto, isLoading, isError } = useQuery({
@@ -50,6 +52,13 @@ export default function InquiryFormWidget({ published = true, previewForm, compa
     mutationFn: (payload: { formId?: number; values: Record<string, unknown> }) =>
       manufacturingApi.submitInquiry(payload),
     onSuccess: (res) => {
+      if (marketingOptIn) {
+        void recordMarketingConsent({
+          email: res.clientEmail || res.accountEmail, phone: res.clientPhone || res.accountPhone,
+          name: res.clientName || res.accountName, source: 'inquiry-form',
+        });
+      }
+      setMarketingOptIn(false);
       setSubmitted({ reference: res.reference });
       setValues({});
       setErrors({});
@@ -165,6 +174,7 @@ export default function InquiryFormWidget({ published = true, previewForm, compa
           ),
         )}
       </div>
+      <MarketingConsentCheckbox id="inquiry-marketing" checked={marketingOptIn} onChange={setMarketingOptIn} />
       <Button
         type="submit"
         size="lg"

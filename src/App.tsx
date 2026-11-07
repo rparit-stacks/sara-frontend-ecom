@@ -28,6 +28,8 @@ import Contact from "./pages/Contact";
 import About from "./pages/About";
 import FAQ from "./pages/FAQ";
 import Terms from "./pages/Terms";
+import MarketingTerms from "./pages/MarketingTerms";
+import Unsubscribe from "./pages/Unsubscribe";
 import Privacy from "./pages/Privacy";
 import DataDeletion from "./pages/DataDeletion";
 import Shipping from "./pages/Shipping";
@@ -233,6 +235,8 @@ const App = () =>
           <Route path="/about" element={<About />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/terms" element={<Terms />} />
+          <Route path="/marketing-terms" element={<MarketingTerms />} />
+          <Route path="/unsubscribe" element={<Unsubscribe />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/data-deletion" element={<DataDeletion />} />
           <Route path="/shipping" element={<Shipping />} />

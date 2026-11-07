@@ -11,6 +11,7 @@ import { guestCart } from '@/lib/guestCart';
 import { dispatchLoggedIn } from '@/lib/authEvents';
 import { API_BASE_URL, authApi, cartApi } from '@/lib/api';
 import { COUNTRY_CODES } from '@/lib/countryCodes';
+import { MarketingConsentCheckbox, recordMarketingConsent } from '@/components/MarketingConsent';
 
 type AuthTab = 'signup' | 'login';
 type OtpMethod = 'email' | 'phone';
@@ -35,6 +36,7 @@ const Login = () => {
   const [selectedPhoneEmail, setSelectedPhoneEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   const resetOtpState = () => {
     setOtp('');
@@ -148,6 +150,15 @@ const Login = () => {
     try {
       setIsVerifying(true);
       const data = await authApi.verifyOtp(effectiveEmail, otp);
+
+      if (marketingOptIn) {
+        const digits = phoneLocal.replace(/\D/g, '');
+        void recordMarketingConsent({
+          email: data.email ?? effectiveEmail,
+          phone: digits ? `${countryCode}${digits}` : undefined,
+          source: activeTab === 'signup' ? 'signup' : 'login',
+        });
+      }
 
       localStorage.setItem('authToken', data.token);
       // 30-day refresh token — api.ts spends this to silently renew the 24h access token.
@@ -335,6 +346,8 @@ const Login = () => {
                       </div>
                     )}
 
+                    <MarketingConsentCheckbox checked={marketingOptIn} onChange={setMarketingOptIn} />
+
                     <div className="space-y-3">
                       {isOtpSent ? (
                         <>
@@ -499,6 +512,8 @@ const Login = () => {
                         />
                       </div>
                     )}
+
+                    <MarketingConsentCheckbox checked={marketingOptIn} onChange={setMarketingOptIn} />
 
                     <div className="space-y-3">
                       {isOtpSent ? (

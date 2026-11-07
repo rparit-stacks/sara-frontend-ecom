@@ -17,9 +17,10 @@ import { cn } from '@/lib/utils';
 import { CategoryBadge, ErrorNote } from './shared';
 import { CountryPicker, PhoneInput, emptyPhone, phoneResult } from './PhoneInput';
 import { TemplatePreview } from './TemplatePreview';
-import { Section, WhyBox, WizardShell, WizardStep } from './WizardShell';
+import { Section, StepHead, WhyBox, WizardShell, WizardStep } from './WizardShell';
 
-type Audience = 'list' | 'tags' | 'all';
+type Audience = 'list' | 'customers' | 'tags' | 'all';
+
 type When = 'draft' | 'now' | 'later';
 type Source = 'shared' | 'list';
 
@@ -52,6 +53,7 @@ export const BroadcastWizard = ({
   const [headerLink, setHeaderLink] = useState('');
   const [btnValues, setBtnValues] = useState<Record<number, string>>({});
   const [audience, setAudience] = useState<Audience>('list');
+  const [custSource, setCustSource] = useState('ALL');
   const [defaultCode, setDefaultCode] = useState(DEFAULT_COUNTRY);
   const [listText, setListText] = useState('');
   const [tags, setTags] = useState('');
@@ -75,7 +77,13 @@ export const BroadcastWizard = ({
 
   const parsed = useMemo(() => parseList(listText, defaultCode, listVars), [listText, defaultCode, listVars]);
   const tagList = useMemo(() => Array.from(new Set(tags.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean))), [tags]);
-  const audienceCount = audience === 'list' ? parsed.valid.length : audience === 'tags' ? tagList.length : 0;
+  const customerAudience = useQuery({
+    queryKey: ['waCloudCustomerAudience', custSource],
+    queryFn: () => whatsappCloudApi.getCustomerAudience(custSource),
+    enabled: audience === 'customers',
+  });
+  const customers = customerAudience.data?.customers ?? [];
+  const audienceCount = audience === 'list' ? parsed.valid.length : audience === 'customers' ? customers.length : audience === 'tags' ? tagList.length : 0;
 
   const problems = useMemo(() => {
     const list: Array<{ step: number; message: string }> = [];
@@ -90,6 +98,11 @@ export const BroadcastWizard = ({
       if (parsed.valid.length === 0) list.push({ step: 3, message: 'Add at least one valid phone number' });
       if (parsed.tooMany) list.push({ step: 3, message: `A list can have at most ${MAX_RECIPIENTS} numbers. Use a tag for a bigger audience.` });
     }
+    if (audience === 'customers') {
+      if (customerAudience.isLoading) list.push({ step: 3, message: 'Customers are still loading' });
+      else if (customers.length === 0) list.push({ step: 3, message: 'No customers with a phone number found for this choice' });
+      if (customers.length > MAX_RECIPIENTS) list.push({ step: 3, message: `A broadcast can have at most ${MAX_RECIPIENTS} numbers. Pick one source.` });
+    }
     if (audience === 'tags') {
       if (tagList.length === 0) list.push({ step: 3, message: 'Add at least one tag' });
       if (tagList.length > 10) list.push({ step: 3, message: 'Use at most 10 tags' });
@@ -101,9 +114,9 @@ export const BroadcastWizard = ({
       if (!t) list.push({ step: 4, message: 'Choose the date and time to send' });
       else if (t < Date.now() + 10 * 60 * 1000) list.push({ step: 4, message: 'Choose a time at least 10 minutes from now' });
     }
-    if (isMarketing && when !== 'draft' && !consent) list.push({ step: 5, message: 'Confirm that these customers agreed to receive marketing messages' });
+    if (isMarketing && audience !== 'customers' && when !== 'draft' && !consent) list.push({ step: 5, message: 'Confirm that these customers agreed to receive marketing messages' });
     return list;
-  }, [name, template, parts, shared, listVars, audience, parsed, tagList, when, scheduledAt, isMarketing, consent, headerLink, btnValues]);
+  }, [name, template, parts, shared, listVars, audience, parsed, customers, customerAudience.isLoading, tagList, when, scheduledAt, isMarketing, consent, headerLink, btnValues]);
 
   const stepHas = (i: number) => showIssues && problems.some((p) => p.step === i);
   const steps: WizardStep[] = [
@@ -124,6 +137,16 @@ export const BroadcastWizard = ({
     mutationFn: async () => {
       const header = mediaHeader();
       const buttons = buttonValues();
+      if (audience === 'customers' && when !== 'draft') {
+        // Safety net: these people ticked the box, so make sure the service has them as opted in. Their consent is already synced when they tick it.
+        // A customer who replied STOP stays blocked until they opt in again: an import never reverses an opt-out.
+        for (let i = 0; i < customers.length; i += 1000) {
+          await whatsappCloudApi.importContacts(
+            customers.slice(i, i + 1000).map((c) => ({ phone: c.phone, ...(c.name ? { name: c.name } : {}), optIn: true })),
+            'consent-table',
+          );
+        }
+      }
       const body = {
         name: name.trim(), kind, templateKey,
         parameters: {
@@ -131,6 +154,7 @@ export const BroadcastWizard = ({
           ...(header ? { header } : {}), ...(buttons.length ? { buttons } : {}),
         },
         ...(audience === 'list' ? { recipients: parsed.valid.map((r) => ({ to: r.digits, ...(listVars.length ? { variables: r.values } : {}) })) } : {}),
+        ...(audience === 'customers' ? { recipients: customers.map((c) => ({ to: c.phone })) } : {}),
         ...(audience === 'tags' ? { tags: tagList } : {}),
         ...(audience === 'all' ? { allContacts: true } : {}),
         ...(when === 'later' ? { scheduledAt: new Date(scheduledAt).toISOString() } : {}),
@@ -197,6 +221,7 @@ export const BroadcastWizard = ({
 
   const basicsStep = (
     <div className="space-y-6">
+      <StepHead title="Name your broadcast" subtitle="Only you see this. It helps you find the broadcast later." />
       <WhyBox title="What a broadcast is">
         A broadcast sends one template to many customers. The service sends them in small batches, one message each, and keeps to the daily limit WhatsApp sets for your number. You can watch the progress afterwards.
       </WhyBox>
@@ -221,6 +246,7 @@ export const BroadcastWizard = ({
 
   const templateStep = (
     <div className="space-y-5">
+      <StepHead title="Choose the message" subtitle="Only approved templates can be broadcast." />
       <WhyBox title="Why only approved templates">
         WhatsApp lets a business message customers first only with an approved template. Login codes are not available for broadcasts. A Marketing template reaches only customers who agreed to hear from you.
       </WhyBox>
@@ -242,7 +268,7 @@ export const BroadcastWizard = ({
           return (
             <button key={t.id} type="button" disabled={blocked}
               onClick={() => { setTemplateKey(t.key); setSource({}); setShared({}); setBtnValues({}); setHeaderLink(''); }}
-              className={cn('flex flex-col gap-2 rounded-2xl border-2 p-3 text-left transition', templateKey === t.key ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50', blocked && 'cursor-not-allowed opacity-50')}>
+              className={cn('flex flex-col gap-2 rounded-xl border p-3 text-left transition', templateKey === t.key ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50', blocked && 'cursor-not-allowed opacity-50')}>
               <div className="flex items-center justify-between gap-2"><code className="truncate text-xs">{t.key}</code><CategoryBadge category={t.category} /></div>
               <p className="line-clamp-4 whitespace-pre-wrap text-sm text-muted-foreground">{p.body || 'No preview yet'}</p>
               <p className="text-xs text-muted-foreground">
@@ -260,6 +286,7 @@ export const BroadcastWizard = ({
 
   const valuesStep = (
     <div className="space-y-6">
+      <StepHead title="Fill in the details" subtitle="Same value for everyone, or a different one for each person." />
       <WhyBox title="Same for everyone, or from your list">
         A value that is the same for every customer (a collection name, an end date) is typed once. A value that differs per person (their name, their order number) comes from a column in your list, which you add in the next step.
       </WhyBox>
@@ -299,15 +326,52 @@ export const BroadcastWizard = ({
 
   const audienceStep = (
     <div className="space-y-5">
+      <StepHead title="Choose who gets it" subtitle="Customers who opted in, or numbers you paste or upload." />
       <WhyBox title="Who will receive it">
         Paste or upload a list of numbers with their country code, send to every customer who agreed to receive messages, or send to customers with a tag. Numbers that are wrong or repeated are left out, and you see exactly which.
       </WhyBox>
       <Tabs value={audience} onValueChange={(v) => setAudience(v as Audience)}>
         <TabsList>
+          <TabsTrigger value="customers">Our customers</TabsTrigger>
           <TabsTrigger value="list">Paste or upload a list</TabsTrigger>
           <TabsTrigger value="tags">Customers with a tag</TabsTrigger>
           <TabsTrigger value="all">All who agreed</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="customers" className="space-y-4">
+          {customerAudience.isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading customers</p>}
+          {customerAudience.isError && <p className="text-sm text-red-700">Could not load customers. Try again.</p>}
+          {customerAudience.data && (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {[['ALL', Object.values(customerAudience.data.sources).reduce((a, b) => a + b, 0)], ...Object.entries(customerAudience.data.sources)].map(([key, n]) => (
+                  <button key={key as string} type="button" onClick={() => setCustSource(key as string)}
+                    className={cn('rounded-full border px-3 py-1 text-sm', custSource === key ? 'border-primary bg-primary/10 font-medium' : 'text-muted-foreground')}>
+                    {key === 'ALL' ? 'Everyone who opted in' : (key as string).replace(/-/g, ' ')} ({n as number})
+                  </button>
+                ))}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border px-4 py-3"><p className="text-xs text-muted-foreground">Will receive it</p><p className="text-2xl font-semibold">{customers.length}</p></div>
+                <div className="rounded-xl border px-4 py-3"><p className="text-xs text-muted-foreground">Opted in, no phone number</p><p className="text-2xl font-semibold text-amber-700">{customerAudience.data.withoutPhone}</p></div>
+                <div className="rounded-xl border px-4 py-3"><p className="text-xs text-muted-foreground">Unsubscribed (never sent to)</p><p className="text-2xl font-semibold">{customerAudience.data.unsubscribed}</p></div>
+              </div>
+              <div className="rounded-xl border">
+                <p className="border-b px-3 py-2 text-sm font-semibold">First customers</p>
+                <ul className="divide-y text-sm">
+                  {customers.slice(0, 8).map((c) => (
+                    <li key={c.phone} className="flex justify-between gap-3 px-3 py-1.5">
+                      <span>{c.name || c.email || c.phone} <span className="text-muted-foreground">+{c.phone}</span></span>
+                      <span className="text-muted-foreground">{c.source.replace(/-/g, ' ')}</span>
+                    </li>
+                  ))}
+                  {customers.length === 0 && <li className="px-3 py-3 text-muted-foreground">Nobody has opted in with a phone number yet.</li>}
+                </ul>
+              </div>
+              <p className="text-xs text-muted-foreground">These are customers who ticked the marketing box on signup, login, a form, checkout or the newsletter, and have not unsubscribed. Everyone listed gets the message.</p>
+            </>
+          )}
+        </TabsContent>
 
         <TabsContent value="list" className="space-y-4">
           <div className="flex flex-wrap items-end gap-4">
@@ -367,10 +431,11 @@ export const BroadcastWizard = ({
 
   const whenStep = (
     <div className="space-y-6">
+      <StepHead title="When should it go out?" subtitle="Send now, schedule it, or save it as a draft." />
       <WhyBox title="Why the daily limit matters">
         WhatsApp limits how many different customers your number can message in a day (new numbers start at about {DAILY_LIMIT}). The broadcast stays under the limit and carries on the next day. {audienceCount > DAILY_LIMIT && audience !== 'all' ? `With ${audienceCount} customers that is about ${days} days.` : ''}
       </WhyBox>
-      <RadioGroup value={when} onValueChange={(v) => setWhen(v as When)} className="grid gap-3 lg:grid-cols-3">
+      <RadioGroup value={when} onValueChange={(v) => setWhen(v as When)} className="grid gap-3">
         {([
           ['draft', 'Save as draft', 'Nothing is sent. Start it later from the list.', Save],
           ['now', 'Send now', 'Starts right after you confirm.', Play],
@@ -395,6 +460,7 @@ export const BroadcastWizard = ({
 
   const reviewStep = (
     <div className="space-y-6">
+      <StepHead title="Check and send" subtitle="A broadcast cannot be taken back once messages go out." />
       <WhyBox title="Check it once more">
         A broadcast cannot be taken back once messages are sent. Send yourself a test first so you see exactly what customers will see.
       </WhyBox>
@@ -404,7 +470,7 @@ export const BroadcastWizard = ({
             ['Name', name || '—'],
             ['Kind', kind === 'CAMPAIGN' ? 'Campaign' : 'Collection launch'],
             ['Template', template?.key ?? '—'],
-            ['Audience', audience === 'list' ? `${parsed.valid.length} numbers` : audience === 'tags' ? `Tags: ${tagList.join(', ') || '—'}` : 'All who agreed'],
+            ['Audience', audience === 'list' ? `${parsed.valid.length} numbers` : audience === 'customers' ? `${customers.length} customers who opted in${custSource !== 'ALL' ? ` (${custSource.replace(/-/g, ' ')})` : ''}` : audience === 'tags' ? `Tags: ${tagList.join(', ') || '—'}` : 'All who agreed'],
             ['When', when === 'draft' ? 'Saved as a draft' : when === 'now' ? 'Starts right away' : scheduledAt ? new Date(scheduledAt).toLocaleString() : '—'],
             ['Values from the list', listVars.length ? listVars.map((v) => `{{${v}}}`).join(', ') : 'None'],
           ] as Array<[string, string]>).map(([k, v]) => <div key={k} className="flex justify-between border-b py-2"><dt className="text-muted-foreground">{k}</dt><dd className="font-medium">{v}</dd></div>)}
@@ -422,7 +488,7 @@ export const BroadcastWizard = ({
         {!testSent && when !== 'draft' && <p className="flex items-center gap-1.5 text-xs text-amber-700"><AlertTriangle className="h-3.5 w-3.5" /> You have not sent a test yet.</p>}
       </Section>
 
-      {isMarketing && when !== 'draft' && (
+      {isMarketing && audience !== 'customers' && when !== 'draft' && (
         <label className="flex cursor-pointer gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4">
           <Checkbox checked={consent} onCheckedChange={(v) => setConsent(v === true)} className="mt-0.5" />
           <span className="text-sm">
@@ -447,8 +513,7 @@ export const BroadcastWizard = ({
   return (
     <WizardShell
       open={open}
-      onOpenChange={(o) => onOpenChange?.(o)}
-      page={asPage}
+      onClose={close}
       title="New broadcast"
       subtitle="Send one approved template to many customers. Nothing is sent until the last step."
       steps={steps}

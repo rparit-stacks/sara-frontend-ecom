@@ -19,6 +19,7 @@ import { useCurrency } from '@/context/CurrencyContext';
 import { CurrencySelector } from '@/components/currency/CurrencySelector';
 import { lookupPincode } from '@/lib/pincodeLookup';
 import { getDomainBrandColorHex } from '@/lib/domainTheme';
+import { MarketingConsentCheckbox, recordMarketingConsent } from '@/components/MarketingConsent';
 
 // Countries list
 const COUNTRIES = [
@@ -161,6 +162,7 @@ const Checkout = () => {
   const [availableGateways, setAvailableGateways] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
   const [hasGstin, setHasGstin] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [saveAddressAsDefault, setSaveAddressAsDefault] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
@@ -853,6 +855,16 @@ const Checkout = () => {
       return;
     }
     
+    if (marketingOptIn) {
+      const phone = String(dataToValidate.phone || '').trim();
+      void recordMarketingConsent({
+        email: dataToValidate.email, name: `${dataToValidate.firstName || ''} ${dataToValidate.lastName || ''}`.trim() || undefined,
+        // A number without a country code is only trusted for India.
+        phone: phone.startsWith('+') || dataToValidate.country === 'IN' ? phone : undefined,
+        source: 'checkout',
+      });
+    }
+
     // Validate payment gateway availability
     if (availableGateways.length === 0) {
       toast.error(hasDigitalProducts
@@ -2037,6 +2049,8 @@ const Checkout = () => {
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
+
+                <MarketingConsentCheckbox id="checkout-marketing" checked={marketingOptIn} onChange={setMarketingOptIn} className="mt-2" />
 
                 <Button 
                   className="w-full bg-primary hover:bg-primary/90 text-white mt-2 h-12 sm:h-14 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"

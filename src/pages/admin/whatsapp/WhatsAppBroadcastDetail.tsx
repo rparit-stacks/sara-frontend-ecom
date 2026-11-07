@@ -71,7 +71,7 @@ const WhatsAppBroadcastDetail = () => {
 
       {b && p && (
         <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-background p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background p-4">
             <div className="flex items-center gap-3"><BroadcastStatusBadge status={b.status} /><span className="text-sm text-muted-foreground">Created {fmtDateTime(b.createdAt)}</span></div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="gap-2" onClick={() => { query.refetch(); recipients.refetch(); }}><RefreshCw className="h-4 w-4" /> Refresh</Button>
@@ -87,11 +87,11 @@ const WhatsAppBroadcastDetail = () => {
               ['Waiting or sent', String(p.waiting + p.sent), 'text-sky-700'],
               ['Failed or skipped', String(p.failed), 'text-red-700'],
             ].map(([k, v, c]) => (
-              <div key={k} className="rounded-2xl border bg-background p-4"><p className="text-sm text-muted-foreground">{k}</p><p className={cn('mt-1 text-3xl font-semibold tabular-nums', c)}>{v}</p></div>
+              <div key={k} className="rounded-xl border bg-background p-4"><p className="text-sm text-muted-foreground">{k}</p><p className={cn('mt-1 text-3xl font-semibold tabular-nums', c)}>{v}</p></div>
             ))}
           </div>
 
-          <div className="rounded-2xl border bg-background p-4">
+          <div className="rounded-xl border bg-background p-4">
             <ProgressBar b={b} />
             <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-emerald-500" /> Reached</span>
@@ -144,7 +144,7 @@ const WhatsAppBroadcastDetail = () => {
             </TabsContent>
 
             <TabsContent value="details">
-              <dl className="grid gap-x-10 rounded-2xl border bg-background p-5 text-sm sm:grid-cols-2">
+              <dl className="grid gap-x-10 rounded-xl border bg-background p-5 text-sm sm:grid-cols-2">
                 {([
                   ['Template', b.templateKey],
                   ['Kind', b.kind === 'COLLECTION_LAUNCH' ? 'Collection launch' : 'Campaign'],

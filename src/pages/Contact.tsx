@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { contactApi, cmsApi } from '@/lib/api';
 import { toast } from 'sonner';
+import { MarketingConsentCheckbox, recordMarketingConsent } from '@/components/MarketingConsent';
 
 // Country codes list
 const countryCodes = [
@@ -235,10 +236,19 @@ const Contact = () => {
     queryFn: () => cmsApi.getContactInfo(),
   });
   
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
+
   // Submit contact form
   const submitMutation = useMutation({
     mutationFn: (data: any) => contactApi.submit(data),
-    onSuccess: () => {
+    onSuccess: (_result, sent) => {
+      if (marketingOptIn) {
+        void recordMarketingConsent({
+          email: sent.email, name: `${sent.firstName} ${sent.lastName}`.trim(),
+          phone: sent.phoneNumber ? `${sent.countryCode}${sent.phoneNumber}` : undefined, source: 'contact-form',
+        });
+      }
+      setMarketingOptIn(false);
       toast.success('Thank you for contacting us! We\'ll get back to you soon.');
       setFormData({
         firstName: '',
@@ -376,6 +386,7 @@ const Contact = () => {
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                   required
                 />
+                <MarketingConsentCheckbox id="contact-marketing" checked={marketingOptIn} onChange={setMarketingOptIn} />
                 <Button 
                   type="submit" 
                   className="w-full btn-primary h-14 text-base" 

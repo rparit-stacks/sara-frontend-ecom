@@ -14,7 +14,7 @@ const useCount = (key: string, status?: string, from?: string) =>
   useQuery({ queryKey: ['waCloudCount', key], queryFn: () => whatsappCloudApi.listMessages({ size: 1, status, from }), refetchInterval: 30_000, retry: false });
 
 const Stat = ({ label, value, hint, icon: Icon, tone, to }: { label: string; value?: number; hint: string; icon: typeof Send; tone: string; to: string }) => (
-  <Link to={to} className="rounded-2xl border bg-background p-4 transition hover:border-primary/50 hover:shadow-sm">
+  <Link to={to} className="rounded-xl border bg-background p-4 transition hover:border-primary/50">
     <div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">{label}</p><Icon className={cn('h-4 w-4', tone)} /></div>
     <p className="mt-2 text-3xl font-semibold tabular-nums">{value ?? '—'}</p>
     <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
@@ -61,7 +61,7 @@ const WhatsAppOverview = () => {
             ].map(([to, Icon, t, d]) => {
               const I = Icon as typeof Send;
               return (
-                <Link key={to as string} to={to as string} className="group flex items-start gap-3 rounded-2xl border bg-background p-4 transition hover:border-primary/50 hover:shadow-sm">
+                <Link key={to as string} to={to as string} className="group flex items-start gap-3 rounded-xl border bg-background p-4 transition hover:border-primary/50">
                   <span className="rounded-xl bg-primary/10 p-2.5 text-primary"><I className="h-5 w-5" /></span>
                   <span className="flex-1"><span className="block font-semibold">{t as string}</span><span className="block text-sm text-muted-foreground">{d as string}</span></span>
                   <ArrowRight className="mt-1 h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" />
@@ -72,8 +72,8 @@ const WhatsAppOverview = () => {
         )}
 
         <div className="grid gap-6 xl:grid-cols-2">
-          <section className="rounded-2xl border bg-background">
-            <div className="flex items-center justify-between border-b px-4 py-3"><h2 className="font-semibold">Latest messages</h2><Link to="/admin-sara/whatsapp/messages" className="text-sm text-primary hover:underline">See all</Link></div>
+          <section className="rounded-xl border bg-background">
+            <div className="flex items-center justify-between border-b px-4 py-3"><h2 className="font-sans font-semibold">Latest messages</h2><Link to="/admin-sara/whatsapp/messages" className="text-sm text-primary hover:underline">See all</Link></div>
             <ul className="divide-y">
               {(recent.data?.content ?? []).map((m) => (
                 <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
@@ -85,8 +85,8 @@ const WhatsAppOverview = () => {
             </ul>
           </section>
 
-          <section className="rounded-2xl border bg-background">
-            <div className="flex items-center justify-between border-b px-4 py-3"><h2 className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4 text-amber-600" /> Needs attention</h2></div>
+          <section className="rounded-xl border bg-background">
+            <div className="flex items-center justify-between border-b px-4 py-3"><h2 className="font-sans flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4 text-amber-600" /> Needs attention</h2></div>
             <div className="space-y-4 p-4 text-sm">
               {(failedRecent.data?.content ?? []).length > 0 && (
                 <div>

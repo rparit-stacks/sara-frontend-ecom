@@ -21,7 +21,7 @@ import { parsePhone } from '@/lib/phone';
 import { cn } from '@/lib/utils';
 import { TemplatePreview } from './TemplatePreview';
 import { PhoneInput, PhoneValue, emptyPhone } from './PhoneInput';
-import { Section, WhyBox, WizardShell, WizardStep } from './WizardShell';
+import { Section, StepHead, WhyBox, WizardShell, WizardStep } from './WizardShell';
 
 export const LANGUAGES = [
   { value: 'en', label: 'English' },
@@ -125,11 +125,11 @@ export const TemplateBuilder = ({
   const hasIssue = (...fields: string[]) => issues.some((i) => fields.includes(i.field));
   const steps: WizardStep[] = stepIds.map((id) => ({
     type: { id, label: 'Type', hint: 'Utility, Marketing or Login code', problem: false },
-    basics: { id, label: 'Name & language', hint: 'What it is called and who reads it', problem: showIssues && hasIssue('name', 'language') },
+    basics: { id, label: 'Name', hint: 'What it is called and who reads it', problem: showIssues && hasIssue('name', 'language') },
     content: { id, label: 'Message', hint: 'Header, text and footer', problem: showIssues && hasIssue('header', 'body', 'footer', 'general') },
     buttons: { id, label: 'Buttons', hint: 'Optional taps for the customer', problem: showIssues && hasIssue('buttons') },
-    settings: { id, label: 'Code settings', hint: 'Expiry and security line', problem: showIssues && hasIssue('footer') },
-    review: { id, label: 'Review & send', hint: 'Check the rules, then submit', problem: false },
+    settings: { id, label: 'Settings', hint: 'Expiry and security line', problem: showIssues && hasIssue('footer') },
+    review: { id, label: 'Review', hint: 'Check the rules, then submit', problem: false },
   }[id] as WizardStep));
 
   const issuesFor = (field: string) => (showIssues ? issues.filter((i) => i.field === field) : []);
@@ -233,10 +233,11 @@ export const TemplateBuilder = ({
   // ---------- steps ----------
   const typeStep = (
     <div className="space-y-5">
+      <StepHead title="What kind of template is this?" subtitle="Pick the type that matches your message. WhatsApp reviews and prices each type differently." />
       <WhyBox title="Why the type matters">
         WhatsApp reviews, prices and delivers each type differently. Choosing the wrong one gets a template rejected, or moved to a more expensive type. If a message mentions a discount or an offer, it is Marketing.
       </WhyBox>
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-3">
         {CATEGORY_INFO.map((c) => {
           const Icon = CATEGORY_ICON[c.id];
           const selected = c.id === 'AUTHENTICATION' ? mode === 'auth' : mode === 'message' && draft.category === c.id;
@@ -249,19 +250,25 @@ export const TemplateBuilder = ({
                 if (c.id === 'AUTHENTICATION') setMode('auth');
                 else { setMode('message'); set({ category: c.id, buttons: c.id === 'MARKETING' ? draft.buttons : draft.buttons.filter((b) => b.kind !== 'copy_code') }); }
               }}
-              className={cn('flex flex-col rounded-2xl border-2 p-4 text-left transition', selected ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50', editing && 'cursor-not-allowed opacity-70')}
+              className={cn('grid gap-x-8 gap-y-3 rounded-xl border p-5 text-left transition md:grid-cols-[230px_1fr_1fr]', selected ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:border-primary/50', editing && 'cursor-not-allowed opacity-70')}
             >
-              <div className="flex items-center justify-between">
-                <Icon className="h-6 w-6 text-primary" />
-                {selected && <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" /></span>}
+              <div>
+                <div className="flex items-center gap-2">
+                  <Icon className="h-5 w-5 text-primary" />
+                  <p className="font-sans text-base font-semibold">{c.title}</p>
+                  {selected && <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" /></span>}
+                </div>
+                <p className="mt-1.5 text-sm leading-snug text-muted-foreground">{c.tagline}</p>
+                <p className="mt-2 text-xs text-muted-foreground">Review: {c.approval.toLowerCase()}</p>
               </div>
-              <p className="mt-2 text-lg font-semibold">{c.title}</p>
-              <p className="text-sm text-muted-foreground">{c.tagline}</p>
-              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Use it for</p>
-              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm">{c.useFor.map((u) => <li key={u}>{u}</li>)}</ul>
-              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Watch out</p>
-              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-amber-800">{c.watchOut.map((u) => <li key={u}>{u}</li>)}</ul>
-              <p className="mt-3 text-xs text-muted-foreground">Review: {c.approval}</p>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Use it for</p>
+                <ul className="mt-1.5 space-y-1 text-sm leading-snug">{c.useFor.slice(0, 3).map((u) => <li key={u} className="flex gap-2"><span className="text-muted-foreground">•</span>{u}</li>)}</ul>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Watch out</p>
+                <ul className="mt-1.5 space-y-1 text-sm leading-snug text-amber-900">{c.watchOut.slice(0, 2).map((u) => <li key={u} className="flex gap-2"><span>•</span>{u}</li>)}</ul>
+              </div>
             </button>
           );
         })}
@@ -278,6 +285,7 @@ export const TemplateBuilder = ({
 
   const basicsStep = (
     <div className="space-y-6">
+      <StepHead title="Name your template" subtitle="The name is how the platform finds it, and it cannot be changed later." />
       <WhyBox title="Why the name and language matter">
         The name is how the platform and this page find the template, and it cannot be changed later. The language tells WhatsApp how to review the text.
       </WhyBox>
@@ -303,7 +311,7 @@ export const TemplateBuilder = ({
               <button key={s.id} type="button" onClick={() => applyStarter(s)} className="rounded-xl border p-3 text-left transition hover:border-primary hover:bg-muted/40">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold">{s.label}</p>
-                  <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', s.category === 'UTILITY' ? 'bg-sky-100 text-sky-800' : 'bg-violet-100 text-violet-800')}>{s.category === 'UTILITY' ? 'Utility' : 'Marketing'}</span>
+                  <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', s.category === 'UTILITY' ? 'bg-sky-100 text-sky-800' : 'bg-violet-100 text-violet-800')}>{s.category === 'UTILITY' ? 'Utility' : 'Marketing'}</span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{s.description}</p>
               </button>
@@ -316,6 +324,7 @@ export const TemplateBuilder = ({
 
   const contentStep = (
     <div className="space-y-8">
+      <StepHead title="Write the message" subtitle="The text your customer will read, with an optional header and footer." />
       {platform && (
         <WhyBox title={`Used by the platform: ${platform.label}`} tone="warn">
           You can change the wording and the buttons, but the message must keep exactly {platform.variables} variable{platform.variables === 1 ? '' : 's'}, because the platform sends that many values. It cannot be deleted.
@@ -408,6 +417,7 @@ export const TemplateBuilder = ({
 
   const buttonsStep = (
     <div className="space-y-5">
+      <StepHead title="Add buttons" subtitle="Optional. A button saves your customer a step." />
       <WhyBox title="Why add buttons">
         A button saves the customer a step: open the order page, call you, or confirm in one tap. They are optional. Up to {LIMITS.buttons} buttons in all, and every label up to {LIMITS.buttonText} characters.
       </WhyBox>
@@ -485,6 +495,7 @@ export const TemplateBuilder = ({
 
   const settingsStep = (
     <div className="space-y-6">
+      <StepHead title="Login code settings" subtitle="Choose how long the code lasts." />
       <WhyBox title="Why login codes are different">
         WhatsApp writes the message itself ("{'{{1}}'} is your verification code") so it cannot be misused. You only choose the security reminder and how long the code lasts. The customer gets a Copy Code button.
       </WhyBox>
@@ -508,6 +519,7 @@ export const TemplateBuilder = ({
 
   const reviewStep = (
     <div className="space-y-6">
+      <StepHead title="Review and send" subtitle="Check the rules, then send it to WhatsApp for review." />
       <WhyBox title="What happens when you submit">
         WhatsApp reviews the template, usually in minutes to a few hours. If it is rejected, the reason is shown on the Templates page and you can fix it and try again. Once approved you can use it straight away.
       </WhyBox>
@@ -558,12 +570,12 @@ export const TemplateBuilder = ({
   return (
     <WizardShell
       open={open}
-      onOpenChange={(o) => onOpenChange?.(o)}
-      page={asPage}
+      onClose={close}
+      wide={current === 'type'}
       title={editing ? `Edit “${template!.key}”` : 'Create a WhatsApp template'}
       subtitle={editing
         ? 'After you save, WhatsApp reviews the template again and it cannot be used until it is approved. WhatsApp also limits how often a template can be edited.'
-        : 'A template is the message WhatsApp lets you send first. Fill in each step, and we check the rules as you go.'}
+        : 'Fill in each step. We check the rules as you go.'}
       steps={steps}
       current={Math.min(step, stepIds.length - 1)}
       onStep={(i) => setStep(i)}

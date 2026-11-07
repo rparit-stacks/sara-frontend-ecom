@@ -117,9 +117,9 @@ export const SendMessagePanel = ({ onDone }: { onDone?: () => void }) => {
   const bodyVars = parts?.bodyVariables ?? template?.bodyParameters ?? [];
 
   return (
-    <div className="rounded-2xl border bg-background shadow-sm">
+    <div className="rounded-xl border bg-background">
       <div className="border-b bg-muted/30 px-6 py-4">
-        <h2 className="text-xl font-semibold">Send a message to one customer</h2>
+        <h2 className="font-sans text-xl font-semibold">Send a message to one customer</h2>
         <p className="mt-1 text-sm text-muted-foreground">Pick a customer and an approved template, fill in the details, and send. WhatsApp only lets you message a customer first with an approved template.</p>
       </div>
       <div className="p-6">
