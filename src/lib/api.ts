@@ -1507,23 +1507,195 @@ export const paymentConfigApi = {
 };
 
 export const whatsappApi = {
-  // Template names (DB; fallback to application.properties)
-  getTemplateConfig: () => fetchApi<{ key: string; templateName: string; source: string }[]>('/api/admin/whatsapp/template-config'),
-  updateTemplateConfig: (data: { key: string; templateName: string }) =>
-    fetchApi<void>('/api/admin/whatsapp/template-config', { method: 'PUT', body: JSON.stringify(data) }),
-
-  // Template payloads (placeholder mappings per template key)
-  getTemplatePayloads: () =>
-    fetchApi<Array<{ key: string; label: string; templateName: string; placeholders: Array<{ index: number; name: string; description: string }> }>>(
-      '/api/admin/whatsapp/template-payloads'
-    ),
-
-  // Logs
-  getLogs: (page: number = 0, size: number = 20) => fetchApi<any>(`/api/admin/whatsapp/logs?page=${page}&size=${size}`),
+  // Logs of WhatsApp sends for one order (Order detail)
   getLogsByOrder: (orderId: number) => fetchApi<any[]>(`/api/admin/whatsapp/logs/order/${orderId}`),
 
   // Custom statuses (used by Order detail status dropdown)
   getCustomStatuses: () => fetchApi<any[]>('/api/admin/whatsapp/custom-statuses'),
+};
+
+// ===============================
+// WhatsApp Cloud API (sara-whatsapp-service via the backend gateway)
+// ===============================
+export interface WaCloudMessage {
+  id: string;
+  clientMessageId: string;
+  event: string | null;
+  templateKey: string;
+  to: string;
+  status: 'QUEUED' | 'SENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED' | 'SKIPPED' | string;
+  skipReason: string | null;
+  provider: string | null;
+  providerMessageId: string | null;
+  priority: string;
+  attempts: number;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  sentAt: string | null;
+  deliveredAt: string | null;
+  readAt: string | null;
+  expiresAt: string | null;
+}
+export interface WaCloudPage<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+export interface WaCloudMessageEvent {
+  id: string;
+  messageId: string;
+  status: string;
+  at: string;
+  errorCode: string | null;
+  detail: string | null;
+}
+export interface WaCloudTemplate {
+  id: string;
+  key: string;
+  metaName: string;
+  language: string;
+  category: 'UTILITY' | 'MARKETING' | 'AUTHENTICATION' | string;
+  status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'DISABLED' | string;
+  quality: string | null;
+  parameterFormat: string;
+  headerType: string | null;
+  bodyParameters: string[];
+  /** The template's content as Meta holds it (header, body, footer, buttons). */
+  components?: Array<Record<string, any>> | null;
+  syncedAt: string | null;
+  updatedAt: string | null;
+}
+export interface WaCloudBroadcast {
+  id: string;
+  name: string;
+  kind: string;
+  templateKey: string;
+  status: 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED' | string;
+  scheduledAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  recipientsListed: number;
+  tags: string[] | null;
+  allContacts: boolean;
+  messagesCreated: number;
+  counts: Record<string, number>;
+  createdAt: string;
+}
+export interface WaCloudMessageQuery {
+  page?: number;
+  size?: number;
+  q?: string;
+  status?: string;
+  templateKey?: string;
+  from?: string;
+  until?: string;
+  sort?: string;
+  dir?: 'asc' | 'desc';
+}
+export interface WaCloudCreateTemplate {
+  key: string;
+  name: string;
+  language: string;
+  category: 'UTILITY' | 'MARKETING' | 'AUTHENTICATION';
+  /** Left out for login-code templates. */
+  parameterFormat?: 'POSITIONAL';
+  components: Array<Record<string, unknown>>;
+}
+export interface WaCloudCreateBroadcast {
+  name: string;
+  templateKey: string;
+  parameters?: { variables: Record<string, string> };
+  recipients?: Array<{ to: string; variables?: Record<string, string> }>;
+  tags?: string[];
+  allContacts?: boolean;
+  scheduledAt?: string;
+}
+
+const waCloud = '/api/admin/whatsapp-cloud';
+const waQuery = (params: Record<string, string | number | undefined>) => {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== '') qs.set(k, String(v));
+  });
+  const text = qs.toString();
+  return text ? `?${text}` : '';
+};
+
+export interface WaCloudSendMessage {
+  clientMessageId: string;
+  templateKey: string;
+  to: string;
+  parameters?: {
+    variables?: Record<string, string>;
+    header?: { type: string; value: string; filename?: string };
+    buttons?: Array<{ index: number; subType: string; value: string }>;
+  };
+}
+
+export interface WaCloudPlatformTemplate {
+  key: string;
+  label: string;
+  name: string;
+  variables: number;
+  document: boolean;
+}
+
+export const whatsappCloudApi = {
+  /** Templates the platform itself sends: fixed names and how many variables each must keep. */
+  platformTemplates: () => fetchApi<WaCloudPlatformTemplate[]>(`${waCloud}/platform-templates`),
+  // Messages
+  sendMessage: (data: WaCloudSendMessage) =>
+    fetchApi<WaCloudMessage>(`${waCloud}/messages`, { method: 'POST', body: JSON.stringify(data) }),
+  listMessages: (query: WaCloudMessageQuery) =>
+    fetchApi<WaCloudPage<WaCloudMessage>>(`${waCloud}/messages${waQuery({ ...query })}`),
+  getMessageEvents: (id: string) => fetchApi<WaCloudMessageEvent[]>(`${waCloud}/messages/${id}/events`),
+  retryMessage: (id: string) => fetchApi<WaCloudMessage>(`${waCloud}/messages/${id}/retry`, { method: 'POST' }),
+
+  // Templates
+  listTemplates: () => fetchApi<WaCloudTemplate[]>(`${waCloud}/templates`),
+  syncTemplates: () => fetchApi<{ synced: number }>(`${waCloud}/templates/sync`, { method: 'POST' }),
+  createTemplate: (data: WaCloudCreateTemplate) =>
+    fetchApi<WaCloudTemplate>(`${waCloud}/templates`, { method: 'POST', body: JSON.stringify(data) }),
+  updateTemplate: (key: string, data: { components: Array<Record<string, unknown>>; category?: string }) =>
+    fetchApi<WaCloudTemplate>(`${waCloud}/templates/${encodeURIComponent(key)}/components`, { method: 'PUT', body: JSON.stringify(data) }),
+  /** Uploads a sample file for a media header and returns the handle WhatsApp needs. */
+  uploadTemplateSample: async (file: File): Promise<{ handle: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('adminToken');
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${waCloud}/templates/media`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+    } catch {
+      throw new Error('Upload failed. Please check your connection and try again.');
+    }
+    const text = await response.text();
+    if (!response.ok) {
+      let message = 'The sample file could not be uploaded.';
+      try { message = JSON.parse(text).message || message; } catch { /* keep default */ }
+      throw new Error(message);
+    }
+    return JSON.parse(text);
+  },
+  deleteTemplate: (key: string) =>
+    fetchApi<{ deleted: string }>(`${waCloud}/templates/${encodeURIComponent(key)}`, { method: 'DELETE' }),
+
+  // Broadcasts
+  listBroadcasts: (page = 0, size = 15) =>
+    fetchApi<WaCloudPage<WaCloudBroadcast>>(`${waCloud}/broadcasts${waQuery({ page, size })}`),
+  createBroadcast: (data: WaCloudCreateBroadcast) =>
+    fetchApi<WaCloudBroadcast>(`${waCloud}/broadcasts`, { method: 'POST', body: JSON.stringify(data) }),
+  broadcastAction: (id: string, action: 'start' | 'pause' | 'resume' | 'cancel') =>
+    fetchApi<WaCloudBroadcast>(`${waCloud}/broadcasts/${id}/${action}`, { method: 'POST' }),
+  broadcastRecipients: (id: string, page = 0, size = 15, status?: string) =>
+    fetchApi<WaCloudPage<WaCloudMessage>>(`${waCloud}/broadcasts/${id}/recipients${waQuery({ page, size, status })}`),
 };
 
 // ===============================

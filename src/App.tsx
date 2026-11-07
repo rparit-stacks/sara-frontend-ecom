@@ -72,7 +72,7 @@ import AdminOrderDetail from "./pages/admin/AdminOrderDetail";
 import AdminBusinessConfig from "./pages/admin/AdminBusinessConfig";
 import AdminPaymentConfig from "./pages/admin/AdminPaymentConfig";
 import AdminCurrencyMultipliers from "./pages/admin/AdminCurrencyMultipliers";
-import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
+import AdminWhatsAppCloud from "./pages/admin/AdminWhatsAppCloud";
 import AdminPlatformPayments from "./pages/admin/AdminPlatformPayments";
 import AdminNotificationCenter from "./pages/admin/AdminNotificationCenter";
 import AdminLogs from "./pages/admin/AdminLogs";
@@ -510,10 +510,10 @@ const App = () =>
             }
           />
           <Route
-            path="/admin-sara/whatsapp"
+            path="/admin-sara/whatsapp-cloud"
             element={
               <ProtectedAdminRoute>
-                <AdminWhatsApp />
+                <AdminWhatsAppCloud />
               </ProtectedAdminRoute>
             }
           />

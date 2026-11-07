@@ -78,7 +78,7 @@ const adminMenuSections = [
   {
     title: 'Communication',
     items: [
-      { icon: MessageSquare, label: 'WhatsApp', path: '/admin-sara/whatsapp' },
+      { icon: MessageSquare, label: 'WhatsApp', path: '/admin-sara/whatsapp-cloud' },
       { icon: MessageSquare, label: 'Contact Submissions', path: '/admin-sara/contact-submissions' },
       { icon: Bell, label: 'Notification Center', path: '/admin-sara/notifications' },
     ],
