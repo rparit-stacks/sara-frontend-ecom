@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, KeyboardEvent, ClipboardEvent
 import { Send, Paperclip, X, Loader2, ImagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { aiChatApi } from '@/lib/api';
+import { PolishAssist } from '@/components/polish/PolishAssist';
 
 interface ComposerProps {
   onSend: (text: string, imageUrls?: string[]) => void;
@@ -240,6 +241,7 @@ export function Composer({ onSend, disabled, placeholder, autoFocus }: ComposerP
           rows={1}
           className="max-h-24 flex-1 resize-none rounded-2xl border border-input bg-muted/40 px-4 py-2.5 text-sm leading-relaxed outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/40 focus:bg-white disabled:opacity-50"
         />
+        <PolishAssist value={value} onApply={(t) => { setValue(t); requestAnimationFrame(() => textareaRef.current?.focus()); }} context="message to the shop's AI assistant" disabled={disabled} />
         <Button
           size="icon"
           onClick={submit}

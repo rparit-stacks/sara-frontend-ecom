@@ -4,6 +4,8 @@ import { useLocation } from 'react-router-dom';
 import { ADMIN_AI_ASK_EVENT, type AdminAiAskPayload } from './askAdminAi';
 import {
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
   History,
   Loader2,
   Maximize2,
@@ -31,6 +33,7 @@ import { cn } from '@/lib/utils';
 
 const THREAD_KEY = 'adminAiChatThreadId';
 const EXPANDED_KEY = 'adminAiChatExpanded';
+const DOCKED_KEY = 'adminAiChatDocked';
 
 function loadThreadId(): string | null {
   try {
@@ -51,6 +54,22 @@ function saveThreadId(id: string) {
 function clearThreadId() {
   try {
     localStorage.removeItem(THREAD_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadDocked(): boolean {
+  try {
+    return localStorage.getItem(DOCKED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveDocked(docked: boolean) {
+  try {
+    localStorage.setItem(DOCKED_KEY, docked ? '1' : '0');
   } catch {
     /* ignore */
   }
@@ -136,6 +155,8 @@ export function AdminAiChatWidget() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(loadExpanded);
+  /** Tucked against the right edge as a small arrow, so it never covers a button on the page. */
+  const [isDocked, setIsDocked] = useState(loadDocked);
   const [messages, setMessages] = useState<AdminChatMessage[]>([]);
   const [pendingInput, setPendingInput] = useState<AdminPendingInput>({ kind: 'FREE_TEXT' });
   const [isSending, setIsSending] = useState(false);
@@ -378,36 +399,73 @@ export function AdminAiChatWidget() {
 
   return (
     <>
-      {/* FAB */}
+      {/* Docked: only a small arrow stuck to the right edge */}
       <AnimatePresence>
-        {!isOpen && (
+        {!isOpen && isDocked && (
           <motion.button
             type="button"
+            initial={{ x: 16, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 16, opacity: 0 }}
+            onClick={() => {
+              setIsDocked(false);
+              saveDocked(false);
+            }}
+            className="fixed bottom-6 right-0 z-[60] flex h-12 w-6 items-center justify-center rounded-l-lg bg-amber-500 text-white shadow-md hover:w-8"
+            aria-label="Show Ops AI"
+            title="Show Ops AI"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* FAB, with a small arrow to tuck it away */}
+      <AnimatePresence>
+        {!isOpen && !isDocked && (
+          <motion.div
             initial={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.6, opacity: 0 }}
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 z-[60] flex items-center gap-2.5 rounded-2xl bg-white px-4 py-3 text-slate-800 shadow-[0_12px_40px_-10px_rgba(15,23,42,0.25)] ring-1 ring-amber-400/45"
-            aria-label="Open Admin AI"
+            className="fixed bottom-6 right-6 z-[60]"
           >
-            <span
-              className={cn(
-                'relative flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-white',
-                pulse && 'animate-pulse',
-              )}
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setIsOpen(true)}
+              className="flex items-center gap-2.5 rounded-2xl bg-white px-4 py-3 text-slate-800 shadow-[0_12px_40px_-10px_rgba(15,23,42,0.25)] ring-1 ring-amber-400/45"
+              aria-label="Open Admin AI"
             >
-              <Terminal className="h-4 w-4" />
-              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
-            </span>
-            <span className="pr-0.5 text-left leading-tight">
-              <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-amber-600">
-                Ops AI
+              <span
+                className={cn(
+                  'relative flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-white',
+                  pulse && 'animate-pulse',
+                )}
+              >
+                <Terminal className="h-4 w-4" />
+                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
               </span>
-              <span className="block text-sm font-semibold text-slate-800">Ask console</span>
-            </span>
-          </motion.button>
+              <span className="pr-0.5 text-left leading-tight">
+                <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-amber-600">
+                  Ops AI
+                </span>
+                <span className="block text-sm font-semibold text-slate-800">Ask console</span>
+              </span>
+            </motion.button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsDocked(true);
+                saveDocked(true);
+              }}
+              className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-500 shadow ring-1 ring-slate-200 hover:text-slate-800"
+              aria-label="Tuck Ops AI to the right edge"
+              title="Tuck away to the right"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
 

@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { contactApi, cmsApi } from '@/lib/api';
 import { toast } from 'sonner';
+import { PolishAssist } from '@/components/polish/PolishAssist';
 import { MarketingConsentCheckbox, recordMarketingConsent } from '@/components/MarketingConsent';
 
 // Country codes list
@@ -386,6 +387,9 @@ const Contact = () => {
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                   required
                 />
+                <div className="-mt-3 flex justify-end">
+                  <PolishAssist value={formData.message} onApply={(t) => setFormData((f) => ({ ...f, message: t }))} context="message in a contact form to a fabric and apparel studio" />
+                </div>
                 <MarketingConsentCheckbox id="contact-marketing" checked={marketingOptIn} onChange={setMarketingOptIn} />
                 <Button 
                   type="submit" 

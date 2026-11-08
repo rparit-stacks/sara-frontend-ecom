@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, AlertTriangle, Gauge, Loader2, Settings2, Timer, Workflow } from 'lucide-react';
+import { Activity, AlertTriangle, BellRing, Eraser, Gauge, Loader2, Settings2, Timer, Workflow } from 'lucide-react';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,10 @@ import { Label } from '@/components/ui/label';
 import { logsApi } from '@/lib/api';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { HealthAlertRecipients } from '@/components/admin/HealthAlertRecipients';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const WINDOWS = [
   { value: '1', label: 'Last 1h' },
@@ -58,6 +62,22 @@ export const SystemHealthPanel = () => {
     setSlowMs(String(ingest.slowThresholdMs ?? 2000));
   }, [ingest]);
 
+  const sendSummary = useMutation({
+    mutationFn: () => logsApi.sendHealthSummaryNow(),
+    onSuccess: (r) => toast.success(r.message),
+    onError: (e: Error) => toast.error(e.message || 'Could not send the alert'),
+  });
+
+  const cleanNoise = useMutation({
+    mutationFn: () => logsApi.cleanupScannerNoise(),
+    onSuccess: (r) => {
+      toast.success(r.message);
+      queryClient.invalidateQueries({ queryKey: ['system-health-brief'] });
+      queryClient.invalidateQueries({ queryKey: ['api-logs'] });
+    },
+    onError: (e: Error) => toast.error(e.message || 'Could not clean the logs'),
+  });
+
   const saveIngest = useMutation({
     mutationFn: () => {
       const pct = Number(samplePct);
@@ -91,6 +111,34 @@ export const SystemHealthPanel = () => {
         <h2 className="font-semibold flex items-center gap-2">
           <Activity className="w-5 h-5 text-primary" /> System Health
         </h2>
+        <div className="flex flex-wrap items-center gap-2">
+        {isMainAdmin && (
+          <>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5" disabled={sendSummary.isPending}>
+                  {sendSummary.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />} Send alert now
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Send the health summary now?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This sends the same last-24-hours summary that goes out every day at 9:00, to everyone set up to get alerts below (email and WhatsApp).
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => sendSummary.mutate()}>Send now</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <Button variant="outline" size="sm" className="gap-1.5" disabled={cleanNoise.isPending} onClick={() => cleanNoise.mutate()}
+              title="Delete log rows that are only bots asking for /.env, *.php, /graphql and other pages that do not exist here">
+              {cleanNoise.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eraser className="h-4 w-4" />} Clean bot noise
+            </Button>
+          </>
+        )}
         <Select value={windowHours} onValueChange={setWindowHours}>
           <SelectTrigger className="w-32 h-9">
             <SelectValue />
@@ -101,6 +149,7 @@ export const SystemHealthPanel = () => {
             ))}
           </SelectContent>
         </Select>
+        </div>
       </div>
 
       {isLoading || !data || !tone ? (

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { PolishAssist } from '@/components/polish/PolishAssist';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -109,13 +110,20 @@ export default function WebsiteInquiryField({ field, value, onChange, error }: P
     case 'html':
     case 'address':
       return wrap(
-        <Textarea
-          rows={4}
-          placeholder={field.placeholder}
-          value={strVal}
-          onChange={(e) => onChange(field.key, e.target.value)}
-          className="resize-none"
-        />,
+        <>
+          <Textarea
+            rows={4}
+            placeholder={field.placeholder}
+            value={strVal}
+            onChange={(e) => onChange(field.key, e.target.value)}
+            className="resize-none"
+          />
+          {field.type !== 'address' && (
+            <div className="mt-2 flex justify-end">
+              <PolishAssist value={strVal} onApply={(t) => onChange(field.key, t)} context="answer on a manufacturing inquiry form" />
+            </div>
+          )}
+        </>,
       );
     case 'date':
     case 'time':

@@ -1,3 +1,4 @@
+import { PolishAssist } from '@/components/polish/PolishAssist';
 import { useCallback, useEffect, useRef, useState, KeyboardEvent } from 'react';
 import { ImagePlus, Loader2, Send, X } from 'lucide-react';
 import { adminAiChatApi } from '@/lib/api';
@@ -132,6 +133,7 @@ export function AdminComposer({ onSend, disabled, placeholder }: Props) {
           placeholder={placeholder || 'Ask ops AI…'}
           className="max-h-32 min-h-[42px] flex-1 resize-none bg-transparent py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
         />
+        <PolishAssist value={value} onApply={setValue} context="question to the admin ops AI" disabled={disabled} />
         <button
           type="button"
           onClick={submit}

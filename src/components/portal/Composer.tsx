@@ -1,3 +1,4 @@
+import { PolishAssist } from '@/components/polish/PolishAssist';
 import { useRef, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { Sym } from './Sym';
 import { htmlToMarkdown, isEditorEmpty } from '@/lib/messageFormat';
@@ -685,6 +686,19 @@ export default function Composer({
           <input ref={fileInput} type="file" multiple hidden onChange={(e) => { addFiles(e.target.files, 'file'); e.target.value = ''; }} />
         </div>
         <div className="flex items-center gap-2">
+          <PolishAssist
+            value={empty ? '' : 'typed'}
+            getValue={() => editorRef.current?.innerText || ''}
+            context="message in a project chat between a studio and its client"
+            disabled={sending}
+            onApply={(t) => {
+              const editor = editorRef.current;
+              if (!editor) return;
+              editor.textContent = t;
+              onInput();
+              editor.focus();
+            }}
+          />
           <span className="hidden sm:inline text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}>⌘↵ send · Enter new line</span>
           <button type="button" onClick={submit} disabled={!canSend} className="p-2 rounded-lg flex items-center justify-center min-w-[40px]" style={canSend ? { background: 'var(--p-primary)', color: '#fff' } : { background: 'var(--p-surface-container-high)', color: 'var(--p-on-surface-variant)', cursor: 'not-allowed' }}>
             {sending ? <Sym name="progress_activity" className="text-[18px] animate-spin" /> : <Sym name="send" className="text-[18px]" />}

@@ -11,6 +11,7 @@ import ScrollReveal from '@/components/animations/ScrollReveal';
 import AnimatedWaveBackground from '@/components/animations/AnimatedWaveBackground';
 import { toast } from 'sonner';
 import { customConfigApi } from '@/lib/api';
+import { PolishAssist } from '@/components/polish/PolishAssist';
 import { MarketingConsentCheckbox, recordMarketingConsent } from '@/components/MarketingConsent';
 
 const steps = [
@@ -496,6 +497,9 @@ const CustomDesign = () => {
                       rows={5}
                       className="rounded-lg border-primary/20 focus:border-primary resize-none transition-colors text-base"
                     />
+                    <div className="mt-2 flex justify-end">
+                      <PolishAssist value={formData.description} onApply={(t) => handleInputChange('description', t)} context="description of a custom fabric or apparel design request" />
+                    </div>
                   </div>
 
                   <div className="mb-4 xs:mb-5 sm:mb-6">

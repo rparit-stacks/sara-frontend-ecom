@@ -11,6 +11,7 @@ import { Loader2, Send, Image as ImageIcon, X, ChevronsUpDown, Check } from 'luc
 import { cn } from '@/lib/utils';
 import { broadcastApi, adminUsersApi, productsApi, categoriesApi } from '@/lib/api';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { PolishAssist } from '@/components/polish/PolishAssist';
 import { P } from '@/lib/adminPermissionCodes';
 
 interface AdminUser {
@@ -297,6 +298,9 @@ export function BroadcastComposer() {
           value={body}
           onChange={(e) => setBody(e.target.value)}
         />
+        <div className="flex justify-end pt-1">
+          <PolishAssist value={body} onApply={setBody} context="announcement sent to customers by a fabric and apparel studio" />
+        </div>
       </div>
 
       <div className="space-y-3 border rounded-lg p-4">

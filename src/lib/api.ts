@@ -2401,6 +2401,14 @@ export const marketingApi = {
     fetchApi<{ unsubscribed: boolean; email: string }>('/api/marketing/unsubscribe', { method: 'POST', body: JSON.stringify({ token }) }),
 };
 
+// Polish with AI: fixes grammar and arranges text into points, in the language it was written in
+export const polishApi = {
+  polish: (text: string, context?: string) =>
+    fetchApi<{ text: string; changed: boolean }>('/api/polish', { method: 'POST', body: JSON.stringify({ text, context }) }),
+  introSeen: () => fetchApi<{ seen: boolean }>('/api/polish/intro'),
+  introDone: () => fetchApi<{ seen: boolean }>('/api/polish/intro', { method: 'POST' }),
+};
+
 // Get Instagram thumbnail
 export const getInstagramThumbnail = (url: string) => 
   fetchApi<{ thumbnailUrl: string }>(`/api/instagram/thumbnail`, { method: 'POST', body: JSON.stringify({ url }) });
@@ -3693,6 +3701,13 @@ export const logsApi = {
       body: JSON.stringify(request),
     }),
   
+  /** Sends the 24-hour health summary right now to the alert recipients (main admin). */
+  sendHealthSummaryNow: () =>
+    fetchApi<{ sent: number; message: string }>('/api/admin/system-health/send-summary', { method: 'POST' }),
+  /** Deletes log rows that are only bots probing for /.env, *.php and similar. */
+  cleanupScannerNoise: () =>
+    fetchApi<{ deleted: number; message: string }>('/api/admin/logs/scanner-noise', { method: 'DELETE' }),
+
   cleanup: (daysOld?: number, errorFlag?: string) => {
     const params = new URLSearchParams();
     if (daysOld !== undefined) params.set('daysOld', daysOld.toString());

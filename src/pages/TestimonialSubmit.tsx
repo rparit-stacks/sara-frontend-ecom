@@ -1,3 +1,4 @@
+import { PolishAssist } from '@/components/polish/PolishAssist';
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
@@ -157,6 +158,9 @@ const TestimonialSubmit = () => {
                       onChange={(e) => handleInputChange('text', e.target.value)}
                       required
                     />
+                    <div className="mt-2 flex justify-end">
+                      <PolishAssist value={formData.text} onApply={(t) => handleInputChange('text', t)} context="customer testimonial about a fabric and apparel studio" />
+                    </div>
                   </div>
 
                   <div>
