@@ -11,6 +11,7 @@ const NAV = [
   { to: '/admin-sara/whatsapp/broadcasts', label: 'Broadcasts' },
   { to: '/admin-sara/whatsapp/templates', label: 'Templates' },
   { to: '/admin-sara/whatsapp/send', label: 'Send message' },
+  { to: '/admin-sara/whatsapp/pricing', label: 'Pricing' },
 ];
 
 /** The frame of every WhatsApp page: a title, the connection status, and tabs across the top so the page gets the full width. */

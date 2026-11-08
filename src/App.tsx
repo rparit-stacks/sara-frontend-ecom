@@ -75,6 +75,7 @@ import AdminBusinessConfig from "./pages/admin/AdminBusinessConfig";
 import AdminPaymentConfig from "./pages/admin/AdminPaymentConfig";
 import AdminCurrencyMultipliers from "./pages/admin/AdminCurrencyMultipliers";
 import WhatsAppOverview from "./pages/admin/whatsapp/WhatsAppOverview";
+import WhatsAppPricing from "./pages/admin/whatsapp/WhatsAppPricing";
 import WhatsAppSend from "./pages/admin/whatsapp/WhatsAppSend";
 import WhatsAppMessages from "./pages/admin/whatsapp/WhatsAppMessages";
 import WhatsAppBroadcasts from "./pages/admin/whatsapp/WhatsAppBroadcasts";
@@ -533,6 +534,14 @@ const App = () =>
             element={
               <ProtectedAdminRoute>
                 <WhatsAppSend />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/whatsapp/pricing"
+            element={
+              <ProtectedAdminRoute>
+                <WhatsAppPricing />
               </ProtectedAdminRoute>
             }
           />

@@ -1618,6 +1618,21 @@ export interface WaCloudCustomer { name?: string; email?: string; phone: string;
 export interface WaCloudCustomerAudience {
   customers: WaCloudCustomer[]; sources: Record<string, number>; withoutPhone: number; unsubscribed: number;
 }
+export interface WaCloudUsageRow { count: number; cost: number; }
+export interface WaCloudUsage {
+  from: string; to: string; month?: string | null; zone: string; currency: string; rateSource: string; gstPercent: number;
+  deliveredMessages: number; estimatedCost: number; estimatedGst: number; estimatedTotal: number; unpricedMessages: number;
+  notCharged: { failed: number; skipped: number; waitingForDelivery: number };
+  byCategory: Array<WaCloudUsageRow & { category: string }>;
+  byMarket: Array<WaCloudUsageRow & { market: string; callingCode?: string | null }>;
+  daily: Array<WaCloudUsageRow & { date: string }>;
+  note: string;
+}
+export interface WaCloudRates {
+  source: string; effectiveFrom: string; currency: string; customRateCardActive: boolean; gstPercent: number;
+  markets: Array<{ market: string; callingCodes: string[]; marketing: number; utility: number; authentication: number }>;
+  officialPricingUrl: string; billingUrl: string; howBilled: string[];
+}
 const waCloud = '/api/admin/whatsapp-cloud';
 const waQuery = (params: Record<string, string | number | undefined>) => {
   const qs = new URLSearchParams();
@@ -1690,6 +1705,12 @@ export const whatsappCloudApi = {
   },
   deleteTemplate: (key: string) =>
     fetchApi<{ deleted: string }>(`${waCloud}/templates/${encodeURIComponent(key)}`, { method: 'DELETE' }),
+
+  // Pricing: what has been spent (an estimate) and Meta's rates
+  getUsage: (range: { month?: string; from?: string; to?: string }) =>
+    fetchApi<WaCloudUsage>(`${waCloud}/usage${waQuery({ ...range })}`),
+  getUsageRates: () => fetchApi<WaCloudRates>(`${waCloud}/usage/rates`),
+  getBillingLink: () => fetchApi<{ url: string }>(`${waCloud}/usage/billing-link`),
 
   // Customers from the platform (store accounts and manufacturing portal), one row per phone
   getCustomerAudience: (source = 'ALL') =>
