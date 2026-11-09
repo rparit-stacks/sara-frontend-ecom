@@ -14,11 +14,7 @@ import ScrollToTop from "./components/ScrollToTop";
 import AuthSessionListener from "./components/AuthSessionListener";
 import VisitTracker from "./components/VisitTracker";
 import ErrorBoundary from "@/components/common/ErrorBoundary";
-import Index from "./pages/Index";
-import Categories from "./pages/Categories";
 import CategoryProducts from "./pages/CategoryProducts";
-import CategoryHierarchy from "./pages/CategoryHierarchy";
-import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
@@ -78,6 +74,10 @@ import WhatsAppOverview from "./pages/admin/whatsapp/WhatsAppOverview";
 import WhatsAppPricing from "./pages/admin/whatsapp/WhatsAppPricing";
 import WhatsAppSend from "./pages/admin/whatsapp/WhatsAppSend";
 import WhatsAppMessages from "./pages/admin/whatsapp/WhatsAppMessages";
+import ThemedHome from "./themes/ThemedHome";
+import { ThemeRoute } from "./themes/ThemeProvider";
+import ThemedProducts from "./themes/ThemedProducts";
+import { ThemedCategories, ThemedCategory } from "./themes/ThemedCategories";
 import ChatOnWhatsApp from "./pages/ChatOnWhatsApp";
 import WhatsAppIncoming from "./pages/admin/whatsapp/WhatsAppIncoming";
 import WhatsAppBroadcasts from "./pages/admin/whatsapp/WhatsAppBroadcasts";
@@ -89,6 +89,8 @@ import AdminPlatformPayments from "./pages/admin/AdminPlatformPayments";
 import AdminNotificationCenter from "./pages/admin/AdminNotificationCenter";
 import AdminLogs from "./pages/admin/AdminLogs";
 import AdminRuntimeConfig from "./pages/admin/AdminRuntimeConfig";
+import AdminMarketplace from "./pages/admin/AdminMarketplace";
+import AdminMarketplaceItem from "./pages/admin/AdminMarketplaceItem";
 import AdminRoles from "./pages/admin/AdminRoles";
 import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
 import ProtectedPortalAdminRoute from "./components/admin/ProtectedPortalAdminRoute";
@@ -210,6 +212,7 @@ const App = () =>
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ThemeRoute />
         <ChatPageContextProvider>
         <ScrollToTop />
         <AuthSessionListener />
@@ -218,10 +221,10 @@ const App = () =>
         <AdminSiteWideChatWidget />
         <RouteErrorBoundary>
         <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/categories" element={<Categories />} />
-          <Route path="/category/*" element={<CategoryHierarchy />} />
-          <Route path="/products" element={<Products />} />
+          <Route path="/" element={<ThemedHome />} />
+          <Route path="/categories" element={<ThemedCategories />} />
+          <Route path="/category/*" element={<ThemedCategory />} />
+          <Route path="/products" element={<ThemedProducts />} />
           <Route path="/product/:slug" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
@@ -634,6 +637,23 @@ const App = () =>
             element={
               <ProtectedAdminRoute>
                 <AdminRuntimeConfig />
+              </ProtectedAdminRoute>
+            }
+          />
+
+          <Route
+            path="/admin-sara/marketplace"
+            element={
+              <ProtectedAdminRoute>
+                <AdminMarketplace />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/marketplace/:key"
+            element={
+              <ProtectedAdminRoute>
+                <AdminMarketplaceItem />
               </ProtectedAdminRoute>
             }
           />

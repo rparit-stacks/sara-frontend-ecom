@@ -138,7 +138,7 @@ const FabricVariantPopup: React.FC<FabricVariantPopupProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+      <DialogContent data-ed="popup" className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
         <DialogHeader className="px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4 border-b border-border flex-shrink-0">
           <DialogTitle className="font-medium text-base sm:text-lg md:text-xl flex items-center gap-2 sm:gap-3">
             <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 rounded-lg overflow-hidden flex-shrink-0">

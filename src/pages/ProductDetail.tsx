@@ -1249,7 +1249,7 @@ const ProductDetail = () => {
   return (
     <Layout>
       {/* Breadcrumb: Home > Categories > Category > Product */}
-      <section className="w-full bg-secondary/30 py-3 sm:py-4">
+      <section className="w-full bg-secondary/30 py-3 sm:py-4" data-ed="crumbs">
         <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
           <Breadcrumb>
             <BreadcrumbList>
@@ -1284,17 +1284,18 @@ const ProductDetail = () => {
       </section>
 
       {/* Product Section */}
-      <section className="w-full py-8 sm:py-14 lg:py-20">
+      <section className="w-full py-8 sm:py-14 lg:py-20" data-ed="product">
         <div className="max-w-[1600px] mx-auto px-3 xs:px-4 sm:px-6 lg:px-12">
           <div className="grid lg:grid-cols-12 gap-6 sm:gap-10 lg:gap-16">
             {/* Images */}
-            <div className="lg:col-span-5">
+            <div className="lg:col-span-5" data-ed="gallery">
               <ScrollReveal direction="left">
-                <div className="space-y-3 sm:space-y-5">
+                <div className="space-y-3 sm:space-y-5" data-ed="gallery-inner">
                   {product && product.media && product.media.length > 0 ? (
                     <>
                       <motion.div
                         key={selectedMedia}
+                        data-ed="main"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         className={cn(
@@ -1325,6 +1326,7 @@ const ProductDetail = () => {
                             <img
                               src={product.media[selectedMedia].url}
                               alt={product.name}
+                              onError={(e) => { const t = e.target as HTMLImageElement; if (!t.src.endsWith('/placeholder-product.svg')) t.src = '/placeholder-product.svg'; }}
                               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                             />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
@@ -1334,7 +1336,7 @@ const ProductDetail = () => {
                         )}
                       </motion.div>
                       
-                      <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-full sm:max-w-lg mx-auto">
+                      <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-full sm:max-w-lg mx-auto" data-ed="thumbs">
                         {product.media.map((item: any, index: number) => (
                           <button
                             key={index}
@@ -1362,6 +1364,7 @@ const ProductDetail = () => {
                               <img
                                 src={item.url}
                                 alt={`${product.name} ${index + 1}`}
+                                onError={(e) => { const t = e.target as HTMLImageElement; if (!t.src.endsWith('/placeholder-product.svg')) t.src = '/placeholder-product.svg'; }}
                                 className="w-full h-full object-cover"
                               />
                             )}
@@ -1373,6 +1376,7 @@ const ProductDetail = () => {
                     <>
                       <motion.div
                         key={selectedMedia}
+                        data-ed="main"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         className="aspect-square rounded-xl sm:rounded-2xl overflow-hidden bg-secondary/30 border border-border shadow-sm mx-auto w-full max-w-full sm:max-w-lg relative group cursor-zoom-in"
@@ -1381,6 +1385,7 @@ const ProductDetail = () => {
                         <img
                           src={displayImages[selectedMedia]}
                           alt={product.name}
+                          onError={(e) => { const t = e.target as HTMLImageElement; if (!t.src.endsWith('/placeholder-product.svg')) t.src = '/placeholder-product.svg'; }}
                           className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
@@ -1388,7 +1393,7 @@ const ProductDetail = () => {
                         </div>
                       </motion.div>
                       
-                      <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-full sm:max-w-lg mx-auto">
+                      <div className="grid grid-cols-4 gap-2 sm:gap-4 max-w-full sm:max-w-lg mx-auto" data-ed="thumbs">
                         {displayImages.map((image: string, index: number) => (
                           <button
                             key={index}
@@ -1403,6 +1408,7 @@ const ProductDetail = () => {
                             <img
                               src={image}
                               alt={`${product.name} ${index + 1}`}
+                              onError={(e) => { const t = e.target as HTMLImageElement; if (!t.src.endsWith('/placeholder-product.svg')) t.src = '/placeholder-product.svg'; }}
                               className="w-full h-full object-cover"
                             />
                           </button>
@@ -1410,8 +1416,8 @@ const ProductDetail = () => {
                       </div>
                     </>
                   ) : (
-                    <div className="aspect-square rounded-xl sm:rounded-2xl bg-secondary/30 border border-border flex items-center justify-center">
-                      <p className="text-muted-foreground">No media available</p>
+                    <div className="aspect-square rounded-xl sm:rounded-2xl bg-secondary/30 border border-border flex items-center justify-center" data-ed="empty" style={{ backgroundImage: "url(/placeholder-product.svg)", backgroundSize: "cover", backgroundPosition: "center" }}>
+                      <p className="sr-only text-muted-foreground">No media available</p>
                     </div>
                   )}
                 </div>
@@ -1419,7 +1425,7 @@ const ProductDetail = () => {
             </div>
 
             {/* Product Info */}
-            <div className="lg:col-span-7">
+            <div className="lg:col-span-7" data-ed="info">
               <ScrollReveal direction="right">
                 <div className="lg:sticky lg:top-24 space-y-5 sm:space-y-6 lg:space-y-8 max-w-2xl">
                   {/* Badges */}
@@ -1431,7 +1437,7 @@ const ProductDetail = () => {
                   {/* Title & Price */}
                   <div className="space-y-2 sm:space-y-3">
                     <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">{product.category}</p>
-                    <h1 className="font-sans font-semibold text-lg xs:text-xl sm:text-2xl lg:text-3xl xl:text-3xl break-words not-italic" style={{ fontFamily: "'Poppins', sans-serif" }}>{product.name}</h1>
+                    <h1 data-ed="title" className="font-sans font-semibold text-lg xs:text-xl sm:text-2xl lg:text-3xl xl:text-3xl break-words not-italic" style={{ fontFamily: "'Poppins', sans-serif" }}>{product.name}</h1>
 
                     {/* DESIGNED: no price at top; breakdown and grand total shown at bottom after options */}
                     {product.type === 'PLAIN' && (
@@ -2068,7 +2074,7 @@ const ProductDetail = () => {
 
       {/* Related Products */}
       {relatedProducts.length > 0 && (
-        <section className="w-full py-14 lg:py-20 bg-secondary/30">
+        <section className="w-full py-14 lg:py-20 bg-secondary/30" data-ed="related">
           <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
             <ScrollReveal>
               <h2 className="font-cursive font-semibold text-4xl lg:text-5xl mb-12">You May Also Like</h2>

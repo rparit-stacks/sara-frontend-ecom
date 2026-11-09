@@ -60,7 +60,7 @@ const CartItem = ({
 
   return (
     <ScrollReveal key={item.id}>
-      <div className="flex gap-3 xs:gap-4 sm:gap-6 p-3 xs:p-4 sm:p-6 bg-card rounded-xl sm:rounded-2xl border border-border">
+      <div className="flex gap-3 xs:gap-4 sm:gap-6 p-3 xs:p-4 sm:p-6 bg-card rounded-xl sm:rounded-2xl border border-border" data-ed="cart-item">
         {productUrl ? (
           <Link to={productUrl}>
             <img src={item.productImage || ''} alt={item.productName} className="w-20 h-24 xs:w-24 xs:h-32 sm:w-28 sm:h-36 lg:w-32 lg:h-40 object-cover rounded-lg sm:rounded-xl flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity" />
@@ -608,7 +608,7 @@ const Cart = () => {
                 )}
               </div>
               
-              <div className="bg-card p-4 xs:p-6 sm:p-8 rounded-xl sm:rounded-2xl border border-border h-fit lg:sticky lg:top-24">
+              <div className="bg-card p-4 xs:p-6 sm:p-8 rounded-xl sm:rounded-2xl border border-border h-fit lg:sticky lg:top-24" data-ed="cart-bag">
                 <h3 className="font-cursive text-xl xs:text-2xl mb-4 xs:mb-6">Order Summary</h3>
                 {(() => {
                   const fabricDiscounts: any[] = isLoggedIn

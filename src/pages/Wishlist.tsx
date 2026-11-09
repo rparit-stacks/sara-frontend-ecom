@@ -232,7 +232,7 @@ const Wishlist = () => {
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : wishlistItems.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 xs:gap-4 sm:gap-6 lg:gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 xs:gap-4 sm:gap-6 lg:gap-8" data-ed="wish-grid">
               {wishlistItems.map((item: any, index: number) => {
                 const hasCustomizations = !!(item.variants && Object.keys(item.variants).length) || 
                   !!(item.variantSelections && Object.keys(item.variantSelections).length) || 

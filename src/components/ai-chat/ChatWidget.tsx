@@ -825,6 +825,7 @@ export function ChatWidget() {
           <motion.div
             key={isExpanded ? 'panel-expanded' : 'panel-compact'}
             role="dialog"
+            data-ed="chat"
             aria-modal="true"
             aria-label="Studio Sara chat"
             initial={{ opacity: 0, y: 24, scale: 0.96 }}
@@ -973,6 +974,7 @@ export function ChatWidget() {
               isHighlighted ? 'ring-4 ring-primary/25' : ''
             }`}
             aria-label="Open chat with Studio Sara"
+            data-ed="chat-fab"
           >
             <MessageCircle className="h-4.5 w-4.5" />
             Chat with us

@@ -3,6 +3,7 @@ import { useIsLoggedIn } from '@/hooks/useIsLoggedIn';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
+import { useTheme } from '@/themes/ThemeProvider';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -1144,6 +1145,168 @@ const Checkout = () => {
     }
   };
 
+  // Theme plugins can move delivery, payment and the order button out of the summary and into the form column.
+  const { active: themeActive } = useTheme();
+  const themeSteps = !!themeActive?.checkoutSteps;
+  const deliveryStep = (<>
+                {/* Delivery Option Selector */}
+                <div className="mb-4 pb-4 border-b">
+                  <h4 className="font-serif text-sm font-semibold flex items-center gap-2 mb-3">
+                    <Package className="w-4 h-4 text-muted-foreground" />
+                    Delivery Option
+                  </h4>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryType('STANDARD')}
+                      className={`px-3 py-2.5 rounded-lg border text-sm text-left transition-colors ${
+                        deliveryType === 'STANDARD'
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border hover:bg-muted/50'
+                      }`}
+                    >
+                      <span className="font-medium">Standard Delivery</span>
+                      <span className="block text-xs text-muted-foreground mt-0.5">Shipping charges as per your location</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryType('PORTER')}
+                      className={`px-3 py-2.5 rounded-lg border text-sm text-left transition-colors ${
+                        deliveryType === 'PORTER'
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border hover:bg-muted/50'
+                      }`}
+                    >
+                      <span className="font-medium">Porter Delivery</span>
+                      <span className="block text-xs text-muted-foreground mt-0.5">Our team will contact you for delivery details</span>
+                    </button>
+                  </div>
+                  {deliveryType === 'PORTER' && (
+                    <div className="mt-2 p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-200">
+                      Delivery charges will depend only on Porter charges. Our team will contact you soon regarding the delivery.
+                    </div>
+                  )}
+                </div>
+  </>);
+  const paymentStep = (<>
+                {/* Payment Method - right column */}
+                <div className="border-t pt-4">
+                  <h3 className="font-serif text-base font-semibold flex items-center gap-2 mb-4">
+                    <CreditCard className="w-4 h-4 text-muted-foreground" />
+                    Payment Method
+                  </h3>
+                  {hasDigitalProducts && availableGateways.length === 0 && (
+                    <div className="mb-3 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-lg">
+                      <p className="text-sm text-red-800 dark:text-red-400 font-medium">
+                        Payment method not available. Please try again later.
+                      </p>
+                    </div>
+                  )}
+                  {hasDigitalProducts && availableGateways.length > 0 && (
+                    <div className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-lg">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-400 font-medium">
+                        Digital products require online payment only. COD is not available.
+                      </p>
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2" role="group" aria-label="Payment method">
+                      {availableGateways.includes('COD') && (
+                        <button
+                          type="button"
+                          onClick={() => { setPaymentGateway('COD'); setPaymentMethod('cod'); }}
+                          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                            paymentGateway === 'COD' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
+                          }`}
+                        >
+                          Cash on Delivery (COD)
+                        </button>
+                      )}
+                      {availableGateways.includes('PARTIAL_COD') && (
+                        <button
+                          type="button"
+                          onClick={() => { setPaymentGateway('PARTIAL_COD'); setPaymentMethod('partial_cod'); }}
+                          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                            paymentGateway === 'PARTIAL_COD' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
+                          }`}
+                        >
+                          Partial COD
+                        </button>
+                      )}
+                      {availableGateways.includes('STRIPE') && (
+                        <button
+                          type="button"
+                          onClick={() => { setPaymentGateway('STRIPE'); setPaymentMethod('card'); }}
+                          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                            paymentGateway === 'STRIPE' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
+                          }`}
+                        >
+                          Card (Stripe)
+                        </button>
+                      )}
+                      {availableGateways.includes('RAZORPAY') && (
+                        <button
+                          type="button"
+                          onClick={() => { setPaymentGateway('RAZORPAY'); setPaymentMethod('razorpay'); }}
+                          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                            paymentGateway === 'RAZORPAY' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
+                          }`}
+                        >
+                          Razorpay (UPI/Card)
+                        </button>
+                      )}
+                      {availableGateways.length === 0 && (
+                        <span className="text-sm text-muted-foreground py-2">
+                          {hasDigitalProducts ? 'Payment method not available.' : 'No payment methods available'}
+                        </span>
+                      )}
+                    </div>
+                    {paymentGateway === 'STRIPE' && (
+                      <p className="text-xs text-muted-foreground">Redirect to Stripe secure payment after placing order.</p>
+                    )}
+                    {paymentGateway === 'RAZORPAY' && (
+                      <p className="text-xs text-muted-foreground">Redirect to Razorpay secure payment after placing order.</p>
+                    )}
+                    {paymentGateway === 'COD' && (
+                      <p className="text-xs text-muted-foreground">Payment collected on delivery.</p>
+                    )}
+                    {paymentGateway === 'PARTIAL_COD' && paymentConfig?.partialCodAdvancePercentage && (
+                      <p className="text-xs text-muted-foreground">
+                        Pay {paymentConfig.partialCodAdvancePercentage}% online now, rest on delivery.
+                      </p>
+                    )}
+                    <Input
+                      placeholder="Order notes (optional)"
+                      className="h-10 text-sm"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    />
+                  </div>
+                </div>
+  </>);
+  const placeOrderStep = (<>
+                <MarketingConsentCheckbox id="checkout-marketing" checked={marketingOptIn} onChange={setMarketingOptIn} className="mt-2" />
+
+                <Button 
+                  className="w-full bg-primary hover:bg-primary/90 text-white mt-2 h-12 sm:h-14 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handlePlaceOrder}
+                  disabled={createOrderMutation.isPending || isProcessingPayment || !isFormValid}
+                >
+                  {(createOrderMutation.isPending || isProcessingPayment) ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {isProcessingPayment ? 'Processing Payment...' : 'Placing Order...'}
+                    </>
+                  ) : (
+                    'Place Order'
+                  )}
+                </Button>
+                <p className="mt-3 text-xs text-muted-foreground flex items-center justify-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5" />
+                  Secure checkout
+                </p>
+  </>);
+
   return (
     <Layout>
       {/* Hero */}
@@ -1156,7 +1319,7 @@ const Checkout = () => {
         </div>
       </section>
 
-      <section className="w-full py-14 lg:py-20">
+      <section className="w-full py-14 lg:py-20" data-ed="checkout">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
           {cartLoading ? (
             <div className="flex justify-center py-12">
@@ -1177,8 +1340,8 @@ const Checkout = () => {
                   </div>
                 </div>
               )}
-            <div className="grid lg:grid-cols-3 gap-8 lg:gap-10">
-              <div className="lg:col-span-2 space-y-8">
+            <div className="grid lg:grid-cols-3 gap-8 lg:gap-10" data-ed="checkout-grid">
+              <div className="lg:col-span-2 space-y-8" data-ed="checkout-forms">
                 {/* Login Prompt for Guests */}
                 {!isLoggedIn && (
                   <ScrollReveal>
@@ -1643,9 +1806,25 @@ const Checkout = () => {
                     )}
                   </div>
                 </ScrollReveal>
+
+              {themeSteps && (
+                <>
+                  <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border">
+                    <h3 className="font-serif text-lg sm:text-xl mb-6 font-semibold">Delivery</h3>
+                    {deliveryStep}
+                  </div>
+                  <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border">
+                    {paymentStep}
+                  </div>
+                  <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border">
+                    <h3 className="font-serif text-lg sm:text-xl mb-6 font-semibold">Review and place order</h3>
+                    {placeOrderStep}
+                  </div>
+                </>
+              )}
               </div>
 
-              <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border h-fit lg:sticky lg:top-24 space-y-6">
+              <div className="bg-card p-6 sm:p-8 rounded-2xl border border-border h-fit lg:sticky lg:top-24 space-y-6" data-ed="receipt">
                 <h3 className="font-serif text-lg sm:text-xl mb-2 font-semibold flex items-center gap-2">
                   <ShoppingBag className="w-5 h-5 text-muted-foreground" />
                   Order Summary
@@ -1678,44 +1857,7 @@ const Checkout = () => {
                   )}
                 </div>
 
-                {/* Delivery Option Selector */}
-                <div className="mb-4 pb-4 border-b">
-                  <h4 className="font-serif text-sm font-semibold flex items-center gap-2 mb-3">
-                    <Package className="w-4 h-4 text-muted-foreground" />
-                    Delivery Option
-                  </h4>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryType('STANDARD')}
-                      className={`px-3 py-2.5 rounded-lg border text-sm text-left transition-colors ${
-                        deliveryType === 'STANDARD'
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border hover:bg-muted/50'
-                      }`}
-                    >
-                      <span className="font-medium">Standard Delivery</span>
-                      <span className="block text-xs text-muted-foreground mt-0.5">Shipping charges as per your location</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryType('PORTER')}
-                      className={`px-3 py-2.5 rounded-lg border text-sm text-left transition-colors ${
-                        deliveryType === 'PORTER'
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border hover:bg-muted/50'
-                      }`}
-                    >
-                      <span className="font-medium">Porter Delivery</span>
-                      <span className="block text-xs text-muted-foreground mt-0.5">Our team will contact you for delivery details</span>
-                    </button>
-                  </div>
-                  {deliveryType === 'PORTER' && (
-                    <div className="mt-2 p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-200">
-                      Delivery charges will depend only on Porter charges. Our team will contact you soon regarding the delivery.
-                    </div>
-                  )}
-                </div>
+                {!themeSteps && deliveryStep}
 
                 <div className="space-y-2 text-sm sm:text-base border-b pb-4 mb-4">
                   {items.map((item: any) => {
@@ -1876,100 +2018,7 @@ const Checkout = () => {
                   )}
                 </div>
 
-                {/* Payment Method - right column */}
-                <div className="border-t pt-4">
-                  <h3 className="font-serif text-base font-semibold flex items-center gap-2 mb-4">
-                    <CreditCard className="w-4 h-4 text-muted-foreground" />
-                    Payment Method
-                  </h3>
-                  {hasDigitalProducts && availableGateways.length === 0 && (
-                    <div className="mb-3 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-lg">
-                      <p className="text-sm text-red-800 dark:text-red-400 font-medium">
-                        Payment method not available. Please try again later.
-                      </p>
-                    </div>
-                  )}
-                  {hasDigitalProducts && availableGateways.length > 0 && (
-                    <div className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-lg">
-                      <p className="text-sm text-yellow-800 dark:text-yellow-400 font-medium">
-                        Digital products require online payment only. COD is not available.
-                      </p>
-                    </div>
-                  )}
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap gap-2" role="group" aria-label="Payment method">
-                      {availableGateways.includes('COD') && (
-                        <button
-                          type="button"
-                          onClick={() => { setPaymentGateway('COD'); setPaymentMethod('cod'); }}
-                          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                            paymentGateway === 'COD' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
-                          }`}
-                        >
-                          Cash on Delivery (COD)
-                        </button>
-                      )}
-                      {availableGateways.includes('PARTIAL_COD') && (
-                        <button
-                          type="button"
-                          onClick={() => { setPaymentGateway('PARTIAL_COD'); setPaymentMethod('partial_cod'); }}
-                          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                            paymentGateway === 'PARTIAL_COD' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
-                          }`}
-                        >
-                          Partial COD
-                        </button>
-                      )}
-                      {availableGateways.includes('STRIPE') && (
-                        <button
-                          type="button"
-                          onClick={() => { setPaymentGateway('STRIPE'); setPaymentMethod('card'); }}
-                          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                            paymentGateway === 'STRIPE' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
-                          }`}
-                        >
-                          Card (Stripe)
-                        </button>
-                      )}
-                      {availableGateways.includes('RAZORPAY') && (
-                        <button
-                          type="button"
-                          onClick={() => { setPaymentGateway('RAZORPAY'); setPaymentMethod('razorpay'); }}
-                          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                            paymentGateway === 'RAZORPAY' ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted/50'
-                          }`}
-                        >
-                          Razorpay (UPI/Card)
-                        </button>
-                      )}
-                      {availableGateways.length === 0 && (
-                        <span className="text-sm text-muted-foreground py-2">
-                          {hasDigitalProducts ? 'Payment method not available.' : 'No payment methods available'}
-                        </span>
-                      )}
-                    </div>
-                    {paymentGateway === 'STRIPE' && (
-                      <p className="text-xs text-muted-foreground">Redirect to Stripe secure payment after placing order.</p>
-                    )}
-                    {paymentGateway === 'RAZORPAY' && (
-                      <p className="text-xs text-muted-foreground">Redirect to Razorpay secure payment after placing order.</p>
-                    )}
-                    {paymentGateway === 'COD' && (
-                      <p className="text-xs text-muted-foreground">Payment collected on delivery.</p>
-                    )}
-                    {paymentGateway === 'PARTIAL_COD' && paymentConfig?.partialCodAdvancePercentage && (
-                      <p className="text-xs text-muted-foreground">
-                        Pay {paymentConfig.partialCodAdvancePercentage}% online now, rest on delivery.
-                      </p>
-                    )}
-                    <Input
-                      placeholder="Order notes (optional)"
-                      className="h-10 text-sm"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                    />
-                  </div>
-                </div>
+                {!themeSteps && paymentStep}
 
                 {/* Discount / Coupon - collapsible */}
                 <Collapsible open={discountOpen} onOpenChange={setDiscountOpen} className="border-t pt-4">
@@ -2050,26 +2099,7 @@ const Checkout = () => {
                   </CollapsibleContent>
                 </Collapsible>
 
-                <MarketingConsentCheckbox id="checkout-marketing" checked={marketingOptIn} onChange={setMarketingOptIn} className="mt-2" />
-
-                <Button 
-                  className="w-full bg-primary hover:bg-primary/90 text-white mt-2 h-12 sm:h-14 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={handlePlaceOrder}
-                  disabled={createOrderMutation.isPending || isProcessingPayment || !isFormValid}
-                >
-                  {(createOrderMutation.isPending || isProcessingPayment) ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {isProcessingPayment ? 'Processing Payment...' : 'Placing Order...'}
-                    </>
-                  ) : (
-                    'Place Order'
-                  )}
-                </Button>
-                <p className="mt-3 text-xs text-muted-foreground flex items-center justify-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5" />
-                  Secure checkout
-                </p>
+                {!themeSteps && placeOrderStep}
               </div>
             </div>
             </div>

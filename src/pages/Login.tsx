@@ -207,9 +207,9 @@ const Login = () => {
   
   return (
     <Layout>
-      <section className="section-padding relative min-h-[calc(100vh-200px)] flex items-center py-10 md:py-16 overflow-hidden">
+      <section className="section-padding relative min-h-[calc(100vh-200px)] flex items-center py-10 md:py-16 overflow-hidden" data-ed="auth">
         {/* Full-page background image */}
-        <div className="absolute inset-0 -z-10">
+        <div className="absolute inset-0 -z-10" data-ed="auth-bg">
           <img
             src="/bg_images/9598237.jpg"
             alt="Studio Sara background"
@@ -227,7 +227,7 @@ const Login = () => {
                 ? 'order-2 lg:order-1 opacity-100 translate-x-0'
                 : 'order-2 lg:order-2 opacity-100 lg:-translate-x-4'}`}
             >
-              <div className="w-full bg-card p-6 sm:p-8 md:p-10 rounded-2xl border shadow-lg">
+              <div className="w-full bg-card p-6 sm:p-8 md:p-10 rounded-2xl border shadow-lg" data-ed="auth-card">
                 <div className="mb-6">
                   <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2">
                     Studio Sara · Bespoke Ethnicwear
@@ -629,10 +629,11 @@ const Login = () => {
                 ? 'order-1 lg:order-2 opacity-100 translate-x-0'
                 : 'order-1 lg:order-1 opacity-100 lg:translate-x-4'}`}
             >
-              <div className="relative w-full h-full min-h-[260px] rounded-2xl overflow-hidden shadow-lg bg-primary/10 border border-primary/20">
+              <div className="relative w-full h-full min-h-[260px] rounded-2xl overflow-hidden shadow-lg bg-primary/10 border border-primary/20" data-ed="auth-panel">
                 <img
                   src="https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=1200&h=800&fit=crop&q=80"
                   alt="Studio Sara fashion"
+                  onError={(e) => { const t = e.target as HTMLImageElement; if (!t.src.endsWith('/placeholder-product.svg')) t.src = '/placeholder-product.svg'; }}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-primary/50 to-primary/30" />

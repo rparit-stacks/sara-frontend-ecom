@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import { useTheme } from '@/themes/ThemeProvider';
 import { MobileBottomNav } from './MobileBottomNav';
 import AnimatedWaveBackground from '@/components/animations/AnimatedWaveBackground';
 import FloatingCurlyLines from '@/components/animations/FloatingCurlyLines';
@@ -15,6 +16,9 @@ interface LayoutProps {
 
 export const Layout = ({ children, showFooter = true }: LayoutProps) => {
   const location = useLocation();
+  const { active: theme } = useTheme();
+  const NavbarView = theme?.components.Navbar ?? Navbar;
+  const FooterView = theme?.components.Footer ?? Footer;
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -39,14 +43,18 @@ export const Layout = ({ children, showFooter = true }: LayoutProps) => {
 
   return (
     <div className="min-h-screen flex flex-col w-full max-w-[100vw] relative">
-      <AnimatedWaveBackground />
-      <FloatingCurlyLines />
-      <Navbar />
+      {!theme?.hideDecor && (
+        <>
+          <AnimatedWaveBackground />
+          <FloatingCurlyLines />
+        </>
+      )}
+      <NavbarView />
       <GeoSuggestionBanner />
       <main className="flex-1 pb-16 lg:pb-0 w-full max-w-full relative z-10 min-w-0">
         {children}
       </main>
-      {showFooter && <Footer />}
+      {showFooter && <FooterView />}
       <MobileBottomNav />
 
       {/* Global page loader with blurred background */}

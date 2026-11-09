@@ -49,7 +49,7 @@ const FabricSelectionPopup: React.FC<FabricSelectionPopupProps> = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+        <DialogContent data-ed="popup" className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
           <DialogHeader className="px-6 py-4 border-b border-border flex-shrink-0">
             <DialogTitle className="font-cursive text-3xl flex items-center gap-3">
               <Palette className="w-6 h-6 text-primary" />
@@ -86,7 +86,8 @@ const FabricSelectionPopup: React.FC<FabricSelectionPopupProps> = ({
                       )}
                     >
                       <img
-                        src={fabric.image}
+                        src={fabric.image || '/placeholder-fabric.svg'}
+                        onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-fabric.svg'; }}
                         alt={fabric.name}
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                       />

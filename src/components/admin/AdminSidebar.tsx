@@ -23,6 +23,7 @@ import {
   Bell,
   KeyRound,
   IndianRupee,
+  Store,
 } from 'lucide-react';
 import { ChevronLeft, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -81,6 +82,12 @@ const adminMenuSections = [
       { icon: MessageSquare, label: 'WhatsApp', path: '/admin-sara/whatsapp' },
       { icon: MessageSquare, label: 'Contact Submissions', path: '/admin-sara/contact-submissions' },
       { icon: Bell, label: 'Notification Center', path: '/admin-sara/notifications' },
+    ],
+  },
+  {
+    title: 'Marketplace',
+    items: [
+      { icon: Store, label: 'Marketplace', path: '/admin-sara/marketplace' },
     ],
   },
   {

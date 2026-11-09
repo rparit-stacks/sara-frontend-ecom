@@ -4284,3 +4284,34 @@ export const runtimeConfigApi = {
       body: JSON.stringify({ value }),
     }),
 };
+
+
+// ---- Marketplace (themes and add-ons: trial, purchase, on/off) ----
+export type MarketplaceStatus = 'AVAILABLE' | 'TRIAL' | 'TRIAL_ENDED' | 'OWNED';
+export interface MarketplaceItemState {
+  key: string;
+  kind: string;
+  name: string;
+  priceInr: number;
+  trialDays: number;
+  status: MarketplaceStatus;
+  enabled: boolean;
+  /** On and licensed: the storefront is wearing it right now. */
+  live: boolean;
+  trialStartedAt: string | null;
+  trialEndsAt: string | null;
+  secondsLeft: number;
+  purchasedAt: string | null;
+}
+
+export const marketplaceApi = {
+  list: () => fetchApi<MarketplaceItemState[]>('/api/admin/marketplace'),
+  get: (key: string) => fetchApi<MarketplaceItemState>(`/api/admin/marketplace/${encodeURIComponent(key)}`),
+  startTrial: (key: string) =>
+    fetchApi<MarketplaceItemState>(`/api/admin/marketplace/${encodeURIComponent(key)}/trial`, { method: 'POST' }),
+  setEnabled: (key: string, enabled: boolean) =>
+    fetchApi<MarketplaceItemState>(`/api/admin/marketplace/${encodeURIComponent(key)}/enabled`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    }),
+};

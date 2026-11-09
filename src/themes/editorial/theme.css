@@ -1,0 +1,1041 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Instrument+Sans:wght@400;500;600&display=swap');
+
+/*
+ * Editorial theme plugin: a print-magazine look. Warm paper, ink, one brand-teal accent,
+ * Fraunces serif headlines, Instrument Sans text, hairline rules, square corners.
+ * Scoped to html[data-theme-plugin="editorial"]; with the theme off this file changes nothing.
+ */
+
+:root[data-theme-plugin="editorial"] {
+  --background: 40 33% 92%;            /* paper  */
+  --foreground: 195 40% 9%;             /* ink    */
+  --card: 40 30% 95%;
+  --card-foreground: 195 40% 9%;
+  --popover: 40 30% 95%;
+  --popover-foreground: 195 40% 9%;
+  --muted: 38 24% 87%;
+  --muted-foreground: 195 12% 34%;
+  --secondary: 38 24% 87%;
+  --secondary-foreground: 195 40% 9%;
+  --border: 30 14% 78%;
+  --input: 30 14% 74%;
+  --primary: 171 56% 36%;               /* brand teal */
+  --primary-foreground: 40 33% 96%;
+  --accent: 171 56% 36%;
+  --accent-foreground: 40 33% 96%;
+  --ring: 171 56% 36%;
+  --dark: 195 40% 9%;
+  --dark-foreground: 40 33% 92%;
+  --warm: 38 24% 87%;
+  --warm-foreground: 195 40% 9%;
+  --tertiary: 171 40% 48%;
+  --tertiary-foreground: 40 33% 96%;
+  --destructive: 4 70% 42%;
+  --radius: 0.125rem;
+  --shadow-soft: none;
+  --shadow-medium: 0 24px 50px -28px hsl(195 40% 9% / 0.45);
+
+  --ed-serif: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --ed-sans: 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+  --ed-ease: cubic-bezier(0.2, 0.7, 0.1, 1);
+}
+
+/* ---------- Type ---------- */
+html[data-theme-plugin="editorial"] body {
+  font-family: var(--ed-sans);
+  font-size: 1rem;
+  line-height: 1.6;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .1 0 0 0 0 .08 0 0 0 0 .05 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+html[data-theme-plugin="editorial"] h1,
+html[data-theme-plugin="editorial"] h2,
+html[data-theme-plugin="editorial"] h3,
+html[data-theme-plugin="editorial"] h4,
+html[data-theme-plugin="editorial"] h5,
+html[data-theme-plugin="editorial"] h6,
+html[data-theme-plugin="editorial"] .font-cursive,
+html[data-theme-plugin="editorial"] .font-elegant,
+html[data-theme-plugin="editorial"] .font-serif {
+  font-family: var(--ed-serif);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  font-variation-settings: 'opsz' 96;
+}
+html[data-theme-plugin="editorial"] .font-sans { font-family: var(--ed-sans); }
+html[data-theme-plugin="editorial"] .rt h1,
+html[data-theme-plugin="editorial"] .rt h2,
+html[data-theme-plugin="editorial"] .rt h3,
+html[data-theme-plugin="editorial"] .rt h4 { font-family: inherit; }
+
+.ed-display {
+  font-family: var(--ed-serif);
+  font-weight: 300;
+  font-size: clamp(3.4rem, 11.5vw, 11rem);
+  line-height: 0.88;
+  letter-spacing: -0.045em;
+  font-variation-settings: 'opsz' 144;
+}
+.ed-display em, .ed-title em { font-style: italic; font-weight: 300; color: hsl(var(--primary)); }
+.ed-title {
+  font-family: var(--ed-serif);
+  font-weight: 300;
+  font-size: clamp(2.2rem, 6vw, 5rem);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  font-variation-settings: 'opsz' 120;
+}
+.ed-kicker {
+  font-family: var(--ed-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.ed-lede { font-family: var(--ed-serif); font-size: clamp(1.25rem, 2.2vw, 1.75rem); line-height: 1.35; font-weight: 300; letter-spacing: -0.01em; }
+.ed-rule { border-color: hsl(var(--foreground) / 0.85); }
+.ed-hair { border-color: hsl(var(--foreground) / 0.18); }
+.ed-num { font-family: var(--ed-serif); font-style: italic; font-weight: 300; font-feature-settings: 'lnum'; }
+
+/* Running stitch: a dashed thread used as a divider and a border accent */
+.ed-stitch { height: 0; border-top: 2px dashed hsl(var(--primary) / 0.7); }
+.ed-stitch-light { height: 0; border-top: 2px dashed hsl(0 0% 100% / 0.35); }
+
+/* A link that draws its underline on hover */
+.ed-link { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size 0.5s var(--ed-ease); }
+.ed-link:hover { background-size: 100% 1px; }
+
+/* ---------- Shared pieces ---------- */
+html[data-theme-plugin="editorial"] .container-custom { max-width: 1440px; }
+html[data-theme-plugin="editorial"] .card-floral {
+  border: 0; border-radius: 0; box-shadow: none; background: transparent;
+}
+html[data-theme-plugin="editorial"] .card-floral:hover { transform: none; box-shadow: none; }
+
+html[data-theme-plugin="editorial"] .inline-flex.rounded-md,
+html[data-theme-plugin="editorial"] .btn-primary,
+html[data-theme-plugin="editorial"] .btn-secondary,
+html[data-theme-plugin="editorial"] .btn-outline { border-radius: 0; }
+html[data-theme-plugin="editorial"] .btn-primary,
+html[data-theme-plugin="editorial"] .btn-secondary,
+html[data-theme-plugin="editorial"] .btn-outline {
+  font-family: var(--ed-sans); font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600;
+}
+html[data-theme-plugin="editorial"] input,
+html[data-theme-plugin="editorial"] textarea,
+html[data-theme-plugin="editorial"] select { border-radius: 0; }
+html[data-theme-plugin="editorial"] ::selection { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+
+/* Slowly turning thread rings */
+@keyframes ed-drift { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.ed-drift { animation: ed-drift 160s linear infinite; }
+
+/* Hero slide timer */
+@keyframes ed-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Marquee */
+@keyframes ed-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.ed-marquee-track { display: flex; width: max-content; animation: ed-marquee 48s linear infinite; }
+.ed-marquee:hover .ed-marquee-track { animation-play-state: paused; }
+
+/* ---------- Product page: re-laid out through the data-ed hooks ---------- */
+
+/* Backdrop: teal colour pools, a slowly turning dashed ring top right and nested arches bottom left */
+html[data-theme-plugin="editorial"] [data-ed="product"] {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(55% 45% at 94% 6%, hsl(var(--primary) / 0.16), transparent 70%),
+    radial-gradient(50% 42% at 2% 98%, hsl(171 45% 68% / 0.26), transparent 70%),
+    radial-gradient(40% 30% at 55% 50%, hsl(var(--primary) / 0.05), transparent 70%);
+}
+html[data-theme-plugin="editorial"] [data-ed="product"]::before {
+  content: '';
+  position: absolute; right: -240px; top: -240px; width: 760px; height: 760px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 800' fill='none' stroke='%232C9B8A' stroke-width='1.5'%3E%3Ccircle cx='400' cy='400' r='370' stroke-dasharray='14 8' opacity='.5'/%3E%3Ccircle cx='400' cy='400' r='320' stroke='%230B2530' stroke-dasharray='3 10' opacity='.22'/%3E%3Ccircle cx='400' cy='400' r='270' stroke-dasharray='14 8' opacity='.35'/%3E%3Ccircle cx='400' cy='400' r='220' stroke='%230B2530' stroke-dasharray='3 10' opacity='.2'/%3E%3Ccircle cx='400' cy='400' r='170' stroke-dasharray='14 8' opacity='.45'/%3E%3Ccircle cx='400' cy='400' r='34' fill='%232C9B8A' stroke='none' opacity='.3'/%3E%3C/svg%3E") center / contain no-repeat;
+  animation: ed-drift 160s linear infinite;
+  pointer-events: none;
+}
+html[data-theme-plugin="editorial"] [data-ed="product"]::after {
+  content: '';
+  position: absolute; left: -30px; bottom: -10px; width: 520px; height: 520px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600' preserveAspectRatio='xMidYMax meet' fill='none' stroke-width='1.5'%3E%3Cpath d='M40 600V300A260 260 0 0 1 560 300V600' stroke='%232C9B8A' opacity='.45'/%3E%3Cpath d='M85 600V300A215 215 0 0 1 515 300V600' stroke='%230B2530' opacity='.2'/%3E%3Cpath d='M130 600V300A170 170 0 0 1 470 300V600' stroke='%232C9B8A' opacity='.45'/%3E%3Cpath d='M175 600V300A125 125 0 0 1 425 300V600' stroke='%230B2530' opacity='.2'/%3E%3Cpath d='M220 600V300A80 80 0 0 1 380 300V600' stroke='%232C9B8A' opacity='.45'/%3E%3Ccircle cx='300' cy='300' r='26' fill='%232C9B8A' stroke='none' opacity='.3'/%3E%3C/svg%3E") left bottom / contain no-repeat;
+  pointer-events: none;
+}
+html[data-theme-plugin="editorial"] [data-ed="product"] > * { position: relative; z-index: 1; }
+
+/* Breadcrumb strip */
+html[data-theme-plugin="editorial"] [data-ed="crumbs"] { background: transparent; border-bottom: 1px solid hsl(var(--foreground) / 0.18); }
+html[data-theme-plugin="editorial"] [data-ed="crumbs"] nav,
+html[data-theme-plugin="editorial"] [data-ed="crumbs"] li,
+html[data-theme-plugin="editorial"] [data-ed="crumbs"] a,
+html[data-theme-plugin="editorial"] [data-ed="crumbs"] span {
+  font-family: var(--ed-sans); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+}
+
+/* Two columns: a large gallery that stays put, the details scrolling beside it */
+@media (min-width: 1024px) {
+  html[data-theme-plugin="editorial"] [data-ed="gallery"] { grid-column: span 7 / span 7; position: sticky; top: 7rem; align-self: start; }
+  html[data-theme-plugin="editorial"] [data-ed="info"] { grid-column: span 5 / span 5; padding-top: 0.5rem; }
+  html[data-theme-plugin="editorial"] [data-ed="info"] .lg\:sticky { position: static !important; }
+}
+
+/* Gallery: a vertical strip of thumbnails beside one tall main picture, with an offset teal frame */
+html[data-theme-plugin="editorial"] [data-ed="gallery-inner"] { display: grid; gap: 14px; }
+@media (min-width: 640px) {
+  html[data-theme-plugin="editorial"] [data-ed="gallery-inner"] { grid-template-columns: 88px minmax(0, 1fr); align-items: start; gap: 18px; }
+  html[data-theme-plugin="editorial"] [data-ed="gallery-inner"] > [data-ed="main"] { grid-column: 2; grid-row: 1; }
+  html[data-theme-plugin="editorial"] [data-ed="gallery-inner"] > [data-ed="thumbs"] { grid-column: 1; grid-row: 1; grid-template-columns: 1fr !important; align-content: start; max-height: 78vh; overflow-y: auto; scrollbar-width: none; }
+}
+html[data-theme-plugin="editorial"] [data-ed="main"] {
+  aspect-ratio: 4 / 5 !important;
+  max-width: none !important;
+  width: 100%;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: hsl(var(--muted));
+  box-shadow: 14px 14px 0 hsl(var(--primary) / 0.2) !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="thumbs"] { max-width: none !important; margin: 0 !important; }
+html[data-theme-plugin="editorial"] [data-ed="thumbs"] button {
+  border-radius: 0 !important;
+  border: 0 !important;
+  opacity: 0.55;
+  outline: 1px solid transparent;
+  outline-offset: 3px;
+  transition: opacity 0.3s var(--ed-ease), outline-color 0.3s var(--ed-ease);
+}
+html[data-theme-plugin="editorial"] [data-ed="thumbs"] button:hover { opacity: 0.9; }
+html[data-theme-plugin="editorial"] [data-ed="thumbs"] button.border-primary { opacity: 1; outline-color: hsl(var(--primary)); }
+html[data-theme-plugin="editorial"] [data-ed="gallery"] img,
+html[data-theme-plugin="editorial"] [data-ed="gallery"] video { border-radius: 0 !important; }
+
+/* Title block */
+html[data-theme-plugin="editorial"] [data-ed="title"] {
+  font-family: var(--ed-serif) !important;
+  font-weight: 300 !important;
+  font-size: clamp(2.4rem, 4.6vw, 4.2rem) !important;
+  line-height: 0.98 !important;
+  letter-spacing: -0.035em !important;
+  font-variation-settings: 'opsz' 120;
+}
+html[data-theme-plugin="editorial"] p:has(+ [data-ed="title"]) {
+  font-family: var(--ed-sans); font-size: 0.6875rem !important; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+  color: hsl(var(--primary)) !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="info"] .text-primary { font-family: var(--ed-serif); font-weight: 300; font-variation-settings: 'opsz' 96; }
+html[data-theme-plugin="editorial"] [data-ed="info"] .space-y-5 > .flex.gap-3:first-child:empty { display: none; }
+
+/* No picture at all: a woven swatch, not an empty box */
+html[data-theme-plugin="editorial"] [data-ed="empty"] { aspect-ratio: 4 / 5 !important; border: 0 !important; border-radius: 0 !important; box-shadow: 14px 14px 0 hsl(var(--primary) / 0.2); }
+
+/* Details: hairlines, flat paper, square controls */
+html[data-theme-plugin="editorial"] [data-ed="info"] [class*="rounded"] { border-radius: 0 !important; }
+html[data-theme-plugin="editorial"] [data-ed="info"] .border,
+html[data-theme-plugin="editorial"] [data-ed="info"] .border-b,
+html[data-theme-plugin="editorial"] [data-ed="info"] .border-t { border-color: hsl(var(--foreground) / 0.2); }
+html[data-theme-plugin="editorial"] [data-ed="info"] [class*="bg-secondary"],
+html[data-theme-plugin="editorial"] [data-ed="info"] [class*="bg-muted"] { background: hsl(var(--background) / 0.7); backdrop-filter: blur(3px); }
+html[data-theme-plugin="editorial"] [data-ed="info"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+html[data-theme-plugin="editorial"] [data-ed="info"] textarea,
+html[data-theme-plugin="editorial"] [data-ed="info"] select {
+  background: transparent; border: 0; border-bottom: 1px solid hsl(var(--foreground) / 0.45); box-shadow: none;
+}
+html[data-theme-plugin="editorial"] [data-ed="info"] button[class*="bg-primary"] {
+  font-family: var(--ed-sans); font-size: 0.75rem; letter-spacing: 0.16em; text-transform: uppercase; font-weight: 600; padding-block: 1rem;
+}
+html[data-theme-plugin="editorial"] [data-ed="info"] button[class*="bg-primary"]:hover { background: hsl(var(--foreground)); }
+html[data-theme-plugin="editorial"] [data-ed="info"] button[class*="border"][class*="rounded"]:not([class*="bg-primary"]) { background: transparent; }
+
+/* You may also like */
+html[data-theme-plugin="editorial"] [data-ed="related"] {
+  background: hsl(var(--muted) / 0.6);
+  border-top: 1px solid hsl(var(--foreground) / 0.85);
+}
+
+/* ---------- Fabric pickers (Select Fabric and its variant step): a page of the magazine in a frame ---------- */
+html[data-theme-plugin="editorial"] div[data-state][class*="bg-black/80"] {
+  background: hsl(195 40% 9% / 0.55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+html[data-theme-plugin="editorial"] [data-ed="popup"] {
+  border-radius: 0 !important;
+  border: 1px solid hsl(var(--foreground)) !important;
+  background:
+    radial-gradient(50% 40% at 100% 0%, hsl(var(--primary) / 0.14), transparent 70%),
+    radial-gradient(45% 35% at 0% 100%, hsl(171 45% 68% / 0.22), transparent 70%),
+    hsl(var(--background)) !important;
+  box-shadow: 16px 16px 0 hsl(var(--primary) / 0.28) !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="popup"]::before {
+  content: '';
+  position: absolute; right: -150px; top: -150px; width: 420px; height: 420px; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 800' fill='none' stroke='%232C9B8A' stroke-width='2'%3E%3Ccircle cx='400' cy='400' r='370' stroke-dasharray='14 8' opacity='.5'/%3E%3Ccircle cx='400' cy='400' r='290' stroke='%230B2530' stroke-dasharray='3 10' opacity='.25'/%3E%3Ccircle cx='400' cy='400' r='210' stroke-dasharray='14 8' opacity='.4'/%3E%3Ccircle cx='400' cy='400' r='40' fill='%232C9B8A' stroke='none' opacity='.3'/%3E%3C/svg%3E") center / contain no-repeat;
+  animation: ed-drift 160s linear infinite;
+}
+html[data-theme-plugin="editorial"] [data-ed="popup"] > * { position: relative; z-index: 1; }
+html[data-theme-plugin="editorial"] [data-ed="popup"] > [class*="border-b"] { border-color: hsl(var(--foreground) / 0.85) !important; }
+html[data-theme-plugin="editorial"] [data-ed="popup"] > [class*="border-t"] { border-color: hsl(var(--foreground) / 0.2) !important; }
+html[data-theme-plugin="editorial"] [data-ed="popup"] [class*="border-b"],
+html[data-theme-plugin="editorial"] [data-ed="popup"] [class*="border-t"] { border-color: hsl(var(--foreground) / 0.2); }
+
+/* Title: a small kicker above a large light serif */
+html[data-theme-plugin="editorial"] [data-ed="popup"] h2 {
+  font-family: var(--ed-serif) !important; font-weight: 300 !important; letter-spacing: -0.035em !important; line-height: 1 !important;
+  font-size: clamp(2rem, 3.6vw, 3rem) !important; font-variation-settings: 'opsz' 120;
+}
+html[data-theme-plugin="editorial"] [data-ed="popup"] h2 svg { display: none; }
+html[data-theme-plugin="editorial"] [data-ed="popup"] h2::before {
+  content: 'Choose your cloth'; display: block; margin-bottom: 0.6rem;
+  font-family: var(--ed-sans); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: hsl(var(--primary));
+}
+html[data-theme-plugin="editorial"] [data-ed="popup"] p[class*="text-muted-foreground"] { font-size: 0.875rem; }
+
+/* Section headings */
+html[data-theme-plugin="editorial"] [data-ed="popup"] h3 {
+  font-family: var(--ed-serif); font-weight: 300; font-style: italic; font-size: 1.6rem; letter-spacing: -0.03em; font-variation-settings: 'opsz' 96;
+}
+html[data-theme-plugin="editorial"] [data-ed="popup"] [class*="rounded-full"][class*="bg-secondary"],
+html[data-theme-plugin="editorial"] [data-ed="popup"] .inline-flex.items-center[class*="border"] {
+  border-radius: 0 !important; font-family: var(--ed-sans); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+}
+
+/* Search: a single line, no box */
+html[data-theme-plugin="editorial"] [data-ed="popup"] input {
+  background: transparent !important; border: 0 !important; border-bottom: 1px solid hsl(var(--foreground) / 0.5) !important; box-shadow: none !important;
+  font-family: var(--ed-serif); font-style: italic; font-weight: 300; font-size: 1.15rem !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="popup"] input::placeholder { color: hsl(var(--foreground) / 0.4); }
+
+/* Fabric tiles: square swatches with the name set in italic serif */
+html[data-theme-plugin="editorial"] [data-ed="popup"] [class*="aspect-square"] { border-radius: 0 !important; border: 0 !important; outline: 1px solid transparent; outline-offset: 4px; transition: outline-color 0.3s var(--ed-ease); }
+html[data-theme-plugin="editorial"] [data-ed="popup"] button[class*="aspect-square"]:hover { outline: 2px solid hsl(var(--primary)); }
+html[data-theme-plugin="editorial"] [data-ed="popup"] button[class*="aspect-square"][class*="ring-"] { outline: 2px solid hsl(var(--primary)); }
+html[data-theme-plugin="editorial"] [data-ed="popup"] [class*="aspect-square"] h4 {
+  font-family: var(--ed-serif); font-style: italic; font-weight: 300; font-size: 1.1rem; letter-spacing: -0.02em; line-height: 1.1;
+}
+html[data-theme-plugin="editorial"] [data-ed="popup"] [class*="aspect-square"] [class*="bg-primary"] { border-radius: 0; }
+
+/* Variant options: square chips, the chosen one filled */
+html[data-theme-plugin="editorial"] [data-ed="popup"] button[class*="rounded-full"][class*="border-2"] {
+  border-radius: 0 !important; border-width: 1px !important; border-color: hsl(var(--foreground) / 0.4);
+  font-family: var(--ed-sans); letter-spacing: 0.04em; background: transparent;
+}
+html[data-theme-plugin="editorial"] [data-ed="popup"] button[class*="rounded-full"][class*="border-primary"] {
+  background: hsl(var(--foreground)) !important; color: hsl(var(--background)) !important; border-color: hsl(var(--foreground)) !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="popup"] button[class*="rounded-full"][class*="border-primary"] [class*="text-muted-foreground"] { color: hsl(var(--background) / 0.7) !important; }
+
+/* Buttons and labels */
+html[data-theme-plugin="editorial"] [data-ed="popup"] label,
+html[data-theme-plugin="editorial"] [data-ed="popup"] [class*="font-medium"][class*="text-sm"] { font-family: var(--ed-sans); }
+html[data-theme-plugin="editorial"] [data-ed="popup"] button.inline-flex { border-radius: 0; font-family: var(--ed-sans); font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; }
+html[data-theme-plugin="editorial"] [data-ed="popup"] button[class*="bg-primary"]:hover { background: hsl(var(--foreground)); }
+
+/* ---------- Sign in / sign up ---------- */
+html[data-theme-plugin="editorial"] [data-ed="auth"] {
+  background:
+    radial-gradient(55% 50% at 96% 4%, hsl(var(--primary) / 0.16), transparent 70%),
+    radial-gradient(50% 45% at 0% 100%, hsl(171 45% 68% / 0.26), transparent 70%);
+}
+html[data-theme-plugin="editorial"] [data-ed="auth-bg"] { display: none; }
+html[data-theme-plugin="editorial"] [data-ed="auth"]::before {
+  content: ''; position: absolute; left: -260px; top: -260px; width: 760px; height: 760px; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 800' fill='none' stroke='%232C9B8A' stroke-width='1.5'%3E%3Ccircle cx='400' cy='400' r='370' stroke-dasharray='14 8' opacity='.5'/%3E%3Ccircle cx='400' cy='400' r='310' stroke='%230B2530' stroke-dasharray='3 10' opacity='.22'/%3E%3Ccircle cx='400' cy='400' r='250' stroke-dasharray='14 8' opacity='.35'/%3E%3Ccircle cx='400' cy='400' r='190' stroke='%230B2530' stroke-dasharray='3 10' opacity='.2'/%3E%3Ccircle cx='400' cy='400' r='34' fill='%232C9B8A' stroke='none' opacity='.3'/%3E%3C/svg%3E") center / contain no-repeat;
+  animation: ed-drift 160s linear infinite;
+}
+
+/* The form: a flat paper sheet in a thin frame */
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] {
+  border-radius: 0 !important;
+  border: 1px solid hsl(var(--foreground)) !important;
+  background: hsl(var(--background)) !important;
+  box-shadow: 16px 16px 0 hsl(var(--primary) / 0.25) !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] h1 {
+  font-family: var(--ed-serif); font-weight: 300; font-size: clamp(2.4rem, 4.4vw, 3.6rem) !important; line-height: 0.98; letter-spacing: -0.04em; font-variation-settings: 'opsz' 120;
+}
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] p[class*="uppercase"] {
+  font-family: var(--ed-sans); font-size: 0.6875rem !important; font-weight: 600; letter-spacing: 0.16em !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] [class*="rounded"] { border-radius: 0 !important; }
+
+/* Signup / Login tabs: two words with an underline, not a pill */
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] [role="tablist"] {
+  background: transparent !important; padding: 0; height: auto; border-bottom: 1px solid hsl(var(--foreground) / 0.25);
+}
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] [role="tab"] {
+  background: transparent !important; box-shadow: none !important; border-radius: 0; padding: 0.7rem 0;
+  font-family: var(--ed-sans); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: hsl(var(--foreground) / 0.45);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] [role="tab"][data-state="active"] { color: hsl(var(--foreground)); border-bottom-color: hsl(var(--primary)); }
+
+/* Fields: a single line */
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] input,
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] button[role="combobox"] {
+  background: transparent !important; border: 0 !important; border-bottom: 1px solid hsl(var(--foreground) / 0.5) !important; box-shadow: none !important;
+  font-family: var(--ed-serif); font-weight: 300; font-size: 1.1rem; letter-spacing: -0.01em;
+}
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] input:focus { border-bottom-color: hsl(var(--primary)) !important; }
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] input::placeholder { font-style: italic; color: hsl(var(--foreground) / 0.4); }
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] button.inline-flex,
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] .btn-primary {
+  font-family: var(--ed-sans); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+}
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] button[class*="bg-primary"]:hover,
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] .btn-primary:hover { background: hsl(var(--foreground)); }
+html[data-theme-plugin="editorial"] [data-ed="auth-card"] span[class*="bg-card"] { background: hsl(var(--background)) !important; }
+
+/* The picture panel: square, ink-toned, with a serif headline */
+html[data-theme-plugin="editorial"] [data-ed="auth-panel"] {
+  border-radius: 0 !important; border: 0 !important; box-shadow: none !important; background: hsl(var(--muted)) !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="auth-panel"] [class*="bg-gradient-to-t"] {
+  background: linear-gradient(to top, hsl(195 40% 9% / 0.92), hsl(195 40% 9% / 0.4) 60%, hsl(195 40% 9% / 0.05)) !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="auth-panel"] h2 {
+  font-family: var(--ed-serif); font-weight: 300; font-size: clamp(2rem, 3.4vw, 3rem) !important; line-height: 1.02; letter-spacing: -0.035em; font-variation-settings: 'opsz' 120; white-space: pre-line;
+}
+html[data-theme-plugin="editorial"] [data-ed="auth-panel"] p[class*="uppercase"] { font-family: var(--ed-sans); font-weight: 600; letter-spacing: 0.16em !important; }
+html[data-theme-plugin="editorial"] [data-ed="auth-panel"] span[class*="rounded-full"] {
+  border-radius: 0; background: transparent; font-family: var(--ed-sans); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; border-color: hsl(0 0% 100% / 0.45);
+}
+
+/* ---------- Every other page: cart, wishlist, checkout, payment, account, orders, about, contact ... ---------- */
+/* All of this is scoped to <main> (the page body) and to the theme, so the classic site and the header and footer are untouched. */
+
+/* Ambient background: teal colour pools, a dashed ring top right and arches bottom left. Never causes sideways scroll. */
+html[data-theme-plugin="editorial"] main {
+  position: relative;
+  overflow-x: clip;
+  background:
+    radial-gradient(50% 38% at 96% 2%, hsl(var(--primary) / 0.13), transparent 70%),
+    radial-gradient(46% 34% at 0% 100%, hsl(171 45% 68% / 0.2), transparent 70%);
+}
+html[data-theme-plugin="editorial"] main::before {
+  content: ''; position: absolute; right: -230px; top: -230px; width: 640px; height: 640px; pointer-events: none; z-index: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 800' fill='none' stroke='%232C9B8A' stroke-width='1.5'%3E%3Ccircle cx='400' cy='400' r='370' stroke-dasharray='14 8' opacity='.45'/%3E%3Ccircle cx='400' cy='400' r='300' stroke='%230B2530' stroke-dasharray='3 10' opacity='.2'/%3E%3Ccircle cx='400' cy='400' r='230' stroke-dasharray='14 8' opacity='.35'/%3E%3Ccircle cx='400' cy='400' r='160' stroke='%230B2530' stroke-dasharray='3 10' opacity='.18'/%3E%3Ccircle cx='400' cy='400' r='30' fill='%232C9B8A' stroke='none' opacity='.28'/%3E%3C/svg%3E") center / contain no-repeat;
+  animation: ed-drift 160s linear infinite;
+}
+html[data-theme-plugin="editorial"] main::after {
+  content: ''; position: absolute; left: -20px; bottom: 0; width: 420px; height: 420px; pointer-events: none; z-index: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600' preserveAspectRatio='xMidYMax meet' fill='none' stroke-width='1.5'%3E%3Cpath d='M40 600V300A260 260 0 0 1 560 300V600' stroke='%232C9B8A' opacity='.4'/%3E%3Cpath d='M90 600V300A210 210 0 0 1 510 300V600' stroke='%230B2530' opacity='.18'/%3E%3Cpath d='M140 600V300A160 160 0 0 1 460 300V600' stroke='%232C9B8A' opacity='.4'/%3E%3Cpath d='M190 600V300A110 110 0 0 1 410 300V600' stroke='%230B2530' opacity='.18'/%3E%3Ccircle cx='300' cy='300' r='24' fill='%232C9B8A' stroke='none' opacity='.28'/%3E%3C/svg%3E") left bottom / contain no-repeat;
+}
+html[data-theme-plugin="editorial"] main > section,
+html[data-theme-plugin="editorial"] main > div { position: relative; z-index: 1; }
+
+/* The heading band at the top of the page */
+html[data-theme-plugin="editorial"] main > section.bg-secondary\/30:first-child:not([data-ed]) {
+  background: transparent;
+  border-bottom: 1px solid hsl(var(--foreground));
+}
+html[data-theme-plugin="editorial"] main > section.bg-secondary\/30:first-child:not([data-ed]) h1 {
+  font-family: var(--ed-serif) !important; font-weight: 300 !important;
+  font-size: clamp(2.6rem, 6.4vw, 5.4rem) !important; line-height: 0.96 !important; letter-spacing: -0.04em !important;
+  font-variation-settings: 'opsz' 144;
+}
+html[data-theme-plugin="editorial"] main > section.bg-secondary\/30:first-child:not([data-ed]) p {
+  font-family: var(--ed-sans); font-size: 0.6875rem !important; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: hsl(var(--muted-foreground));
+}
+
+/* Cards and panels: flat paper, hairline edges, square corners */
+html[data-theme-plugin="editorial"] main .border[class*="rounded-xl"],
+html[data-theme-plugin="editorial"] main .border[class*="rounded-2xl"],
+html[data-theme-plugin="editorial"] main .border[class*="rounded-lg"] {
+  border-radius: 0 !important;
+  border-color: hsl(var(--foreground) / 0.2);
+  box-shadow: none;
+}
+html[data-theme-plugin="editorial"] main [class*="rounded-xl"][class*="bg-card"],
+html[data-theme-plugin="editorial"] main [class*="rounded-2xl"][class*="bg-card"] { background: hsl(var(--background) / 0.78); }
+html[data-theme-plugin="editorial"] main img[class*="rounded"]:not([class*="rounded-full"]) { border-radius: 0 !important; }
+/* The order summary beside the items gets the same offset frame as the sign-in sheet */
+html[data-theme-plugin="editorial"] main .lg\:sticky.border {
+  border: 1px solid hsl(var(--foreground)) !important;
+  box-shadow: 12px 12px 0 hsl(var(--primary) / 0.2) !important;
+  background: hsl(var(--background)) !important;
+}
+html[data-theme-plugin="editorial"] main .border-dashed { border-color: hsl(var(--foreground) / 0.35); }
+
+/* Headings inside pages */
+html[data-theme-plugin="editorial"] main h2.font-cursive,
+html[data-theme-plugin="editorial"] main h3.font-cursive { font-weight: 300; letter-spacing: -0.03em; }
+
+/* Main actions: square, small capitals; turn ink on hover */
+/* Full-width primary actions (submit, place order, continue): square, small capitals. Option toggles and small buttons are left alone. */
+html[data-theme-plugin="editorial"] main button[class*="bg-primary"][class*="w-full"],
+html[data-theme-plugin="editorial"] main a[class*="bg-primary"][class*="w-full"] {
+  border-radius: 0 !important; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600;
+}
+html[data-theme-plugin="editorial"] main button[class*="bg-primary"][class*="w-full"]:hover:not(:disabled) { background: hsl(var(--foreground)); }
+/* Large pill-shaped buttons become square; small round icon buttons stay round */
+html[data-theme-plugin="editorial"] main button[class*="rounded-full"]:is([class*="bg-primary"], .btn-primary):not([class*="h-6"]):not([class*="h-7"]):not([class*="h-8"]):not([class*="h-9"]):not([class*="h-10"]):not([class*="w-8"]):not([class*="w-9"]):not([class*="w-10"]) { border-radius: 0 !important; }
+
+/* Forms: a single line under each field */
+html[data-theme-plugin="editorial"] main input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+html[data-theme-plugin="editorial"] main textarea,
+html[data-theme-plugin="editorial"] main button[role="combobox"] {
+  background: transparent; border: 0; border-bottom: 1px solid hsl(var(--foreground) / 0.5); box-shadow: none;
+}
+html[data-theme-plugin="editorial"] main input:focus,
+html[data-theme-plugin="editorial"] main textarea:focus { border-bottom-color: hsl(var(--primary)); outline: none; box-shadow: none; }
+
+/* Tabs: words with an underline, not pills (vertical lists are left alone) */
+html[data-theme-plugin="editorial"] main [role="tablist"]:not([aria-orientation="vertical"]) {
+  background: transparent; padding: 0; height: auto; border-bottom: 1px solid hsl(var(--foreground) / 0.25); border-radius: 0;
+}
+html[data-theme-plugin="editorial"] main [role="tablist"]:not([aria-orientation="vertical"]) [role="tab"] {
+  background: transparent !important; box-shadow: none !important; border-radius: 0; margin-bottom: -1px; border-bottom: 2px solid transparent;
+  font-family: var(--ed-sans); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+}
+html[data-theme-plugin="editorial"] main [role="tablist"]:not([aria-orientation="vertical"]) [role="tab"][data-state="active"] { border-bottom-color: hsl(var(--primary)); color: hsl(var(--foreground)); }
+
+/* Tables */
+html[data-theme-plugin="editorial"] main table { border-collapse: collapse; }
+html[data-theme-plugin="editorial"] main th {
+  font-family: var(--ed-sans); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--muted-foreground));
+}
+html[data-theme-plugin="editorial"] main tr { border-color: hsl(var(--foreground) / 0.15); }
+
+/* Dialogs, sheets and drop-downs anywhere on the site */
+html[data-theme-plugin="editorial"] [role="dialog"]:not([data-ed="popup"]):not([data-ed="chat"]) {
+  border-radius: 0 !important;
+  border: 1px solid hsl(var(--foreground)) !important;
+  background: hsl(var(--background)) !important;
+  box-shadow: 14px 14px 0 hsl(var(--primary) / 0.25) !important;
+}
+html[data-theme-plugin="editorial"] [role="dialog"] h2 {
+  font-family: var(--ed-serif); font-weight: 300; letter-spacing: -0.03em; font-variation-settings: 'opsz' 96;
+}
+html[data-theme-plugin="editorial"] [role="listbox"],
+html[data-theme-plugin="editorial"] [role="menu"],
+html[data-theme-plugin="editorial"] [data-radix-popper-content-wrapper] > div {
+  border-radius: 0 !important; border: 1px solid hsl(var(--foreground) / 0.5) !important; background: hsl(var(--background)) !important; box-shadow: 6px 6px 0 hsl(var(--primary) / 0.16) !important;
+}
+
+/* ---------- Search ---------- */
+html[data-theme-plugin="editorial"] [data-ed="search"] {
+  border-radius: 0 !important;
+  border: 1px solid hsl(var(--foreground)) !important;
+  background:
+    radial-gradient(45% 40% at 100% 0%, hsl(var(--primary) / 0.14), transparent 70%),
+    radial-gradient(40% 35% at 0% 100%, hsl(171 45% 68% / 0.22), transparent 70%),
+    hsl(var(--background)) !important;
+  box-shadow: 16px 16px 0 hsl(var(--primary) / 0.25) !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="search"]::before {
+  content: ''; position: absolute; right: -170px; top: -170px; width: 460px; height: 460px; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 800' fill='none' stroke='%232C9B8A' stroke-width='2'%3E%3Ccircle cx='400' cy='400' r='370' stroke-dasharray='14 8' opacity='.5'/%3E%3Ccircle cx='400' cy='400' r='290' stroke='%230B2530' stroke-dasharray='3 10' opacity='.25'/%3E%3Ccircle cx='400' cy='400' r='210' stroke-dasharray='14 8' opacity='.4'/%3E%3Ccircle cx='400' cy='400' r='40' fill='%232C9B8A' stroke='none' opacity='.3'/%3E%3C/svg%3E") center / contain no-repeat;
+  animation: ed-drift 160s linear infinite;
+}
+html[data-theme-plugin="editorial"] [data-ed="search"] > * { position: relative; z-index: 1; }
+html[data-theme-plugin="editorial"] [data-ed="search"] > [class*="border-b"] { border-color: hsl(var(--foreground)) !important; }
+
+/* The query: one huge italic line */
+html[data-theme-plugin="editorial"] [data-ed="search"] input {
+  background: transparent !important; border: 0 !important; box-shadow: none !important; outline: none !important;
+  font-family: var(--ed-serif); font-weight: 300; font-style: italic; letter-spacing: -0.03em;
+  font-size: clamp(1.6rem, 4vw, 3rem) !important; padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; height: auto !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="search"] input::placeholder { color: hsl(var(--foreground) / 0.35); }
+html[data-theme-plugin="editorial"] [data-ed="search"] input + button svg,
+html[data-theme-plugin="editorial"] [data-ed="search"] svg { stroke-width: 1.5; }
+
+/* Empty and no-result messages */
+html[data-theme-plugin="editorial"] [data-ed="search"] [class*="min-h-[200px]"] svg { display: none; }
+html[data-theme-plugin="editorial"] [data-ed="search"] [class*="min-h-[200px]"] p {
+  font-family: var(--ed-serif); font-style: italic; font-weight: 300; font-size: clamp(1.6rem, 3vw, 2.4rem) !important; letter-spacing: -0.03em; color: hsl(var(--foreground) / 0.45);
+}
+html[data-theme-plugin="editorial"] [data-ed="search"] [class*="min-h-[200px]"] p + p { font-family: var(--ed-sans); font-style: normal; font-size: 0.875rem !important; letter-spacing: 0; }
+
+/* Section headings become kickers; result rows become hairline entries */
+html[data-theme-plugin="editorial"] [data-ed="search"] h3 {
+  font-family: var(--ed-sans); font-style: normal; font-size: 0.6875rem !important; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+  padding-bottom: 0.75rem; border-bottom: 1px solid hsl(var(--foreground) / 0.85);
+}
+html[data-theme-plugin="editorial"] [data-ed="search"] a[class*="rounded-lg"][class*="border"] {
+  border-width: 0 0 1px 0; border-color: hsl(var(--foreground) / 0.18); border-radius: 0 !important; padding-left: 0; padding-right: 0; background: transparent;
+}
+html[data-theme-plugin="editorial"] [data-ed="search"] a[class*="rounded-lg"][class*="border"]:hover { background: hsl(var(--muted) / 0.6); padding-left: 0.5rem; }
+html[data-theme-plugin="editorial"] [data-ed="search"] img { border-radius: 0 !important; }
+html[data-theme-plugin="editorial"] [data-ed="search"] h4[class*="font-medium"] {
+  font-family: var(--ed-serif); font-style: italic; font-weight: 300; font-size: 1.2rem; letter-spacing: -0.02em;
+}
+html[data-theme-plugin="editorial"] [data-ed="search"] p[class*="text-primary"] { font-family: var(--ed-sans); letter-spacing: 0.04em; }
+
+/* Category chips and the side list */
+html[data-theme-plugin="editorial"] [data-ed="search"] a[class*="rounded-lg"][class*="text-center"] {
+  border-radius: 0 !important; border-color: hsl(var(--foreground) / 0.3); font-family: var(--ed-sans);
+}
+html[data-theme-plugin="editorial"] [data-ed="search"] [class*="bg-secondary/30"] { background: hsl(var(--muted) / 0.55); }
+html[data-theme-plugin="editorial"] [data-ed="search"] h4[class*="uppercase"] { font-family: var(--ed-sans); font-style: normal; font-size: 0.625rem; font-weight: 600; letter-spacing: 0.16em; }
+html[data-theme-plugin="editorial"] [data-ed="search"] a[class*="rounded-lg"][class*="hover:bg-white"] { border-radius: 0; }
+
+/* ---------- Custom design and Upload your design (white glass panels, gradient bands, a coloured call-to-action) ---------- */
+/* Page titles anywhere in the page body, set like the rest of the theme */
+html[data-theme-plugin="editorial"] main section h1.font-cursive {
+  font-family: var(--ed-serif) !important; font-weight: 300 !important;
+  font-size: clamp(2.6rem, 6.4vw, 5.4rem) !important; line-height: 0.96 !important; letter-spacing: -0.04em !important;
+  font-variation-settings: 'opsz' 144;
+}
+html[data-theme-plugin="editorial"] main h1 .text-primary,
+html[data-theme-plugin="editorial"] main h2 .text-primary { font-style: italic; }
+
+/* "Glass" white sections: no white wash, no blur */
+html[data-theme-plugin="editorial"] main section[class*="bg-white"] {
+  background: transparent !important; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+html[data-theme-plugin="editorial"] main > section:first-of-type[class*="bg-white"] { border-bottom: 1px solid hsl(var(--foreground)); }
+/* Gradient bands become tinted paper between two hairlines */
+html[data-theme-plugin="editorial"] main section[class*="from-warm"] {
+  background: hsl(var(--muted) / 0.55) !important;
+  border-top: 1px solid hsl(var(--foreground) / 0.2); border-bottom: 1px solid hsl(var(--foreground) / 0.2);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+/* The coloured call-to-action band becomes an ink panel */
+html[data-theme-plugin="editorial"] main section[class*="from-primary/90"] {
+  background: hsl(var(--foreground)) !important; color: hsl(var(--background));
+}
+html[data-theme-plugin="editorial"] main section[class*="from-primary/90"] h2 { color: hsl(var(--background)); font-size: clamp(2rem, 4.4vw, 3.6rem); line-height: 1; letter-spacing: -0.035em; }
+html[data-theme-plugin="editorial"] main section[class*="from-primary/90"] p { color: hsl(var(--background) / 0.75); }
+html[data-theme-plugin="editorial"] main section[class*="from-primary/90"] [class*="bg-white"] { background: hsl(var(--background)) !important; color: hsl(var(--foreground)); }
+html[data-theme-plugin="editorial"] main section[class*="from-primary/90"] [class*="bg-white"]:hover { background: hsl(171 52% 62%) !important; }
+
+/* White cards inside the page become paper panels */
+html[data-theme-plugin="editorial"] main [class*="bg-white"][class*="rounded"] {
+  background: hsl(var(--background) / 0.82) !important; border-radius: 0 !important;
+}
+html[data-theme-plugin="editorial"] main [class*="bg-white"][class*="shadow"] { box-shadow: 10px 10px 0 hsl(var(--primary) / 0.16) !important; }
+/* The upload drop area: a dashed teal frame */
+html[data-theme-plugin="editorial"] main [class*="border-dashed"][class*="border-2"] { border-color: hsl(var(--primary) / 0.65); background: hsl(var(--background) / 0.6) !important; }
+/* Small pill labels above titles */
+html[data-theme-plugin="editorial"] main div[class*="rounded-full"][class*="bg-primary/10"][class*="text-primary"] {
+  border-radius: 0; background: transparent; padding-left: 0; padding-right: 0;
+  font-family: var(--ed-sans); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+}
+/* Number badges on step cards and similar round icons stay round but take the page palette */
+html[data-theme-plugin="editorial"] main [class*="bg-primary/10"][class*="rounded-full"]:not(div[class*="inline-flex"]) { background: hsl(var(--primary) / 0.14); }
+
+/* ---------- Checkout and account: busy pages, so no background art and a calmer, ruled layout ---------- */
+html[data-theme-plugin="editorial"] main:has([data-ed="checkout"])::before,
+html[data-theme-plugin="editorial"] main:has([data-ed="checkout"])::after,
+html[data-theme-plugin="editorial"] main:has([data-ed="dash"])::before,
+html[data-theme-plugin="editorial"] main:has([data-ed="dash"])::after { display: none; }
+
+/* Checkout: forms on the left as ruled sections, a sticky receipt on the right */
+@media (min-width: 1024px) {
+  html[data-theme-plugin="editorial"] [data-ed="checkout-grid"] { grid-template-columns: minmax(0, 1fr) 430px; gap: 4.5rem; align-items: start; }
+  html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] { grid-column: span 1 / span 1 !important; }
+  html[data-theme-plugin="editorial"] [data-ed="receipt"] { grid-column: span 1 / span 1; top: 7rem; }
+}
+/* Each form block loses its box: a heavy rule above, generous air, a large light title */
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] > [class*="rounded"],
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] > div > [class*="rounded-2xl"] {
+  background: transparent !important; border: 0 !important; border-top: 1px solid hsl(var(--foreground)) !important;
+  border-radius: 0 !important; box-shadow: none !important; padding-left: 0 !important; padding-right: 0 !important; padding-top: 1.5rem !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] h3 {
+  font-family: var(--ed-serif); font-weight: 300 !important; font-size: clamp(1.7rem, 2.6vw, 2.3rem) !important; letter-spacing: -0.035em; line-height: 1;
+}
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] h4 {
+  font-family: var(--ed-serif); font-weight: 300 !important; font-size: clamp(1.7rem, 2.6vw, 2.3rem) !important; letter-spacing: -0.035em; line-height: 1;
+}
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] h3 svg,
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] h4 svg { display: none; }
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] label:not(:has(input[type="checkbox"], button[role="checkbox"])):not(:is(input[type="checkbox"], button[role="checkbox"]) + label) { font-family: var(--ed-sans); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] input:disabled { background: hsl(var(--muted) / 0.5); }
+/* The receipt: a ticket with a dashed tear line under its title, rows divided by hairlines */
+html[data-theme-plugin="editorial"] [data-ed="receipt"] {
+  border: 1px solid hsl(var(--foreground)) !important; border-radius: 0 !important;
+  background: hsl(var(--background)) !important; box-shadow: 12px 12px 0 hsl(var(--primary) / 0.2) !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="receipt"] > h3:first-child {
+  font-family: var(--ed-serif); font-weight: 300 !important; font-size: 2rem !important; letter-spacing: -0.04em; line-height: 1;
+  padding-bottom: 1.1rem; border-bottom: 2px dashed hsl(var(--foreground) / 0.35);
+}
+html[data-theme-plugin="editorial"] [data-ed="receipt"] > h3:first-child svg { display: none; }
+html[data-theme-plugin="editorial"] [data-ed="receipt"] h3 { font-family: var(--ed-serif); font-weight: 300 !important; letter-spacing: -0.03em; }
+html[data-theme-plugin="editorial"] [data-ed="receipt"] h3 svg { display: none; }
+html[data-theme-plugin="editorial"] [data-ed="receipt"] .border { border-radius: 0 !important; border-color: hsl(var(--foreground) / 0.2); box-shadow: none; }
+html[data-theme-plugin="editorial"] [data-ed="receipt"] button[class*="border"] { border-radius: 0 !important; }
+html[data-theme-plugin="editorial"] [data-ed="receipt"] button[class*="border-primary"][class*="bg-primary"] { background: hsl(var(--foreground)) !important; border-color: hsl(var(--foreground)) !important; color: hsl(var(--background)) !important; }
+html[data-theme-plugin="editorial"] [data-ed="receipt"] [class*="font-bold"][class*="text-"] { font-family: var(--ed-serif); font-weight: 400; letter-spacing: -0.02em; }
+
+/* Account */
+html[data-theme-plugin="editorial"] [data-ed="dash"] { background: transparent !important; }
+html[data-theme-plugin="editorial"] [data-ed="dash"] h1 {
+  font-family: var(--ed-serif) !important; font-weight: 300 !important; font-size: clamp(2.6rem, 5.6vw, 4.6rem) !important; line-height: 0.96 !important; letter-spacing: -0.04em !important;
+  font-variation-settings: 'opsz' 144;
+}
+html[data-theme-plugin="editorial"] [data-ed="dash"] h1 + p { font-family: var(--ed-sans); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+/* The manufacturing portal entry: an ink panel */
+html[data-theme-plugin="editorial"] [data-ed="dash-portal"] {
+  background: hsl(var(--foreground)) !important; color: hsl(var(--background)); border-radius: 0 !important; border: 0 !important; box-shadow: 10px 10px 0 hsl(var(--primary) / 0.25) !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="dash-portal"] h3 { font-family: var(--ed-serif); font-weight: 300 !important; font-size: clamp(1.5rem, 2.4vw, 2rem) !important; letter-spacing: -0.03em; }
+html[data-theme-plugin="editorial"] [data-ed="dash-portal"] p { color: hsl(var(--background) / 0.7) !important; }
+html[data-theme-plugin="editorial"] [data-ed="dash-portal"] [class*="rounded"] { border-radius: 0 !important; }
+html[data-theme-plugin="editorial"] [data-ed="dash-portal"] button { background: hsl(var(--background)) !important; color: hsl(var(--foreground)) !important; text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.6875rem; font-weight: 600; }
+/* The profile rail: a ruled column, not a boxed card, with a square monogram */
+html[data-theme-plugin="editorial"] [data-ed="dash-aside"] > [class*="rounded"] {
+  background: transparent !important; border: 0 !important; border-top: 1px solid hsl(var(--foreground)) !important; border-radius: 0 !important; box-shadow: none !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="dash-aside"] [class*="rounded-full"] {
+  border-radius: 0 !important; width: 6rem !important; height: 6rem !important; background: hsl(var(--primary) / 0.12) !important;
+  font-family: var(--ed-serif); font-style: italic; font-weight: 300; font-size: 2.4rem !important; letter-spacing: -0.04em;
+}
+html[data-theme-plugin="editorial"] [data-ed="dash-aside"] p[class*="font-medium"] { font-family: var(--ed-serif); font-weight: 300; font-size: 1.7rem !important; line-height: 1.05; letter-spacing: -0.03em; }
+/* The section tabs read as a numbered contents line */
+html[data-theme-plugin="editorial"] [data-ed="dash"] [role="tablist"] { counter-reset: dashtab; }
+html[data-theme-plugin="editorial"] [data-ed="dash"] [role="tab"] { counter-increment: dashtab; }
+html[data-theme-plugin="editorial"] [data-ed="dash"] [role="tab"]::before {
+  content: counter(dashtab, decimal-leading-zero); margin-right: 0.5rem;
+  font-family: var(--ed-serif); font-style: italic; font-weight: 300; font-size: 0.9rem; letter-spacing: 0; text-transform: none; color: hsl(var(--primary));
+}
+html[data-theme-plugin="editorial"] [data-ed="dash"] [role="tab"] svg { display: none; }
+/* Tab content cards: flat, ruled */
+html[data-theme-plugin="editorial"] [data-ed="dash"] [role="tabpanel"] .border[class*="rounded"] { background: hsl(var(--background) / 0.7); border-color: hsl(var(--foreground) / 0.25); }
+html[data-theme-plugin="editorial"] [data-ed="dash"] [role="tabpanel"] h3,
+html[data-theme-plugin="editorial"] [data-ed="dash"] [role="tabpanel"] [class*="CardTitle"] { font-family: var(--ed-serif); font-weight: 300; letter-spacing: -0.03em; }
+
+/* ---------- Account layout (desktop): profile strip across the top, contents list on the left, content on the right ---------- */
+@media (min-width: 1024px) {
+  html[data-theme-plugin="editorial"] [data-ed="dash-body"] { flex-direction: column; gap: 2.5rem; }
+  html[data-theme-plugin="editorial"] [data-ed="dash-aside"] { width: 100% !important; }
+  html[data-theme-plugin="editorial"] [data-ed="dash-aside"] .lg\:flex-col { flex-direction: row !important; align-items: center !important; gap: 2rem !important; }
+  html[data-theme-plugin="editorial"] [data-ed="dash-aside"] [class*="rounded-full"] { width: 5rem !important; height: 5rem !important; font-size: 2rem !important; }
+  html[data-theme-plugin="editorial"] [data-ed="dash-aside"] .lg\:text-left { text-align: left; }
+  html[data-theme-plugin="editorial"] [data-ed="dash-aside"] [class*="sticky"] { position: static; }
+
+  html[data-theme-plugin="editorial"] [data-ed="dash-tabs"] { display: grid !important; grid-template-columns: 230px minmax(0, 1fr); column-gap: 3.5rem; align-items: start; }
+  html[data-theme-plugin="editorial"] [data-ed="dash-tabs"] > [role="tablist"] {
+    display: flex !important; flex-direction: column; align-items: stretch; position: sticky; top: 7rem; margin: 0 !important;
+    border-bottom: 0 !important; border-top: 1px solid hsl(var(--foreground)); width: 100%;
+  }
+  html[data-theme-plugin="editorial"] [data-ed="dash-tabs"] > [role="tablist"] [role="tab"] {
+    justify-content: flex-start; text-align: left; padding: 1rem 0 !important; margin: 0 !important;
+    border-bottom: 1px solid hsl(var(--foreground) / 0.2) !important; border-left: 2px solid transparent !important; padding-left: 0.75rem !important;
+    font-size: 0.75rem;
+  }
+  html[data-theme-plugin="editorial"] [data-ed="dash-tabs"] > [role="tablist"] [role="tab"][data-state="active"] {
+    border-left-color: hsl(var(--primary)) !important; border-bottom-color: hsl(var(--foreground) / 0.2) !important; background: hsl(var(--muted) / 0.5) !important;
+  }
+  html[data-theme-plugin="editorial"] [data-ed="dash-tabs"] > [role="tabpanel"] { grid-column: 2; margin-top: 0 !important; }
+}
+
+/* Checkout steps: each block is introduced by a small step number */
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] { counter-reset: ckstep; }
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] > [class*="rounded"],
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] > div > [class*="rounded-2xl"] { counter-increment: ckstep; }
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] > [class*="rounded"]::before,
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] > div > [class*="rounded-2xl"]::before {
+  content: 'Step ' counter(ckstep, decimal-leading-zero); display: block; margin-bottom: 0.7rem;
+  font-family: var(--ed-sans); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: hsl(var(--primary));
+}
+
+/* =====================================================================================
+   BOLD COLLAGE: colour blocks, tilted stickers, a running text strip, offset shadows,
+   a dark "bag" for the order, staggered wishlist. Checkout, cart, account, wishlist, login.
+   ===================================================================================== */
+
+/* ---- Page title band: a rotating sticker on the right and a running strip along the bottom ---- */
+@keyframes ed-strip { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes ed-wobble { 0%, 100% { transform: translateY(-50%) rotate(-10deg); } 50% { transform: translateY(-50%) rotate(-3deg); } }
+html[data-theme-plugin="editorial"] main > section.bg-secondary\/30:first-child:not([data-ed]) {
+  position: relative; overflow: hidden; padding-bottom: 4.5rem !important;
+}
+html[data-theme-plugin="editorial"] main > section.bg-secondary\/30:first-child:not([data-ed])::before {
+  content: 'Made to\A order'; white-space: pre; position: absolute; right: clamp(1rem, 7vw, 7rem); top: 42%; z-index: 2;
+  width: 7.2rem; height: 7.2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-align: center;
+  background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+  box-shadow: 0 0 0 5px hsl(var(--background)), 0 0 0 6px hsl(var(--primary) / 0.55);
+  font-family: var(--ed-sans); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; line-height: 1.5;
+  animation: ed-wobble 7s ease-in-out infinite; pointer-events: none;
+}
+html[data-theme-plugin="editorial"] main > section.bg-secondary\/30:first-child:not([data-ed])::after {
+  content: 'Made to order  ✦  From two pieces  ✦  Prints & embroidery  ✦  Designed in India  ✦  Made to order  ✦  From two pieces  ✦  Prints & embroidery  ✦  Designed in India  ✦  Made to order  ✦  From two pieces  ✦  Prints & embroidery  ✦  Designed in India  ✦  Made to order  ✦  From two pieces  ✦  Prints & embroidery  ✦  Designed in India  ✦  Made to order  ✦  From two pieces  ✦  Prints & embroidery  ✦  Designed in India  ✦  Made to order  ✦  From two pieces  ✦  Prints & embroidery  ✦  Designed in India  ✦  ';
+  position: absolute; left: 0; bottom: 0; white-space: nowrap; width: max-content; z-index: 1;
+  border-top: 1px solid hsl(var(--foreground)); padding: 0.7rem 0; background: hsl(var(--background));
+  font-family: var(--ed-serif); font-style: italic; font-weight: 300; font-size: 1.15rem; letter-spacing: -0.01em;
+  animation: ed-strip 36s linear infinite;
+}
+@media (max-width: 767px) {
+  html[data-theme-plugin="editorial"] main > section.bg-secondary\/30:first-child:not([data-ed])::before { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme-plugin="editorial"] main > section.bg-secondary\/30:first-child:not([data-ed])::before,
+  html[data-theme-plugin="editorial"] main > section.bg-secondary\/30:first-child:not([data-ed])::after { animation: none; }
+}
+
+/* ---- The dark bag: the order summary in checkout and the cart ---- */
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) {
+  background: hsl(var(--foreground)) !important; color: hsl(var(--background));
+  border: 0 !important; border-radius: 0 !important;
+  box-shadow: 12px 12px 0 hsl(var(--primary)) !important;
+  transform: rotate(0.6deg); transform-origin: top center;
+}
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) [class*="text-muted-foreground"] { color: hsl(var(--background) / 0.62) !important; }
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) [class*="border"] { border-color: hsl(var(--background) / 0.22) !important; }
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) .text-primary,
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) [class*="text-primary"] { color: hsl(171 52% 66%) !important; }
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) h3 {
+  color: hsl(var(--background)); font-family: var(--ed-serif); font-weight: 300 !important; letter-spacing: -0.04em;
+}
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) > h3:first-child {
+  font-size: 2.2rem !important; line-height: 1; padding-bottom: 1.1rem; border-bottom: 2px dashed hsl(var(--background) / 0.35);
+}
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) input,
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) button[role="combobox"] {
+  color: hsl(var(--background)); border-bottom-color: hsl(var(--background) / 0.5) !important;
+}
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) input::placeholder { color: hsl(var(--background) / 0.45); }
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) button:not([class*="bg-primary"]):not([role="combobox"]) {
+  color: hsl(var(--background)); border-color: hsl(var(--background) / 0.5); background: transparent;
+}
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) button[class*="bg-primary"],
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) a[class*="bg-primary"] {
+  background: hsl(171 52% 64%) !important; color: hsl(var(--foreground)) !important; border-radius: 0 !important;
+}
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) img { border-radius: 0 !important; box-shadow: 4px 4px 0 hsl(var(--background) / 0.18); }
+html[data-theme-plugin="editorial"] :is([data-ed="receipt"], [data-ed="cart-bag"]) svg { color: inherit; }
+
+/* The generic sticky-panel frame has higher priority than the bag rules above, so the bag repeats its surface here with more weight. */
+html[data-theme-plugin="editorial"] main :is([data-ed="receipt"], [data-ed="cart-bag"])[data-ed].border {
+  background: hsl(var(--foreground)) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: 12px 12px 0 hsl(var(--primary)) !important;
+}
+
+/* ---- Checkout: step numbers become coloured, tilted tags; titles get big ---- */
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] > [class*="rounded"]::before,
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] > div > [class*="rounded-2xl"]::before {
+  display: inline-block; padding: 0.4rem 0.8rem; margin-bottom: 1.1rem;
+  background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); transform: rotate(-3deg); box-shadow: 4px 4px 0 hsl(var(--foreground));
+}
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] h3,
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] h4 { font-size: clamp(2.1rem, 3.8vw, 3.3rem) !important; }
+/* Breathing room under every field row and around the checkboxes */
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] div:has(> button[role="checkbox"]),
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] div:has(> input[type="checkbox"]),
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] label:has(input[type="checkbox"]) { margin-top: 1.4rem; }
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] .grid { row-gap: 1.6rem; }
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] > [class*="rounded"],
+html[data-theme-plugin="editorial"] [data-ed="checkout-forms"] > div > [class*="rounded-2xl"] { padding-bottom: 2.25rem !important; }
+
+/* ---- Cart: items as paper slips with an offset shadow that tilt when touched ---- */
+html[data-theme-plugin="editorial"] [data-ed="cart-item"] {
+  border: 1px solid hsl(var(--foreground)) !important; border-radius: 0 !important; background: hsl(var(--background)) !important;
+  box-shadow: 8px 8px 0 hsl(var(--primary) / 0.28) !important;
+  transition: transform 0.4s var(--ed-ease), box-shadow 0.4s var(--ed-ease);
+}
+html[data-theme-plugin="editorial"] [data-ed="cart-item"]:hover { transform: rotate(-0.6deg) translateY(-3px); box-shadow: 12px 12px 0 hsl(var(--primary) / 0.4) !important; }
+html[data-theme-plugin="editorial"] [data-ed="cart-item"] img { border-radius: 0 !important; width: 7rem; height: auto; aspect-ratio: 4 / 5; object-fit: cover; box-shadow: 6px 6px 0 hsl(var(--foreground) / 0.14); }
+html[data-theme-plugin="editorial"] [data-ed="cart-item"] h3,
+html[data-theme-plugin="editorial"] [data-ed="cart-item"] [class*="font-medium"][class*="text-base"] { font-family: var(--ed-serif); font-style: italic; font-weight: 300; letter-spacing: -0.02em; }
+
+/* ---- Wishlist: a staggered, collage-like grid ---- */
+@media (min-width: 1024px) {
+  html[data-theme-plugin="editorial"] [data-ed="wish-grid"] > *:nth-child(3n + 2) { margin-top: 3.5rem; }
+  html[data-theme-plugin="editorial"] [data-ed="wish-grid"] > *:nth-child(3n) { margin-top: 1.75rem; }
+}
+html[data-theme-plugin="editorial"] [data-ed="wish-grid"] > * { transition: transform 0.4s var(--ed-ease); }
+html[data-theme-plugin="editorial"] [data-ed="wish-grid"] > *:nth-child(odd):hover { transform: rotate(-1deg) translateY(-4px); }
+html[data-theme-plugin="editorial"] [data-ed="wish-grid"] > *:nth-child(even):hover { transform: rotate(1deg) translateY(-4px); }
+
+/* ---- Account: a teal monogram block, tilted; panels lift on touch ---- */
+html[data-theme-plugin="editorial"] [data-ed="dash-aside"] [class*="rounded-full"] {
+  background: hsl(var(--primary)) !important; color: hsl(var(--primary-foreground)) !important;
+  transform: rotate(-4deg); box-shadow: 6px 6px 0 hsl(var(--foreground));
+}
+html[data-theme-plugin="editorial"] [data-ed="dash-aside"] p[class*="font-medium"] { font-size: 2.3rem !important; }
+html[data-theme-plugin="editorial"] [data-ed="dash"] [role="tabpanel"] .border[class*="rounded"] {
+  border-color: hsl(var(--foreground)) !important; box-shadow: 8px 8px 0 hsl(var(--primary) / 0.22);
+  transition: transform 0.4s var(--ed-ease), box-shadow 0.4s var(--ed-ease);
+}
+html[data-theme-plugin="editorial"] [data-ed="dash"] [role="tabpanel"] .border[class*="rounded"]:hover { transform: translateY(-3px); box-shadow: 12px 12px 0 hsl(var(--primary) / 0.35); }
+html[data-theme-plugin="editorial"] [data-ed="dash-portal"]::after {
+  content: 'New'; position: absolute; right: 7.5rem; top: -0.7rem; transform: rotate(6deg);
+  background: hsl(171 52% 64%); color: hsl(var(--foreground)); padding: 0.3rem 0.7rem;
+  font-family: var(--ed-sans); font-size: 0.65rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+}
+html[data-theme-plugin="editorial"] [data-ed="dash-portal"] { position: relative; overflow: visible !important; }
+
+/* ---- Login: the photo panel turns, with a sticker ---- */
+@media (min-width: 1024px) {
+  html[data-theme-plugin="editorial"] [data-ed="auth-panel"] { transform: rotate(1.8deg); box-shadow: 14px 14px 0 hsl(var(--foreground)) !important; }
+  html[data-theme-plugin="editorial"] [data-ed="auth-panel"]::after {
+    content: 'Welcome\A to the studio'; white-space: pre; position: absolute; right: 1.2rem; top: 1.2rem; z-index: 5;
+    width: 6.4rem; height: 6.4rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-align: center;
+    background: hsl(171 52% 64%); color: hsl(var(--foreground)); transform: rotate(10deg);
+    font-family: var(--ed-sans); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.5;
+  }
+}
+
+/* ---- Account, inside the tabs: the profile as a bold ID sheet with two tiles, orders as loose slips ---- */
+/* Profile: values set large; the two counters become coloured tiles */
+html[data-theme-plugin="editorial"] [data-ed="dash-profile"] > .border[class*="rounded"] { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+html[data-theme-plugin="editorial"] [data-ed="dash-profile"] [class*="CardTitle"],
+html[data-theme-plugin="editorial"] [data-ed="dash-profile"] h3 { font-size: clamp(2rem, 3.4vw, 3rem) !important; line-height: 1; }
+html[data-theme-plugin="editorial"] [data-ed="dash-profile"] p[class*="uppercase"] {
+  font-family: var(--ed-sans); font-size: 0.6875rem !important; font-weight: 600; letter-spacing: 0.16em; color: hsl(var(--primary));
+}
+html[data-theme-plugin="editorial"] [data-ed="dash-profile"] p[class*="uppercase"] + p {
+  font-family: var(--ed-serif); font-weight: 300; font-size: clamp(1.6rem, 2.6vw, 2.4rem) !important; letter-spacing: -0.03em; line-height: 1.05; margin-top: 0.25rem;
+}
+html[data-theme-plugin="editorial"] [data-ed="dash-profile"] .md\:grid-cols-2 { gap: 3rem; align-items: start; }
+html[data-theme-plugin="editorial"] [data-ed="dash-profile"] .md\:grid-cols-2 > div:last-child {
+  border: 0 !important; padding: 0 !important; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+}
+html[data-theme-plugin="editorial"] [data-ed="dash-profile"] .md\:grid-cols-2 > div:last-child > div {
+  flex-direction: column; align-items: flex-start !important; justify-content: space-between; gap: 1.2rem; min-height: 11rem; padding: 1.2rem;
+  box-shadow: 6px 6px 0 hsl(var(--foreground)); transition: transform 0.4s var(--ed-ease);
+}
+html[data-theme-plugin="editorial"] [data-ed="dash-profile"] .md\:grid-cols-2 > div:last-child > div:nth-child(1) { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); transform: rotate(-1.6deg); }
+html[data-theme-plugin="editorial"] [data-ed="dash-profile"] .md\:grid-cols-2 > div:last-child > div:nth-child(2) { background: hsl(var(--foreground)); color: hsl(var(--background)); transform: rotate(1.4deg) translateY(1rem); box-shadow: 6px 6px 0 hsl(171 52% 64%); }
+html[data-theme-plugin="editorial"] [data-ed="dash-profile"] .md\:grid-cols-2 > div:last-child > div:hover { transform: rotate(0deg) translateY(-4px); }
+html[data-theme-plugin="editorial"] [data-ed="dash-profile"] .md\:grid-cols-2 > div:last-child > div span { color: inherit !important; opacity: 0.75; font-family: var(--ed-sans); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
+html[data-theme-plugin="editorial"] [data-ed="dash-profile"] .md\:grid-cols-2 > div:last-child > div button {
+  color: inherit !important; padding: 0; height: auto; background: transparent !important; justify-content: flex-start; white-space: normal; text-align: left;
+  font-family: var(--ed-serif); font-weight: 300; font-size: 2rem; letter-spacing: -0.03em; line-height: 1;
+}
+
+/* Orders: the box around the list goes; each order is a loose paper slip, alternately tilted */
+html[data-theme-plugin="editorial"] [data-ed="dash-orders"] > .border[class*="rounded"] { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+html[data-theme-plugin="editorial"] [data-ed="dash-orders"] [class*="CardTitle"],
+html[data-theme-plugin="editorial"] [data-ed="dash-orders"] h3 { font-size: clamp(2rem, 3.4vw, 3rem) !important; line-height: 1; }
+html[data-theme-plugin="editorial"] [data-ed="dash-orders"] .space-y-3 > .border,
+html[data-theme-plugin="editorial"] [data-ed="dash-orders"] .space-y-4 > .border {
+  background: hsl(var(--background)) !important; border: 1px solid hsl(var(--foreground)) !important; border-radius: 0 !important;
+  box-shadow: 8px 8px 0 hsl(var(--primary) / 0.3); transition: transform 0.4s var(--ed-ease), box-shadow 0.4s var(--ed-ease);
+}
+html[data-theme-plugin="editorial"] [data-ed="dash-orders"] :is(.space-y-3, .space-y-4) > .border:nth-child(odd) { transform: rotate(-0.4deg); }
+html[data-theme-plugin="editorial"] [data-ed="dash-orders"] :is(.space-y-3, .space-y-4) > .border:nth-child(even) { transform: rotate(0.4deg) translateX(0.5rem); }
+html[data-theme-plugin="editorial"] [data-ed="dash-orders"] :is(.space-y-3, .space-y-4) > .border:hover { transform: rotate(0deg) translateY(-3px); box-shadow: 12px 12px 0 hsl(var(--primary) / 0.45); }
+html[data-theme-plugin="editorial"] [data-ed="dash-orders"] :is(.space-y-3, .space-y-4) > .border p[class*="font-semibold"]:first-child {
+  font-family: var(--ed-serif); font-weight: 300; font-size: 1.7rem; letter-spacing: -0.03em; line-height: 1;
+}
+html[data-theme-plugin="editorial"] [data-ed="dash-orders"] [class*="rounded-full"][class*="text-xs"],
+html[data-theme-plugin="editorial"] [data-ed="dash-orders"] .inline-flex[class*="rounded"] { border-radius: 0 !important; font-family: var(--ed-sans); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.625rem; }
+
+/* ---------- Header pieces taken from the classic navbar: categories menu, currency, drop-downs ---------- */
+html[data-theme-plugin="editorial"] .ed-catdrop button {
+  font-family: var(--ed-sans); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: hsl(var(--foreground));
+}
+html[data-theme-plugin="editorial"] .ed-catdrop button:hover { color: hsl(var(--primary)); }
+html[data-theme-plugin="editorial"] header [class*="bg-white"][class*="shadow-lg"] {
+  border-radius: 0 !important; background: hsl(var(--background)) !important; border: 1px solid hsl(var(--foreground)) !important;
+  box-shadow: 8px 8px 0 hsl(var(--primary) / 0.25) !important;
+}
+html[data-theme-plugin="editorial"] header [class*="bg-white"][class*="shadow-lg"] button { font-family: var(--ed-sans); }
+html[data-theme-plugin="editorial"] .ed-currency button {
+  font-family: var(--ed-sans); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.12em; background: transparent !important; border: 0 !important; color: hsl(var(--foreground));
+}
+
+/* ---- Search, collage touches: a tilted tag over the query, slips for results, coloured chips for categories ---- */
+html[data-theme-plugin="editorial"] [data-ed="search"] > div:first-child::before {
+  content: 'Search the studio'; display: inline-block; margin-bottom: 0.9rem; padding: 0.4rem 0.8rem;
+  background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); transform: rotate(-2.5deg); box-shadow: 4px 4px 0 hsl(var(--foreground));
+  font-family: var(--ed-sans); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+}
+html[data-theme-plugin="editorial"] [data-ed="search"] input { border-bottom: 2px solid hsl(var(--foreground)) !important; }
+html[data-theme-plugin="editorial"] [data-ed="search"] a[class*="rounded-lg"][class*="border"] {
+  position: relative; border: 1px solid hsl(var(--foreground) / 0.25); margin-bottom: 0.75rem; padding: 0.75rem !important; background: hsl(var(--background));
+  transition: transform 0.35s var(--ed-ease), box-shadow 0.35s var(--ed-ease), border-color 0.35s var(--ed-ease);
+}
+html[data-theme-plugin="editorial"] [data-ed="search"] a[class*="rounded-lg"][class*="border"]:hover {
+  transform: translate(-3px, -3px) rotate(-0.4deg); border-color: hsl(var(--foreground)); box-shadow: 6px 6px 0 hsl(var(--primary) / 0.45); background: hsl(var(--background)); padding-left: 0.75rem;
+}
+html[data-theme-plugin="editorial"] [data-ed="search"] img { box-shadow: 4px 4px 0 hsl(var(--foreground) / 0.14); }
+/* Category chips: teal, ink and mint blocks, a little off-square */
+html[data-theme-plugin="editorial"] [data-ed="search"] a[class*="rounded-lg"][class*="text-center"] {
+  border: 0 !important; color: hsl(var(--foreground)); box-shadow: 4px 4px 0 hsl(var(--foreground));
+  transition: transform 0.35s var(--ed-ease);
+}
+html[data-theme-plugin="editorial"] [data-ed="search"] a[class*="rounded-lg"][class*="text-center"]:nth-child(3n + 1) { background: hsl(171 52% 70%); transform: rotate(-1.2deg); }
+html[data-theme-plugin="editorial"] [data-ed="search"] a[class*="rounded-lg"][class*="text-center"]:nth-child(3n + 2) { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); transform: rotate(1deg); }
+html[data-theme-plugin="editorial"] [data-ed="search"] a[class*="rounded-lg"][class*="text-center"]:nth-child(3n) { background: hsl(var(--foreground)); color: hsl(var(--background)); transform: rotate(-0.6deg); box-shadow: 4px 4px 0 hsl(171 52% 64%); }
+html[data-theme-plugin="editorial"] [data-ed="search"] a[class*="rounded-lg"][class*="text-center"]:hover { transform: rotate(0deg) translateY(-3px); }
+/* Side list of categories: a rotated round sticker in the corner */
+html[data-theme-plugin="editorial"] [data-ed="search"] [class*="bg-secondary/30"]::before {
+  content: 'Browse\A by type'; white-space: pre; display: flex; align-items: center; justify-content: center; text-align: center;
+  width: 5.6rem; height: 5.6rem; margin: 0 0 1.4rem; border-radius: 50%; transform: rotate(-8deg);
+  background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); box-shadow: 0 0 0 4px hsl(var(--background)), 0 0 0 5px hsl(var(--primary) / 0.5);
+  font-family: var(--ed-sans); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.5;
+}
+
+/* ---------- Header alignment: one row height, everything centred on it ---------- */
+html[data-theme-plugin="editorial"] header .container-custom > .grid { align-items: center; min-height: 3.25rem; }
+html[data-theme-plugin="editorial"] header nav { align-items: center; }
+html[data-theme-plugin="editorial"] .ed-catdrop,
+html[data-theme-plugin="editorial"] .ed-catdrop > div { display: flex; align-items: center; height: 2.25rem; }
+html[data-theme-plugin="editorial"] .ed-catdrop button { display: inline-flex; align-items: center; gap: 0.35rem; line-height: 1; padding: 0; height: 2.25rem; }
+html[data-theme-plugin="editorial"] .ed-catdrop button svg { width: 0.85rem; height: 0.85rem; }
+html[data-theme-plugin="editorial"] .ed-currency,
+html[data-theme-plugin="editorial"] .ed-currency > div { display: flex; align-items: center; height: 2.25rem; }
+html[data-theme-plugin="editorial"] .ed-currency button { display: inline-flex; align-items: center; gap: 0.3rem; line-height: 1; height: 2.25rem; padding: 0 !important; }
+html[data-theme-plugin="editorial"] header .container-custom > .grid > div:last-child > div:last-child { height: 2.25rem; align-items: center; }
+html[data-theme-plugin="editorial"] header .container-custom > .grid > div:last-child > div:last-child > * { display: flex; align-items: center; justify-content: center; height: 2.25rem; }
+
+/* ---------- The assistant chat: its own frame, an ink header, square bubbles ---------- */
+html[data-theme-plugin="editorial"] [data-ed="chat"] { border: 0 !important; background: transparent !important; box-shadow: none !important; }
+html[data-theme-plugin="editorial"] [data-ed="chat"] > div {
+  border-radius: 0 !important; border: 1px solid hsl(var(--foreground)) !important; box-shadow: 10px 10px 0 hsl(var(--primary) / 0.35) !important;
+  background: hsl(var(--background)) !important; --tw-ring-shadow: 0 0 #0000;
+}
+html[data-theme-plugin="editorial"] [data-ed="chat"] > div > div:first-child {
+  border-radius: 0 !important; background-image: none !important; background-color: hsl(var(--foreground)) !important; color: hsl(var(--background)); border-bottom: 0;
+}
+html[data-theme-plugin="editorial"] [data-ed="chat"] > div > div:first-child [class*="rounded-full"] { border-radius: 0 !important; background: hsl(var(--primary)) !important; transform: rotate(-4deg); }
+html[data-theme-plugin="editorial"] [data-ed="chat"] > div > div:first-child p:first-child {
+  font-family: var(--ed-serif); font-style: italic; font-weight: 300; font-size: 1.4rem; letter-spacing: -0.03em; line-height: 1;
+}
+html[data-theme-plugin="editorial"] [data-ed="chat"] > div > div:first-child p + p {
+  font-family: var(--ed-sans); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: hsl(171 52% 66%) !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="chat"] > div > div:first-child button { border-radius: 0 !important; }
+/* The conversation */
+html[data-theme-plugin="editorial"] [data-ed="chat"] [class*="rounded-2xl"][class*="shadow-soft"] { border-radius: 0 !important; box-shadow: 4px 4px 0 hsl(var(--foreground) / 0.16) !important; --tw-ring-shadow: 0 0 #0000; }
+html[data-theme-plugin="editorial"] [data-ed="chat"] [class*="rounded-2xl"][class*="bg-white"] { background: hsl(var(--background)) !important; border: 1px solid hsl(var(--foreground) / 0.7); }
+html[data-theme-plugin="editorial"] [data-ed="chat"] [class*="rounded-2xl"][class*="bg-primary"] { background: hsl(var(--primary)) !important; box-shadow: 4px 4px 0 hsl(var(--foreground)) !important; }
+html[data-theme-plugin="editorial"] [data-ed="chat"] [class*="rounded-xl"][class*="bg-white"] { border-radius: 0 !important; background: hsl(var(--background)) !important; border: 1px solid hsl(var(--foreground) / 0.5); }
+html[data-theme-plugin="editorial"] [data-ed="chat"] [class*="rounded-full"][class*="bg-secondary"] { border-radius: 0 !important; font-family: var(--ed-sans); font-weight: 600; letter-spacing: 0.06em; border: 1px solid hsl(var(--foreground) / 0.4); background: transparent !important; }
+html[data-theme-plugin="editorial"] [data-ed="chat"] [class*="rounded-full"][class*="bg-secondary"]:hover { background: hsl(var(--foreground)) !important; color: hsl(var(--background)); }
+/* The box where you type: a single line, a square send button */
+html[data-theme-plugin="editorial"] [data-ed="chat"] [class*="border-t"][class*="bg-white"] { background: hsl(var(--background)) !important; border-top: 1px solid hsl(var(--foreground)) !important; }
+html[data-theme-plugin="editorial"] [data-ed="chat"] textarea {
+  border-radius: 0 !important; background: transparent !important; border: 0 !important; border-bottom: 1px solid hsl(var(--foreground) / 0.6) !important;
+  font-family: var(--ed-serif); font-style: italic; font-weight: 300; font-size: 1.05rem; box-shadow: none !important;
+}
+html[data-theme-plugin="editorial"] [data-ed="chat"] [class*="border-t"] button[class*="rounded-full"] { border-radius: 0 !important; }
+html[data-theme-plugin="editorial"] [data-ed="chat"] [class*="border-t"] button[class*="bg-primary"] { background: hsl(var(--foreground)) !important; color: hsl(var(--background)) !important; box-shadow: 3px 3px 0 hsl(var(--primary)); }
+/* The "Chat with us" launcher */
+html[data-theme-plugin="editorial"] [data-ed="chat-fab"] {
+  border-radius: 0 !important; background-image: none !important; background-color: hsl(var(--foreground)) !important; color: hsl(var(--background)) !important;
+  box-shadow: 5px 5px 0 hsl(var(--primary)) !important; font-family: var(--ed-sans); font-size: 0.6875rem !important; letter-spacing: 0.16em; text-transform: uppercase; font-weight: 700;
+}
+
+/* ---------- Preview mode (marketplace screenshots and live previews): no assistant bubble, no floating extras ---------- */
+html[data-theme-preview] [data-ed="chat-fab"],
+html[data-theme-preview] [data-ed="chat"] { display: none !important; }
+/* The route-change blur with "Loading..." has no place in a picture or a live preview */
+html[data-theme-preview] div.fixed.inset-0.z-40[class*="backdrop-blur"] { display: none !important; }
+
+/* ---------- Mobile bottom bar ---------- */
+html[data-theme-plugin="editorial"] nav.fixed.bottom-0 {
+  background: hsl(var(--background)) !important;
+  border-top: 1px solid hsl(var(--foreground) / 0.85) !important;
+  box-shadow: none !important;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .ed-marquee-track, .ed-drift { animation: none; }
+  .ed-progress { animation: none !important; transform: scaleX(1); }
+  html[data-theme-plugin="editorial"] *, html[data-theme-plugin="editorial"] *::before, html[data-theme-plugin="editorial"] *::after {
+    transition-duration: 0.01ms !important; scroll-behavior: auto !important;
+  }
+}

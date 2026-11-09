@@ -576,7 +576,7 @@ const Dashboard = () => {
         />
       )}
 
-      <section className="section-padding min-h-[calc(100vh-200px)] bg-muted/40">
+      <section className="section-padding min-h-[calc(100vh-200px)] bg-muted/40" data-ed="dash">
         <div className="container-custom max-w-7xl mx-auto py-4 md:py-6 lg:py-8">
           {/* Mobile Header */}
           <div className="lg:hidden flex items-center justify-between mb-4 pb-4 border-b">
@@ -616,6 +616,7 @@ const Dashboard = () => {
 
           {/* Manufacturing Portal entry point */}
           <Card
+            data-ed="dash-portal"
             className="mb-4 md:mb-6 bg-gradient-to-r from-[#00676a] to-[#0d8a8d] text-white border-none cursor-pointer hover:brightness-105 transition-all overflow-hidden"
             onClick={() => navigate('/portal')}
           >
@@ -661,9 +662,9 @@ const Dashboard = () => {
             </Card>
           )}
 
-          <div className="flex flex-col lg:flex-row gap-4 md:gap-6">
+          <div className="flex flex-col lg:flex-row gap-4 md:gap-6" data-ed="dash-body">
             {/* Sidebar - Desktop & Mobile */}
-            <aside className={`w-full lg:w-64 space-y-4 transition-all duration-300 ${
+            <aside data-ed="dash-aside" className={`w-full lg:w-64 space-y-4 transition-all duration-300 ${
               isMobileMenuOpen ? 'block' : 'hidden lg:block'
             }`}>
               <Card className="bg-card sticky top-4">
@@ -749,7 +750,7 @@ const Dashboard = () => {
             {/* Main content */}
             <div className="flex-1 min-w-0">
               {/* Desktop Tabs */}
-              <Tabs value={effectiveTab} onValueChange={setActiveTab} className="w-full hidden lg:block">
+              <Tabs value={effectiveTab} onValueChange={setActiveTab} className="w-full hidden lg:block" data-ed="dash-tabs">
                 <TabsList className={`grid w-full mb-6 ${hasRestrictedCategories ? 'grid-cols-5' : 'grid-cols-4'}`}>
                   <TabsTrigger value="profile" className="gap-2">
                     <User className="w-4 h-4" />
@@ -776,7 +777,7 @@ const Dashboard = () => {
                 </TabsList>
 
                 {/* Profile Tab: read-only by default, single Edit toggles edit mode */}
-                <TabsContent value="profile" className="space-y-4 md:space-y-6 mt-4 md:mt-6">
+                <TabsContent value="profile" className="space-y-4 md:space-y-6 mt-4 md:mt-6" data-ed="dash-profile">
                   <Card>
                     <CardHeader className="p-4 md:p-6 flex flex-row items-center justify-between gap-4">
                       <CardTitle className="text-lg md:text-xl">Profile</CardTitle>
@@ -880,7 +881,7 @@ const Dashboard = () => {
                 </TabsContent>
 
                 {/* Orders Tab */}
-                <TabsContent value="orders" className="space-y-4 md:space-y-6 mt-4 md:mt-6">
+                <TabsContent value="orders" className="space-y-4 md:space-y-6 mt-4 md:mt-6" data-ed="dash-orders">
                   <Card>
                     <CardHeader className="p-4 md:p-6">
                       <CardTitle className="text-lg md:text-xl">Order History</CardTitle>

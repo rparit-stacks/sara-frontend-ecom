@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <pattern id="weave" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="16" height="16" fill="#E9E4D9"/>
+      <rect width="16" height="2" fill="#2C9B8A" opacity=".22"/>
+      <rect width="2" height="16" fill="#0B2530" opacity=".1"/>
+    </pattern>
+    <radialGradient id="glow" cx="75%" cy="20%" r="70%">
+      <stop offset="0" stop-color="#2C9B8A" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#2C9B8A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#weave)"/>
+  <rect width="400" height="400" fill="url(#glow)"/>
+  <g fill="none" stroke="#2C9B8A" stroke-width="1.5" opacity=".55">
+    <circle cx="200" cy="200" r="74" stroke-dasharray="10 7"/>
+    <circle cx="200" cy="200" r="44" stroke="#0B2530" stroke-dasharray="3 8" opacity=".5"/>
+  </g>
+  <circle cx="200" cy="200" r="9" fill="#2C9B8A" opacity=".5"/>
+  <text x="200" y="338" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="19" fill="#0B2530" opacity=".55">Photo coming soon</text>
+</svg>

@@ -152,7 +152,7 @@ export const SearchPopup = ({ open, onOpenChange }: SearchPopupProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl w-[95vw] sm:w-full h-[90vh] sm:h-[85vh] md:h-[80vh] p-0 gap-0 overflow-hidden flex flex-col !translate-y-[-50%] sm:!translate-y-[-50%]">
+      <DialogContent data-ed="search" className="max-w-6xl w-[95vw] sm:w-full h-[90vh] sm:h-[85vh] md:h-[80vh] p-0 gap-0 overflow-hidden flex flex-col !translate-y-[-50%] sm:!translate-y-[-50%]">
         {/* Search Input - Fixed at top */}
         <div className="p-4 md:p-6 border-b border-border flex-shrink-0">
           <div className="relative">
@@ -218,8 +218,9 @@ export const SearchPopup = ({ open, onOpenChange }: SearchPopupProps) => {
                             >
                               {/* Product Image */}
                               <img
-                                src={product.image}
+                                src={product.image || '/placeholder-product.svg'}
                                 alt={product.name}
+                                onError={(e) => { const t = e.target as HTMLImageElement; if (!t.src.endsWith('/placeholder-product.svg')) t.src = '/placeholder-product.svg'; }}
                                 className="w-16 h-16 md:w-20 md:h-20 object-cover rounded-lg flex-shrink-0"
                               />
                               
