@@ -125,7 +125,7 @@ export const LISTINGS: MarketplaceListing[] = [
     key: 'bot-whatsapp',
     kind: 'bot',
     folder: 'bot',
-    priceInr: 0,
+    priceInr: 3999,
     trialDays: 10,
     noun: 'bot',
     name: 'WhatsApp bot',
@@ -175,7 +175,7 @@ export const LISTINGS: MarketplaceListing[] = [
       { q: 'Does it cost me WhatsApp charges?', a: 'Replies to someone who messaged you in the last 24 hours are the cheapest kind of WhatsApp message. The bot never sends marketing templates, and the daily limits cap what it can send.' },
       { q: 'What if a customer needs a person?', a: 'The bot sends them to the app, where they can chat with you for free.' },
       { q: 'Can I turn it off?', a: 'Yes, at any time with the switch on this page. Your published flow is kept.' },
-      { q: 'What does it cost to keep?', a: 'The price has not been set yet. Your free trial is not affected.' },
+      { q: 'What does it cost to keep?', a: 'A one-time price of ₹3,999. Try it free for 10 days of use first. To keep it, press Buy and scan the QR code with any UPI app; after you pay, contact us and we will unlock it.' },
     ],
   },
 ];
