@@ -4354,6 +4354,6 @@ export interface BotAssistOp {
   fields?: Record<string, unknown>;
 }
 export const botAssistApi = {
-  assist: (body: { instruction: string; flow: unknown; issues: string[] }) =>
+  assist: (body: { instruction: string; flow: unknown; issues: string[]; history: { role: 'user' | 'assistant'; text: string }[] }) =>
     fetchApi<{ ops: BotAssistOp[]; notes: string; dropped: number }>('/api/admin/bot-assist', { method: 'POST', body: JSON.stringify(body) }),
 };

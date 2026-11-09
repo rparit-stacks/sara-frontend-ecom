@@ -6,7 +6,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Download, Loader2, PanelRightClose, PanelRightOpen, Upload } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, PanelRightClose, PanelRightOpen, Upload, Wand2 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { botApi, BotFlowState, marketplaceApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { AssistPanel } from './AssistPanel';
 import { Inspector } from './Inspector';
 import { TestChat } from './TestChat';
 import { sanitizeFlow } from './sanitize';
+import { autoLayout } from './layout';
 import { starterFlow } from './starter';
 import { validateFlow } from './validate';
 import { KIND_META, MAX_EVENTS, START_ID, newId, type BotEdge, type BotFlow, type BotNode, type BotNodeData, type NodeKind } from './types';
@@ -92,9 +93,16 @@ const Inner = ({ initial, server }: { initial: BotFlow; server: BotFlowState | n
   const [undoStack, setUndoStack] = useState<{ nodes: BotNode[]; edges: BotEdge[] }[]>([]);
   const applyAssist = (n: BotNode[], e: BotEdge[]) => {
     setUndoStack((u) => [...u.slice(-9), { nodes, edges }]);
-    setNodes(n);
+    setNodes(autoLayout(n, e));
     setEdges(e);
-    window.setTimeout(() => flow.fitView({ padding: 0.15, duration: 400 }), 50);
+    window.setTimeout(() => flow.fitView({ padding: 0.15, duration: 400 }), 80);
+  };
+  // Tidy up: put every step in order, left to right, with even spacing. One undo brings the old arrangement back.
+  const tidy = () => {
+    setUndoStack((u) => [...u.slice(-9), { nodes, edges }]);
+    setNodes(autoLayout(nodes.map((n) => ({ ...n, selected: false })), edges));
+    window.setTimeout(() => flow.fitView({ padding: 0.12, duration: 500 }), 80);
+    toast.success('Tidied up. You can undo it in the AI tab.');
   };
   const undoAssist = () => {
     const last = undoStack[undoStack.length - 1];
@@ -242,6 +250,7 @@ const Inner = ({ initial, server }: { initial: BotFlow; server: BotFlowState | n
         </span>
         <span className="text-xs text-muted-foreground">{issues.filter((i) => i.level === 'error').length} errors · {issues.filter((i) => i.level === 'warning').length} warnings</span>
         <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => importFlow(e.target.files?.[0])} />
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={tidy}><Wand2 className="h-3.5 w-3.5" /> Tidy up</Button>
         <Button variant="outline" size="sm" onClick={loadStarter}>Starter flow</Button>
         <Button variant="outline" size="sm" className="gap-1.5" onClick={() => fileRef.current?.click()}><Upload className="h-3.5 w-3.5" /> Import</Button>
         <Button variant="outline" size="sm" className="gap-1.5" onClick={exportFlow}><Download className="h-3.5 w-3.5" /> Export</Button>
