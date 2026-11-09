@@ -6,7 +6,7 @@ import type { Edge, Node } from '@xyflow/react';
  * Outcome to approved wording privately.
  */
 export type NodeKind = 'start' | 'event' | 'outcome' | 'condition' | 'end';
-export type OutcomeId = 'menu' | 'order_status' | 'open_app' | 'answer' | 'ask_details' | 'confirm' | 'feedback' | 'handover' | 'closed';
+export type OutcomeId = 'menu' | 'order_status' | 'open_app' | 'answer' | 'ai_chat' | 'ask_details' | 'confirm' | 'feedback' | 'handover' | 'closed';
 export type ConditionType = 'business_hours' | 'has_orders' | 'new_customer';
 
 export type BotNodeData = {

@@ -74,6 +74,10 @@ const render = (node: BotNode, found: boolean): Rendered => {
       const topics = (d.scopes ?? []).map((s) => ANSWER_SCOPES.find((x) => x.id === s)?.label ?? s).join(', ');
       return { text: `Hi ${NAME}, here is the information you asked for: [AI answer, using only: ${topics || 'no topics chosen'}] Reply here if you need anything else.`, buttons: [{ label: 'Main menu', kind: 'reply' }] };
     }
+    case 'ai_chat': {
+      const topics = (d.scopes ?? []).map((s) => ANSWER_SCOPES.find((x) => x.id === s)?.label ?? s).join(', ');
+      return { text: `[The AI replies here in its own words, using only: ${topics || 'no topics chosen'}. It keeps answering the customer's next messages until they tap Main menu, and passes the chat to the team if it is not sure.]`, buttons: [{ label: 'Main menu', kind: 'reply' }] };
+    }
     case 'ask_details':
       return { text: `Hi ${NAME}, we need a little more information to move ahead: ${d.need ?? '...'} Please reply to this message with the details.` };
     case 'confirm':

@@ -30,7 +30,7 @@ const Summary = ({ node }: { node: BotNode }) => {
     case 'outcome': {
       const spec = findOutcome(d.outcomeId);
       const extra = d.outcomeId === 'open_app' ? APP_PAGES.find((p) => p.path === d.appPage)?.label
-        : d.outcomeId === 'answer' ? (d.scopes ?? []).map((s) => ANSWER_SCOPES.find((x) => x.id === s)?.label).filter(Boolean).join(', ')
+        : d.outcomeId === 'answer' || d.outcomeId === 'ai_chat' ? (d.scopes ?? []).map((s) => ANSWER_SCOPES.find((x) => x.id === s)?.label).filter(Boolean).join(', ')
         : d.outcomeId === 'ask_details' ? d.need : '';
       return (
         <div>

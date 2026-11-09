@@ -56,6 +56,7 @@ export const OUTCOMES: OutcomeSpec[] = [
   { id: 'order_status', label: 'Share the order status', hint: 'Looks up their latest order', params: [], outputs: [out('found', 'Order found'), out('none', 'No order')], template: 'ai_order_status', cost: 0.115 },
   { id: 'open_app', label: 'Send them to the app', hint: 'A button that opens a page in the app', params: ['appPage'], outputs: [out()], template: 'ai_info_link', cost: 0.115 },
   { id: 'answer', label: 'Answer from our knowledge', hint: 'AI answers using only the topics you allow', params: ['scopes'], outputs: [out()], template: 'ai_info_text', cost: 0.115 },
+  { id: 'ai_chat', label: 'Let AI handle from here', hint: 'The AI keeps the chat going in its own words, on the topics you allow, until the customer taps Main menu. It hands over to the team when it is not sure.', params: ['scopes'], outputs: [], template: 'ai_info_text', cost: 0.115 },
   { id: 'ask_details', label: 'Ask for more details', hint: 'Asks for one thing we need', params: ['need'], outputs: [out()], template: 'ai_design_needs_info', cost: 0.115 },
   { id: 'confirm', label: 'Confirm we got their request', hint: 'Says the team will reply', params: [], outputs: [out()], template: 'ai_ticket_created', cost: 0.115 },
   { id: 'feedback', label: 'Ask how it went', hint: 'Three answer buttons', params: [], outputs: [out('loved', 'Loved it'), out('okay', 'It was okay'), out('unhappy', 'Not happy')], template: 'ai_feedback_request', cost: 0.115 },

@@ -36,7 +36,7 @@ export const Inspector = ({ node, onChange, onDelete }: { node: BotNode | undefi
     onChange({
       outcomeId: id,
       appPage: spec.params.includes('appPage') ? d.appPage ?? '/ask' : undefined,
-      scopes: spec.params.includes('scopes') ? d.scopes ?? ['products'] : undefined,
+      scopes: spec.params.includes('scopes') ? d.scopes ?? (id === 'ai_chat' ? ANSWER_SCOPES.map((s) => s.id) : ['products']) : undefined,
       need: spec.params.includes('need') ? d.need ?? NEEDS[0] : undefined,
     });
   };
