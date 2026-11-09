@@ -80,6 +80,7 @@ import ThemedProducts from "./themes/ThemedProducts";
 import { ThemedCategories, ThemedCategory } from "./themes/ThemedCategories";
 import ChatOnWhatsApp from "./pages/ChatOnWhatsApp";
 import WhatsAppIncoming from "./pages/admin/whatsapp/WhatsAppIncoming";
+import WhatsAppBot from "./pages/admin/whatsapp/WhatsAppBot";
 import WhatsAppBroadcasts from "./pages/admin/whatsapp/WhatsAppBroadcasts";
 import WhatsAppBroadcastNew from "./pages/admin/whatsapp/WhatsAppBroadcastNew";
 import WhatsAppBroadcastDetail from "./pages/admin/whatsapp/WhatsAppBroadcastDetail";
@@ -556,6 +557,14 @@ const App = () =>
             element={
               <ProtectedAdminRoute>
                 <WhatsAppMessages />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/whatsapp/bot"
+            element={
+              <ProtectedAdminRoute>
+                <WhatsAppBot />
               </ProtectedAdminRoute>
             }
           />

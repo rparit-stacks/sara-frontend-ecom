@@ -9,6 +9,7 @@ const NAV = [
   { to: '/admin-sara/whatsapp', label: 'Overview', end: true },
   { to: '/admin-sara/whatsapp/messages', label: 'Messages' },
   { to: '/admin-sara/whatsapp/incoming', label: 'Incoming' },
+  { to: '/admin-sara/whatsapp/bot', label: 'Bot' },
   { to: '/admin-sara/whatsapp/broadcasts', label: 'Broadcasts' },
   { to: '/admin-sara/whatsapp/templates', label: 'Templates' },
   { to: '/admin-sara/whatsapp/send', label: 'Send message' },

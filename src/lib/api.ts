@@ -4315,3 +4315,28 @@ export const marketplaceApi = {
       body: JSON.stringify({ enabled }),
     }),
 };
+
+
+// ---- WhatsApp bot workflow (stored on the WhatsApp service; reached through the backend) ----
+export interface BotFlowIssue {
+  level: 'error' | 'warning';
+  nodeId?: string | null;
+  text: string;
+}
+export interface BotFlowState {
+  draft: any | null;
+  published: any | null;
+  publishedVersion: number;
+  publishedAt: string | null;
+  updatedAt: string | null;
+  issues: BotFlowIssue[];
+  /** The bot may answer customers right now: licence live and a flow published. */
+  live: boolean;
+}
+
+export const botApi = {
+  getFlow: () => fetchApi<BotFlowState>(`${waCloud}/bot/flow`),
+  saveDraft: (flow: unknown) =>
+    fetchApi<{ flow: any; issues: BotFlowIssue[]; dropped: string[] }>(`${waCloud}/bot/flow/draft`, { method: 'PUT', body: JSON.stringify(flow) }),
+  publish: () => fetchApi<{ publishedVersion: number; publishedAt: string; live: boolean }>(`${waCloud}/bot/flow/publish`, { method: 'POST' }),
+};
