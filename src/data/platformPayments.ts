@@ -123,8 +123,8 @@ export const PLATFORM_PAYMENTS: PlatformPayment[] = [
     periodLabel: '9 Nov 2026',
     amount: 10000,
     title: 'WhatsApp manual integration',
-    detail: 'Due today, 9 Nov, by 12:00 midnight',
-    status: 'DUE',
+    detail: 'Received on 9 Nov 2026',
+    status: 'PAID',
   },
   {
     id: 'dec-due',
