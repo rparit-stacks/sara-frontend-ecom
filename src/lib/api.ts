@@ -1537,6 +1537,29 @@ export interface WaCloudMessage {
   readAt: string | null;
   expiresAt: string | null;
 }
+export interface WaCloudInbound {
+  id: string;
+  from: string;
+  name?: string | null;
+  type: string;
+  text?: string | null;
+  optedOut: boolean;
+  receivedAt: string;
+}
+
+export interface WaCloudInboundQuery {
+  page?: number;
+  size?: number;
+  q?: string;
+  from?: string;
+  type?: string;
+  optedOut?: string;
+  since?: string;
+  until?: string;
+  sort?: string;
+  dir?: string;
+}
+
 export interface WaCloudPage<T> {
   content: T[];
   page: number;
@@ -1670,6 +1693,8 @@ export const whatsappCloudApi = {
     fetchApi<WaCloudMessage>(`${waCloud}/messages`, { method: 'POST', body: JSON.stringify(data) }),
   listMessages: (query: WaCloudMessageQuery) =>
     fetchApi<WaCloudPage<WaCloudMessage>>(`${waCloud}/messages${waQuery({ ...query })}`),
+  listInbound: (query: WaCloudInboundQuery) =>
+    fetchApi<WaCloudPage<WaCloudInbound>>(`${waCloud}/inbound${waQuery({ ...query })}`),
   getMessageEvents: (id: string) => fetchApi<WaCloudMessageEvent[]>(`${waCloud}/messages/${id}/events`),
   retryMessage: (id: string) => fetchApi<WaCloudMessage>(`${waCloud}/messages/${id}/retry`, { method: 'POST' }),
 

@@ -78,6 +78,8 @@ import WhatsAppOverview from "./pages/admin/whatsapp/WhatsAppOverview";
 import WhatsAppPricing from "./pages/admin/whatsapp/WhatsAppPricing";
 import WhatsAppSend from "./pages/admin/whatsapp/WhatsAppSend";
 import WhatsAppMessages from "./pages/admin/whatsapp/WhatsAppMessages";
+import ChatOnWhatsApp from "./pages/ChatOnWhatsApp";
+import WhatsAppIncoming from "./pages/admin/whatsapp/WhatsAppIncoming";
 import WhatsAppBroadcasts from "./pages/admin/whatsapp/WhatsAppBroadcasts";
 import WhatsAppBroadcastNew from "./pages/admin/whatsapp/WhatsAppBroadcastNew";
 import WhatsAppBroadcastDetail from "./pages/admin/whatsapp/WhatsAppBroadcastDetail";
@@ -238,6 +240,7 @@ const App = () =>
           <Route path="/terms" element={<Terms />} />
           <Route path="/marketing-terms" element={<MarketingTerms />} />
           <Route path="/unsubscribe" element={<Unsubscribe />} />
+          <Route path="/chat" element={<ChatOnWhatsApp />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/data-deletion" element={<DataDeletion />} />
           <Route path="/shipping" element={<Shipping />} />
@@ -550,6 +553,14 @@ const App = () =>
             element={
               <ProtectedAdminRoute>
                 <WhatsAppMessages />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/whatsapp/incoming"
+            element={
+              <ProtectedAdminRoute>
+                <WhatsAppIncoming />
               </ProtectedAdminRoute>
             }
           />
