@@ -61,9 +61,17 @@ const Inner = ({ initial, server }: { initial: BotFlow; server: BotFlowState | n
   const qc = useQueryClient();
   const { data: licence } = useQuery({ queryKey: ['bot-licence'], queryFn: () => marketplaceApi.get('bot-whatsapp'), retry: 1, refetchOnWindowFocus: false });
   const [licensing, setLicensing] = useState(false);
+  // The WhatsApp service re-checks the licence about once a minute, so ask it again every 15 seconds instead of trusting the page-load answer.
+  const { data: liveNow } = useQuery({ queryKey: ['bot-live'], queryFn: () => botApi.getFlow().then((r) => r.live), refetchInterval: 15_000, retry: false });
+  useEffect(() => { if (typeof liveNow === 'boolean') setLive(liveNow); }, [liveNow]);
   const licenceAction = licence && !licence.live
     ? (licence.status === 'AVAILABLE' ? 'trial' : (licence.status === 'TRIAL' || licence.status === 'OWNED') && !licence.enabled ? 'enable' : null)
     : null;
+  const offReason = !licence ? 'checking the bot licence…'
+    : licence.status === 'AVAILABLE' ? 'start the free trial to turn the bot on'
+    : licence.status === 'TRIAL_ENDED' ? 'the free trial has ended'
+    : !licence.live ? 'the bot is switched off in Marketplace'
+    : 'licence is on, waiting for the WhatsApp service to pick it up (up to a minute)';
   const turnOnBot = async () => {
     setLicensing(true);
     try {
@@ -71,7 +79,7 @@ const Inner = ({ initial, server }: { initial: BotFlow; server: BotFlowState | n
       if (licenceAction === 'trial') state = await marketplaceApi.startTrial('bot-whatsapp');
       if (!state.enabled) state = await marketplaceApi.setEnabled('bot-whatsapp', true);
       qc.setQueryData(['bot-licence'], state);
-      setLive(state.live && version > 0);
+      qc.invalidateQueries({ queryKey: ['bot-live'] });
       toast.success(state.live ? 'The bot is on.' : 'Licence updated.');
     } catch (e: any) {
       toast.error(e?.message || 'Could not turn the bot on.');
@@ -211,7 +219,7 @@ const Inner = ({ initial, server }: { initial: BotFlow; server: BotFlowState | n
         <span className="h-5 w-px bg-slate-200" />
         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} aria-label="Flow name" className="min-w-[10rem] flex-1 bg-transparent text-base font-semibold outline-none" />
         <span className={`hidden rounded-full px-2.5 py-1 text-[11px] font-medium xl:inline ${live ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-          {live ? `Live · version ${version}` : version ? `Published v${version} · bot is off until its licence is on` : 'Not published yet'}
+          {live ? `Live · version ${version}` : version ? `Published v${version} · ${offReason}` : 'Not published yet'}
         </span>
         <span className={`text-[11px] ${save === 'offline' ? 'text-amber-600' : 'text-slate-400'}`}>
           {save === 'saving' ? 'Saving…' : save === 'saved' ? 'Saved' : save === 'unsaved' ? 'Unsaved changes' : 'Saved in this browser only'}
