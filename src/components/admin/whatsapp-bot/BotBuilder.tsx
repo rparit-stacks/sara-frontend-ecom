@@ -12,6 +12,7 @@ import { botApi, BotFlowState, marketplaceApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { BotNodeView, NodeIssuesContext } from './nodes';
 import { ChecksPanel } from './ChecksPanel';
+import { AssistPanel } from './AssistPanel';
 import { Inspector } from './Inspector';
 import { TestChat } from './TestChat';
 import { sanitizeFlow } from './sanitize';
@@ -52,7 +53,7 @@ const Inner = ({ initial, server }: { initial: BotFlow; server: BotFlowState | n
   const flow = useReactFlow();
   const wrap = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [tab, setTab] = useState<'edit' | 'test' | 'checks'>('edit');
+  const [tab, setTab] = useState<'edit' | 'test' | 'checks' | 'ai'>('edit');
   const [panelOpen, setPanelOpen] = useState(true);
   const [save, setSave] = useState<SaveState>(server ? 'saved' : 'offline');
   const [live, setLive] = useState(!!server?.live);
@@ -86,6 +87,21 @@ const Inner = ({ initial, server }: { initial: BotFlow; server: BotFlowState | n
     } finally {
       setLicensing(false);
     }
+  };
+  // One step back for the assistant's changes: the flow as it was just before the last accepted change.
+  const [undoStack, setUndoStack] = useState<{ nodes: BotNode[]; edges: BotEdge[] }[]>([]);
+  const applyAssist = (n: BotNode[], e: BotEdge[]) => {
+    setUndoStack((u) => [...u.slice(-9), { nodes, edges }]);
+    setNodes(n);
+    setEdges(e);
+    window.setTimeout(() => flow.fitView({ padding: 0.15, duration: 400 }), 50);
+  };
+  const undoAssist = () => {
+    const last = undoStack[undoStack.length - 1];
+    if (!last) return;
+    setNodes(last.nodes);
+    setEdges(last.edges);
+    setUndoStack((u) => u.slice(0, -1));
   };
   const firstRun = useRef(true);
   const selected = nodes.find((n) => n.selected);
@@ -280,12 +296,13 @@ const Inner = ({ initial, server }: { initial: BotFlow; server: BotFlowState | n
         </div>
         <aside className={`${panelOpen ? 'flex' : 'hidden'} w-[340px] shrink-0 flex-col border-l bg-white max-md:hidden`}>
           <div className="flex border-b text-sm">
-            {([['edit', 'Edit'], ['test', 'Test chat'], ['checks', `Checks${issues.length ? ` (${issues.length})` : ''}`]] as const).map(([k, l]) => (
+            {([['edit', 'Edit'], ['ai', 'AI'], ['test', 'Test chat'], ['checks', `Checks${issues.length ? ` (${issues.length})` : ''}`]] as const).map(([k, l]) => (
               <button key={k} type="button" onClick={() => setTab(k)} className={`flex-1 px-3 py-2.5 font-medium transition-colors ${tab === k ? 'border-b-2 border-primary text-foreground' : 'text-slate-400 hover:text-slate-700'}`}>{l}</button>
             ))}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {tab === 'edit' && <Inspector node={selected} onChange={patchSelected} onDelete={deleteSelected} />}
+            {tab === 'ai' && <AssistPanel nodes={nodes} edges={edges} issues={issues} onApply={applyAssist} onUndo={undoAssist} canUndo={undoStack.length > 0} />}
             {tab === 'test' && <TestChat nodes={nodes} edges={edges} />}
             {tab === 'checks' && <ChecksPanel issues={issues} onPick={pickIssue} />}
           </div>

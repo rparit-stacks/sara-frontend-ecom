@@ -4340,3 +4340,20 @@ export const botApi = {
     fetchApi<{ flow: any; issues: BotFlowIssue[]; dropped: string[] }>(`${waCloud}/bot/flow/draft`, { method: 'PUT', body: JSON.stringify(flow) }),
   publish: () => fetchApi<{ publishedVersion: number; publishedAt: string; live: boolean }>(`${waCloud}/bot/flow/publish`, { method: 'POST' }),
 };
+
+// ---- The AI assistant inside the bot builder: it proposes changes, the builder previews and applies them ----
+export interface BotAssistOp {
+  op: 'add' | 'update' | 'delete' | 'connect' | 'disconnect';
+  ref?: string;
+  kind?: string;
+  id?: string;
+  ids?: string[];
+  from?: string;
+  to?: string;
+  handle?: string;
+  fields?: Record<string, unknown>;
+}
+export const botAssistApi = {
+  assist: (body: { instruction: string; flow: unknown; issues: string[] }) =>
+    fetchApi<{ ops: BotAssistOp[]; notes: string; dropped: number }>('/api/admin/bot-assist', { method: 'POST', body: JSON.stringify(body) }),
+};
