@@ -7,8 +7,8 @@ import '@xyflow/react/dist/style.css';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Download, Loader2, PanelRightClose, PanelRightOpen, Upload } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { botApi, BotFlowState } from '@/lib/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { botApi, BotFlowState, marketplaceApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { BotNodeView, NodeIssuesContext } from './nodes';
 import { ChecksPanel } from './ChecksPanel';
@@ -58,6 +58,27 @@ const Inner = ({ initial, server }: { initial: BotFlow; server: BotFlowState | n
   const [live, setLive] = useState(!!server?.live);
   const [version, setVersion] = useState(server?.publishedVersion ?? 0);
   const [publishing, setPublishing] = useState(false);
+  const qc = useQueryClient();
+  const { data: licence } = useQuery({ queryKey: ['bot-licence'], queryFn: () => marketplaceApi.get('bot-whatsapp'), retry: 1, refetchOnWindowFocus: false });
+  const [licensing, setLicensing] = useState(false);
+  const licenceAction = licence && !licence.live
+    ? (licence.status === 'AVAILABLE' ? 'trial' : (licence.status === 'TRIAL' || licence.status === 'OWNED') && !licence.enabled ? 'enable' : null)
+    : null;
+  const turnOnBot = async () => {
+    setLicensing(true);
+    try {
+      let state = licence!;
+      if (licenceAction === 'trial') state = await marketplaceApi.startTrial('bot-whatsapp');
+      if (!state.enabled) state = await marketplaceApi.setEnabled('bot-whatsapp', true);
+      qc.setQueryData(['bot-licence'], state);
+      setLive(state.live && version > 0);
+      toast.success(state.live ? 'The bot is on.' : 'Licence updated.');
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not turn the bot on.');
+    } finally {
+      setLicensing(false);
+    }
+  };
   const firstRun = useRef(true);
   const selected = nodes.find((n) => n.selected);
 
@@ -200,6 +221,11 @@ const Inner = ({ initial, server }: { initial: BotFlow; server: BotFlowState | n
         <Button variant="outline" size="sm" onClick={loadStarter}>Starter flow</Button>
         <Button variant="outline" size="sm" className="gap-1.5" onClick={() => fileRef.current?.click()}><Upload className="h-3.5 w-3.5" /> Import</Button>
         <Button variant="outline" size="sm" className="gap-1.5" onClick={exportFlow}><Download className="h-3.5 w-3.5" /> Export</Button>
+        {licenceAction && (
+          <Button size="sm" variant="secondary" onClick={turnOnBot} disabled={licensing} className="gap-1.5">
+            {licensing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{licenceAction === 'trial' ? 'Start 10-day trial' : 'Turn bot on'}
+          </Button>
+        )}
         <Button size="sm" onClick={publish} disabled={publishing} className="gap-1.5">{publishing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Publish</Button>
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setPanelOpen((o) => !o)} aria-label={panelOpen ? 'Hide side panels' : 'Show side panels'} title={panelOpen ? 'Hide side panels' : 'Show side panels'}>
           {panelOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
