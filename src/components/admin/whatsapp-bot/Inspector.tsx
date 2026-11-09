@@ -86,7 +86,7 @@ export const Inspector = ({ node, onChange, onDelete }: { node: BotNode | undefi
           <Field label="Also starts when the customer taps" hint="A button tap is matched exactly, with no AI.">
             <Select value={d.tapButton ?? 'none'} onValueChange={(v) => onChange({ tapButton: v === 'none' ? undefined : v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[100]">
                 <SelectItem value="none">Nothing</SelectItem>
                 {TAPS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
               </SelectContent>
@@ -107,7 +107,7 @@ export const Inspector = ({ node, onChange, onDelete }: { node: BotNode | undefi
           <Field label="What should the bot do?">
             <Select value={d.outcomeId} onValueChange={(v) => pickOutcome(v as OutcomeId)}>
               <SelectTrigger><SelectValue placeholder="Choose" /></SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[100]">
                 {OUTCOMES.map((o) => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -117,7 +117,7 @@ export const Inspector = ({ node, onChange, onDelete }: { node: BotNode | undefi
             <Field label="Which page in the app?" hint="The button opens this page in the app, or on the website if they do not have it.">
               <Select value={d.appPage} onValueChange={(v) => onChange({ appPage: v })}>
                 <SelectTrigger><SelectValue placeholder="Choose a page" /></SelectTrigger>
-                <SelectContent>{APP_PAGES.map((p) => <SelectItem key={p.path} value={p.path}>{p.label}</SelectItem>)}</SelectContent>
+                <SelectContent className="z-[100]">{APP_PAGES.map((p) => <SelectItem key={p.path} value={p.path}>{p.label}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
           )}
@@ -140,7 +140,7 @@ export const Inspector = ({ node, onChange, onDelete }: { node: BotNode | undefi
             <Field label="What do we need from them?">
               <Select value={d.need} onValueChange={(v) => onChange({ need: v })}>
                 <SelectTrigger><SelectValue placeholder="Choose" /></SelectTrigger>
-                <SelectContent>{NEEDS.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent>
+                <SelectContent className="z-[100]">{NEEDS.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
           )}
@@ -151,7 +151,7 @@ export const Inspector = ({ node, onChange, onDelete }: { node: BotNode | undefi
         <Field label="Check" hint="Yes goes one way, No the other.">
           <Select value={d.conditionType} onValueChange={(v) => onChange({ conditionType: v as ConditionType })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{(Object.keys(CONDITION_LABEL) as ConditionType[]).map((c) => <SelectItem key={c} value={c}>{CONDITION_LABEL[c]}</SelectItem>)}</SelectContent>
+            <SelectContent className="z-[100]">{(Object.keys(CONDITION_LABEL) as ConditionType[]).map((c) => <SelectItem key={c} value={c}>{CONDITION_LABEL[c]}</SelectItem>)}</SelectContent>
           </Select>
         </Field>
       )}
