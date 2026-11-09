@@ -6,11 +6,11 @@ import { BrowserFrame, ScrollShot } from './ScrollShot';
 import type { ListingPreview } from './catalog';
 
 /** The big stage: page tabs, a browser window that scrolls the chosen page, a caption, and an optional live preview. */
-export const Showcase = ({ previews, themeId, host }: { previews: ListingPreview[]; themeId: string; host: string }) => {
+export const Showcase = ({ previews, themeId, host }: { previews: ListingPreview[]; themeId?: string; host: string }) => {
   const [index, setIndex] = useState(0);
   const [live, setLive] = useState(false);
   const current = previews[index];
-  const previewUrl = `${current.path}${current.path.includes('?') ? '&' : '?'}theme-preview=${themeId}`;
+  const previewUrl = themeId ? `${current.path}${current.path.includes('?') ? '&' : '?'}theme-preview=${themeId}` : '';
 
   return (
     <div>
@@ -30,6 +30,7 @@ export const Showcase = ({ previews, themeId, host }: { previews: ListingPreview
             </button>
           ))}
         </div>
+        {themeId && (
         <div className="flex rounded-full border bg-muted/50 p-0.5 text-sm">
           <button type="button" onClick={() => setLive(false)} className={cn('flex items-center gap-1.5 rounded-full px-3 py-1.5', !live ? 'bg-background shadow-sm' : 'text-muted-foreground')}>
             <ImageIcon className="h-3.5 w-3.5" /> Screenshots
@@ -38,6 +39,7 @@ export const Showcase = ({ previews, themeId, host }: { previews: ListingPreview
             <MonitorPlay className="h-3.5 w-3.5" /> Live preview
           </button>
         </div>
+        )}
       </div>
 
       <AnimatePresence mode="wait">
@@ -49,10 +51,10 @@ export const Showcase = ({ previews, themeId, host }: { previews: ListingPreview
           transition={{ duration: 0.35, ease: [0.2, 0.7, 0.1, 1] }}
         >
           <BrowserFrame url={`${host}${current.path === '/' ? '' : current.path}`}>
-            {live ? (
+            {live && themeId ? (
               <iframe title={`${current.label} live preview`} src={previewUrl} loading="lazy" className="block h-[560px] w-full bg-white sm:h-[640px]" />
             ) : (
-              <ScrollShot tall={current.tall} still={current.image} alt={`${current.label} page in the Editorial theme`} className="aspect-[16/10]" />
+              <ScrollShot tall={current.tall} still={current.image} alt={`${current.label}`} className="aspect-[16/10]" />
             )}
           </BrowserFrame>
         </motion.div>
@@ -65,7 +67,7 @@ export const Showcase = ({ previews, themeId, host }: { previews: ListingPreview
             {current.caption}
           </motion.p>
         </AnimatePresence>
-        {live && (
+        {live && themeId && (
           <a href={previewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
             Open in a new tab <ExternalLink className="h-3.5 w-3.5" />
           </a>

@@ -52,6 +52,10 @@ export interface MarketplaceListing {
   openLabel?: string;
   coverageTitle?: string;
   coverageText?: string;
+  /** Heading and line above the screenshots, and the address shown in their window frame. */
+  showcaseTitle?: string;
+  showcaseText?: string;
+  showcaseHost?: string;
   highlights: ListingHighlight[];
   pagesCovered: { group: string; pages: string[] }[];
   included: string[];
@@ -139,7 +143,14 @@ export const LISTINGS: MarketplaceListing[] = [
       { title: 'Build and publish a flow', text: 'Open the builder, set a greeting and a few options, test it in the chat preview, then publish.' },
       { title: 'Keep it or switch it off', text: 'The clock runs only while the bot is on. When the 10 days of use are spent, the bot stops replying.' },
     ],
-    previews: [],
+    showcaseTitle: 'See it working',
+    showcaseText: 'The flow builder, the test chat and the AI assistant, as you will use them.',
+    showcaseHost: 'Admin · WhatsApp · Bot',
+    previews: [
+      { id: 'canvas', label: 'Flow builder', image: shot('bot', 'canvas-view'), path: '/', caption: 'Every chat starts at the left. Events are what customers ask for, outcomes are what the bot does. The starter flow already covers hello, orders, quotes, people and product questions.' },
+      { id: 'test', label: 'Test chat', image: shot('bot', 'test-view'), path: '/', caption: 'Try the flow as a customer before it goes live. Switch "open now" or "has orders" and see the reply, the buttons and the approximate cost.' },
+      { id: 'ai', label: 'Build with AI', image: shot('bot', 'ai-view'), path: '/', caption: 'Describe the bot in plain words. The assistant suggests changes, you see them first, and nothing happens until you accept. One click undoes it.' },
+    ],
     highlights: [
       { icon: GitBranch, title: 'A visual flow builder', text: 'Place steps on a canvas, connect them, and check for mistakes before you publish.' },
       { icon: MessageCircle, title: 'Replies, not broadcasts', text: 'The bot answers people who message you. It never sends marketing messages by itself.' },

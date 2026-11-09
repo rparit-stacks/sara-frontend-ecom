@@ -112,10 +112,10 @@ const AdminMarketplaceItem = () => {
         </div>
 
         {/* Showcase */}
-        {listing.previews.length > 0 && listing.themeId && (
+        {listing.previews.length > 0 && (
         <section>
-          <SectionTitle eyebrow="See it" title="Every page, in place" text="Pick a page. Long pages scroll by themselves; hover to hold one still, or open the live preview to click around." />
-          <Reveal><Showcase previews={listing.previews} themeId={listing.themeId} host="yourshop.com" /></Reveal>
+          <SectionTitle eyebrow="See it" title={listing.showcaseTitle ?? 'Every page, in place'} text={listing.showcaseText ?? 'Pick a page. Long pages scroll by themselves; hover to hold one still, or open the live preview to click around.'} />
+          <Reveal><Showcase previews={listing.previews} themeId={listing.themeId} host={listing.showcaseHost ?? 'yourshop.com'} /></Reveal>
         </section>
         )}
 
