@@ -135,6 +135,12 @@ export const PurchasePanel = ({
         )}
       </div>
 
+      {!isTheme && item.live && (
+        <p className="mt-3 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+          Switching on can take up to 2 minutes before the {noun} starts answering. Switching off stops it right away.
+        </p>
+      )}
+
       {openPath && item.live && (
         <Button asChild variant="outline" className="mt-3 h-11 w-full gap-2"><Link to={openPath}>{openLabel ?? 'Open'} <ArrowUpRight className="h-4 w-4" /></Link></Button>
       )}

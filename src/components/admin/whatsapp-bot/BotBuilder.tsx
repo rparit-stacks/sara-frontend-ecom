@@ -69,11 +69,26 @@ const Inner = ({ initial, server }: { initial: BotFlow; server: BotFlowState | n
   const licenceAction = licence && !licence.live
     ? (licence.status === 'AVAILABLE' ? 'trial' : (licence.status === 'TRIAL' || licence.status === 'OWNED') && !licence.enabled ? 'enable' : null)
     : null;
+  // Switching on can take a moment to reach the WhatsApp service, so show a two-minute "starting" window. It flips to Live as soon as the service says so.
+  const START_WINDOW = 120;
+  const waiting = !!licence?.live && !live;
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [tickNow, setTickNow] = useState(() => Date.now());
+  useEffect(() => { setStartedAt((s) => (waiting ? s ?? Date.now() : null)); }, [waiting]);
+  useEffect(() => {
+    if (!waiting) return;
+    const t = window.setInterval(() => setTickNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [waiting]);
+  const startLeft = startedAt ? Math.max(0, START_WINDOW - Math.floor((tickNow - startedAt) / 1000)) : START_WINDOW;
+  const startText = startLeft > 0
+    ? `starting up, ready in about ${Math.floor(startLeft / 60)}:${String(startLeft % 60).padStart(2, '0')}`
+    : 'it is taking longer than 2 minutes, so check the WhatsApp service settings';
   const offReason = !licence ? 'checking the bot licence…'
     : licence.status === 'AVAILABLE' ? 'start the free trial to turn the bot on'
     : licence.status === 'TRIAL_ENDED' ? 'the free trial has ended'
     : !licence.live ? 'the bot is switched off in Marketplace'
-    : 'licence is on, waiting for the WhatsApp service to pick it up (up to a minute)';
+    : startText;
   const turnOnBot = async () => {
     setLicensing(true);
     try {
