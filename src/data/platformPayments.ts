@@ -118,6 +118,15 @@ export const PLATFORM_PAYMENTS: PlatformPayment[] = [
     group: 'Mobile App and AI (₹80,000)',
   },
   {
+    id: 'wa-manual-nov',
+    date: '2026-11-09',
+    periodLabel: '9 Nov 2026',
+    amount: 10000,
+    title: 'WhatsApp manual integration',
+    detail: 'Due today, 9 Nov, by 12:00 midnight',
+    status: 'DUE',
+  },
+  {
     id: 'dec-due',
     date: null,
     periodLabel: 'December 2026',
@@ -162,7 +171,7 @@ export function getUpcomingDuePayments(
     const due = startOfDay(new Date(p.date + 'T00:00:00')).getTime();
     // Show from 10 days before due, through and after due (still unpaid).
     return due <= windowEnd;
-  });
+  }).sort((a, b) => (a.date as string).localeCompare(b.date as string));
 }
 
 export function sumByStatus(status: PlatformPaymentStatus): number {
