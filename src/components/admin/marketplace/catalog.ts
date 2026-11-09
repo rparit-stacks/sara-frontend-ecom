@@ -6,7 +6,7 @@
  * public/marketplace/<folder>/. The cards, the listing page and the buy flow all read from this list.
  */
 import type { LucideIcon } from 'lucide-react';
-import { Boxes, Brush, Gauge, LayoutDashboard, MonitorSmartphone, MousePointerClick, Palette, ShieldCheck, Sparkles, Type, Wand2 } from 'lucide-react';
+import { BellOff, Boxes, Brush, Clock, Gauge, GitBranch, LayoutDashboard, MessageCircle, MonitorSmartphone, MousePointerClick, Palette, ShieldCheck, Smartphone, Sparkles, Type, Wand2 } from 'lucide-react';
 
 export interface ListingPreview {
   id: string;
@@ -28,7 +28,7 @@ export interface ListingHighlight {
 
 export interface MarketplaceListing {
   key: string;
-  kind: 'theme';
+  kind: 'theme' | 'bot';
   folder: string;
   /** Shown only if the server cannot be reached. The server's own price and trial length are the real ones. */
   priceInr: number;
@@ -37,9 +37,21 @@ export interface MarketplaceListing {
   tagline: string;
   summary: string;
   tags: string[];
-  /** The theme id the storefront understands (src/themes/<id>). */
-  themeId: string;
+  /** The theme id the storefront understands (src/themes/<id>). Themes only. */
+  themeId?: string;
+  /** Pictures for the showcase. An add-on with none shows no showcase. */
   previews: ListingPreview[];
+  /** Words the page uses for the product ("theme", "bot") and what switching it on does. Defaults suit a theme. */
+  noun?: string;
+  /** Four short points under the title. */
+  points?: string[];
+  /** The three "how the trial works" steps. */
+  steps?: { title: string; text: string }[];
+  /** Where the owner goes to use it once it is on. */
+  openPath?: string;
+  openLabel?: string;
+  coverageTitle?: string;
+  coverageText?: string;
   highlights: ListingHighlight[];
   pagesCovered: { group: string; pages: string[] }[];
   included: string[];
@@ -103,6 +115,56 @@ export const LISTINGS: MarketplaceListing[] = [
       { q: 'Can I go back to my old look?', a: 'Yes, at any time. Use the switch on this page. Your data, products and orders are never touched.' },
       { q: 'What happens after the trial?', a: 'Once your 10 days of use are spent, the storefront goes back to the classic look. To keep the theme, buy it for ₹2,000. We will switch it on for you once your payment is confirmed.' },
       { q: 'How do I pay?', a: 'Press Buy and scan the QR code with any UPI app. After you pay, contact us and we will unlock the theme.' },
+    ],
+  },
+  {
+    key: 'bot-whatsapp',
+    kind: 'bot',
+    folder: 'bot',
+    priceInr: 0,
+    trialDays: 10,
+    noun: 'bot',
+    name: 'WhatsApp bot',
+    tagline: 'Answer your customers on WhatsApp, and send them to the app.',
+    summary:
+      'Build a short chat flow once: a greeting, a few options, quick answers about orders and products. The bot replies on your WhatsApp number and, when someone needs a person or a quote, sends them to the app, where chat is free.',
+    tags: ['WhatsApp add-on', 'Flow builder', 'Business hours', 'Daily limits'],
+    openPath: '/admin-sara/whatsapp/bot',
+    openLabel: 'Open the bot builder',
+    coverageTitle: 'What the bot can do',
+    coverageText: 'It runs the flow you publish, inside limits you can trust.',
+    points: ['Drag-and-drop flow builder', 'Replies inside the 24-hour window', 'Sends people to the app for quotes', 'Daily message and AI limits'],
+    steps: [
+      { title: 'Start the trial', text: 'One click. The bot is switched on and your 10 days of use begin counting.' },
+      { title: 'Build and publish a flow', text: 'Open the builder, set a greeting and a few options, test it in the chat preview, then publish.' },
+      { title: 'Keep it or switch it off', text: 'The clock runs only while the bot is on. When the 10 days of use are spent, the bot stops replying.' },
+    ],
+    previews: [],
+    highlights: [
+      { icon: GitBranch, title: 'A visual flow builder', text: 'Place steps on a canvas, connect them, and check for mistakes before you publish.' },
+      { icon: MessageCircle, title: 'Replies, not broadcasts', text: 'The bot answers people who message you. It never sends marketing messages by itself.' },
+      { icon: Smartphone, title: 'Hands off to the app', text: 'Quotes, long questions and talking to a person go to the app, where chat costs nothing.' },
+      { icon: Clock, title: 'Business hours', text: 'Set the days and hours the bot is on, with a polite notice outside them.' },
+      { icon: Gauge, title: 'Daily limits', text: 'A cap on messages and on AI answers per day keeps WhatsApp costs predictable.' },
+      { icon: BellOff, title: 'Switch off any time', text: 'Turn it off from this page and it stops at once. Your flow is kept.' },
+    ],
+    pagesCovered: [
+      { group: 'Builder', pages: ['Flow canvas', 'Test chat', 'Checks before publishing', 'Import and export'] },
+      { group: 'Running', pages: ['Greeting and menus', 'Order and product answers', 'App links', 'Business-hours notice'] },
+      { group: 'Control', pages: ['On and off switch', 'Daily message limit', 'Daily AI limit'] },
+    ],
+    included: [
+      'The flow builder with a test chat',
+      'The bot running on your WhatsApp number',
+      'Business hours and daily limits',
+      'Switch it on and off any time from this page',
+    ],
+    faq: [
+      { q: 'How does the free trial work?', a: 'You get 10 days of use. Start it once and the bot is switched on; the clock runs only while it is on. Switch it off and the clock stops, switch it on and it carries on. When the 10 days of use are spent, the bot stops replying.' },
+      { q: 'Does it cost me WhatsApp charges?', a: 'Replies to someone who messaged you in the last 24 hours are the cheapest kind of WhatsApp message. The bot never sends marketing templates, and the daily limits cap what it can send.' },
+      { q: 'What if a customer needs a person?', a: 'The bot sends them to the app, where they can chat with you for free.' },
+      { q: 'Can I turn it off?', a: 'Yes, at any time with the switch on this page. Your published flow is kept.' },
+      { q: 'What does it cost to keep?', a: 'The price has not been set yet. Your free trial is not affected.' },
     ],
   },
 ];

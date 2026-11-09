@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowUpRight, Clock, Search, Sparkles, Store } from 'lucide-react';
+import { ArrowUpRight, Clock, MessageCircle, Search, Sparkles, Store } from 'lucide-react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Input } from '@/components/ui/input';
 import { marketplaceApi, MarketplaceItemState } from '@/lib/api';
@@ -14,6 +14,7 @@ import { BrowserFrame, ScrollShot } from '@/components/admin/marketplace/ScrollS
 const KINDS = [
   { id: 'all', label: 'All' },
   { id: 'theme', label: 'Themes' },
+  { id: 'bot', label: 'Add-ons' },
 ];
 
 const StatusBadge = ({ state }: { state?: MarketplaceItemState }) => {
@@ -99,8 +100,14 @@ const AdminMarketplace = () => {
               <motion.div key={l.key} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 + i * 0.08, ease: [0.2, 0.7, 0.1, 1] }}>
                 <Link to={`/admin-sara/marketplace/${l.key}`} className="group block overflow-hidden rounded-2xl border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
                   <div className="relative overflow-hidden border-b bg-muted">
-                    <ScrollShot tall={l.previews[0].tall} still={l.previews[0].image} alt={`${l.name} preview`} className="aspect-[16/10]" seconds={20} />
-                    <span className="absolute left-3 top-3 rounded-full bg-background/90 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider shadow-sm backdrop-blur">{l.kind}</span>
+                    {l.previews[0] ? (
+                      <ScrollShot tall={l.previews[0].tall} still={l.previews[0].image} alt={`${l.name} preview`} className="aspect-[16/10]" seconds={20} />
+                    ) : (
+                      <div className="flex aspect-[16/10] items-center justify-center bg-gradient-to-br from-emerald-50 via-background to-primary/10">
+                        <span className="flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"><MessageCircle className="h-10 w-10" /></span>
+                      </div>
+                    )}
+                    <span className="absolute left-3 top-3 rounded-full bg-background/90 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider shadow-sm backdrop-blur">{l.kind === 'bot' ? 'add-on' : l.kind}</span>
                   </div>
                   <div className="space-y-3 p-5">
                     <div className="flex items-start justify-between gap-3">
@@ -108,7 +115,7 @@ const AdminMarketplace = () => {
                         <h3 className="text-lg font-semibold leading-tight">{l.name}</h3>
                         <p className="mt-1 text-sm text-muted-foreground">{l.tagline}</p>
                       </div>
-                      <p className="shrink-0 text-lg font-semibold">{formatInr(state?.priceInr ?? 2000)}</p>
+                      <p className="shrink-0 text-lg font-semibold">{(state?.priceInr ?? l.priceInr) > 0 ? formatInr(state?.priceInr ?? l.priceInr) : 'Price soon'}</p>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {l.tags.map((t) => <span key={t} className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{t}</span>)}

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { CheckCircle2, Clock, Loader2, Lock, Power, ShoppingBag, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowUpRight, CheckCircle2, Clock, Loader2, Lock, Power, ShoppingBag, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { marketplaceApi, MarketplaceItemState } from '@/lib/api';
@@ -40,13 +41,19 @@ const Unit = ({ value, label }: { value: number; label: string }) => (
 
 /** The buying box on a product page: price, start the trial, the countdown, buy, and the on/off switch. */
 export const PurchasePanel = ({
-  item, name, canManage, fetchedAt, offlineReason, onRetry,
+  item, name, canManage, fetchedAt, offlineReason, onRetry, noun = 'theme', openPath, openLabel,
 }: {
   item: MarketplaceItemState; name: string; canManage: boolean; fetchedAt: number;
+  /** "theme" or "bot": the word used in the messages. */
+  noun?: string;
+  /** Where the owner goes to use the product once it is on. */
+  openPath?: string; openLabel?: string;
   /** Set when the server could not be reached: the buttons still show, the trial one waits. */
   offlineReason?: string; onRetry?: () => void;
 }) => {
   const queryClient = useQueryClient();
+  const isTheme = noun === 'theme';
+  const priced = item.priceInr > 0;
   const [buyOpen, setBuyOpen] = useState(false);
   const running = item.status === 'TRIAL' && item.enabled;
   const countdown = useCountdown(item.secondsLeft, fetchedAt, running);
@@ -58,12 +65,12 @@ export const PurchasePanel = ({
   };
   const trial = useMutation({
     mutationFn: () => marketplaceApi.startTrial(item.key),
-    onSuccess: (next) => { refresh(next); toast.success(`Your ${item.trialDays}-day trial has started. ${name} is live on your shop.`); },
+    onSuccess: (next) => { refresh(next); toast.success(isTheme ? `Your ${item.trialDays}-day trial has started. ${name} is live on your shop.` : `Your ${item.trialDays}-day trial has started. The ${noun} is on.`); },
     onError: (e: any) => toast.error(e?.message || 'Could not start the trial'),
   });
   const toggle = useMutation({
     mutationFn: (on: boolean) => marketplaceApi.setEnabled(item.key, on),
-    onSuccess: (next) => { refresh(next); toast.success(next.enabled ? `${name} is now live on your shop` : 'Back to your classic look'); },
+    onSuccess: (next) => { refresh(next); toast.success(next.enabled ? (isTheme ? `${name} is now live on your shop` : `The ${noun} is on`) : (isTheme ? 'Back to your classic look' : `The ${noun} is off`)); },
     onError: (e: any) => toast.error(e?.message || 'Could not change the switch'),
   });
 
@@ -76,8 +83,8 @@ export const PurchasePanel = ({
     <div className="rounded-2xl border bg-card p-6 shadow-sm">
       <div className="flex items-baseline justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">One-time price</p>
-          <p className="mt-1 text-4xl font-semibold tracking-tight">{formatInr(item.priceInr)}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{priced ? 'One-time price' : 'Price'}</p>
+          <p className="mt-1 text-4xl font-semibold tracking-tight">{priced ? formatInr(item.priceInr) : 'Price soon'}</p>
         </div>
         {owned ? (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" /> Purchased</span>
@@ -104,13 +111,13 @@ export const PurchasePanel = ({
           <p className="mt-2 text-xs text-muted-foreground">
             {running
               ? <>Counting down while it is switched on. It would run out on {item.trialEndsAt ? new Date(item.trialEndsAt + 'Z').toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'a later date'} if you leave it on.</>
-              : <>The timer is paused. It only runs while the theme is switched on, and carries on from here.</>}
+              : <>The timer is paused. It only runs while the {noun} is switched on, and carries on from here.</>}
           </p>
         </div>
       )}
       {ended && (
         <p className="mt-5 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-800">
-          Your {item.trialDays} days of free use are up, so your shop is back to its classic look. Buy the theme to bring it back.
+          {isTheme ? <>Your {item.trialDays} days of free use are up, so your shop is back to its classic look. Buy the theme to bring it back.</> : <>Your {item.trialDays} days of free use are up, so the {noun} has stopped. {priced ? `Buy it to switch it back on.` : 'The price will be announced soon.'}</>}
         </p>
       )}
 
@@ -121,19 +128,23 @@ export const PurchasePanel = ({
             Start {item.trialDays}-day free trial
           </Button>
         )}
-        {!owned && (
+        {!owned && priced && (
           <Button variant={item.status === 'AVAILABLE' ? 'outline' : 'default'} className="h-11 w-full gap-2" onClick={() => setBuyOpen(true)}>
             <ShoppingBag className="h-4 w-4" /> Buy for {formatInr(item.priceInr)}
           </Button>
         )}
       </div>
 
+      {openPath && item.live && (
+        <Button asChild variant="outline" className="mt-3 h-11 w-full gap-2"><Link to={openPath}>{openLabel ?? 'Open'} <ArrowUpRight className="h-4 w-4" /></Link></Button>
+      )}
+
       {(item.status !== 'AVAILABLE') && (
         <div className={cn('mt-5 flex items-center justify-between gap-4 rounded-xl border p-4', item.live ? 'border-primary/40 bg-primary/5' : 'bg-muted/40')}>
           <div className="flex items-start gap-3">
             {usable ? <Power className={cn('mt-0.5 h-4 w-4', item.live ? 'text-primary' : 'text-muted-foreground')} /> : <Lock className="mt-0.5 h-4 w-4 text-muted-foreground" />}
             <div>
-              <p className="text-sm font-medium">{item.live ? 'Live on your shop' : 'Switched off'}</p>
+              <p className="text-sm font-medium">{item.live ? (isTheme ? 'Live on your shop' : `The ${noun} is on`) : 'Switched off'}</p>
               <p className="text-xs text-muted-foreground">{usable ? 'Turn it on or off any time.' : 'Buy it to switch it on.'}</p>
             </div>
           </div>
@@ -149,7 +160,7 @@ export const PurchasePanel = ({
         </div>
       )}
       {!canManage && !offlineReason && <p className="mt-4 text-xs text-muted-foreground">You can look around, but starting a trial or changing the switch needs the "Manage marketplace" permission.</p>}
-      <BuyQrDialog open={buyOpen} onOpenChange={setBuyOpen} name={`${name} theme`} amount={item.priceInr} />
+      <BuyQrDialog open={buyOpen} onOpenChange={setBuyOpen} name={isTheme ? `${name} theme` : name} amount={item.priceInr} />
     </div>
   );
 };

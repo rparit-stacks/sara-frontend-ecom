@@ -29,11 +29,13 @@ const SectionTitle = ({ eyebrow, title, text }: { eyebrow: string; title: string
   </Reveal>
 );
 
-const STEPS = [
+const THEME_STEPS = [
   { icon: MousePointerClick, title: 'Start the trial', text: 'One click. The theme goes live on your shop at once and your 10 days of use begin counting.' },
   { icon: Power, title: 'Switch it on and off', text: 'The clock runs only while the theme is on. Switch it off and it stops; switch it on and it carries on.' },
   { icon: Clock, title: 'Keep it or go back', text: 'When the 10 days of use are spent, your shop returns to its classic look. Buy it any time to keep the new one.' },
 ];
+
+const THEME_POINTS = ['Redesigns every storefront page', 'Reads your banners and catalogue', 'Switch on and off any time', 'Admin panel stays untouched'];
 
 const AdminMarketplaceItem = () => {
   const { key } = useParams<{ key: string }>();
@@ -75,11 +77,11 @@ const AdminMarketplaceItem = () => {
                 <div className="flex flex-wrap gap-2">
                   {listing.tags.map((t) => <span key={t} className="rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">{t}</span>)}
                 </div>
-                <h1 className="mt-5 font-serif text-6xl font-light italic leading-[0.95] tracking-tight sm:text-8xl">{listing.name}</h1>
+                <h1 className={listing.kind === 'theme' ? 'mt-5 font-serif text-6xl font-light italic leading-[0.95] tracking-tight sm:text-8xl' : 'mt-5 text-5xl font-semibold leading-[1] tracking-tight sm:text-7xl'}>{listing.name}</h1>
                 <p className="mt-5 text-2xl font-medium tracking-tight sm:text-3xl">{listing.tagline}</p>
                 <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">{listing.summary}</p>
                 <ul className="mt-6 grid max-w-xl gap-2 text-sm sm:grid-cols-2">
-                  {['Redesigns every storefront page', 'Reads your banners and catalogue', 'Switch on and off any time', 'Admin panel stays untouched'].map((t, i) => (
+                  {(listing.points ?? THEME_POINTS).map((t, i) => (
                     <motion.li key={t} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: 0.3 + i * 0.07 }} className="flex items-center gap-2">
                       <CircleCheck className="h-4 w-4 shrink-0 text-primary" /> {t}
                     </motion.li>
@@ -99,6 +101,9 @@ const AdminMarketplaceItem = () => {
                     fetchedAt={dataUpdatedAt || Date.now()}
                     offlineReason={!item ? (error instanceof Error && error.message ? error.message : 'The server did not answer.') : undefined}
                     onRetry={() => refetch()}
+                    noun={listing.noun}
+                    openPath={listing.openPath}
+                    openLabel={listing.openLabel}
                   />
                 )}
               </motion.div>
@@ -107,14 +112,16 @@ const AdminMarketplaceItem = () => {
         </div>
 
         {/* Showcase */}
+        {listing.previews.length > 0 && listing.themeId && (
         <section>
           <SectionTitle eyebrow="See it" title="Every page, in place" text="Pick a page. Long pages scroll by themselves; hover to hold one still, or open the live preview to click around." />
           <Reveal><Showcase previews={listing.previews} themeId={listing.themeId} host="yourshop.com" /></Reveal>
         </section>
+        )}
 
         {/* Highlights */}
         <section>
-          <SectionTitle eyebrow="What is inside" title="More than a new colour" text="The layouts, the type, the motion and the details, all included." />
+          <SectionTitle eyebrow="What is inside" title={listing.kind === 'theme' ? 'More than a new colour' : 'What you get'} text={listing.kind === 'theme' ? 'The layouts, the type, the motion and the details, all included.' : 'Everything you need to answer customers on WhatsApp.'} />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {listing.highlights.map((h, i) => (
               <Reveal key={h.title} delay={(i % 4) * 0.07}>
@@ -130,7 +137,7 @@ const AdminMarketplaceItem = () => {
 
         {/* Pages covered */}
         <section className="grid gap-10 lg:grid-cols-12">
-          <div className="lg:col-span-4"><SectionTitle eyebrow="Coverage" title="Pages it covers" text="The whole public side of your shop. The admin panel is never touched." /></div>
+          <div className="lg:col-span-4"><SectionTitle eyebrow="Coverage" title={listing.coverageTitle ?? 'Pages it covers'} text={listing.coverageText ?? 'The whole public side of your shop. The admin panel is never touched.'} /></div>
           <div className="grid gap-4 sm:grid-cols-2 lg:col-span-8">
             {listing.pagesCovered.map((g, i) => (
               <Reveal key={g.group} delay={i * 0.06}>
@@ -154,7 +161,7 @@ const AdminMarketplaceItem = () => {
           <SectionTitle eyebrow="Try before you buy" title="How the free trial works" />
           <div className="relative grid gap-6 md:grid-cols-3">
             <div className="pointer-events-none absolute left-[16%] right-[16%] top-7 hidden border-t-2 border-dashed border-primary/30 md:block" />
-            {STEPS.map((s, i) => (
+            {(listing.steps ?? THEME_STEPS).map((st, i) => { const s = { ...st, icon: THEME_STEPS[i].icon }; return (
               <Reveal key={s.title} delay={i * 0.12}>
                 <div className="relative text-center md:px-4">
                   <span className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30"><s.icon className="h-6 w-6" /></span>
@@ -163,7 +170,7 @@ const AdminMarketplaceItem = () => {
                   <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">{s.text}</p>
                 </div>
               </Reveal>
-            ))}
+            );})}
           </div>
         </section>
 
