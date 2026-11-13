@@ -71,7 +71,7 @@ const RcaCard = ({ r }: { r: IncidentRca }) => {
         </div>
       </div>
 
-      {r.summary && (
+      {r.summary && r.status !== 'NO_EVIDENCE' && (
         <div className="rounded-md bg-muted/60 px-3 py-2 text-sm">
           <span className="font-medium">{r.errorCount > 0 ? `${r.errorCount} error record${r.errorCount > 1 ? 's' : ''}, ${r.distinctErrors} kind${r.distinctErrors > 1 ? 's' : ''}: ` : ''}</span>
           {r.summary}
