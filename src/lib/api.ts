@@ -2634,10 +2634,12 @@ export interface ProjectMessageDto {
  * id it might tie with on timestamp, which is fine — it's always the newest thing in the list and
  * its `createdAt` is already the freshest timestamp present).
  */
+import { parseServerDate } from './serverTime';
+
 export function sortMessagesByTime<T extends { id: number; createdAt?: string }>(messages: T[]): T[] {
   return [...messages].sort((a, b) => {
-    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    const ta = parseServerDate(a.createdAt)?.getTime() ?? 0;
+    const tb = parseServerDate(b.createdAt)?.getTime() ?? 0;
     if (ta !== tb) return ta - tb;
     return a.id - b.id;
   });
@@ -3046,8 +3048,13 @@ export const adminCustomerChatApi = {
     }),
   unreadCount: (customerEmail: string) =>
     fetchApi<{ count: number }>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/unread-count`),
-  unreadCounts: (customerEmails: string[]) =>
-    fetchApi<Record<string, number>>(`/api/admin/manufacturing/customer-chat/unread-counts?emails=${encodeURIComponent(customerEmails.join(','))}`),
+  /** Unread counts for every chat. Pass emails only to ask about a few specific customers. */
+  unreadCounts: (customerEmails?: string[]) =>
+    fetchApi<Record<string, number>>(customerEmails && customerEmails.length
+      ? `/api/admin/manufacturing/customer-chat/unread-counts?emails=${encodeURIComponent(customerEmails.join(','))}`
+      : '/api/admin/manufacturing/customer-chat/unread-counts'),
+  lastMessages: () =>
+    fetchApi<Record<string, { text: string; authorType?: string; createdAt?: string }>>('/api/admin/manufacturing/customer-chat/last-messages'),
   getMessage: (customerEmail: string, messageId: number) =>
     fetchApi<CustomerMessageDto>(`/api/admin/manufacturing/customer-chat/${encodeURIComponent(customerEmail)}/messages/${messageId}`),
 

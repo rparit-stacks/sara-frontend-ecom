@@ -429,7 +429,7 @@ export default function Composer({
   };
 
   const toolbar = (
-    <div className="px-2 py-1 flex items-center gap-0.5 border-b flex-wrap relative z-10" style={{ background: 'var(--p-surface-container-low)', borderColor: 'var(--p-outline-variant)' }}>
+    <div className="wa-toolbar px-2 py-1 flex items-center gap-0.5 border-b flex-wrap relative z-10" style={{ background: 'var(--p-surface-container-low)', borderColor: 'var(--p-outline-variant)' }}>
       <ToolbarBtn title="Bold (toggle)" disabled={sending} active={fmt.bold} onClick={() => runFormat('bold')}><span className="font-bold text-[14px]">B</span></ToolbarBtn>
       <ToolbarBtn title="Italic (toggle)" disabled={sending} active={fmt.italic} onClick={() => runFormat('italic')}><span className="italic text-[14px]">I</span></ToolbarBtn>
       <ToolbarBtn title="Underline (toggle)" disabled={sending} active={fmt.underline} onClick={() => runFormat('underline')}><span className="underline text-[14px]">U</span></ToolbarBtn>
@@ -453,7 +453,7 @@ export default function Composer({
 
   return (
     <div
-      className={`border rounded-xl slack-input-shadow focus-within:ring-2 focus-within:ring-offset-0 transition-all relative ${sending && uploadLabel ? 'opacity-90' : ''} ${dragOver ? 'ring-2' : ''}`}
+      className={`wa-composer border rounded-2xl slack-input-shadow focus-within:ring-2 focus-within:ring-offset-0 transition-all relative ${sending && uploadLabel ? 'opacity-90' : ''} ${dragOver ? 'ring-2' : ''}`}
       style={{ borderColor: dragOver ? 'var(--p-primary)' : 'var(--p-outline)', background: 'var(--p-surface-container-lowest)', ['--tw-ring-color' as string]: 'rgba(0,103,106,0.25)' }}
       onDragOver={(e) => { if (!sending && e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); setDragOver(true); } }}
       onDragLeave={(e) => { if (e.currentTarget === e.target) setDragOver(false); }}
@@ -700,7 +700,7 @@ export default function Composer({
             }}
           />
           <span className="hidden sm:inline text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}>⌘↵ send · Enter new line</span>
-          <button type="button" onClick={submit} disabled={!canSend} className="p-2 rounded-lg flex items-center justify-center min-w-[40px]" style={canSend ? { background: 'var(--p-primary)', color: '#fff' } : { background: 'var(--p-surface-container-high)', color: 'var(--p-on-surface-variant)', cursor: 'not-allowed' }}>
+          <button type="button" onClick={submit} disabled={!canSend} className="wa-send p-2 rounded-full flex items-center justify-center min-w-[40px]" style={canSend ? { background: 'var(--p-primary)', color: '#fff' } : { background: 'var(--p-surface-container-high)', color: 'var(--p-on-surface-variant)', cursor: 'not-allowed' }}>
             {sending ? <Sym name="progress_activity" className="text-[18px] animate-spin" /> : <Sym name="send" className="text-[18px]" />}
           </button>
         </div>

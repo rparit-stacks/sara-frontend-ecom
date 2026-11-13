@@ -514,6 +514,98 @@
 }
 .portal-root .is-grid .pa-li-more { width: auto; }
 
+/* ---- Chat: WhatsApp-style bubbles in the portal's teal ---- */
+.portal-root .wa-bubble {
+  position: relative; padding: 6px 10px 4px; font-size: 14px; line-height: 1.45; border-radius: 12px;
+  overflow-wrap: anywhere; min-width: 64px; max-width: 540px; width: fit-content;
+}
+.portal-root .wa-mine { background: linear-gradient(180deg, #00797c, var(--p-primary)); color: #fff; box-shadow: 0 1px 1.5px rgba(0, 50, 52, .28); }
+.portal-root .wa-other { background: #fff; color: var(--p-on-surface); box-shadow: 0 1px 1.5px rgba(0, 0, 0, .13); }
+.portal-root .wa-ai { background: var(--p-ai-bubble); color: var(--p-ai-bubble-text); box-shadow: 0 1px 1.5px rgba(0, 0, 0, .1); }
+.portal-root .wa-meta { text-align: right; font-size: 10.5px; line-height: 1; margin: 3px 0 0 14px; opacity: .72; font-variant-numeric: tabular-nums; }
+.portal-root .wa-bubble > :first-child { margin-top: 0; }
+.portal-root .wa-bubble p { margin: 0; }
+/* the little tail on the first bubble of a run */
+.portal-root .wa-tail::after { content: ""; position: absolute; top: 0; width: 9px; height: 12px; }
+.portal-root .wa-mine.wa-tail { border-top-right-radius: 2px; }
+.portal-root .wa-mine.wa-tail::after { right: -7px; background: #00797c; clip-path: polygon(0 0, 100% 0, 0 100%); }
+.portal-root .wa-other.wa-tail { border-top-left-radius: 2px; }
+.portal-root .wa-other.wa-tail::after { left: -7px; background: #fff; clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.portal-root .wa-ai.wa-tail { border-top-left-radius: 2px; }
+.portal-root .wa-datechip {
+  display: inline-block; padding: 4px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; letter-spacing: .02em;
+  background: rgba(255, 255, 255, .96); color: var(--p-primary); box-shadow: 0 1px 1px rgba(0, 0, 0, .08);
+}
+
+/* ---- Chat screen: WhatsApp-style rows, header, composer, images ---- */
+.portal-root .wa-row { position: relative; }
+.portal-root .wa-row::after { content: ""; position: absolute; left: 73px; right: 0; bottom: 0; height: 1px; background: var(--p-outline-variant); opacity: .55; }
+.portal-root .wa-row:hover { background: color-mix(in srgb, var(--p-primary) 7%, transparent) !important; }
+.portal-root .wa-chathead { background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); position: relative; z-index: 2; }
+.portal-root .wa-chathead p.font-bold { font-size: 15.5px; }
+.portal-root .wa-chathead p.font-bold + p { font-size: 12.5px; }
+.portal-root .wa-composer { border: 0 !important; border-radius: 22px; background: #fff !important; box-shadow: 0 1px 4px rgba(0, 0, 0, .12), 0 0 0 1px var(--p-outline-variant) !important; overflow: hidden; }
+.portal-root .wa-composer:focus-within { box-shadow: 0 2px 10px rgba(0, 103, 106, .18), 0 0 0 2px var(--pa-teal-16, rgba(0,103,106,.25)) !important; }
+.portal-root .wa-composer .wa-toolbar { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-bottom-width: 0; overflow: hidden; transition: max-height .2s var(--pa-ease), opacity .2s, padding .2s; }
+.portal-root .wa-composer:focus-within .wa-toolbar { max-height: 60px; opacity: 1; padding-top: 4px; padding-bottom: 4px; border-bottom-width: 1px; }
+.portal-root .wa-send { width: 42px; height: 42px; box-shadow: 0 2px 6px rgba(0, 103, 106, .35); transition: transform .12s var(--pa-ease), filter .12s; }
+.portal-root .wa-send:not(:disabled):hover { filter: brightness(1.08); }
+.portal-root .wa-send:not(:disabled):active { transform: scale(.92); }
+.portal-root .wa-img { position: relative; padding: 3px; border-radius: 12px; background: #fff; box-shadow: 0 1px 1.5px rgba(0, 0, 0, .13); }
+.portal-root .wa-img-mine { background: #00797c; box-shadow: 0 1px 1.5px rgba(0, 50, 52, .28); }
+.portal-root .wa-img-time { position: absolute; right: 9px; bottom: 7px; padding: 1px 7px; border-radius: 10px; font-size: 10.5px; font-weight: 600; color: #fff; background: rgba(0, 0, 0, .45); }
+.portal-root .wa-img.wa-tail::after { content: ""; position: absolute; top: 0; width: 9px; height: 12px; }
+.portal-root .wa-img-mine.wa-tail { border-top-right-radius: 2px; }
+.portal-root .wa-img-mine.wa-tail::after { right: -7px; background: #00797c; clip-path: polygon(0 0, 100% 0, 0 100%); }
+.portal-root .wa-img:not(.wa-img-mine).wa-tail { border-top-left-radius: 2px; }
+.portal-root .wa-img:not(.wa-img-mine).wa-tail::after { left: -7px; background: #fff; clip-path: polygon(0 0, 100% 0, 100% 100%); }
+
+/* ---- Composer: stands out from the chat, glows when you are typing ---- */
+.portal-root .wa-composer {
+  border-radius: 26px;
+  box-shadow: 0 3px 14px rgba(0, 60, 62, .16), 0 0 0 1.5px color-mix(in srgb, var(--p-primary) 38%, transparent) !important;
+  transition: box-shadow .2s var(--pa-ease), transform .2s var(--pa-ease);
+}
+.portal-root .wa-composer:hover { box-shadow: 0 4px 18px rgba(0, 60, 62, .2), 0 0 0 1.5px color-mix(in srgb, var(--p-primary) 60%, transparent) !important; }
+.portal-root .wa-composer:focus-within {
+  box-shadow: 0 6px 26px rgba(0, 103, 106, .30), 0 0 0 2.5px var(--p-primary) !important;
+  transform: translateY(-1px);
+}
+.portal-root .wa-composer .composer-editor { font-size: 15.5px; padding-top: 12px; padding-bottom: 8px; }
+.portal-root .wa-composer .msym { color: var(--p-primary) !important; }
+.portal-root .wa-composer button:not(.wa-send):hover { background: var(--pa-teal-10, rgba(0,103,106,.1)); }
+.portal-root .wa-send:not(:disabled) { background: linear-gradient(180deg, #00858a, var(--p-primary)) !important; color: #fff !important; }
+.portal-root .wa-send:not(:disabled) .msym { color: #fff !important; }
+.portal-root .wa-send:disabled { background: color-mix(in srgb, var(--p-primary) 14%, #fff) !important; box-shadow: none; }
+.portal-root .wa-send:disabled .msym { color: color-mix(in srgb, var(--p-primary) 55%, #fff) !important; }
+
+/* ---- More polish: search, active row, message entrance, unread ---- */
+.portal-root .wa-search { background: #fff; box-shadow: inset 0 0 0 1px var(--p-outline-variant); transition: box-shadow .18s var(--pa-ease); }
+.portal-root .wa-search:focus-within { box-shadow: 0 0 0 2px var(--p-primary), 0 2px 8px rgba(0, 103, 106, .15); }
+.portal-root .wa-row[style*="rgba(0,103,106,0.1)"], .portal-root .wa-row[style*="rgba(0, 103, 106, 0.1)"] { box-shadow: inset 3px 0 0 var(--p-primary); }
+@keyframes wa-pop { from { opacity: 0; transform: translateY(6px) scale(.97); } to { opacity: 1; transform: none; } }
+.portal-root .wa-bubble, .portal-root .wa-img { animation: wa-pop .2s var(--pa-ease) backwards; }
+.portal-root .wa-mine { transform-origin: bottom right; }
+.portal-root .wa-other, .portal-root .wa-ai { transform-origin: bottom left; }
+@media (prefers-reduced-motion: reduce) { .portal-root .wa-bubble, .portal-root .wa-img { animation: none; } }
+
+/* ---- Attachments: photo tiles, voice notes, documents ---- */
+.portal-root .wa-tiles { display: grid; gap: 3px; }
+.portal-root .wa-tiles-all { max-height: 360px; overflow-y: auto; border-radius: 9px; }
+.portal-root .wa-tile { position: relative; display: block; width: 100%; overflow: hidden; border-radius: 9px; padding: 0; border: 0; background: var(--p-surface-container); cursor: zoom-in; }
+.portal-root .wa-tile img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s var(--pa-ease); }
+.portal-root .wa-tile:hover img { transform: scale(1.04); }
+.portal-root .wa-tile-more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; color: #fff; background: rgba(0, 0, 0, .5); }
+.portal-root .wa-tiles-collapse { grid-column: 1 / -1; padding: 6px; font-size: 12.5px; font-weight: 700; color: var(--p-primary); background: rgba(255, 255, 255, .85); border: 0; border-radius: 8px; cursor: pointer; }
+.portal-root .wa-voice { position: relative; padding: 6px 8px 4px; border-radius: 14px; background: #fff; box-shadow: 0 1px 1.5px rgba(0, 0, 0, .13); width: 280px; max-width: 100%; }
+.portal-root .wa-voice-mine { background: #d4efec; box-shadow: 0 1px 1.5px rgba(0, 50, 52, .2); }
+.portal-root .wa-voice audio { width: 100%; height: 38px; display: block; }
+.portal-root .wa-voice.wa-tail::after { content: ""; position: absolute; top: 0; width: 9px; height: 12px; background: #fff; left: -7px; clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.portal-root .wa-voice-mine.wa-tail::after { left: auto; right: -7px; background: #d4efec; clip-path: polygon(0 0, 100% 0, 0 100%); }
+.portal-root .wa-voice .wa-meta { color: var(--p-on-surface-variant); }
+.portal-root .wa-filewrap { position: relative; max-width: 100%; }
+.portal-root .wa-filewrap .wa-meta { padding: 0 6px; margin-top: 2px; }
+
 /* ======================================================================== */
 /* Reduced motion                                                            */
 /* ======================================================================== */

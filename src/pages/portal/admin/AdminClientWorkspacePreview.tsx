@@ -37,6 +37,8 @@ import CustomerTagMenu, { CustomerTagChips, CustomerStatusBadge } from '@/compon
 import { buildProjectTagMarker, buildDesignTagMarker, buildInvoiceTagMarker, buildQuoteTagMarker } from '@/components/portal/EntityTagCard';
 import { STAGES, STAGE_INDEX, defaultStatusFor, stageDef, type StageKey } from '@/components/manufacturing/stages';
 import { DESIGN_STAGES as REAL_DESIGN_STAGES, designStageLabel } from '@/lib/portalChatConstants';
+import { acquireStomp, releaseStomp, subscribeTopic } from '@/lib/stompClient';
+import { compressImageIfNeeded, withRetry, startLimited } from '@/lib/uploadQueue';
 import { formatServerTime, parseServerDate, formatServerDate, formatChatDateDivider, isDifferentServerDay } from '@/lib/serverTime';
 import { getStoredAdminUser, isSuperAdmin } from '@/lib/adminAccess';
 import { useCustomerChatStomp } from '@/hooks/useCustomerChatStomp';
@@ -162,11 +164,36 @@ function panesFromParams(customerKey: string, projectId: number, tab: string | n
   return { kind: 'customerGeneral', customerKey };
 }
 
-function Avatar({ initials, size = 40 }: { initials: string; size?: number }) {
+function lastMessageTime(iso?: string): string | undefined {
+  const d = parseServerDate(iso);
+  if (!d) return undefined;
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+}
+
+/** "14:20" today, "Yesterday", or "12 Nov": when the client's most recently touched project changed. */
+function lastActivityLabel(projects: ManufacturingProjectDto[]): string | undefined {
+  let best: Date | null = null;
+  for (const p of projects) {
+    const d = parseServerDate(p.updatedAt || p.createdAt);
+    if (d && (!best || d > best)) best = d;
+  }
+  if (!best) return undefined;
+  const now = new Date();
+  if (best.toDateString() === now.toDateString()) return best.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if (best.toDateString() === y.toDateString()) return 'Yesterday';
+  return best.toLocaleDateString([], { day: 'numeric', month: 'short' });
+}
+
+function Avatar({ initials, size = 46 }: { initials: string; size?: number }) {
   return (
     <div
-      className="rounded-full flex items-center justify-center shrink-0 font-bold text-white"
-      style={{ width: size, height: size, background: 'var(--p-primary)', fontSize: size * 0.36 }}
+      className="rounded-full flex items-center justify-center shrink-0 font-bold uppercase"
+      style={{ width: size, height: size, background: 'var(--p-primary-fixed)', color: 'var(--p-primary)', fontSize: size * 0.34 }}
     >
       {initials}
     </div>
@@ -220,7 +247,7 @@ function MobileBackButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function ListRow({ icon, iconBg, iconColor, leading, title, titleBadges, subtitle, active, onClick, onContextMenu, onDoubleClick, unread, trailing, kindTag, pinned, tag, tagChips, statusBadge }: {
+function ListRow({ icon, iconBg, iconColor, leading, title, titleBadges, subtitle, active, onClick, onContextMenu, onDoubleClick, unread, trailing, kindTag, pinned, tag, tagChips, statusBadge, meta }: {
   icon?: string;
   iconBg?: string;
   iconColor?: string;
@@ -245,6 +272,8 @@ function ListRow({ icon, iconBg, iconColor, leading, title, titleBadges, subtitl
   tagChips?: string[];
   /** Chat-status marker (Open/Priority/Closed) on a customer row (REQ-3). */
   statusBadge?: React.ReactNode;
+  /** Small right-aligned line above the unread badge, e.g. when the client was last active. */
+  meta?: string;
 }) {
   const accent = kindTag ? KIND_ACCENT[kindTag] : undefined;
   return (
@@ -252,9 +281,8 @@ function ListRow({ icon, iconBg, iconColor, leading, title, titleBadges, subtitl
       onClick={onClick}
       onContextMenu={onContextMenu ? (e) => { e.preventDefault(); onContextMenu(e); } : undefined}
       onDoubleClick={onDoubleClick}
-      className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b"
+      className="wa-row w-full flex items-center gap-3 px-3 py-2.5 text-left transition-[background,transform] duration-150 active:scale-[0.99]"
       style={{
-        borderColor: 'var(--p-outline-variant)',
         borderLeft: accent ? `3px solid ${accent}` : '3px solid transparent',
         background: active ? 'rgba(0,103,106,0.1)' : pinned ? 'var(--p-surface-container-high)' : undefined,
       }}
@@ -271,16 +299,21 @@ function ListRow({ icon, iconBg, iconColor, leading, title, titleBadges, subtitl
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <p className="font-semibold text-[14px] truncate" style={active ? { color: 'var(--p-primary)' } : undefined}>{title}</p>
+          <p className={`${unread ? 'font-extrabold' : 'font-semibold'} text-[15px] truncate`} style={active ? { color: 'var(--p-primary)' } : undefined}>{title}</p>
           {titleBadges}
           {kindTag && <KindTag kind={kindTag} />}
           {pinned && <Sym name="push_pin" className="text-[12px] shrink-0" style={{ color: 'var(--p-on-surface-variant)' }} />}
           {statusBadge}
           {tagChips ? <CustomerTagChips tags={tagChips} /> : <EntityTagPill tag={tag} />}
         </div>
-        {subtitle && <p className="text-[12px] truncate" style={{ color: 'var(--p-on-surface-variant)' }}>{subtitle}</p>}
+        {subtitle && <p className="text-[13px] truncate mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>{subtitle}</p>}
       </div>
-      <UnreadDot count={unread} />
+      {(meta || unread) ? (
+        <div className="flex flex-col items-end gap-1 shrink-0 self-stretch justify-center">
+          {meta && <span className="text-[11.5px] tabular-nums" style={{ color: unread ? 'var(--p-primary)' : 'var(--p-on-surface-variant)', fontWeight: unread ? 700 : 400 }}>{meta}</span>}
+          <UnreadDot count={unread} />
+        </div>
+      ) : null}
       {trailing}
     </button>
   );
@@ -371,6 +404,10 @@ type MockMessage = {
   time: string;
   createdAt?: string;
   text?: string;
+  /** Message text that travelled with the attachments (kept apart from `text`, which holds a filename for file/video). */
+  caption?: string;
+  /** Ids of every message merged into this photo album (consecutive photos from one sender). */
+  albumIds?: number[];
   attachmentUrl?: string;
   attachmentUrls?: string[];
   replyCount?: number;
@@ -389,21 +426,114 @@ function MessageAvatar({ type }: { type?: string }) {
   const iconColor = type === 'SYSTEM' ? 'var(--p-on-surface-variant)' : '#fff';
   const icon = type === 'SYSTEM' ? 'info' : type === 'AI' ? 'smart_toy' : 'person';
   return (
-    <div className="w-9 h-9 rounded flex items-center justify-center shrink-0" style={{ background: bg }}>
-      <Sym name={icon} className="text-[18px]" style={{ color: iconColor }} />
+    <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: bg }}>
+      <Sym name={icon} className="text-[14px]" style={{ color: iconColor }} />
     </div>
   );
 }
 
-/** Centered date pill shown when a message starts a new calendar day. */
+/** Centered date chip shown when a message starts a new calendar day (WhatsApp style). */
 function DateDivider({ iso }: { iso?: string }) {
   return (
-    <div className="relative flex items-center py-2 mb-2">
-      <div className="flex-grow h-px" style={{ background: 'var(--p-outline-variant)' }} />
-      <span className="mx-4 text-[12px] font-bold px-2" style={{ color: 'var(--p-on-surface-variant)', background: 'var(--p-surface-container-lowest)' }}>
-        {formatChatDateDivider(iso)}
-      </span>
-      <div className="flex-grow h-px" style={{ background: 'var(--p-outline-variant)' }} />
+    <div className="flex justify-center py-2.5">
+      <span className="wa-datechip">{formatChatDateDivider(iso)}</span>
+    </div>
+  );
+}
+
+/** Image tiles like a messaging app: 1 large, 2 side by side, 3 = one wide + two, 4+ = a 2x2 with a "+N" tile that opens the rest
+ *  in a scrollable grid. Tiles load lazily, so a message with 100 photos stays cheap and never fills the screen. */
+function ImageTiles({ urls, onOpen }: { urls: string[]; onOpen?: (url: string) => void }) {
+  const [all, setAll] = useState(false);
+  const LIMIT = 4;
+  const shown = all ? urls : urls.slice(0, LIMIT);
+  const extra = urls.length - LIMIT;
+  const one = urls.length === 1;
+  return (
+    <div className={all ? 'wa-tiles wa-tiles-all' : 'wa-tiles'} style={{ gridTemplateColumns: one ? '1fr' : all ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }}>
+      {shown.map((url, i) => {
+        const wide = !all && urls.length === 3 && i === 0;
+        const more = !all && i === LIMIT - 1 && extra > 0;
+        return (
+          <button
+            key={url + i}
+            type="button"
+            className="wa-tile"
+            style={{ gridColumn: wide ? 'span 2' : undefined, height: one ? 220 : all ? 104 : wide ? 150 : urls.length <= 2 ? 150 : 108 }}
+            onClick={() => (more ? setAll(true) : onOpen?.(url))}
+          >
+            <img src={url} alt="" loading="lazy" />
+            {more && <span className="wa-tile-more">+{extra + 1}</span>}
+          </button>
+        );
+      })}
+      {all && urls.length > LIMIT && (
+        <button type="button" className="wa-tiles-collapse" onClick={() => setAll(false)}>Show fewer</button>
+      )}
+    </div>
+  );
+}
+
+/** Everything attached to one message, each in its right shape: photos + videos in one framed block, every voice
+ *  note as its own player, every document as a card, then the caption. Mixed attachments all show (nothing is dropped). */
+function AttachmentStack({ m, isGroupStart, onOpenImage, onOpenFile }: {
+  m: MockMessage;
+  isGroupStart: boolean;
+  onOpenImage?: (url: string) => void;
+  onOpenFile?: (url: string, fileName?: string) => void;
+}) {
+  const urls = m.attachmentUrls && m.attachmentUrls.length > 0 ? m.attachmentUrls : (m.attachmentUrl ? [m.attachmentUrl] : []);
+  const images = urls.filter((u) => isImageUrl(u));
+  const audios = urls.filter((u) => !isImageUrl(u) && isAudioUrl(u));
+  const videos = urls.filter((u) => !isImageUrl(u) && !isAudioUrl(u) && isVideoUrl(u));
+  const files = urls.filter((u) => !isImageUrl(u) && !isAudioUrl(u) && !isVideoUrl(u));
+  const caption = m.caption ?? (m.kind === 'image' || m.kind === 'voice' ? (m.text && m.text !== '(attachment)' ? m.text : undefined) : undefined);
+  const mine = !!m.mine;
+  const hasMedia = images.length + videos.length > 0;
+  // the time goes on the last thing in the stack
+  const last: 'media' | 'audio' | 'file' | 'caption' = caption ? 'caption' : files.length ? 'file' : audios.length ? 'audio' : 'media';
+  const tail = isGroupStart ? 'wa-tail' : '';
+
+  if (urls.length === 0) {
+    return (
+      <div className={`wa-img ${mine ? 'wa-img-mine' : ''} ${tail} w-60`}>
+        <div className="w-full h-32 flex items-center justify-center rounded-[9px]" style={{ background: 'var(--p-surface-container-high)' }}>
+          <Sym name="image" className="text-[32px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+        </div>
+        <span className="wa-img-time">{m.time}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex flex-col gap-1 ${mine ? 'items-end' : 'items-start'}`}>
+      {hasMedia && (
+        <div className={`wa-img ${mine ? 'wa-img-mine' : ''} ${tail} ${images.length === 1 && videos.length === 0 ? 'w-64' : 'w-72'} max-w-full`}>
+          {images.length > 0 && <ImageTiles urls={images} onOpen={onOpenImage} />}
+          {videos.map((url, i) => (
+            <video key={url + i} src={url} controls preload="metadata" className={`w-full h-44 bg-black rounded-[9px] block ${images.length > 0 || i > 0 ? 'mt-1' : ''}`} />
+          ))}
+          {last === 'media' && <span className="wa-img-time">{m.time}</span>}
+        </div>
+      )}
+      {audios.map((url, i) => (
+        <div key={url + i} className={`wa-voice ${mine ? 'wa-voice-mine' : ''} ${!hasMedia && i === 0 ? tail : ''}`}>
+          <audio controls preload="metadata" src={url} />
+          {last === 'audio' && i === audios.length - 1 && <div className="wa-meta">{m.time}</div>}
+        </div>
+      ))}
+      {files.map((url, i) => (
+        <div key={url + i} className="wa-filewrap">
+          <AttachmentFileCard name={fileNameFromUrl(url) || 'Attachment'} url={url} onOpen={() => onOpenFile?.(url, fileNameFromUrl(url))} />
+          {last === 'file' && i === files.length - 1 && <div className="wa-meta" style={{ color: 'var(--p-on-surface-variant)' }}>{m.time}</div>}
+        </div>
+      ))}
+      {caption && (
+        <div className={`wa-bubble ${mine ? 'wa-mine chat-bubble-mine' : 'wa-other'}`}>
+          <RichMessageBody text={caption} />
+          <div className="wa-meta">{m.time}</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -454,7 +584,7 @@ function MessageBubble({
   return (
     <div
       id={!inThread ? `msg-${m.id}` : undefined}
-      className={`group relative flex flex-col gap-1 max-w-[65%] rounded-lg px-1 -mx-1 ${isGroupStart ? 'py-1 mt-1.5' : 'py-0.5'} transition-all duration-500 ${align}`}
+      className={`group relative flex flex-col gap-1 max-w-[72%] rounded-lg px-1 -mx-1 ${isGroupStart ? 'py-0.5 mt-1.5' : 'py-px'} transition-all duration-500 ${align}`}
       style={highlighted ? { background: 'rgba(0,103,106,0.15)', boxShadow: 'inset 0 0 0 2px var(--p-primary)' } : undefined}
       onContextMenu={onOpenMenuAt ? (e) => { e.preventDefault(); onOpenMenuAt(e.clientX, e.clientY); } : undefined}
     >
@@ -472,20 +602,20 @@ function MessageBubble({
           canDelete={canDelete}
         />
       )}
-      {isGroupStart ? (
+      {isGroupStart && !(m.kind === 'text' && m.mine) ? (
         <span className="flex items-center gap-1.5 px-1">
           {showAvatar && <MessageAvatar type={isAi ? 'AI' : m.authorType} />}
-          <span className="text-[11px] font-semibold" style={{ color: isAi ? 'var(--p-tertiary)' : m.authorType === 'ADMIN' ? 'var(--p-secondary)' : 'var(--p-on-surface-variant)' }}>{m.author}</span>
+          <span className="text-[12px] font-bold" style={{ color: isAi ? 'var(--p-tertiary)' : m.authorType === 'ADMIN' ? 'var(--p-secondary)' : 'var(--p-primary)' }}>{m.author}</span>
           {isAi && (
             <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white shrink-0" style={{ background: 'var(--p-tertiary)' }}>AI</span>
           )}
-          <span className="text-[11px] font-semibold" style={{ color: 'var(--p-on-surface-variant)' }}>· {m.time}</span>
+          {m.kind !== 'text' && <span className="text-[11px] font-normal" style={{ color: 'var(--p-on-surface-variant)', opacity: 0.8 }}>· {m.time}</span>}
         </span>
-      ) : (
+      ) : !isGroupStart && m.kind !== 'text' ? (
         <span className="hidden group-hover:flex items-center px-1 -mb-0.5">
           <span className="text-[10px] font-medium" style={{ color: 'var(--p-on-surface-variant)' }}>{m.time}</span>
         </span>
-      )}
+      ) : null}
 
       {m.kind === 'text' && (() => {
         const pay = parsePaymentCard(m.text);
@@ -493,69 +623,19 @@ function MessageBubble({
         const product = parseProductCard(m.text);
         if (product) return <ProductCard data={product} />;
         return (
-          <div className={`${radius} px-4 py-2.5 text-[13px] ${isAi ? 'chat-bubble-ai chat-bubble-ai-text' : m.mine ? 'chat-bubble-mine' : ''}`} style={{ background: bubbleBg, color: bubbleColor }}>
+          <div className={`wa-bubble ${m.mine ? 'wa-mine chat-bubble-mine' : isAi ? 'wa-ai chat-bubble-ai chat-bubble-ai-text' : 'wa-other'} ${isGroupStart ? 'wa-tail' : ''}`}>
             {isAi ? (
               <MarkdownMessageBody text={stripProductMarker(m.text) || m.text || ''} streaming={m.streaming} />
             ) : (
               <RichMessageBody text={stripProductMarker(m.text) || m.text || ''} />
             )}
+            <div className="wa-meta">{m.time}</div>
           </div>
         );
       })()}
 
-      {m.kind === 'image' && (() => {
-        const urls = m.attachmentUrls && m.attachmentUrls.length > 0 ? m.attachmentUrls : (m.attachmentUrl ? [m.attachmentUrl] : []);
-        const gridWidth = urls.length <= 1 ? 'w-40' : urls.length === 2 ? 'w-64' : 'w-72';
-        const cols = urls.length <= 1 ? 'grid-cols-1' : 'grid-cols-2';
-        return (
-          <div className={`${radius} overflow-hidden border ${gridWidth}`} style={{ borderColor: 'var(--p-outline-variant)' }}>
-            {urls.length > 0 ? (
-              <div className={`grid ${cols} gap-0.5`}>
-                {urls.map((url, i) => (
-                  <img
-                    key={i}
-                    src={url}
-                    alt=""
-                    className={`w-full ${urls.length <= 1 ? 'h-32' : 'h-28'} object-cover cursor-zoom-in block`}
-                    onClick={() => onOpenImage?.(url)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="w-40 h-32 flex items-center justify-center" style={{ background: 'var(--p-surface-container-high)' }}>
-                <Sym name="image" className="text-[32px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-              </div>
-            )}
-            {m.text && m.text !== '(attachment)' && <p className="text-[12px] px-2.5 py-1.5 break-words" style={{ background: bubbleBg, color: bubbleColor }}>{m.text}</p>}
-          </div>
-        );
-      })()}
-
-      {m.kind === 'voice' && (() => {
-        const url = m.attachmentUrls?.[0] || m.attachmentUrl;
-        if (!url) return null;
-        return (
-          <div className={`${radius} px-3 py-2.5 border`} style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)', minWidth: 220 }}>
-            <audio controls preload="metadata" src={url} className="w-full h-9" style={{ borderRadius: 8 }} />
-          </div>
-        );
-      })()}
-
-      {m.kind === 'video' && (() => {
-        const url = m.attachmentUrls?.[0] || m.attachmentUrl;
-        if (!url) return null;
-        return (
-          <div className={`${radius} overflow-hidden border w-64`} style={{ borderColor: 'var(--p-outline-variant)' }}>
-            <video src={url} controls preload="metadata" className="w-full h-40 bg-black" />
-          </div>
-        );
-      })()}
-      {m.kind === 'file' && (
-        <AttachmentFileCard
-          name={m.text || 'Attachment'}
-          url={m.attachmentUrl}
-          onOpen={() => m.attachmentUrl && onOpenFile?.(m.attachmentUrl, m.text)}
-        />
+      {(m.kind === 'image' || m.kind === 'voice' || m.kind === 'video' || m.kind === 'file') && (
+        <AttachmentStack m={m} isGroupStart={isGroupStart} onOpenImage={onOpenImage} onOpenFile={onOpenFile} />
       )}
 
       {m.reactions && m.reactions.length > 0 && (
@@ -631,6 +711,26 @@ type ChatMessageLike = {
   reactions?: MessageReactionSummaryDto[];
 };
 
+/** Consecutive photo-only messages from one sender within a few minutes read as one album, so ten photos sent one by one
+ *  still look like one tidy block. The original messages are untouched; deleting the album deletes all of them. */
+function groupImageAlbums(list: MockMessage[]): MockMessage[] {
+  const out: MockMessage[] = [];
+  for (const m of list) {
+    const last = out[out.length - 1];
+    const photoOnly = (x: MockMessage) => x.kind === 'image' && !x.caption && !x.replyCount && !(x.reactions && x.reactions.length > 0);
+    const gap = last && m.createdAt && last.createdAt
+      ? Math.abs((parseServerDate(m.createdAt)?.getTime() ?? 0) - (parseServerDate(last.createdAt)?.getTime() ?? 0)) : Infinity;
+    if (last && photoOnly(m) && photoOnly(last) && last.author === m.author && last.authorType === m.authorType
+      && !!last.mine === !!m.mine && gap < 4 * 60 * 1000) {
+      const urls = [...(last.attachmentUrls ?? []), ...(m.attachmentUrls ?? [])];
+      out[out.length - 1] = { ...last, attachmentUrls: urls, attachmentUrl: urls[0], time: m.time, albumIds: [...(last.albumIds ?? [last.id]), m.id] };
+    } else {
+      out.push(m);
+    }
+  }
+  return out;
+}
+
 function toMockMessage(m: ChatMessageLike): MockMessage {
   const mine = m.authorType === 'ADMIN';
   const urls = m.attachmentUrls && m.attachmentUrls.length > 0 ? m.attachmentUrls : (m.attachmentUrl ? [m.attachmentUrl] : []);
@@ -656,6 +756,7 @@ function toMockMessage(m: ChatMessageLike): MockMessage {
     time: formatServerTime(m.createdAt),
     createdAt: m.createdAt,
     text: kind === 'file' || kind === 'video' ? (fileNameFromUrl(firstUrl) || 'Attachment') : (m.body || undefined),
+    caption: m.body && m.body !== '(attachment)' ? m.body : undefined,
     attachmentUrl: firstUrl,
     attachmentUrls: urls,
     replyCount: m.replyCount || undefined,
@@ -806,12 +907,50 @@ export default function AdminClientWorkspacePreview() {
     () => groups.map((g) => g.email).filter((e) => e && e !== '—'),
     [groups],
   );
+  // Chat-list numbers (unread badge, last-message preview): fetched ONCE with no parameters, then kept current by
+  // the live channel below. The slow refetch is only a safety net for a dropped socket, not the update mechanism.
   const { data: unreadCounts = {} } = useQuery({
-    queryKey: ['customer-chat-unread-counts', customerEmails],
-    queryFn: () => adminCustomerChatApi.unreadCounts(customerEmails),
-    enabled: customerEmails.length > 0,
-    refetchInterval: 20_000,
+    queryKey: ['customer-chat-unread-counts'],
+    queryFn: () => adminCustomerChatApi.unreadCounts(),
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+    retry: false,
   });
+  // Latest message per client: the grey preview line + time on each client row.
+  const { data: lastMessages = {} } = useQuery({
+    queryKey: ['customer-chat-last-messages'],
+    queryFn: () => adminCustomerChatApi.lastMessages(),
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+    retry: false,
+  });
+
+  // Live: the server pushes /topic/admin/activity on every client message. Patch the two caches in place, no API call.
+  // (The chat that is open right now is marked read by the server, so it never gains an unread badge.)
+  const openCustomerEmailRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!localStorage.getItem('adminToken')) return;
+    const client = acquireStomp('admin');
+    const unsubscribe = subscribeTopic(client, '/topic/admin/activity', (frame) => {
+      try {
+        const parsed = JSON.parse(frame.body) as { event?: string; data?: { customerEmail?: string; preview?: string; isGeneralChat?: boolean } };
+        const d = parsed.data;
+        if (parsed.event !== 'message' || !d?.isGeneralChat || !d.customerEmail) return;
+        const email = d.customerEmail.toLowerCase();
+        qc.setQueryData<Record<string, { text: string; authorType?: string; createdAt?: string }>>(['customer-chat-last-messages'],
+          (old = {}) => ({ ...old, [email]: { text: (d.preview || 'Attachment').replace(/\s+/g, ' ').slice(0, 90), authorType: 'CLIENT', createdAt: new Date().toISOString() } }));
+        if (openCustomerEmailRef.current !== email) {
+          qc.setQueryData<Record<string, number>>(['customer-chat-unread-counts'], (old = {}) => ({ ...old, [email]: (old[email] ?? 0) + 1 }));
+        }
+      } catch { /* ignore malformed frame */ }
+    });
+    return () => { unsubscribe(); releaseStomp(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  /** An admin reply is also the newest message in that chat: update the preview locally (no refetch). */
+  const patchLastMessage = (email: string, text: string) =>
+    qc.setQueryData<Record<string, { text: string; authorType?: string; createdAt?: string }>>(['customer-chat-last-messages'],
+      (old = {}) => ({ ...old, [email.toLowerCase()]: { text: text.replace(/\s+/g, ' ').trim().slice(0, 90) || 'Attachment', authorType: 'ADMIN', createdAt: new Date().toISOString() } }));
   // REQ-4 (Multiple Tags per Customer) — replaces the old single-tag projectApi.getCustomerTags
   // for this screen; batch keyed by every customer currently visible in the sidebar.
   const { data: customerTagsByEmail = {} } = useQuery({
@@ -1012,6 +1151,7 @@ export default function AdminClientWorkspacePreview() {
 
   const hasRealEmail = !!customer?.email && customer.email !== '—';
   const customerEmail = customer?.email;
+  openCustomerEmailRef.current = active.kind === 'customerGeneral' ? customerEmail?.toLowerCase() : undefined;
 
   /** Fans out to project/design/invoice/quote search in parallel and flattens into one
    *  mixed @-mention result list — scoped to whichever customer's workspace is open. */
@@ -1132,7 +1272,7 @@ export default function AdminClientWorkspacePreview() {
     queryFn: () => adminCustomerChatApi.listMessages(customerEmail!),
     select: sortMessagesByTime,
     enabled: hasRealEmail && active.kind === 'customerGeneral',
-    refetchInterval: 15_000,
+    refetchInterval: 45_000,
   });
 
   // Opening General Chat marks it read server-side (see listMessages) — reflect that locally.
@@ -1148,7 +1288,7 @@ export default function AdminClientWorkspacePreview() {
     queryKey: ['customer-chat-threads', customerEmail],
     queryFn: () => adminCustomerChatApi.listThreads(customerEmail!),
     enabled: hasRealEmail && active.kind === 'threadsGeneral',
-    refetchInterval: 15_000,
+    refetchInterval: 45_000,
   });
 
   const sendGeneralMessage = useMutation({
@@ -1172,6 +1312,7 @@ export default function AdminClientWorkspacePreview() {
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['customer-chat-messages', customerEmail] });
+      if (!vars.parentMessageId && customerEmail) patchLastMessage(customerEmail, vars.body === '(attachment)' ? 'Attachment' : vars.body);
       if (vars.parentMessageId) qc.invalidateQueries({ queryKey: ['customer-chat-threads', customerEmail] });
     },
     onError: (e: Error, _vars, context) => {
@@ -1279,7 +1420,7 @@ export default function AdminClientWorkspacePreview() {
     queryFn: () => projectApi.getChannelMessages(project!.code, activeChannelDesignId),
     select: sortMessagesByTime,
     enabled: !!project && activeChannelDesignId != null,
-    refetchInterval: 15_000,
+    refetchInterval: 45_000,
   });
 
   // Manufacturing Admin AI auto-reply status for the active channel — drives the locked
@@ -1317,7 +1458,7 @@ export default function AdminClientWorkspacePreview() {
     queryKey: ['project-threads', project?.code],
     queryFn: () => projectApi.listThreads(project!.code),
     enabled: !!project && active.kind === 'threads',
-    refetchInterval: 15_000,
+    refetchInterval: 45_000,
   });
 
   const sendChannelMessage = useMutation({
@@ -1384,6 +1525,94 @@ export default function AdminClientWorkspacePreview() {
   const uploadAndSendChannel = (text: string, attachments: Attachment[], parentMessageId?: number) =>
     sendWithAttachments(attachments, text, (body, attachmentUrls) =>
       sendChannelMessage.mutateAsync({ body, attachmentUrls, parentMessageId }));
+
+  // ---- Progressive attachment sending -------------------------------------------------------------------------
+  // Each attachment is posted as its OWN message the moment its upload finishes (like a messaging app), in the order
+  // picked, instead of everything waiting for the slowest upload. The chat shows a bubble per file straight away, so
+  // there is always something on screen; a failed file shows Retry and never takes the others down.
+  type PendingUpload = {
+    id: string;
+    paneKey: string;
+    name: string;
+    previewUrl: string;
+    isImage: boolean;
+    status: 'uploading' | 'failed';
+    error?: string;
+    retry?: () => void;
+  };
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+  const patchPending = (id: string, patch: Partial<PendingUpload>) =>
+    setPendingUploads((list) => list.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  const dropPending = (id: string) =>
+    setPendingUploads((list) => {
+      const gone = list.find((p) => p.id === id);
+      if (gone) URL.revokeObjectURL(gone.previewUrl);
+      return list.filter((p) => p.id !== id);
+    });
+
+  // Closing the tab mid-upload loses the files still on their way; warn instead of failing silently.
+  useEffect(() => {
+    if (!pendingUploads.some((p) => p.status === 'uploading')) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [pendingUploads]);
+
+  /** Text goes out at once; every file uploads (3 at a time, big photos shrunk first) and is posted as soon as it is ready. */
+  async function queueAttachments(text: string, attachments: Attachment[], sendText: (body: string) => Promise<unknown>) {
+    // Capture the target NOW: the admin may switch to another chat while files are still uploading.
+    const target = active.kind === 'customerGeneral' && customerEmail
+      ? { key: `general:${customerEmail}`, invalidate: ['customer-chat-messages', customerEmail] as unknown[],
+          post: (body: string, urls: string[]) => adminCustomerChatApi.postMessage(customerEmail, body, { attachmentUrls: urls }) }
+      : project
+        ? (() => {
+            const code = project.code;
+            const designId = activeChannelDesignId;
+            return { key: `channel:${code}:${designId ?? ''}`, invalidate: ['project-channel-messages', code, designId] as unknown[],
+              post: (body: string, urls: string[]) => projectApi.postMessage(code, body, { attachmentUrls: urls, designId }) };
+          })()
+        : null;
+    if (!target) return;
+
+    // The composer revokes its own preview URLs when onSend returns, so read the files and make our own previews first.
+    const files = await Promise.all(attachments.map((a) => toFile(a)));
+    if (text.trim()) await sendText(text.trim());
+
+    const items: PendingUpload[] = files.map((f, i) => ({
+      id: `${Date.now()}-${i}-${Math.random().toString(36).slice(2, 7)}`,
+      paneKey: target.key,
+      name: f.name,
+      previewUrl: URL.createObjectURL(f),
+      isImage: f.type.startsWith('image/'),
+      status: 'uploading',
+    }));
+    setPendingUploads((list) => [...list, ...items]);
+    window.setTimeout(() => scrollToBottom('auto'), 50);
+
+    const uploadOne = async (f: File) => withRetry(async () => mediaApi.upload(await compressImageIfNeeded(f), 'projects'));
+    const postOne = async (item: PendingUpload, url: string) => {
+      await withRetry(() => target.post('(attachment)', [url]), 2);
+      await qc.invalidateQueries({ queryKey: target.invalidate });
+      if (target.key.startsWith('general:')) patchLastMessage(target.key.slice('general:'.length), 'Attachment');
+      dropPending(item.id);
+    };
+    const fail = (item: PendingUpload, e: unknown, retry: () => void) =>
+      patchPending(item.id, { status: 'failed', error: e instanceof Error ? e.message : 'Upload failed', retry });
+    const runSingle = async (item: PendingUpload, f: File) => {
+      patchPending(item.id, { status: 'uploading', error: undefined });
+      try { await postOne(item, await uploadOne(f)); } catch (e) { fail(item, e, () => void runSingle(item, f)); }
+    };
+
+    // Uploads run in parallel (limit 3); posting stays in the order the files were picked.
+    const uploads = startLimited(files.map((f) => () => uploadOne(f).then((url) => ({ ok: true as const, url }), (error) => ({ ok: false as const, error }))), 3);
+    void (async () => {
+      for (let i = 0; i < items.length; i++) {
+        const res = await uploads[i];
+        if (!res.ok) { fail(items[i], res.error, () => void runSingle(items[i], files[i])); continue; }
+        try { await postOne(items[i], res.url); } catch (e) { fail(items[i], e, () => void runSingle(items[i], files[i])); }
+      }
+    })();
+  }
 
   const renameProjectMutation = useMutation({
     mutationFn: (title: string) => projectApi.renameProject(project!.code, title),
@@ -1471,11 +1700,14 @@ export default function AdminClientWorkspacePreview() {
 
   const handleDeleteMessage = (m: MockMessage) => {
     if (m.authorType === 'SYSTEM' || m.authorType === 'AI') return;
-    if (!window.confirm('Delete this message? This cannot be undone.')) return;
-    if (active.kind === 'customerGeneral' || active.kind === 'threadsGeneral') {
-      deleteGeneralMessageMutation.mutate(m.id);
-    } else {
-      deleteChannelMessageMutation.mutate(m.id);
+    const ids = m.albumIds && m.albumIds.length > 1 ? m.albumIds : [m.id];
+    if (!window.confirm(ids.length > 1 ? `Delete these ${ids.length} photos? This cannot be undone.` : 'Delete this message? This cannot be undone.')) return;
+    for (const id of ids) {
+      if (active.kind === 'customerGeneral' || active.kind === 'threadsGeneral') {
+        deleteGeneralMessageMutation.mutate(id);
+      } else {
+        deleteChannelMessageMutation.mutate(id);
+      }
     }
   };
 
@@ -1634,9 +1866,12 @@ export default function AdminClientWorkspacePreview() {
     : undefined;
 
   const isChannelPane = active.kind === 'announcements' || active.kind === 'design';
-  const activeMessages = active.kind === 'customerGeneral' ? generalMessages.map(toMockMessage)
+  const activeMessages = groupImageAlbums(active.kind === 'customerGeneral' ? generalMessages.map(toMockMessage)
     : isChannelPane ? channelMessages.map(toMockMessage)
-    : [];
+    : []);
+  // Which chat the open pane is, so pending uploads only show in the chat they belong to.
+  const currentTargetKey = active.kind === 'customerGeneral' ? `general:${customerEmail}`
+    : isChannelPane && project ? `channel:${project.code}:${activeChannelDesignId ?? ''}` : '';
   const channelLabel = active.kind === 'customerGeneral' ? 'General Chat'
     : active.kind === 'announcements' ? '#announcements'
     : active.kind === 'design' ? (activeDesign?.name ?? '') : '';
@@ -1891,7 +2126,7 @@ export default function AdminClientWorkspacePreview() {
           {level.kind === 'customers' && (
             <>
               <div className="h-14 px-4 flex items-center justify-between border-b shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
-                <h2 className="font-display text-[17px] font-bold">Clients</h2>
+                <h2 className="text-[21px] font-extrabold tracking-tight" style={{ color: 'var(--p-primary)', fontFamily: "'Inter', system-ui, sans-serif", fontStyle: 'normal' }}>Clients</h2>
                 <div className="flex gap-1 p-0.5 rounded-lg" style={{ background: 'var(--p-surface-container-high)' }}>
                   <button
                     type="button"
@@ -1915,13 +2150,13 @@ export default function AdminClientWorkspacePreview() {
               </div>
               <div className="px-3 py-2 border-b shrink-0 space-y-2" style={{ borderColor: 'var(--p-outline-variant)' }}>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 flex items-center gap-2 rounded-lg px-3 h-9" style={{ background: 'var(--p-surface-container-high)' }}>
+                  <div className="wa-search flex-1 flex items-center gap-2 rounded-full px-3.5 h-10">
                     <Sym name="search" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
                     <input
                       value={clientSearch}
                       onChange={(e) => setClientSearch(e.target.value)}
                       placeholder="Search clients, projects, code…"
-                      className="flex-1 bg-transparent border-none outline-none text-[13px]"
+                      className="flex-1 bg-transparent border-none outline-none text-[14px]"
                     />
                   </div>
                   {/* Filter pills default collapsed (see filtersExpanded) — this toggle shows/hides
@@ -2011,8 +2246,13 @@ export default function AdminClientWorkspacePreview() {
                     key={g.key}
                     leading={<Avatar initials={initialsOf(g.name)} />}
                     title={g.name}
-                    subtitle={`${g.projects.length} project${g.projects.length === 1 ? '' : 's'} · ${g.email}`}
+                    subtitle={(() => {
+                      const lm = lastMessages[g.email.toLowerCase()];
+                      if (lm && lm.text) return `${lm.authorType === 'ADMIN' ? 'You: ' : ''}${lm.text}`;
+                      return `${g.projects.length} project${g.projects.length === 1 ? '' : 's'} · ${g.email}`;
+                    })()}
                     unread={unreadCounts[g.email.toLowerCase()]}
+                    meta={lastMessageTime(lastMessages[g.email.toLowerCase()]?.createdAt) ?? lastActivityLabel(g.projects)}
                     tagChips={customerTagsByEmail[g.email.toLowerCase()]}
                     statusBadge={<CustomerStatusBadge status={customerStatuses[g.email.toLowerCase()] as CustomerChatStatus} />}
                     active={(active.kind === 'customerGeneral' || active.kind === 'threadsGeneral') && active.customerKey === g.key}
@@ -2455,15 +2695,15 @@ export default function AdminClientWorkspacePreview() {
               </>
             ) : (
               <>
-                <div className="border-b shrink-0" style={{ borderColor: 'var(--p-outline-variant)' }}>
+                <div className="wa-chathead shrink-0">
                   <div className="h-14 px-5 flex items-center gap-3">
                     <MobileBackButton onClick={mobilePaneBack} />
                     {active.kind === 'customerGeneral' && customer && (
                       <>
-                        <Avatar initials={initialsOf(customer.name)} size={32} />
+                        <Avatar initials={initialsOf(customer.name)} size={40} />
                         <div>
                           <p className="font-bold text-[14px] leading-tight">{customer.name}</p>
-                          <p className="text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}>General Chat · all projects</p>
+                          <p className="text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}>General Chat · {customer.projects.length} project{customer.projects.length === 1 ? '' : 's'} · {customer.email}</p>
                         </div>
                       </>
                     )}
@@ -2618,7 +2858,7 @@ export default function AdminClientWorkspacePreview() {
                   )}
                 </div>
 
-                <div className="relative flex flex-1 min-h-0 flex-col" style={{ background: 'var(--p-surface-container-lowest)' }}>
+                <div className="relative flex flex-1 min-h-0 flex-col" style={{ background: 'color-mix(in srgb, var(--p-primary) 7%, #f6faf9)' }}>
                   {/* Chat wallpaper — fixed behind the messages (not inside the scroller, so it
                       doesn't scroll away) and pointer-events-none so it never eats clicks. Same
                       watercolor asset + low opacity the inquiry/quote pages already use. */}
@@ -2643,12 +2883,16 @@ export default function AdminClientWorkspacePreview() {
                   >
                     {activeMessages.map((m, i) => {
                       const prev = activeMessages[i - 1];
-                      const newDay = i === 0 || isDifferentServerDay(m.createdAt, prev.createdAt);
+                      // A message with no usable timestamp (e.g. one that was just sent) counts as "now", so its
+                      // day divider is decided the moment it appears instead of after the next refresh.
+                      const nowIso = new Date().toISOString();
+                      const dayOf = (x: { createdAt?: string }) => (parseServerDate(x.createdAt) ? x.createdAt : nowIso);
+                      const newDay = i === 0 || isDifferentServerDay(dayOf(m), dayOf(prev));
                       const groupStart = newDay || m.kind === 'system' || prev.kind === 'system'
                         || prev.author !== m.author || prev.authorType !== m.authorType || !!prev.mine !== !!m.mine;
                       return (
                       <Fragment key={m.id}>
-                        {newDay && <DateDivider iso={m.createdAt} />}
+                        {newDay && <DateDivider iso={dayOf(m)} />}
                         <MessageBubble
                           m={m}
                           groupStart={groupStart}
@@ -2669,6 +2913,36 @@ export default function AdminClientWorkspacePreview() {
                       </Fragment>
                       );
                     })}
+                    {pendingUploads.filter((p) => p.paneKey === currentTargetKey).map((p) => (
+                      <div key={p.id} className="self-end max-w-[72%] flex flex-col items-end gap-1 mt-1">
+                        <div className="wa-img wa-img-mine w-44" style={{ opacity: p.status === 'failed' ? 0.95 : 1 }}>
+                          {p.isImage ? (
+                            <div className="relative rounded-[9px] overflow-hidden h-36 bg-black/10">
+                              <img src={p.previewUrl} alt="" className="w-full h-full object-cover" style={{ filter: p.status === 'uploading' ? 'brightness(.7)' : 'brightness(.55)' }} />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                {p.status === 'uploading'
+                                  ? <Sym name="progress_activity" className="text-[30px] animate-spin" style={{ color: '#fff' }} />
+                                  : <Sym name="error" className="text-[30px]" style={{ color: '#ffb4ab' }} />}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 px-2 py-3 text-white text-[13px] font-semibold">
+                              <Sym name={p.status === 'uploading' ? 'progress_activity' : 'error'} className={`text-[22px] ${p.status === 'uploading' ? 'animate-spin' : ''}`} />
+                              <span className="truncate">{p.name}</span>
+                            </div>
+                          )}
+                        </div>
+                        {p.status === 'failed' ? (
+                          <div className="flex items-center gap-2 text-[12px]">
+                            <span style={{ color: 'var(--p-error)' }}>Not sent{p.error ? `: ${p.error}` : ''}</span>
+                            <button type="button" onClick={() => p.retry?.()} className="font-bold underline" style={{ color: 'var(--p-primary)' }}>Retry</button>
+                            <button type="button" onClick={() => dropPending(p.id)} className="font-bold underline" style={{ color: 'var(--p-on-surface-variant)' }}>Remove</button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px]" style={{ color: 'var(--p-on-surface-variant)' }}>Sending…</span>
+                        )}
+                      </div>
+                    ))}
                     {activeAiStreamText != null && (
                       <MessageBubble
                         m={{
@@ -2762,13 +3036,18 @@ export default function AdminClientWorkspacePreview() {
                         setPayModal(true);
                       } : undefined}
                       onSend={async (text, attachments) => {
-                        if (active.kind === 'customerGeneral') {
+                        if (attachments.length > 0) {
+                          // Files: text goes first, then each file is uploaded and posted on its own (see queueAttachments).
+                          await queueAttachments(text, attachments, (body) => (active.kind === 'customerGeneral'
+                            ? sendGeneralMessage.mutateAsync({ body })
+                            : sendChannelMessage.mutateAsync({ body })));
+                        } else if (active.kind === 'customerGeneral') {
                           await uploadAndSendGeneral(text, attachments);
-                          notifyGeneralTyping(false);
                         } else {
                           await uploadAndSendChannel(text, attachments);
-                          notifyChannelTyping(false, activeChannelDesignId);
                         }
+                        if (active.kind === 'customerGeneral') notifyGeneralTyping(false);
+                        else notifyChannelTyping(false, activeChannelDesignId);
                         scrollToBottom('auto');
                       }}
                     />
