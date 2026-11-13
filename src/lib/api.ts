@@ -3444,6 +3444,8 @@ export const invoiceApi = {
     fetchApi<ManufacturingInvoiceDto>(`/api/admin/manufacturing/invoices/${id}/pdf`, { method: 'PATCH', body: JSON.stringify({ pdfUrl }) }),
   send: (id: number, pdfBase64?: string) =>
     fetchApi<ManufacturingInvoiceDto>(`/api/admin/manufacturing/invoices/${id}/send`, { method: 'POST', body: JSON.stringify({ pdfBase64 }) }),
+  sendReceipt: (id: number, pdfUrl?: string) =>
+    fetchApi<{ email: boolean; whatsapp: boolean; clientEmail?: string }>(`/api/admin/manufacturing/invoices/${id}/send-receipt`, { method: 'POST', body: JSON.stringify({ pdfUrl }) }),
   cancel: (id: number) =>
     fetchApi<ManufacturingInvoiceDto>(`/api/admin/manufacturing/invoices/${id}/cancel`, { method: 'POST' }),
 };

@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import AdminShell from '@/components/portal/AdminShell';
 import { Sym } from '@/components/portal/Sym';
+import StatTile from '@/components/portal/StatTile';
+import ListToolbar, { ViewToggle, useListView } from '@/components/portal/ListToolbar';
+import LedgerList, { LedgerSkeleton, PaAvatar } from '@/components/portal/LedgerList';
 import { manufacturingApi, projectApi } from '@/lib/api';
 
 interface ClientRow {
@@ -84,6 +87,8 @@ export default function PortalAdminClients() {
   const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<ClientRow | null>(null);
+  const [seg, setSeg] = useState('all');
+  const [view, setView] = useListView('clients', 'grid-3');
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ['admin-projects'],
@@ -98,64 +103,69 @@ export default function PortalAdminClients() {
   const clients = useMemo(() => buildClients(projects, inquiries), [projects, inquiries]);
   const isLoading = projectsLoading || inquiriesLoading;
 
-  const shown = clients.filter(
+  const searched = clients.filter(
     (c) =>
       !q ||
       c.name.toLowerCase().includes(q.toLowerCase()) ||
       (c.brand || '').toLowerCase().includes(q.toLowerCase()) ||
       c.email.toLowerCase().includes(q.toLowerCase()),
   );
+  const shown = searched.filter((c) => (seg === 'projects' ? c.projects > 0 : seg === 'inquiry' ? c.projects === 0 : true));
 
   return (
     <AdminShell title="Clients">
-      <div className="p-5 sm:p-8">
-        <div className="flex items-center gap-2 border rounded-lg px-3 h-9 max-w-xs mb-5" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-low)' }}>
-          <Sym name="search" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search clients…" className="flex-1 bg-transparent border-none outline-none focus:ring-0 text-[13px]" />
+      <div className="p-4 sm:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 max-w-3xl">
+          <StatTile label="Clients" value={clients.length} icon="groups" color="var(--p-primary)" />
+          <StatTile label="With projects" value={clients.filter((c) => c.projects > 0).length} icon="folder_open" color="#15803d" />
+          <StatTile label="Inquiry only" value={clients.filter((c) => c.projects === 0).length} icon="inbox" color="#b45309" />
         </div>
 
+        <ListToolbar
+          tabs={[
+            { key: 'all', label: 'All', count: searched.length },
+            { key: 'projects', label: 'With projects', count: searched.filter((c) => c.projects > 0).length },
+            { key: 'inquiry', label: 'Inquiry only', count: searched.filter((c) => c.projects === 0).length },
+          ]}
+          tab={seg}
+          onTab={setSeg}
+          search={q}
+          onSearch={setQ}
+          placeholder="Name, brand, email…"
+        >
+          <ViewToggle view={view} onChange={setView} />
+        </ListToolbar>
+
         {isLoading ? (
-          <div className="flex justify-center py-24">
-            <Sym name="progress_activity" className="text-[32px] animate-spin" style={{ color: 'var(--p-primary)' }} />
-          </div>
+          <LedgerSkeleton />
         ) : shown.length === 0 ? (
           <div className="text-center py-20 border-2 border-dashed rounded-xl" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>
             <Sym name="groups" className="text-[40px] opacity-40" />
-            <p className="mt-2 text-[15px] font-semibold">No clients yet</p>
-            <p className="text-[13px] mt-1">Clients appear here when inquiries are submitted or projects are created.</p>
+            <p className="mt-2 text-[15px] font-semibold">{clients.length === 0 ? 'No clients yet' : 'No clients match'}</p>
+            <p className="text-[13px] mt-1">{clients.length === 0 ? 'Clients appear here when inquiries are submitted or projects are created.' : 'Try another tab or clear the search.'}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {shown.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setOpen(c)}
-                className="border rounded-xl p-5 text-left card-hover"
-                style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold uppercase" style={{ background: 'var(--p-primary)' }}>
-                    {c.name.split(' ').map((p) => p[0]).join('').slice(0, 2)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-bold text-[15px] truncate capitalize">{c.name}</p>
-                    <p className="text-[12px] truncate" style={{ color: 'var(--p-on-surface-variant)' }}>{c.brand || c.email}</p>
-                  </div>
-                </div>
-                <div className="flex justify-between text-[13px]">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase opacity-60" style={{ color: 'var(--p-on-surface-variant)' }}>Projects</p>
-                    <p className="font-semibold">{c.projects}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold uppercase opacity-60" style={{ color: 'var(--p-on-surface-variant)' }}>Since</p>
-                    <p className="font-semibold">{formatSince(c.since)}</p>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
+          <LedgerList
+            layout={view}
+            rows={shown.map((c) => ({
+              key: c.id,
+              lead: <PaAvatar name={c.name} />,
+              title: <span className="truncate capitalize">{c.name}</span>,
+              sub: [c.brand, c.email, c.phone].filter(Boolean).join(' · '),
+              amount: `${c.projects} project${c.projects === 1 ? '' : 's'}`,
+              amountSub: `since ${formatSince(c.since)}`,
+              onClick: () => setOpen(c),
+              actions: c.projectCodes[0] ? (
+                <button
+                  onClick={() => navigate(`/portal-admin/workspace-preview?project=${encodeURIComponent(c.projectCodes[0])}`)}
+                  className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border"
+                  style={{ borderColor: 'var(--p-outline)', color: 'var(--p-primary)' }}
+                >
+                  Open project
+                </button>
+              ) : undefined,
+            }))}
+          />
         )}
       </div>
 

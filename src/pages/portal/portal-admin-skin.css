@@ -1,0 +1,534 @@
+/**
+ * Portal admin skin: layout, depth and motion polish for the Manufacturing Portal admin list pages.
+ *
+ * Colours are NOT changed: everything uses the existing --p-* tokens (or the primary teal at some opacity).
+ * Chrome rules (.pa-nav*, .pa-topbar*) apply to the shared shell. Page rules are scoped to `.pa-skin`, which the
+ * shell only adds on the pages that were redesigned, so project workspaces, chat, the inquiry form and the
+ * inquiry page are untouched.
+ *
+ * Motion follows the usual app-feel rules: respond on press (scale .97), springs/ease-out curves, short durations,
+ * and everything switches off under prefers-reduced-motion.
+ */
+
+.portal-root {
+  --pa-ease: cubic-bezier(.2, .8, .2, 1);
+  --pa-teal-06: rgba(0, 103, 106, .06);
+  --pa-teal-10: rgba(0, 103, 106, .10);
+  --pa-teal-16: rgba(0, 103, 106, .16);
+  --pa-shadow-rest: 0 1px 2px rgba(0, 40, 42, .05), 0 10px 28px -18px rgba(0, 40, 42, .30);
+  --pa-shadow-lift: 0 1px 2px rgba(0, 40, 42, .06), 0 18px 34px -16px rgba(0, 103, 106, .42);
+}
+
+@keyframes pa-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes pa-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pa-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes pa-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(0, 103, 106, .45); }
+  70%  { box-shadow: 0 0 0 7px rgba(0, 103, 106, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 103, 106, 0); }
+}
+
+/* ======================================================================== */
+/* Shell chrome (sidebar + top bar), shared by every portal admin page       */
+/* ======================================================================== */
+
+.portal-root .pa-topbar {
+  background: var(--p-primary);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .10) inset, 0 6px 18px -12px rgba(0, 40, 42, .6);
+}
+.portal-root .pa-search {
+  background: rgba(255, 255, 255, .12);
+  border: 1px solid rgba(255, 255, 255, .22);
+  transition: background-color .18s var(--pa-ease), border-color .18s var(--pa-ease), box-shadow .18s var(--pa-ease);
+}
+.portal-root .pa-search:hover { background: rgba(255, 255, 255, .18); }
+.portal-root .pa-search:focus-within {
+  background: #fff;
+  border-color: #fff;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, .22);
+}
+.portal-root .pa-search:focus-within input,
+.portal-root .pa-search:focus-within .msym { color: var(--p-on-surface); }
+.portal-root .pa-search:focus-within input::placeholder { color: var(--p-on-surface-variant); }
+.portal-root .pa-kbd {
+  font-size: 11px; font-weight: 700; line-height: 1;
+  padding: 3px 6px; border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, .35); color: rgba(255, 255, 255, .85);
+}
+.portal-root .pa-search:focus-within .pa-kbd { opacity: 0; }
+
+.portal-root .pa-side {
+  background: var(--p-surface-container-lowest);
+  border-right: 1px solid var(--p-outline-variant);
+}
+.portal-root .pa-nav-title {
+  padding: 0 12px;
+  margin: 2px 0 4px;
+  font-size: 12px; font-weight: 700; letter-spacing: .01em;
+  color: var(--p-on-surface-variant);
+}
+.portal-root .pa-nav-item {
+  position: relative;
+  display: flex; align-items: center; gap: 12px;
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 14px; font-weight: 600;
+  color: var(--p-on-surface);
+  text-align: left;
+  transition: background-color .16s var(--pa-ease), color .16s var(--pa-ease), transform .12s ease-out;
+}
+.portal-root .pa-nav-item .msym { font-size: 22px; color: var(--p-on-surface-variant); transition: color .16s var(--pa-ease), transform .2s var(--pa-ease); }
+.portal-root .pa-nav-item:hover:not(.is-active) { background: var(--pa-teal-10); }
+.portal-root .pa-nav-item:hover:not(.is-active) .msym { color: var(--p-primary); transform: translateX(2px) scale(1.06); }
+.portal-root .pa-nav-item:active { transform: scale(.97); }
+.portal-root .pa-nav-item.is-active { color: #fff; font-weight: 700; }
+.portal-root .pa-nav-item.is-active .msym { color: #fff; }
+.portal-root .pa-nav-item .pa-nav-label { position: relative; z-index: 1; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.portal-root .pa-nav-item .msym { position: relative; z-index: 1; }
+.portal-root .pa-nav-badge {
+  position: relative; z-index: 1;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: var(--p-primary-fixed); color: var(--p-primary);
+}
+.portal-root .pa-nav-item.is-active .pa-nav-badge { background: rgba(255, 255, 255, .26); color: #fff; }
+.portal-root .pa-nav-dot {
+  position: absolute; top: 7px; right: 8px; z-index: 2;
+  width: 8px; height: 8px; border-radius: 999px; background: var(--p-primary);
+  animation: pa-pulse-ring 1.8s ease-out infinite;
+}
+.portal-root .pa-nav-item.is-active .pa-nav-dot { background: #fff; }
+
+.portal-root .pa-user {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px; border-radius: 14px;
+  background: var(--p-surface-container-low);
+  border: 1px solid var(--p-outline-variant);
+}
+
+/* ======================================================================== */
+/* Page title bar                                                            */
+/* ======================================================================== */
+
+.portal-root .pa-titlebar {
+  background: var(--p-surface-container-lowest);
+  border-bottom: 1px solid var(--p-outline-variant);
+  animation: pa-fade .3s var(--pa-ease) backwards;
+}
+.portal-root .pa-title {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-size: 30px; line-height: 1.1; letter-spacing: -.01em;
+  color: var(--p-on-surface);
+  animation: pa-rise .42s var(--pa-ease) backwards;
+}
+.portal-root .pa-subtitle {
+  margin-top: 4px; font-size: 14px; color: var(--p-on-surface-variant);
+  animation: pa-rise .5s var(--pa-ease) .05s backwards;
+}
+
+/* ======================================================================== */
+/* Page skin (only inside .pa-skin)                                          */
+/* ======================================================================== */
+
+.portal-root .pa-skin { background: var(--p-surface); }
+/* Opacity only and no forwards fill: a transform, or an animation that never ends, on an ancestor would trap every
+   position:fixed overlay (viewers, dialogs, menus) inside the page and under the top bar. */
+.portal-root .pa-skin .pa-page { animation: pa-fade .35s var(--pa-ease) backwards; }
+
+/* Cards: depth instead of a bare 1px line */
+.portal-root .pa-skin .border.rounded-2xl:not(.border-dashed):not(.fixed *),
+.portal-root .pa-skin .border.rounded-xl:not(.border-dashed):not(.fixed *) {
+  background-color: var(--p-surface-container-lowest);
+  box-shadow: var(--pa-shadow-rest);
+  transition: transform .24s var(--pa-ease), box-shadow .24s var(--pa-ease), border-color .24s var(--pa-ease);
+}
+.portal-root .pa-skin button.border.rounded-2xl:hover,
+.portal-root .pa-skin button.border.rounded-xl:hover,
+.portal-root .pa-skin .card-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--pa-shadow-lift);
+  border-color: var(--p-primary);
+}
+.portal-root .pa-skin button.border.rounded-2xl:active,
+.portal-root .pa-skin button.border.rounded-xl:active { transform: scale(.985); }
+
+/* Small text was the main reason the screens felt faded */
+.portal-root .pa-skin [class*="text-[10px]"]:not(.fixed *) { font-size: 11.5px; }
+.portal-root .pa-skin [class*="text-[11px]"]:not(.fixed *) { font-size: 12px; }
+.portal-root .pa-skin .uppercase:not(.fixed *) { text-transform: none; letter-spacing: 0; }
+.portal-root .pa-skin label:not(.fixed *) { font-weight: 700; }
+
+/* Tables: rules and alignment, a strong header edge, a clear row accent */
+.portal-root .pa-skin table:not(.fixed *) { border-collapse: separate; border-spacing: 0; }
+.portal-root .pa-skin table:not(.fixed *) thead tr { background: transparent !important; }
+.portal-root .pa-skin table:not(.fixed *) thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--p-surface-container-lowest);
+  text-transform: none !important; letter-spacing: 0 !important;
+  font-size: 12.5px !important; font-weight: 700 !important;
+  color: var(--p-on-surface-variant);
+  padding-top: 13px !important; padding-bottom: 13px !important;
+  border-bottom: 2px solid var(--p-primary-fixed-dim);
+}
+.portal-root .pa-skin table:not(.fixed *) tbody td { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.portal-root .pa-skin table:not(.fixed *) tbody tr {
+  transition: background-color .16s var(--pa-ease), box-shadow .16s var(--pa-ease);
+  animation: pa-fade .38s var(--pa-ease) backwards; /* opacity only: rows can contain fixed menus */
+}
+.portal-root .pa-skin table:not(.fixed *) tbody tr:hover { background: var(--pa-teal-06) !important; box-shadow: inset 3px 0 0 var(--p-primary); }
+.portal-root .pa-skin table:not(.fixed *) tbody tr:nth-child(1)  { animation-delay: 0ms; }
+.portal-root .pa-skin table:not(.fixed *) tbody tr:nth-child(2)  { animation-delay: 30ms; }
+.portal-root .pa-skin table:not(.fixed *) tbody tr:nth-child(3)  { animation-delay: 60ms; }
+.portal-root .pa-skin table:not(.fixed *) tbody tr:nth-child(4)  { animation-delay: 90ms; }
+.portal-root .pa-skin table:not(.fixed *) tbody tr:nth-child(5)  { animation-delay: 120ms; }
+.portal-root .pa-skin table:not(.fixed *) tbody tr:nth-child(6)  { animation-delay: 150ms; }
+.portal-root .pa-skin table:not(.fixed *) tbody tr:nth-child(7)  { animation-delay: 180ms; }
+.portal-root .pa-skin table:not(.fixed *) tbody tr:nth-child(8)  { animation-delay: 210ms; }
+.portal-root .pa-skin table:not(.fixed *) tbody tr:nth-child(n+9) { animation-delay: 240ms; }
+
+/* Inputs and buttons: instant press feedback, clear focus */
+.portal-root .pa-skin input,
+.portal-root .pa-skin select,
+.portal-root .pa-skin textarea {
+  transition: box-shadow .16s var(--pa-ease), border-color .16s var(--pa-ease), background-color .16s var(--pa-ease);
+}
+.portal-root .pa-skin input:focus,
+.portal-root .pa-skin select:focus,
+.portal-root .pa-skin textarea:focus {
+  outline: none;
+  border-color: var(--p-primary) !important;
+  box-shadow: 0 0 0 4px var(--pa-teal-16);
+}
+.portal-root .pa-skin button {
+  transition: transform .12s ease-out, filter .16s, box-shadow .2s var(--pa-ease), background-color .16s, border-color .16s, color .16s;
+}
+.portal-root .pa-skin button:active:not(:disabled) { transform: scale(.97); }
+.portal-root .pa-skin button[style*="background: var(--p-primary)"]:not(:disabled),
+.portal-root .pa-skin button[style*="background: rgb(0, 103, 106)"]:not(:disabled) {
+  box-shadow: 0 8px 16px -10px rgba(0, 103, 106, .85);
+}
+.portal-root .pa-skin button[style*="background: var(--p-primary)"]:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 20px -10px rgba(0, 103, 106, .9);
+}
+
+/* Empty / loading states keep their frame but breathe */
+.portal-root .pa-skin .border-dashed { transition: border-color .2s var(--pa-ease), background-color .2s var(--pa-ease); }
+.portal-root .pa-skin .border-dashed:hover { border-color: var(--p-primary); background-color: var(--pa-teal-06); }
+
+/* ======================================================================== */
+/* Stat tiles (StatTile component)                                           */
+/* ======================================================================== */
+
+.portal-root .pa-stat {
+  --stat: var(--p-primary);
+  position: relative; overflow: hidden; text-align: left;
+  display: block; width: 100%;
+  padding: 18px 18px 16px;
+  border: 1px solid var(--p-outline-variant);
+  border-radius: 16px;
+  background: var(--p-surface-container-lowest);
+  box-shadow: var(--pa-shadow-rest);
+  transition: transform .24s var(--pa-ease), box-shadow .24s var(--pa-ease), border-color .24s var(--pa-ease);
+  animation: pa-rise .45s var(--pa-ease) backwards;
+}
+.portal-root .pa-stat::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px;
+  background: var(--stat); transform-origin: left; animation: pa-grow .7s var(--pa-ease) .1s backwards;
+}
+.portal-root .pa-stat:nth-child(2) { animation-delay: 60ms; }
+.portal-root .pa-stat:nth-child(3) { animation-delay: 120ms; }
+.portal-root .pa-stat:nth-child(4) { animation-delay: 180ms; }
+.portal-root .pa-stat:nth-child(5) { animation-delay: 240ms; }
+.portal-root button.pa-stat { cursor: pointer; }
+.portal-root button.pa-stat:hover { transform: translateY(-3px); box-shadow: var(--pa-shadow-lift); border-color: var(--stat); }
+.portal-root button.pa-stat:active { transform: scale(.985); }
+.portal-root .pa-stat-label { font-size: 13px; font-weight: 600; color: var(--p-on-surface-variant); }
+.portal-root .pa-stat-value {
+  margin-top: 10px;
+  font-size: 32px; font-weight: 700; line-height: 1; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-on-surface);
+}
+.portal-root .pa-stat-value { white-space: nowrap; }
+.portal-root .pa-stat-value.is-long { font-size: 26px; }
+.portal-root .pa-stat.has-tone .pa-stat-value { color: var(--stat); }
+.portal-root .msym.pa-stat-ghost {
+  position: absolute; right: -8px; bottom: -14px;
+  font-size: 84px; color: var(--stat); opacity: .08;
+  pointer-events: none; transition: transform .4s var(--pa-ease), opacity .3s;
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 48;
+}
+.portal-root button.pa-stat:hover .pa-stat-ghost { transform: rotate(-8deg) scale(1.1); opacity: .13; }
+
+/* ======================================================================== */
+/* Dashboard + inquiries building blocks                                     */
+/* ======================================================================== */
+
+.portal-root .pa-card {
+  background: var(--p-surface-container-lowest);
+  border: 1px solid var(--p-outline-variant);
+  border-radius: 18px;
+  box-shadow: var(--pa-shadow-rest);
+}
+.portal-root .pa-card-title { font-family: 'Inter', system-ui, sans-serif; font-style: normal; font-size: 16px; line-height: 1.3; font-weight: 700; color: var(--p-on-surface); }
+.portal-root .pa-card-sub { font-size: 13px; color: var(--p-on-surface-variant); margin-top: 2px; }
+
+.portal-root .pa-row {
+  position: relative;
+  transition: background-color .16s var(--pa-ease), box-shadow .16s var(--pa-ease);
+}
+.portal-root .pa-row:hover { background: var(--pa-teal-06); box-shadow: inset 3px 0 0 var(--p-primary); }
+.portal-root .pa-row:active { background: var(--pa-teal-10); }
+.portal-root .pa-row .pa-chev { transition: transform .2s var(--pa-ease), opacity .2s; opacity: .45; }
+.portal-root .pa-row:hover .pa-chev { transform: translateX(4px); opacity: 1; color: var(--p-primary); }
+
+.portal-root .pa-bar { height: 10px; border-radius: 999px; background: var(--p-surface-container-high); overflow: hidden; }
+.portal-root .pa-bar > i {
+  display: block; height: 100%; border-radius: 999px; background: var(--p-primary);
+  transform-origin: left; animation: pa-grow .9s var(--pa-ease) backwards;
+}
+
+.portal-root .pa-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 700;
+  background: var(--pa-teal-10); color: var(--p-primary);
+}
+.portal-root .pa-new-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--p-primary); animation: pa-pulse-ring 1.8s ease-out infinite; }
+
+.portal-root .pa-seg {
+  position: relative; display: inline-flex; padding: 4px; gap: 2px;
+  border-radius: 14px; background: var(--p-surface-container);
+}
+.portal-root .pa-seg button {
+  position: relative; z-index: 1;
+  padding: 7px 16px; border-radius: 10px;
+  font-size: 13.5px; font-weight: 600; color: var(--p-on-surface-variant);
+  transition: color .16s var(--pa-ease), transform .12s ease-out;
+}
+.portal-root .pa-seg button:hover { color: var(--p-on-surface); }
+.portal-root .pa-seg button:active { transform: scale(.96); }
+.portal-root .pa-seg button.on { color: var(--p-primary); font-weight: 700; }
+
+.portal-root .pa-avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 40px; height: 40px; border-radius: 999px;
+  background: var(--p-primary-fixed); color: var(--p-primary);
+  font-size: 14px; font-weight: 700; text-transform: uppercase;
+}
+
+/* ======================================================================== */
+/* Layout kit: StatStrip, ListToolbar, LedgerList                            */
+/* ======================================================================== */
+
+.portal-root .pa-strip {
+  display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr));
+  background: var(--p-surface-container-lowest, #fff); border: 1px solid var(--p-outline-variant);
+  border-radius: 14px; box-shadow: var(--pa-shadow-rest); margin-bottom: 14px; overflow: hidden;
+}
+.portal-root .pa-strip-cell {
+  display: flex; flex-direction: column; gap: 2px; padding: 12px 18px; text-align: left;
+  border: 0; background: transparent; position: relative; min-width: 0;
+  transition: background .18s var(--pa-ease);
+}
+.portal-root .pa-strip-cell + .pa-strip-cell { border-left: 1px solid var(--p-outline-variant); }
+.portal-root button.pa-strip-cell { cursor: pointer; }
+.portal-root button.pa-strip-cell:hover { background: var(--pa-teal-06); }
+.portal-root button.pa-strip-cell:active { transform: scale(.99); }
+.portal-root .pa-strip-cell.is-active::after {
+  content: ""; position: absolute; left: 20px; right: 20px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--p-primary);
+}
+.portal-root .pa-strip-label { font-size: 12px; font-weight: 600; color: var(--p-on-surface-variant); }
+.portal-root .pa-strip-value {
+  font-family: 'Inter', system-ui, sans-serif; letter-spacing: -.02em; font-size: 28px; line-height: 1.15; font-weight: 700;
+  color: var(--p-on-surface); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.portal-root .pa-strip-cell.tone-good .pa-strip-value { color: #15803d; }
+.portal-root .pa-strip-cell.tone-warn .pa-strip-value { color: #b45309; }
+.portal-root .pa-strip-cell.tone-bad .pa-strip-value { color: #b91c1c; }
+.portal-root .pa-strip-hint { font-size: 12px; color: var(--p-on-surface-variant); }
+@media (max-width: 720px) {
+  .portal-root .pa-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .portal-root .pa-strip-cell:nth-child(odd) { border-left: 0; }
+  .portal-root .pa-strip-cell:nth-child(n+3) { border-top: 1px solid var(--p-outline-variant); }
+}
+
+.portal-root .pa-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.portal-root .pa-toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.portal-root .pa-seg-count {
+  margin-left: 6px; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+  background: var(--p-surface-container); color: var(--p-on-surface-variant); font-variant-numeric: tabular-nums;
+}
+.portal-root .pa-seg button.on .pa-seg-count { background: var(--p-primary); color: #fff; }
+.portal-root .pa-searchbox {
+  display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; min-width: 240px;
+  background: var(--p-surface-container-lowest, #fff); border: 1px solid var(--p-outline-variant); border-radius: 999px;
+  color: var(--p-on-surface-variant); transition: border-color .18s, box-shadow .18s;
+}
+.portal-root .pa-searchbox:focus-within { border-color: var(--p-primary); box-shadow: 0 0 0 3px var(--pa-teal-16); }
+.portal-root .pa-searchbox input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14px; color: var(--p-on-surface); }
+.portal-root .pa-searchbox button { display: inline-flex; border: 0; background: transparent; color: inherit; cursor: pointer; }
+
+.portal-root .pa-ledger section + section { margin-top: 20px; }
+.portal-root .pa-ledger-head {
+  display: flex; justify-content: space-between; align-items: baseline; padding: 0 4px 8px;
+  font-size: 12px; font-weight: 700; color: var(--p-on-surface-variant); letter-spacing: .02em;
+}
+.portal-root .pa-ledger-count { font-weight: 500; font-variant-numeric: tabular-nums; }
+.portal-root .pa-ledger-rows {
+  background: var(--p-surface-container-lowest, #fff); border: 1px solid var(--p-outline-variant);
+  border-radius: 16px; box-shadow: var(--pa-shadow-rest);
+}
+.portal-root .pa-li:first-child { border-radius: 15px 15px 0 0; }
+.portal-root .pa-li:last-child { border-radius: 0 0 15px 15px; }
+.portal-root .pa-li:only-child { border-radius: 15px; }
+.portal-root .is-grid .pa-li, .portal-root .is-grid .pa-li:first-child, .portal-root .is-grid .pa-li:last-child { border-radius: 14px; }
+.portal-root .pa-li {
+  position: relative; display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 58px;
+  transition: background .16s var(--pa-ease);
+  animation: pa-fade .35s var(--pa-ease) backwards; animation-delay: calc(var(--i, 0) * 25ms);
+}
+.portal-root .pa-li + .pa-li { border-top: 1px solid var(--p-outline-variant); }
+.portal-root .pa-li.is-click { cursor: pointer; }
+.portal-root .pa-li:hover, .portal-root .pa-li:focus-within { background: var(--pa-teal-06); }
+.portal-root .pa-li.is-click:active { background: var(--pa-teal-10); }
+.portal-root .pa-li::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: transparent; }
+.portal-root .pa-li.accent-good::before { background: #16a34a; }
+.portal-root .pa-li.accent-warn::before { background: #d97706; }
+.portal-root .pa-li.accent-bad::before { background: #dc2626; }
+.portal-root .pa-li-lead { flex: none; }
+.portal-root .pa-li-main { flex: 1; min-width: 0; }
+.portal-root .pa-li-title { font-size: 15px; font-weight: 600; color: var(--p-on-surface); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.portal-root .pa-li-sub { font-size: 13px; color: var(--p-on-surface-variant); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+.portal-root .pa-li-amount { flex: none; text-align: right; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 96px; }
+.portal-root .pa-li-amount .pa-li-sub { font-weight: 400; }
+.portal-root .pa-li-status { flex: none; min-width: 96px; display: flex; justify-content: flex-end; }
+.portal-root .pa-li-actions { flex: none; display: flex; align-items: center; gap: 6px; }
+.portal-root .pa-li-more { display: inline-flex; gap: 6px; opacity: 0; transform: translateX(4px); transition: opacity .16s, transform .16s var(--pa-ease); }
+.portal-root .pa-li:hover .pa-li-more, .portal-root .pa-li:focus-within .pa-li-more { opacity: 1; transform: none; }
+@media (hover: none) { .portal-root .pa-li-more { opacity: 1; transform: none; } }
+@media (max-width: 760px) {
+  .portal-root .pa-li { flex-wrap: wrap; }
+  .portal-root .pa-li-main { flex-basis: calc(100% - 60px); }
+  .portal-root .pa-li-amount, .portal-root .pa-li-status { min-width: 0; }
+  .portal-root .pa-li-primary { margin-left: auto; }
+}
+
+.portal-root .pa-setnav {
+  display: flex; flex-direction: column; gap: 2px; text-align: left; flex: none; padding: 10px 14px; border-radius: 12px;
+  border: 0; background: transparent; cursor: pointer; transition: background .16s var(--pa-ease), transform .12s;
+}
+.portal-root .pa-setnav:hover { background: var(--pa-teal-06); }
+.portal-root .pa-setnav:active { transform: scale(.98); }
+.portal-root .pa-setnav.on { background: var(--pa-teal-10); }
+.portal-root .pa-setnav-title { font-size: 14px; font-weight: 600; color: var(--p-on-surface); }
+.portal-root .pa-setnav.on .pa-setnav-title { color: var(--p-primary); font-weight: 700; }
+.portal-root .pa-setnav-hint { font-size: 12px; color: var(--p-on-surface-variant); white-space: nowrap; }
+.portal-root .pa-field {
+  width: 100%; padding: 9px 12px; border-radius: 10px; font-size: 14px; outline: none; background: var(--p-surface-container-lowest, #fff);
+  border: 1px solid var(--p-outline-variant); transition: border-color .16s, box-shadow .16s;
+}
+.portal-root .pa-field[readonly] { background: var(--p-surface-container-low); }
+.portal-root .pa-field:focus { border-color: var(--p-primary); box-shadow: 0 0 0 3px var(--pa-teal-16); }
+
+.portal-root .pa-ledger section + section { margin-top: 14px; }
+.portal-root .pa-viewtoggle button { padding: 6px 9px; }
+.portal-root .pa-ledger-rows.is-grid { display: grid; gap: 12px; background: transparent; border: 0; box-shadow: none; overflow: visible; border-radius: 0; }
+.portal-root .pa-ledger-rows.is-grid.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.portal-root .pa-ledger-rows.is-grid.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.portal-root .is-grid .pa-li {
+  flex-wrap: wrap; align-items: flex-start; align-content: flex-start; gap: 10px 12px; padding: 14px 16px; min-height: 0;
+  background: var(--p-surface-container-lowest, #fff); border: 1px solid var(--p-outline-variant); border-radius: 14px; box-shadow: var(--pa-shadow-rest);
+  transition: transform .18s var(--pa-ease), box-shadow .18s var(--pa-ease), background .16s;
+}
+.portal-root .is-grid .pa-li + .pa-li { border-top: 1px solid var(--p-outline-variant); }
+.portal-root .is-grid .pa-li:hover { box-shadow: var(--pa-shadow-lift); }
+.portal-root .is-grid .pa-li::before { top: 12px; bottom: 12px; }
+.portal-root .is-grid .pa-li-main { flex-basis: calc(100% - 56px); }
+.portal-root .is-grid .pa-li-amount, .portal-root .is-grid .pa-li-status { min-width: 0; text-align: left; justify-content: flex-start; }
+.portal-root .is-grid .pa-li-primary, .portal-root .is-grid .pa-li-more { order: 5; }
+.portal-root .is-grid .pa-li-primary { margin-left: auto; padding-top: 10px; }
+.portal-root .is-grid .pa-li-more { padding-top: 10px; }
+@media (max-width: 1100px) { .portal-root .pa-ledger-rows.is-grid.grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .portal-root .pa-ledger-rows.is-grid { grid-template-columns: minmax(0, 1fr) !important; } }
+
+/* Inquiry detail: the stage block's status dropdown gets real padding and room from the border */
+.portal-root .pa-stage select {
+  height: 38px; padding: 0 34px 0 14px; border-radius: 10px; font-size: 14px; cursor: pointer;
+  border: 1px solid var(--p-outline-variant); background-color: var(--p-surface-container-lowest, #fff);
+  transition: border-color .16s, box-shadow .16s;
+}
+.portal-root .pa-stage select:focus { border-color: var(--p-primary); box-shadow: 0 0 0 3px var(--pa-teal-16); outline: none; }
+.portal-root .pa-stage > div > div:last-child, .portal-root .pa-stage > div > p:last-child { margin-top: 6px; }
+.portal-root .pa-kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 32px; }
+.portal-root .pa-kv > div { padding: 10px 0; border-top: 1px solid var(--p-outline-variant); min-width: 0; }
+.portal-root .pa-kv-k { font-size: 12px; font-weight: 600; color: var(--p-on-surface-variant); line-height: 1.3; }
+.portal-root .pa-kv-v { font-size: 14px; line-height: 1.4; margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .portal-root .pa-kv { grid-template-columns: minmax(0, 1fr); } }
+
+/* Faint background icon on any card that sets data-ghost="<material symbol>". Sits behind the content, inside the card. */
+.portal-root .pa-card[data-ghost] { position: relative; isolation: isolate; }
+.portal-root .pa-card[data-ghost]::after {
+  content: attr(data-ghost);
+  position: absolute; right: 14px; bottom: 10px; z-index: -1; pointer-events: none;
+  font-family: 'Material Symbols Outlined'; font-weight: 400; font-style: normal; line-height: 1; letter-spacing: normal;
+  text-transform: none; white-space: nowrap; word-wrap: normal; -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga';
+  font-size: 110px; color: var(--p-primary); opacity: .07;
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 48;
+  transition: transform .45s var(--pa-ease), opacity .3s;
+}
+.portal-root .pa-card[data-ghost]:hover::after { transform: rotate(-6deg) scale(1.06); opacity: .1; }
+
+.portal-root .pa-li.has-expand { flex-wrap: wrap; }
+.portal-root .pa-li-expand { flex: 0 0 100%; margin: 4px -16px -10px; padding: 12px 16px; background: var(--p-surface-container-low); border-top: 1px solid var(--p-outline-variant); cursor: default; }
+
+/* Fixed columns (list layout): every row lines up, long names get an ellipsis, nothing resizes with its content. */
+.portal-root .pa-ledger-rows:not(.is-grid) .pa-li-amount { flex: 0 0 var(--amt-w, 150px); width: var(--amt-w, 150px); min-width: var(--amt-w, 150px); }
+.portal-root .pa-ledger-rows:not(.is-grid) .pa-li-amount > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.portal-root .pa-ledger-rows:not(.is-grid) .pa-li-status { flex: 0 0 var(--sts-w, 96px); width: var(--sts-w, 96px); min-width: var(--sts-w, 96px); justify-content: flex-start; }
+.portal-root .pa-ledger-rows:not(.is-grid) .pa-li-actions { flex: 0 0 auto; gap: 8px; }
+.portal-root .pa-li-primary { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; min-width: var(--act-w, 112px); justify-content: flex-end; }
+.portal-root .pa-li-primary > button, .portal-root .pa-li-primary > a { min-width: min(104px, var(--act-w, 104px)); justify-content: center; text-align: center; white-space: nowrap; }
+.portal-root .pa-ledger-rows:not(.is-grid) .pa-li-more { flex: 0 0 var(--more-w, 0px); width: var(--more-w, 0px); display: inline-flex; gap: 8px; justify-content: flex-end; }
+.portal-root .pa-li-more > * { white-space: nowrap; }
+.portal-root .pa-li-title > span.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.portal-root .pa-li-lead { width: 40px; display: flex; justify-content: center; }
+@media (max-width: 1000px) {
+  .portal-root .pa-ledger-rows:not(.is-grid) .pa-li-more { flex-basis: auto; width: auto; opacity: 1; transform: none; }
+  .portal-root .pa-ledger-rows:not(.is-grid) .pa-li-amount { flex-basis: 110px; width: 110px; min-width: 110px; }
+}
+.portal-root .is-grid .pa-li-more { width: auto; }
+
+/* ======================================================================== */
+/* Reduced motion                                                            */
+/* ======================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-root .pa-skin *,
+  .portal-root .pa-stat,
+  .portal-root .pa-stat::before,
+  .portal-root .pa-title,
+  .portal-root .pa-subtitle,
+  .portal-root .pa-titlebar,
+  .portal-root .pa-bar > i,
+  .portal-root .pa-nav-dot,
+  .portal-root .pa-new-dot {
+    animation: none !important;
+    transition: none !important;
+  }
+}

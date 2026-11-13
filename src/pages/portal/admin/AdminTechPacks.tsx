@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import AdminShell, { AdminBtn } from '@/components/portal/AdminShell';
 import { Sym } from '@/components/portal/Sym';
 import StatTile from '@/components/portal/StatTile';
+import ListToolbar, { ViewToggle, useListView } from '@/components/portal/ListToolbar';
 import { techPackApi, projectApi, type ManufacturingProjectDto } from '@/lib/api';
 import { formatInquiryDate } from '@/components/inquiry/inquiryUtils';
 import { openTechPackBuilder } from '@/lib/techPackBuilder';
@@ -25,6 +26,7 @@ export default function PortalAdminTechPacks() {
   const canDelete = hasAny(P.PORTAL_TECHPACKS_DELETE);
   const qc = useQueryClient();
   const [tab, setTab] = useState<'saved' | 'templates'>('saved');
+  const [view, setView] = useListView('tech-packs', 'grid-3');
   const [renaming, setRenaming] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [linkingId, setLinkingId] = useState<string | null>(null);
@@ -156,37 +158,25 @@ export default function PortalAdminTechPacks() {
         </div>
       }
     >
-      <div className="p-5 sm:p-8">
-        <div className="grid grid-cols-2 gap-4 mb-6 max-w-sm">
+      <div className="p-4 sm:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 max-w-2xl">
           <StatTile label="Saved documents" value={savedItems.length} icon="description" color="var(--p-primary)" />
           <StatTile label="Templates" value={templateItems.length} icon="bookmark" color="#b45309" />
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <div className="flex items-center bg-black/[0.04] rounded-lg p-1 w-fit">
-            {(['saved', 'templates'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-colors ${tab === t ? 'bg-white shadow-sm' : ''}`}
-                style={{ color: tab === t ? 'var(--p-primary)' : 'var(--p-on-surface-variant)' }}
-              >
-                {t === 'saved' ? 'Saved' : 'Templates'}
-              </button>
-            ))}
-          </div>
-
-          <div className="relative">
-            <Sym name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name…"
-              className="pl-8 pr-3 py-1.5 rounded-lg text-[13px] w-64 sm:w-72 outline-none border"
-              style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
-            />
-          </div>
-        </div>
+        <ListToolbar
+          tabs={[
+            { key: 'saved', label: 'Saved', count: savedItems.length },
+            { key: 'templates', label: 'Templates', count: templateItems.length },
+          ]}
+          tab={tab}
+          onTab={(k) => setTab(k as 'saved' | 'templates')}
+          search={query}
+          onSearch={setQuery}
+          placeholder="Search by name…"
+        >
+          <ViewToggle view={view} onChange={setView} />
+        </ListToolbar>
 
         {isLoading ? (
           <div className="flex justify-center py-24">
@@ -206,7 +196,7 @@ export default function PortalAdminTechPacks() {
           </div>
         ) : (
           <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className={`grid grid-cols-1 gap-4 ${view === 'grid-2' ? 'sm:grid-cols-2' : view === 'grid-3' ? 'sm:grid-cols-2 lg:grid-cols-3' : ''}`}>
             {shown.map((it) => (
               <div
                 key={it.id}

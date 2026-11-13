@@ -1,9 +1,10 @@
+import AnimatedNumber from './AnimatedNumber';
 import { Sym } from './Sym';
 
 /**
- * Shared metric card used across admin list pages (Invoices, Payment Links,
- * Payment History, Tech Packs, Dashboard) — icon chip + value + label, the
- * consistent "at a glance" summary row every CRM-style page opens with.
+ * Shared metric tile used across the admin list pages (Invoices, Payment Links, Payment History, Tech Packs,
+ * Quotations): a coloured top edge, the label, a counting-up value and a faint icon in the background.
+ * Styles live in portal-admin-skin.css (.pa-stat).
  */
 export default function StatTile({
   label,
@@ -19,22 +20,17 @@ export default function StatTile({
   onClick?: () => void;
 }) {
   const Comp = onClick ? 'button' : 'div';
+  const toned = color !== 'var(--p-primary)';
   return (
     <Comp
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`text-left border rounded-2xl p-4 ${onClick ? 'transition-shadow hover:shadow-md' : ''}`}
-      style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}
+      className={`pa-stat ${toned ? 'has-tone' : ''}`}
+      style={{ ['--stat' as string]: color } as React.CSSProperties}
     >
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>{label}</p>
-        {icon && (
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${color}17`, color }}>
-            <Sym name={icon} className="text-[15px]" />
-          </div>
-        )}
-      </div>
-      <p className="font-bold text-[24px] leading-none" style={{ color: color !== 'var(--p-primary)' ? color : undefined }}>{value}</p>
+      {icon && <Sym name={icon} className="pa-stat-ghost" />}
+      <p className="pa-stat-label">{label}</p>
+      <p className={`pa-stat-value ${String(value).length > 9 ? 'is-long' : ''}`}><AnimatedNumber value={value} /></p>
     </Comp>
   );
 }

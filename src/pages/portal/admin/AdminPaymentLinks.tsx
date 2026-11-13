@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import AdminShell, { AdminBtn } from '@/components/portal/AdminShell';
 import { Sym } from '@/components/portal/Sym';
 import StatTile from '@/components/portal/StatTile';
+import ListToolbar, { ViewToggle, useListView } from '@/components/portal/ListToolbar';
+import LedgerList, { LedgerSkeleton } from '@/components/portal/LedgerList';
 import {
   manufacturingApi, paymentLinkApi, projectApi,
   type PaymentLinkDto, type PaymentLinkMode, type PaymentLinkPaymentDto, type PaymentLinkItem,
@@ -56,6 +58,7 @@ export default function PortalAdminPaymentLinks() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'' | 'active' | 'revoked'>('');
   const [page, setPage] = useState(0);
+  const [view, setView] = useListView('payment-links');
   const markRead = useMarkNavRead('payment_links');
 
   useEffect(() => { markRead(); }, []);
@@ -97,47 +100,33 @@ export default function PortalAdminPaymentLinks() {
 
   return (
     <AdminShell title="Payment Links" actions={canCreate ? <AdminBtn icon="add" onClick={() => setOpen(true)}>New link</AdminBtn> : undefined}>
-      <div className="p-5 sm:p-8">
+      <div className="p-4 sm:p-6">
         {!isLoading && links.length > 0 && (
-          <div className="grid grid-cols-2 gap-4 mb-6 max-w-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 max-w-2xl">
             <StatTile label="Total links" value={stats.total} icon="link" color="var(--p-primary)" />
             <StatTile label="Active" value={stats.active} icon="check_circle" color="#15803d" />
           </div>
         )}
 
         {!isLoading && links.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 mb-5">
-            <div className="relative">
-              <Sym name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search title, code, quote, client…"
-                className="pl-8 pr-3 py-1.5 rounded-lg text-[13px] w-64 sm:w-72 outline-none border"
-                style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
-              />
-            </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as '' | 'active' | 'revoked')}
-              aria-label="Filter by status"
-              className="px-3 py-1.5 rounded-lg text-[13px] outline-none border"
-              style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface)' }}
-            >
-              <option value="">All links</option>
-              <option value="active">Active only</option>
-              <option value="revoked">Revoked only</option>
-            </select>
-            {(query || statusFilter) && (
-              <button type="button" onClick={() => { setQuery(''); setStatusFilter(''); }} className="text-[12px] font-bold underline" style={{ color: 'var(--p-primary)' }}>Clear</button>
-            )}
-          </div>
+          <ListToolbar
+            tabs={[
+              { key: '', label: 'All', count: links.length },
+              { key: 'active', label: 'Active', count: stats.active },
+              { key: 'revoked', label: 'Revoked', count: links.length - stats.active },
+            ]}
+            tab={statusFilter}
+            onTab={(k) => setStatusFilter(k as '' | 'active' | 'revoked')}
+            search={query}
+            onSearch={setQuery}
+            placeholder="Title, code, quote, client…"
+          >
+            <ViewToggle view={view} onChange={setView} />
+          </ListToolbar>
         )}
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-20" style={{ color: 'var(--p-on-surface-variant)' }}>
-            <Sym name="progress_activity" className="text-[28px] animate-spin" />
-          </div>
+          <LedgerSkeleton />
         ) : links.length === 0 ? (
           <div className="text-center py-20" style={{ color: 'var(--p-on-surface-variant)' }}>
             <Sym name="link" className="text-[40px] mb-2 opacity-40" />
@@ -150,62 +139,60 @@ export default function PortalAdminPaymentLinks() {
           </div>
         ) : (
           <>
-          <div className="border rounded-2xl overflow-x-auto" style={{ borderColor: 'var(--p-outline-variant)' }}>
-            <table className="w-full text-left">
-              <thead>
-                <tr style={{ background: 'var(--p-surface-container-low)' }}>
-                  {['Title', 'Mode', 'Amount', 'Link', 'Status', ''].map((h) => (
-                    <th key={h} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paged.map((l, i) => (
-                  <React.Fragment key={l.id}>
-                  <tr style={{ borderTop: i ? '1px solid var(--p-outline-variant)' : undefined }}>
-                    <td className="px-4 py-3 text-[13px] font-semibold">{l.title || '—'}{l.quoteReference ? <span className="text-[11px] font-normal text-[color:var(--p-on-surface-variant)]"> · {l.quoteReference}</span> : null}</td>
-                    <td className="px-4 py-3 text-[12px]">{MODE_LABEL[l.mode] || l.mode}</td>
-                    <td className="px-4 py-3 text-[13px] font-medium">{l.mode === 'OPEN' ? <span className="text-[color:var(--p-on-surface-variant)]">any</span> : money(l.amount, l.currency)}</td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => copy(l.code)} className="text-[12px] font-mono px-2 py-1 rounded border hover:bg-black/[0.03] flex items-center gap-1.5" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-primary)' }}>
-                        <Sym name="content_copy" className="text-[14px]" /> /pay/{l.code}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-[12px] font-semibold flex items-center gap-1" style={{ color: l.active ? '#2e7d32' : '#9e9e9e' }}>
-                        <span>{l.active ? '●' : '○'}</span> {l.active ? 'Active' : 'Revoked'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <a href={payUrl(l.code)} target="_blank" rel="noreferrer" className="text-[13px] font-bold mr-3" style={{ color: 'var(--p-primary)' }}>Open</a>
-                      <button
-                        onClick={() => setHistoryForId(historyForId === l.id ? null : l.id)}
-                        className="text-[13px] font-bold mr-3"
-                        style={{ color: 'var(--p-on-surface-variant)' }}
-                      >
-                        {historyForId === l.id ? 'Hide history' : 'Show history for this'}
-                      </button>
-                      {canToggle && (
-                        <button
-                          onClick={() => {
-                            if (l.active && !window.confirm(`Revoke this payment link? "${payUrl(l.code)}" will stop working immediately — this does not affect any payment already made.`)) return;
-                            activeMut.mutate({ id: l.id, active: !l.active });
-                          }}
-                          disabled={activeMut.isPending}
-                          className="text-[13px] font-bold disabled:opacity-50"
-                          style={{ color: l.active ? '#b42318' : 'var(--p-primary)' }}
-                        >
-                          {l.active ? 'Revoke' : 'Reactivate'}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                  {historyForId === l.id && <LinkHistoryRow linkId={l.id} />}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <LedgerList
+            layout={view}
+            moreWidth={290}
+            rows={paged.map((l) => ({
+              key: l.id,
+              date: l.createdAt,
+              accent: l.active ? ('good' as const) : null,
+              lead: (
+                <span className="pa-avatar" style={{ background: l.active ? 'var(--p-primary-fixed)' : 'var(--p-surface-container)' }}>
+                  <Sym name="link" className="text-[20px]" />
+                </span>
+              ),
+              title: <span className="truncate">{l.title || 'Untitled link'}</span>,
+              sub: [MODE_LABEL[l.mode] || l.mode, l.quoteReference, l.clientName].filter(Boolean).join(' · '),
+              amount: l.mode === 'OPEN' ? <span style={{ color: 'var(--p-on-surface-variant)', fontWeight: 500 }}>Any amount</span> : money(l.amount, l.currency),
+              amountSub: <button onClick={(e) => { e.stopPropagation(); copy(l.code); }} className="font-mono hover:underline" style={{ color: 'var(--p-primary)' }} title="Copy link">/pay/{l.code}</button>,
+              status: (
+                <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full" style={{ background: l.active ? '#2e7d3220' : '#9e9e9e25', color: l.active ? '#2e7d32' : '#757575' }}>
+                  {l.active ? 'Active' : 'Revoked'}
+                </span>
+              ),
+              actions: (
+                <button onClick={() => copy(l.code)} className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border inline-flex items-center gap-1.5" style={{ borderColor: 'var(--p-outline)', color: 'var(--p-primary)' }}>
+                  <Sym name="content_copy" className="text-[15px]" /> Copy
+                </button>
+              ),
+              more: (
+                <>
+                  <a href={payUrl(l.code)} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border" style={{ borderColor: 'var(--p-outline)', color: 'var(--p-on-surface)' }}>Open</a>
+                  <button
+                    onClick={() => setHistoryForId(historyForId === l.id ? null : l.id)}
+                    className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border"
+                    style={{ borderColor: 'var(--p-outline)', color: 'var(--p-on-surface)' }}
+                  >
+                    {historyForId === l.id ? 'Hide' : 'History'}
+                  </button>
+                  {canToggle && (
+                    <button
+                      onClick={() => {
+                        if (l.active && !window.confirm(`Revoke this payment link? "${payUrl(l.code)}" will stop working immediately — this does not affect any payment already made.`)) return;
+                        activeMut.mutate({ id: l.id, active: !l.active });
+                      }}
+                      disabled={activeMut.isPending}
+                      className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border disabled:opacity-50"
+                      style={{ borderColor: 'var(--p-outline)', color: l.active ? '#b42318' : 'var(--p-primary)' }}
+                    >
+                      {l.active ? 'Revoke' : 'Reactivate'}
+                    </button>
+                  )}
+                </>
+              ),
+              expanded: historyForId === l.id ? <LinkHistoryPanel linkId={l.id} /> : undefined,
+            }))}
+          />
           {pageCount > 1 && (
             <div className="flex items-center justify-between mt-4">
               <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>
@@ -248,52 +235,30 @@ export default function PortalAdminPaymentLinks() {
  * even after a later attempt on the same link succeeds. The main row above only ever shows
  * the link's current active/paid state; this is where the failed attempts live.
  */
-function LinkHistoryRow({ linkId }: { linkId: number }) {
+function LinkHistoryPanel({ linkId }: { linkId: number }) {
   const { data: payments = [], isLoading } = useQuery({
     queryKey: ['payment-link-history', linkId],
     queryFn: () => paymentLinkApi.paymentsForLink(linkId),
   });
 
+  if (isLoading) return <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>Loading history…</p>;
+  if (payments.length === 0) return <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>No payment attempts recorded on this link yet.</p>;
   return (
-    <tr>
-      <td colSpan={6} className="px-4 py-3" style={{ background: 'var(--p-surface-container-low)' }}>
-        {isLoading ? (
-          <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>Loading history…</p>
-        ) : payments.length === 0 ? (
-          <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>No payment attempts recorded on this link yet.</p>
-        ) : (
-          <table className="w-full text-left">
-            <thead>
-              <tr>
-                {['Attempt', 'Amount', 'Status', 'Payer', 'Date'].map((h) => (
-                  <th key={h} className="pb-1.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {payments.map((p: PaymentLinkPaymentDto, idx) => {
-                const status = PAYMENT_STATUS_STYLE[p.status] ?? PAYMENT_STATUS_STYLE.PENDING;
-                return (
-                  <tr key={p.id} style={{ borderTop: idx ? '1px solid var(--p-outline-variant)' : undefined }}>
-                    <td className="py-1.5 text-[12px] font-mono">#{payments.length - idx}</td>
-                    <td className="py-1.5 text-[12px] font-medium">{money(p.amount, p.currency)}</td>
-                    <td className="py-1.5">
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: status.bg, color: status.color }}>
-                        {status.label}
-                      </span>
-                    </td>
-                    <td className="py-1.5 text-[12px]">{p.payerName || p.payerEmail || '—'}</td>
-                    <td className="py-1.5 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>
-                      {formatAttemptDate(p.paidAt || p.createdAt)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </td>
-    </tr>
+    <div>
+      <p className="text-[11px] font-bold mb-1.5" style={{ color: 'var(--p-on-surface-variant)' }}>Payment attempts</p>
+      {payments.map((p: PaymentLinkPaymentDto, idx) => {
+        const status = PAYMENT_STATUS_STYLE[p.status] ?? PAYMENT_STATUS_STYLE.PENDING;
+        return (
+          <div key={p.id} className="flex items-center gap-4 py-1.5 text-[13px]" style={{ borderTop: idx ? '1px solid var(--p-outline-variant)' : undefined }}>
+            <span className="font-mono text-[12px] w-8" style={{ color: 'var(--p-on-surface-variant)' }}>#{payments.length - idx}</span>
+            <span className="font-semibold w-28 tabular-nums">{money(p.amount, p.currency)}</span>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: status.bg, color: status.color }}>{status.label}</span>
+            <span className="flex-1 min-w-0 truncate">{p.payerName || p.payerEmail || '—'}</span>
+            <span className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{formatAttemptDate(p.paidAt || p.createdAt)}</span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

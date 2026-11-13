@@ -7,6 +7,7 @@ import { adminAuthApi, manufacturingApi, notificationSettingsApi, adminNotificat
 import { getAdminChatDisplayName } from '@/lib/adminAccess';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { P } from '@/lib/adminPermissionCodes';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const DEFAULT_SETTINGS: PortalAdminSettings = {
   projectCodePrefix: 'PRJ-',
@@ -29,20 +30,15 @@ const Toggle = ({ on, onClick, disabled }: { on: boolean; onClick: () => void; d
   </button>
 );
 
-/** A settings card — icon header + body. The consistent unit this whole page is built from. */
-function SettingsCard({ icon, title, description, children }: { icon: string; title: string; description?: string; children: React.ReactNode }) {
+/** One settings panel: a plain title + description, then rows. (icon kept in the signature for callers, not drawn) */
+function SettingsCard({ icon, title, description, children }: { icon?: string; title: string; description?: string; children: React.ReactNode }) {
   return (
-    <div className="border rounded-xl overflow-hidden flex flex-col" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}>
-      <div className="px-5 py-4 flex items-start gap-3 border-b" style={{ borderColor: 'var(--p-outline-variant)' }}>
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(0,103,106,0.1)', color: 'var(--p-primary)' }}>
-          <Sym name={icon} className="text-[18px]" />
-        </div>
-        <div className="min-w-0">
-          <h4 className="font-bold text-[14px]">{title}</h4>
-          {description && <p className="text-[12px] mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>{description}</p>}
-        </div>
+    <div className="pa-card pa-settings-panel" data-ghost={icon} style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="px-6 pt-5 pb-4 border-b" style={{ borderColor: 'var(--p-outline-variant)' }}>
+        <h4 className="font-display font-bold text-[20px]">{title}</h4>
+        {description && <p className="text-[13px] mt-1" style={{ color: 'var(--p-on-surface-variant)' }}>{description}</p>}
       </div>
-      <div className="flex-1">{children}</div>
+      <div>{children}</div>
     </div>
   );
 }
@@ -158,6 +154,26 @@ function AdminNotificationSettings({ canToggle }: { canToggle: boolean }) {
   );
 }
 
+const SECTIONS: { key: 'profile' | 'manufacturing' | 'team' | 'clients'; label: string; hint: string }[] = [
+  { key: 'profile', label: 'Your identity', hint: 'Name, email, WhatsApp' },
+  { key: 'manufacturing', label: 'Manufacturing', hint: 'Project codes, currency' },
+  { key: 'team', label: 'Team alerts', hint: 'What alerts staff' },
+  { key: 'clients', label: 'Client notifications', hint: 'What clients are told' },
+];
+
+/** Label + hint on the left, the control on the right: the same row shape for every setting. */
+function FieldRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-x-6 gap-y-2 items-center" style={{ borderTop: '1px solid var(--p-outline-variant)' }}>
+      <div className="min-w-0">
+        <p className="font-semibold text-[14px]">{label}</p>
+        {hint && <p className="text-[12px] mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>{hint}</p>}
+      </div>
+      <div className="sm:justify-self-end w-full sm:max-w-sm">{children}</div>
+    </div>
+  );
+}
+
 export default function PortalAdminSettings() {
   const { hasAny } = useAdminPermissions();
   const canUpdateSettings = hasAny(P.PORTAL_SETTINGS_UPDATE);
@@ -170,6 +186,7 @@ export default function PortalAdminSettings() {
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [whatsappSaving, setWhatsappSaving] = useState(false);
   const [settings, setSettings] = useState<PortalAdminSettings>(DEFAULT_SETTINGS);
+  const [section, setSection] = useState<'profile' | 'manufacturing' | 'team' | 'clients'>('profile');
 
   const { data: savedSettings, isLoading } = useQuery({
     queryKey: ['portal-admin-settings'],
@@ -246,104 +263,89 @@ export default function PortalAdminSettings() {
       }
     >
       <div className="p-5 sm:p-8 max-w-6xl">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-          <SettingsCard icon="badge" title="Your identity" description="This name appears when you reply in project chat. It comes from your admin account.">
-            <div className="p-5 space-y-3">
-              <div>
-                <label className="text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>Display name in chat</label>
-                <input
-                  value={identityName}
-                  readOnly
-                  className="w-full mt-1 px-3 py-2 rounded-lg border outline-none text-[14px]"
-                  style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-low)' }}
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>Email</label>
-                <input
-                  value={identityEmail}
-                  readOnly
-                  className="w-full mt-1 px-3 py-2 rounded-lg border outline-none text-[14px]"
-                  style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-low)' }}
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>WhatsApp number</label>
-                <p className="text-[11.5px] mb-1" style={{ color: 'var(--p-on-surface-variant)' }}>
-                  Where your admin notifications (new messages, requests to talk to a human) are sent.
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    type="tel"
-                    value={whatsappNumber}
-                    onChange={(e) => setWhatsappNumber(e.target.value)}
-                    placeholder="e.g. 9876543210"
-                    className="flex-1 mt-1 px-3 py-2 rounded-lg border outline-none text-[14px]"
-                    style={{ borderColor: 'var(--p-outline-variant)' }}
-                  />
-                  {canUpdateCompany && (
-                    <button
-                      type="button"
-                      onClick={() => void saveWhatsapp()}
-                      disabled={whatsappSaving}
-                      className="mt-1 px-3.5 rounded-lg text-[13px] font-semibold text-white disabled:opacity-60 shrink-0"
-                      style={{ background: 'var(--p-primary)' }}
+        <div className="grid grid-cols-1 md:grid-cols-[250px_minmax(0,1fr)] gap-6 items-start">
+          <nav className="md:sticky md:top-4 flex md:flex-col gap-1 overflow-x-auto" aria-label="Settings sections">
+            {SECTIONS.map((sec) => (
+              <button
+                key={sec.key}
+                type="button"
+                onClick={() => setSection(sec.key)}
+                className={`pa-setnav ${section === sec.key ? 'on' : ''}`}
+              >
+                <span className="pa-setnav-title">{sec.label}</span>
+                <span className="pa-setnav-hint">{sec.hint}</span>
+              </button>
+            ))}
+          </nav>
+
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={section}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+            >
+              {section === 'profile' && (
+                <SettingsCard icon="badge" title="Your identity" description="This name appears when you reply in project chat. It comes from your admin account.">
+                  <FieldRow label="Display name in chat" hint="Set by the primary admin under Store Admin → Admins.">
+                    <input value={identityName} readOnly className="pa-field" />
+                  </FieldRow>
+                  <FieldRow label="Email">
+                    <input value={identityEmail} readOnly className="pa-field" />
+                  </FieldRow>
+                  <FieldRow label="WhatsApp number" hint="Where your admin notifications (new messages, requests to talk to a human) are sent.">
+                    <div className="flex gap-2">
+                      <input type="tel" value={whatsappNumber} onChange={(e) => setWhatsappNumber(e.target.value)} placeholder="e.g. 9876543210" className="pa-field" />
+                      {canUpdateCompany && (
+                        <button
+                          type="button"
+                          onClick={() => void saveWhatsapp()}
+                          disabled={whatsappSaving}
+                          className="px-4 rounded-lg text-[13px] font-semibold text-white disabled:opacity-60 shrink-0"
+                          style={{ background: 'var(--p-primary)' }}
+                        >
+                          {whatsappSaving ? 'Saving…' : 'Save'}
+                        </button>
+                      )}
+                    </div>
+                  </FieldRow>
+                </SettingsCard>
+              )}
+
+              {section === 'manufacturing' && (
+                <SettingsCard icon="factory" title="Manufacturing" description="Defaults used when new projects are created. Use Save changes at the top right.">
+                  <FieldRow label="Project code prefix" hint="Shown at the start of every project code.">
+                    <input
+                      value={settings.projectCodePrefix}
+                      onChange={(e) => setSettings((s) => ({ ...s, projectCodePrefix: e.target.value }))}
+                      readOnly={!canUpdateSettings}
+                      className="pa-field"
+                    />
+                  </FieldRow>
+                  <FieldRow label="Default currency">
+                    <select
+                      value={settings.defaultCurrency}
+                      onChange={(e) => setSettings((s) => ({ ...s, defaultCurrency: e.target.value }))}
+                      disabled={!canUpdateSettings}
+                      className="pa-field"
                     >
-                      {whatsappSaving ? 'Saving…' : 'Save'}
-                    </button>
-                  )}
-                </div>
-              </div>
-              <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>
-                To change your display name, ask the primary admin to update your profile under Store Admin → Admins.
-              </p>
-            </div>
-          </SettingsCard>
+                      <option value="INR">INR (₹)</option>
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="GBP">GBP (£)</option>
+                    </select>
+                  </FieldRow>
+                  <FieldRow label="Auto-generate project codes" hint="Assign the next number when a project is created.">
+                    <Toggle on={settings.autoGenerateProjectCodes} disabled={!canUpdateSettings} onClick={() => setBool('autoGenerateProjectCodes')} />
+                  </FieldRow>
+                </SettingsCard>
+              )}
 
-          <SettingsCard icon="factory" title="Manufacturing settings">
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>Project code prefix</label>
-                <input
-                  value={settings.projectCodePrefix}
-                  onChange={(e) => setSettings((s) => ({ ...s, projectCodePrefix: e.target.value }))}
-                  readOnly={!canUpdateSettings}
-                  className="w-full mt-1 px-3 py-2 rounded-lg border outline-none text-[14px]"
-                  style={{ borderColor: 'var(--p-outline-variant)' }}
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>Default currency</label>
-                <select
-                  value={settings.defaultCurrency}
-                  onChange={(e) => setSettings((s) => ({ ...s, defaultCurrency: e.target.value }))}
-                  disabled={!canUpdateSettings}
-                  className="w-full mt-1 px-3 py-2 rounded-lg border outline-none text-[14px] bg-transparent"
-                  style={{ borderColor: 'var(--p-outline-variant)' }}
-                >
-                  <option value="INR">INR (₹)</option>
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="GBP">GBP (£)</option>
-                </select>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-[14px]">Auto-generate project codes</p>
-                  <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>Assign next number on project creation.</p>
-                </div>
-                <Toggle
-                  on={settings.autoGenerateProjectCodes}
-                  disabled={!canUpdateSettings}
-                  onClick={() => setBool('autoGenerateProjectCodes')}
-                />
-              </div>
-            </div>
-          </SettingsCard>
-
-          <AdminNotificationSettings canToggle={canToggleStaffNotifications} />
-
-          <ClientNotificationSettings canToggle={canToggleOrgNotifications} />
+              {section === 'team' && <AdminNotificationSettings canToggle={canToggleStaffNotifications} />}
+              {section === 'clients' && <ClientNotificationSettings canToggle={canToggleOrgNotifications} />}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
     </AdminShell>

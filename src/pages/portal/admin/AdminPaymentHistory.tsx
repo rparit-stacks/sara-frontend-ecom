@@ -3,7 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import AdminShell from '@/components/portal/AdminShell';
 import { Sym } from '@/components/portal/Sym';
 import StatTile from '@/components/portal/StatTile';
-import { paymentLinkApi, type PaymentLinkPaymentDto } from '@/lib/api';
+import ListToolbar, { ViewToggle, useListView } from '@/components/portal/ListToolbar';
+import LedgerList, { LedgerSkeleton, PaAvatar } from '@/components/portal/LedgerList';
+import InvoiceViewModal, { type InvoiceMode } from '@/components/portal/InvoiceViewModal';
+import { paymentLinkApi, invoiceApi, type PaymentLinkPaymentDto, type ManufacturingInvoiceDto } from '@/lib/api';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { P } from '@/lib/adminPermissionCodes';
 import { useMarkNavRead } from '@/hooks/useAdminNotificationCounts';
 
 const CUR: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
@@ -25,6 +30,12 @@ export default function PortalAdminPaymentHistory() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(0);
+  const [view, setView] = useListView('payment-history');
+  const { hasAny } = useAdminPermissions();
+  const canSeeInvoices = hasAny(P.PORTAL_INVOICES_VIEW);
+  const canSend = hasAny(P.PORTAL_INVOICES_SEND);
+  const [menuFor, setMenuFor] = useState<number | null>(null);
+  const [job, setJob] = useState<{ invoice: ManufacturingInvoiceDto; mode: InvoiceMode } | null>(null);
   const markRead = useMarkNavRead('payment_history');
 
   useEffect(() => { markRead(); }, []);
@@ -33,6 +44,13 @@ export default function PortalAdminPaymentHistory() {
     queryKey: ['payment-history'],
     queryFn: () => paymentLinkApi.listAllPayments(),
   });
+
+  const { data: invoices = [], refetch: refetchInvoices } = useQuery({
+    queryKey: ['admin-invoices', null],
+    queryFn: () => invoiceApi.list(),
+    enabled: canSeeInvoices,
+  });
+  const invoiceByRef = useMemo(() => new Map(invoices.map((i) => [i.reference, i])), [invoices]);
 
   const q = query.trim().toLowerCase();
   const shown = useMemo(() => payments
@@ -59,50 +77,26 @@ export default function PortalAdminPaymentHistory() {
 
   return (
     <AdminShell title="Payment History">
-      <div className="p-5 sm:p-8">
-        <div className="grid grid-cols-3 gap-4 mb-6 max-w-xl">
+      <div className="p-4 sm:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 max-w-3xl">
           <StatTile label="Total attempts" value={totals.total} icon="history" color="var(--p-primary)" />
           <StatTile label="Successful" value={totals.paidCount} icon="check_circle" color="#15803d" />
           <StatTile label="Collected" value={money(totals.paid)} icon="payments" color="var(--p-primary)" />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 mb-5">
-          <div className="relative">
-            <Sym name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search payer, link, quote, invoice…"
-              className="pl-8 pr-3 py-1.5 rounded-lg text-[13px] w-72 outline-none border"
-              style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            aria-label="Filter by status"
-            className="px-3 py-1.5 rounded-lg text-[13px] outline-none border"
-            style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface)' }}
-          >
-            <option value="">All statuses</option>
-            {Object.keys(STATUS_STYLE).map((s) => <option key={s} value={s}>{STATUS_STYLE[s].label}</option>)}
-          </select>
-          {(query || statusFilter) && (
-            <button
-              type="button"
-              onClick={() => { setQuery(''); setStatusFilter(''); }}
-              className="text-[12px] font-bold underline"
-              style={{ color: 'var(--p-primary)' }}
-            >
-              Clear
-            </button>
-          )}
-        </div>
+        <ListToolbar
+          tabs={[{ key: '', label: 'All', count: payments.length }, ...Object.keys(STATUS_STYLE).map((k) => ({ key: k, label: STATUS_STYLE[k].label, count: payments.filter((p) => p.status === k).length }))]}
+          tab={statusFilter}
+          onTab={setStatusFilter}
+          search={query}
+          onSearch={setQuery}
+          placeholder="Payer, link, quote, invoice…"
+        >
+          <ViewToggle view={view} onChange={setView} />
+        </ListToolbar>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-20" style={{ color: 'var(--p-on-surface-variant)' }}>
-            <Sym name="progress_activity" className="text-[28px] animate-spin" />
-          </div>
+          <LedgerSkeleton />
         ) : shown.length === 0 ? (
           <div className="text-center py-20" style={{ color: 'var(--p-on-surface-variant)' }}>
             <Sym name="history" className="text-[40px] mb-2 opacity-40" />
@@ -110,46 +104,60 @@ export default function PortalAdminPaymentHistory() {
           </div>
         ) : (
           <>
-            <div className="border rounded-2xl overflow-x-auto" style={{ borderColor: 'var(--p-outline-variant)' }}>
-              <table className="w-full text-left">
-                <thead>
-                  <tr style={{ background: 'var(--p-surface-container-low)' }}>
-                    {['Customer', 'Project', 'Invoice', 'Amount', 'Gateway', 'Status', 'Paid at', 'Transaction ref'].map((h) => (
-                      <th key={h} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paged.map((p: PaymentLinkPaymentDto, i) => {
-                    const status = STATUS_STYLE[p.status] ?? STATUS_STYLE.PENDING;
-                    const invoiceRef = p.invoiceReference || p.quoteReference || '—';
+            <LedgerList
+              layout={view}
+              actionsWidth={40}
+              statusWidth={76}
+              amountWidth={210}
+              rows={paged.map((p: PaymentLinkPaymentDto) => {
+                const status = STATUS_STYLE[p.status] ?? STATUS_STYLE.PENDING;
+                const invoiceRef = p.invoiceReference || p.quoteReference;
+                return {
+                  key: p.id,
+                  date: p.paidAt || p.createdAt,
+                  accent: p.status === 'PAID' ? ('good' as const) : p.status === 'FAILED' ? ('bad' as const) : null,
+                  lead: <PaAvatar name={p.payerName || p.payerEmail} />,
+                  title: <span className="truncate">{p.payerName || p.payerEmail || 'Unknown payer'}</span>,
+                  sub: [p.projectCode, invoiceRef, p.gateway, p.linkCode].filter(Boolean).join(' · '),
+                  amount: money(p.amount, p.currency),
+                  amountSub: formatDate(p.paidAt || p.createdAt),
+                  status: (
+                    <span className="text-[12px] font-semibold py-0.5 rounded-full text-center" style={{ background: status.bg, color: status.color, display: 'inline-block', width: 74 }}>{status.label}</span>
+                  ),
+                  actions: (() => {
+                    const inv = p.status === 'PAID' && canSeeInvoices && p.invoiceReference ? invoiceByRef.get(p.invoiceReference) : undefined;
+                    if (!inv) return undefined;
+                    const run = (mode: InvoiceMode) => { setMenuFor(null); setJob({ invoice: inv, mode }); };
+                    const item = 'w-full text-left px-3 py-2 text-[13px] flex items-center gap-2 hover:bg-black/5';
                     return (
-                      <tr key={p.id} style={{ borderTop: i ? '1px solid var(--p-outline-variant)' : undefined }}>
-                        <td className="px-4 py-3 text-[13px] font-semibold">
-                          {p.payerName || '—'}
-                          {p.payerEmail && <span className="text-[11px] font-normal" style={{ color: 'var(--p-on-surface-variant)' }}> · {p.payerEmail}</span>}
-                        </td>
-                        <td className="px-4 py-3 text-[12px] font-mono">{p.projectCode || '—'}</td>
-                        <td className="px-4 py-3 text-[12px] font-mono">{invoiceRef}</td>
-                        <td className="px-4 py-3 text-[13px] font-medium">{money(p.amount, p.currency)}</td>
-                        <td className="px-4 py-3 text-[12px]">{p.gateway || '—'}</td>
-                        <td className="px-4 py-3">
-                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: status.bg, color: status.color }}>
-                            {status.label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>
-                          {formatDate(p.paidAt || p.createdAt)}
-                        </td>
-                        <td className="px-4 py-3 text-[12px] font-mono" style={{ color: 'var(--p-on-surface-variant)' }}>
-                          {p.linkCode || '—'}
-                        </td>
-                      </tr>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setMenuFor(menuFor === p.id ? null : p.id)}
+                          className="w-9 h-9 rounded-lg border flex items-center justify-center hover:bg-black/[0.04] active:scale-95 transition"
+                          style={{ borderColor: 'var(--p-outline-variant)' }}
+                          aria-label="Invoice actions"
+                        >
+                          <Sym name="more_vert" className="text-[20px]" />
+                        </button>
+                        {menuFor === p.id && (
+                          <>
+                            <div className="fixed inset-0 z-10" onClick={() => setMenuFor(null)} />
+                            <div className="absolute right-0 top-10 w-56 border rounded-xl py-1 z-20 shadow-lg" style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}>
+                              <button type="button" className={item} onClick={() => run('view')}><Sym name="visibility" className="text-[18px]" /> View invoice</button>
+                              <button type="button" className={item} onClick={() => run('download')}><Sym name="download" className="text-[18px]" /> Download invoice</button>
+                              {canSend && (
+                                <button type="button" className={item} onClick={() => run('send')}><Sym name="send" className="text-[18px]" /> Send to customer</button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                  })(),
+                };
+              })}
+            />
 
             {pageCount > 1 && (
               <div className="flex items-center justify-between mt-4">
@@ -182,6 +190,9 @@ export default function PortalAdminPaymentHistory() {
           </>
         )}
       </div>
+      {job && (
+        <InvoiceViewModal invoice={job.invoice} mode={job.mode} onClose={() => setJob(null)} onSaved={() => { void refetchInvoices(); }} />
+      )}
     </AdminShell>
   );
 }

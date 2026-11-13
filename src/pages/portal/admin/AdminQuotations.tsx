@@ -6,6 +6,8 @@ import AdminShell, { AdminBtn } from '@/components/portal/AdminShell';
 import { Pill } from '@/components/portal/Pill';
 import { Sym } from '@/components/portal/Sym';
 import StatTile from '@/components/portal/StatTile';
+import ListToolbar, { ViewToggle, useListView } from '@/components/portal/ListToolbar';
+import LedgerList, { LedgerSkeleton, PaAvatar } from '@/components/portal/LedgerList';
 import { manufacturingApi, type ManufacturingQuoteDto } from '@/lib/api';
 import { formatInquiryDate, portalDateKey, portalDateSearchText } from '@/components/inquiry/inquiryUtils';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -266,6 +268,7 @@ export default function PortalAdminQuotations() {
   const [maxAmount, setMaxAmount] = useState(params.get('maxAmount') ?? '');
   const [menu, setMenu] = useState<number | null>(null);
   const [page, setPage] = useState(0);
+  const [view, setView] = useListView('quotations');
 
   const { data: quotes = [], isLoading: loadingQuotes } = useQuery({
     queryKey: ['admin-quotes', 'quotes'],
@@ -382,7 +385,7 @@ export default function PortalAdminQuotations() {
       title={inquiryFilter ? 'Quotations · Project' : 'Quotations'}
       actions={canCreate ? <AdminBtn icon="add" onClick={() => setShowEntryChooser(true)}>New quotation</AdminBtn> : undefined}
     >
-      <div className="p-5 sm:p-8">
+      <div className="p-4 sm:p-6">
         {inquiryFilter && (
           <p className="text-[13px] mb-4" style={{ color: 'var(--p-on-surface-variant)' }}>
             Showing quotes for inquiry #{inquiryFilter}
@@ -391,107 +394,46 @@ export default function PortalAdminQuotations() {
         )}
 
         {!inquiryFilter && (
-          <div className="grid grid-cols-3 gap-4 mb-6 max-w-xl">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 max-w-3xl">
             <StatTile label="Quotations" value={totals.quoteCount} icon="request_quote" color="var(--p-primary)" />
             <StatTile label="Templates" value={totals.templateCount} icon="bookmark" color="#b45309" />
             <StatTile label="Total value" value={money(totals.value, 'INR')} icon="payments" color="#15803d" />
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-3 mb-5">
-          <div className="flex items-center bg-black/[0.04] rounded-lg p-1 w-fit">
-            {([['quotes', 'Quotations'], ['templates', 'Templates']] as const).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-colors ${tab === key ? 'bg-white shadow-sm' : ''}`}
-                style={{ color: tab === key ? 'var(--p-primary)' : 'var(--p-on-surface-variant)' }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Sym name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
-              <input
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  syncParams(e.target.value, dateFilter, statusFilter, minAmount, maxAmount);
-                }}
-                placeholder="Search name, phone, quote ID, date…"
-                className="pl-8 pr-3 py-1.5 rounded-lg text-[13px] w-64 sm:w-72 outline-none border"
-                style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
-              />
-            </div>
-            {tab === 'quotes' && (
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  syncParams(query, dateFilter, e.target.value, minAmount, maxAmount);
-                }}
-                aria-label="Filter by status"
-                className="px-3 py-1.5 rounded-lg text-[13px] outline-none border"
-                style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface)' }}
-              >
-                <option value="">All statuses</option>
-                {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
-              </select>
-            )}
-            <div className="flex items-center rounded-lg border overflow-hidden" style={{ borderColor: 'var(--p-outline-variant)', background: 'var(--p-surface-container-lowest)' }}>
-              <input
-                type="number"
-                min="0"
-                value={minAmount}
-                onChange={(e) => {
-                  setMinAmount(e.target.value);
-                  syncParams(query, dateFilter, statusFilter, e.target.value, maxAmount);
-                }}
-                placeholder="Min amount"
-                aria-label="Minimum amount"
-                className="w-24 px-2.5 py-1.5 text-[13px] outline-none bg-transparent"
-              />
-              <span className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>–</span>
-              <input
-                type="number"
-                min="0"
-                value={maxAmount}
-                onChange={(e) => {
-                  setMaxAmount(e.target.value);
-                  syncParams(query, dateFilter, statusFilter, minAmount, e.target.value);
-                }}
-                placeholder="Max amount"
-                aria-label="Maximum amount"
-                className="w-24 px-2.5 py-1.5 text-[13px] outline-none bg-transparent"
-              />
-            </div>
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => {
-                setDateFilter(e.target.value);
-                syncParams(query, e.target.value, statusFilter, minAmount, maxAmount);
-              }}
-              title="Filter by created or updated date"
-              aria-label="Filter by created or updated date"
-              className="px-3 py-1.5 rounded-lg text-[13px] outline-none border"
-              style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface)' }}
-            />
-            {hasFilters && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="text-[12px] font-bold underline"
-                style={{ color: 'var(--p-primary)' }}
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </div>
+        <ListToolbar
+          tabs={[
+            { key: 'quotes', label: 'Quotations', count: totals.quoteCount },
+            { key: 'templates', label: 'Templates', count: totals.templateCount },
+          ]}
+          tab={tab}
+          onTab={(k) => setTab(k as Tab)}
+          search={query}
+          onSearch={(v) => { setQuery(v); syncParams(v, dateFilter, statusFilter, minAmount, maxAmount); }}
+          placeholder="Name, phone, quote ID, date…"
+        >
+          {tab === 'quotes' && (
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); syncParams(query, dateFilter, e.target.value, minAmount, maxAmount); }}
+              aria-label="Filter by status"
+              className="pa-field" style={{ width: 'auto' }}
+            >
+              <option value="">All statuses</option>
+              {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+            </select>
+          )}
+          <input type="number" min="0" value={minAmount} placeholder="Min ₹" aria-label="Minimum amount" className="pa-field" style={{ width: 96 }}
+            onChange={(e) => { setMinAmount(e.target.value); syncParams(query, dateFilter, statusFilter, e.target.value, maxAmount); }} />
+          <input type="number" min="0" value={maxAmount} placeholder="Max ₹" aria-label="Maximum amount" className="pa-field" style={{ width: 96 }}
+            onChange={(e) => { setMaxAmount(e.target.value); syncParams(query, dateFilter, statusFilter, minAmount, e.target.value); }} />
+          <input type="date" value={dateFilter} title="Filter by created or updated date" aria-label="Filter by created or updated date" className="pa-field" style={{ width: 'auto' }}
+            onChange={(e) => { setDateFilter(e.target.value); syncParams(query, e.target.value, statusFilter, minAmount, maxAmount); }} />
+          {hasFilters && (
+            <button type="button" onClick={clearFilters} className="text-[13px] font-bold underline" style={{ color: 'var(--p-primary)' }}>Clear</button>
+          )}
+          <ViewToggle view={view} onChange={setView} />
+        </ListToolbar>
 
         {hasFilters && shown.length > 0 && (
           <p className="text-[12px] mb-3" style={{ color: 'var(--p-on-surface-variant)' }}>
@@ -502,9 +444,7 @@ export default function PortalAdminQuotations() {
         )}
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-20" style={{ color: 'var(--p-on-surface-variant)' }}>
-            <Sym name="progress_activity" className="text-[28px] animate-spin" />
-          </div>
+          <LedgerSkeleton />
         ) : shown.length === 0 ? (
           <div className="border-2 border-dashed rounded-xl p-12 text-center" style={{ borderColor: 'var(--p-outline-variant)', color: 'var(--p-on-surface-variant)' }}>
             <Sym name={hasFilters ? 'search_off' : 'request_quote'} className="text-[40px]" />
@@ -539,121 +479,92 @@ export default function PortalAdminQuotations() {
           </div>
         ) : (
           <>
-          <div className="border rounded-2xl overflow-hidden overflow-x-auto" style={{ borderColor: 'var(--p-outline-variant)' }}>
-            <table className="w-full text-left border-collapse min-w-[820px]">
-              <thead>
-                <tr style={{ background: 'var(--p-surface-container-low)' }}>
-                  {[tab === 'templates' ? 'Template' : 'Quote', 'Title', 'Client', 'Amount', tab === 'templates' ? 'Updated' : 'Status', 'Created', ''].map((h, i) => (
-                    <th key={i} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--p-on-surface-variant)' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paged.map((q, i) => (
-                  <tr
-                    key={q.id}
-                    style={{ borderTop: i ? '1px solid var(--p-outline-variant)' : undefined }}
+          <LedgerList
+            layout={view}
+            moreWidth={70}
+            rows={paged.map((q) => ({
+              key: q.id,
+              date: tab === 'templates' ? (q.updatedAt || q.createdAt) : q.createdAt,
+              lead: <PaAvatar name={q.clientName || q.title || q.reference} />,
+              title: <span className="truncate">{q.title || q.reference}</span>,
+              sub: [q.reference, q.clientName, q.clientPhone || q.clientEmail].filter(Boolean).join(' · '),
+              amount: money(q.total, q.currency),
+              status: tab === 'templates' ? undefined : <Pill label={q.status} />,
+              onClick: tab === 'templates' ? undefined : canEdit ? () => navigate(`/portal-admin/quote-editor/${q.reference}`) : undefined,
+              actions: (
+                <>
+                  {tab === 'templates' ? (
+                    canDuplicate && (
+                      <button onClick={() => setTemplateModal(q)} className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border" style={{ borderColor: 'var(--p-outline)', color: 'var(--p-primary)' }}>
+                        Use template
+                      </button>
+                    )
+                  ) : (
+                    canEdit && (
+                      <button onClick={() => navigate(`/portal-admin/quote-editor/${q.reference}`)} className="px-3 py-1.5 rounded-lg text-[13px] font-semibold border" style={{ borderColor: 'var(--p-outline)', color: 'var(--p-primary)' }}>
+                        Edit
+                      </button>
+                    )
+                  )}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMenu(menu === q.id ? null : q.id)}
+                    className="p-1.5 rounded hover:bg-black/5"
                   >
-                    <td className="px-4 py-3 font-semibold text-[13px]">{q.reference}</td>
-                    <td className="px-4 py-3 text-[13px]">{q.title}</td>
-                    <td className="px-4 py-3 text-[13px]">
-                      <div>{q.clientName || '—'}</div>
-                      {(q.clientPhone || q.clientEmail) && (
-                        <div className="text-[11px] mt-0.5" style={{ color: 'var(--p-on-surface-variant)' }}>
-                          {[q.clientPhone, q.clientEmail].filter(Boolean).join(' · ')}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-bold text-[13px]">{money(q.total, q.currency)}</td>
-                    {tab === 'templates' ? (
-                      <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{q.updatedAt ? formatInquiryDate(q.updatedAt) : '—'}</td>
-                    ) : (
-                      <td className="px-4 py-3"><Pill label={q.status} /></td>
-                    )}
-                    <td className="px-4 py-3 text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>{q.createdAt ? formatInquiryDate(q.createdAt) : '—'}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <AskAdminAiButton
-                          entity={{
-                            kind: 'quote',
-                            id: q.id,
-                            name: q.reference || q.title,
-                            pageKey: 'portal.quotes',
-                            userEmail: q.clientEmail,
-                            extra: `Status=${q.status}, total=${q.total} ${q.currency || ''}.`,
-                          }}
-                        />
-                        {tab === 'templates' ? (
-                          canDuplicate && (
-                            <button
-                              onClick={() => setTemplateModal(q)}
-                              className="text-[13px] font-bold px-2 py-1"
-                              style={{ color: 'var(--p-primary)' }}
-                            >
-                              Use template
-                            </button>
-                          )
-                        ) : (
-                          canEdit && (
-                            <button
-                              onClick={() => navigate(`/portal-admin/quote-editor/${q.reference}`)}
-                              className="text-[13px] font-bold px-2 py-1"
-                              style={{ color: 'var(--p-primary)' }}
-                            >
-                              Edit
-                            </button>
-                          )
-                        )}
-                        <div className="relative">
+                    <Sym name="more_vert" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+                  </button>
+                  {menu === q.id && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setMenu(null)} />
+                      <div
+                        className="absolute right-0 top-9 w-52 border rounded-lg py-1 z-20 shadow-lg"
+                        style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
+                      >
+                        {tab === 'quotes' && q.inquiryId == null && (
                           <button
                             type="button"
-                            onClick={() => setMenu(menu === q.id ? null : q.id)}
-                            className="p-1.5 rounded hover:bg-black/5"
+                            disabled={convertToProject.isPending}
+                            onClick={() => { setMenu(null); convertToProject.mutate(q.id); }}
+                            className="w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 hover:bg-black/5 disabled:opacity-50"
+                            style={{ color: 'var(--p-on-surface)' }}
                           >
-                            <Sym name="more_vert" className="text-[18px]" style={{ color: 'var(--p-on-surface-variant)' }} />
+                            <Sym name="folder_open" className="text-[16px]" />
+                            {convertToProject.isPending && convertToProject.variables === q.id ? 'Creating…' : 'Convert to project'}
                           </button>
-                          {menu === q.id && (
-                            <>
-                              <div className="fixed inset-0 z-10" onClick={() => setMenu(null)} />
-                              <div
-                                className="absolute right-0 top-9 w-52 border rounded-lg py-1 z-20 shadow-lg"
-                                style={{ background: 'var(--p-surface-container-lowest)', borderColor: 'var(--p-outline-variant)' }}
-                              >
-                                {tab === 'quotes' && q.inquiryId == null && (
-                                  <button
-                                    type="button"
-                                    disabled={convertToProject.isPending}
-                                    onClick={() => { setMenu(null); convertToProject.mutate(q.id); }}
-                                    className="w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 hover:bg-black/5 disabled:opacity-50"
-                                    style={{ color: 'var(--p-on-surface)' }}
-                                  >
-                                    <Sym name="folder_open" className="text-[16px]" />
-                                    {convertToProject.isPending && convertToProject.variables === q.id ? 'Creating…' : 'Convert to project'}
-                                  </button>
-                                )}
-                                {canDelete && (
-                                  <button
-                                    type="button"
-                                    disabled={deleteQuote.isPending}
-                                    onClick={() => { setMenu(null); confirmDelete(q); }}
-                                    className="w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 hover:bg-black/5 disabled:opacity-50"
-                                    style={{ color: '#b42318' }}
-                                  >
-                                    <Sym name="delete" className="text-[16px]" />
-                                    {tab === 'templates' ? 'Delete template' : 'Delete quotation'}
-                                  </button>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </div>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            disabled={deleteQuote.isPending}
+                            onClick={() => { setMenu(null); confirmDelete(q); }}
+                            className="w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 hover:bg-black/5 disabled:opacity-50"
+                            style={{ color: '#b42318' }}
+                          >
+                            <Sym name="delete" className="text-[16px]" />
+                            {tab === 'templates' ? 'Delete template' : 'Delete quotation'}
+                          </button>
+                        )}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </>
+                  )}
+                </div>
+                </>
+              ),
+              more: (
+                <AskAdminAiButton
+                  entity={{
+                    kind: 'quote',
+                    id: q.id,
+                    name: q.reference || q.title,
+                    pageKey: 'portal.quotes',
+                    userEmail: q.clientEmail,
+                    extra: `Status=${q.status}, total=${q.total} ${q.currency || ''}.`,
+                  }}
+                />
+              ),
+            }))}
+          />
           {pageCount > 1 && (
             <div className="flex items-center justify-between mt-4">
               <p className="text-[12px]" style={{ color: 'var(--p-on-surface-variant)' }}>
