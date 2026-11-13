@@ -7,6 +7,7 @@ import { dashboardApi } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { DashboardModeToggle, DashboardMode } from '@/components/admin/analytics/DashboardModeToggle';
 import { PlatformPaymentDueBanner } from '@/components/admin/PlatformPaymentDueBanner';
+import { VpsHealthCard } from '@/components/admin/VpsHealthCard';
 
 // Lazy-load the 3D dashboard so the heavy Three.js bundle is only fetched
 // when the user actually switches to Advanced mode.
@@ -239,86 +240,8 @@ const AdminDashboard = () => {
             </div>
           </motion.div>
 
-          {/* System Health */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.6, duration: 0.4 }}
-            className="bg-white rounded-xl p-6 border border-border shadow-sm"
-          >
-            <h2 className="font-cursive text-2xl font-bold mb-4">System Health</h2>
-            <div className="space-y-4">
-              <motion.div
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.7, duration: 0.3 }}
-              >
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium">API Response Time</span>
-                  <span className="text-sm font-semibold text-green-600">45ms</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: '90%' }}
-                    transition={{ delay: 0.8, duration: 0.8, ease: "easeOut" }}
-                    className="bg-green-600 h-2 rounded-full"
-                  />
-                </div>
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.8, duration: 0.3 }}
-              >
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium">Server Load</span>
-                  <span className="text-sm font-semibold text-green-600">32%</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: '32%' }}
-                    transition={{ delay: 0.9, duration: 0.8, ease: "easeOut" }}
-                    className="bg-green-600 h-2 rounded-full"
-                  />
-                </div>
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.9, duration: 0.3 }}
-              >
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium">Error Rate</span>
-                  <span className="text-sm font-semibold text-green-600">0.02%</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: '98%' }}
-                    transition={{ delay: 1.0, duration: 0.8, ease: "easeOut" }}
-                    className="bg-green-600 h-2 rounded-full"
-                  />
-                </div>
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.1, duration: 0.3 }}
-                className="pt-4 border-t border-border"
-              >
-                <div className="flex items-center gap-2 text-sm">
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ repeat: Infinity, duration: 2 }}
-                    className="w-2 h-2 rounded-full bg-green-600"
-                  />
-                  <span className="text-muted-foreground">All systems operational</span>
-                </div>
-              </motion.div>
-            </div>
-          </motion.div>
+          {/* System Health: real VPS + API data */}
+          <VpsHealthCard />
         </div>
         </>
         )}

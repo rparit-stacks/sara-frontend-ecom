@@ -3635,6 +3635,78 @@ export interface ApiLogIngestSettings {
   updatedBy?: string | null;
 }
 
+export interface VpsUsage { totalMb: number; usedMb: number; availableMb: number; usedPercent: number }
+export interface VpsApp {
+  name: string;
+  status: string;
+  uptimeSeconds: number | null;
+  restarts: number | null;
+  memoryMb: number | null;
+  cpuPercent: number | null;
+}
+export interface VpsServiceCheck { name: string; port: number; up: boolean; responseMs: number | null }
+export interface VpsIncident {
+  id: number;
+  kind: string;
+  subject: string;
+  severity: 'WARN' | 'CRITICAL' | string;
+  message: string;
+  startedAt: string;
+  resolvedAt: string | null;
+  open: boolean;
+}
+export interface VpsHealth {
+  available: boolean;
+  message?: string | null;
+  sampledAt?: string;
+  stale?: boolean;
+  status?: 'OK' | 'WARN' | 'CRITICAL';
+  reasons?: string[];
+  cpuPercent?: number | null;
+  load1?: number | null;
+  load5?: number | null;
+  load15?: number | null;
+  cores?: number | null;
+  ram?: VpsUsage;
+  swap?: VpsUsage;
+  disk?: { totalGb: number; usedGb: number; freeGb: number; usedPercent: number };
+  uptimeSeconds?: number | null;
+  failedUnits?: number | null;
+  rebootRequired?: boolean | null;
+  postgres?: { used: number | null; max: number | null; usedPercent: number | null };
+  apps?: VpsApp[];
+  services?: VpsServiceCheck[];
+  certs?: { domain: string; daysLeft: number | null }[];
+  backup?: { latestAt: string | null; ageHours: number | null } | null;
+  restartsLast24h?: number;
+  activeIncidents?: VpsIncident[];
+  recentIncidents?: VpsIncident[];
+  incidentsLast24h?: number;
+  thresholds?: { ramWarn: number; ramCritical: number; diskWarn: number; diskCritical: number; cpuWarn: number };
+}
+export interface VpsHistoryPoint {
+  t: string;
+  cpu: number | null;
+  ram: number | null;
+  disk: number | null;
+  swap: number | null;
+  load1: number | null;
+  appsUp: number;
+  appsTotal: number;
+  pgUsed: number;
+}
+export interface VpsHistory {
+  hours: number;
+  from: string;
+  to: string;
+  points: VpsHistoryPoint[];
+  peakRamPercent: number;
+  peakCpuPercent: number;
+  peakDiskPercent: number;
+  avgRamPercent: number;
+  avgCpuPercent: number;
+}
+
 export interface JobHealthBrief {
   windowHours: number;
   from: string;
@@ -3708,6 +3780,10 @@ export const logsApi = {
 
   getJobHealth: (windowHours = 24) =>
     fetchApi<JobHealthBrief>(`/api/admin/system-health/jobs?windowHours=${windowHours}`),
+
+  getVpsHealth: () => fetchApi<VpsHealth>('/api/admin/system-health/vps'),
+  getVpsHistory: (hours = 24) => fetchApi<VpsHistory>(`/api/admin/system-health/vps/history?hours=${hours}`),
+  getVpsIncidents: (days = 7) => fetchApi<VpsIncident[]>(`/api/admin/system-health/vps/incidents?days=${days}`),
 
   getLogIngestSettings: () =>
     fetchApi<ApiLogIngestSettings>('/api/admin/system-health/log-ingest'),

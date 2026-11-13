@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { logsApi } from '@/lib/api';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { HealthAlertRecipients } from '@/components/admin/HealthAlertRecipients';
+import { VpsHealthPanel } from '@/components/admin/VpsHealthPanel';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -357,6 +358,10 @@ export const SystemHealthPanel = () => {
           )}
         </div>
       )}
+
+      <div className="border-t border-border pt-4">
+        <VpsHealthPanel windowHours={Number(windowHours)} />
+      </div>
 
       {isMainAdmin && <HealthAlertRecipients />}
     </div>
