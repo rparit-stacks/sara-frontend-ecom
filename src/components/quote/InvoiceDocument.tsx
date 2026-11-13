@@ -44,7 +44,7 @@ export default function InvoiceDocument({ invoice, txnId }: { invoice: Manufactu
         {/* Header */}
         <div className="flex items-start justify-between gap-6 pb-6 border-b-2" style={{ borderColor: accent }}>
           <div className="min-w-0">
-            {branding.logoUrl ? <img src={branding.logoUrl} alt="" className="h-12 w-auto object-contain mb-2" /> : null}
+            {branding.logoUrl ? <img src={branding.logoUrl} alt="" crossOrigin="anonymous" className="h-12 w-auto object-contain mb-2" /> : null}
             <h1 className="text-[24px] font-bold leading-tight" style={{ color: accent }}>{branding.name || 'Studio Sara'}</h1>
             {branding.tagline && <p className="text-[12px] text-gray-500">{branding.tagline}</p>}
             <div className="text-[11px] text-gray-500 mt-2 leading-relaxed">

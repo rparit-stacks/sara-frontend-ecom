@@ -162,7 +162,7 @@ function BrandingAndBillToProbe({ doc, accent }: { doc: QuoteDoc; accent: string
         <div className="flex items-start justify-between gap-6 pb-6 mb-6 border-b" style={{ borderColor: `${accent}33` }}>
           <div className="min-w-0">
             <div className="flex items-center gap-3">
-              {doc.branding.logoUrl ? <img src={doc.branding.logoUrl} alt="logo" className="h-12 w-auto object-contain" /> : null}
+              {doc.branding.logoUrl ? <img src={doc.branding.logoUrl} alt="logo" crossOrigin="anonymous" className="h-12 w-auto object-contain" /> : null}
               <h2 className="font-sans font-bold text-3xl" style={{ color: accent }}>{doc.branding.name}</h2>
             </div>
             <p className="text-[12px] text-gray-500 mt-0.5">{doc.branding.tagline || ''}</p>

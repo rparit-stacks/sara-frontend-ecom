@@ -69,7 +69,7 @@ export default function QuotePreview({
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
                     {doc.branding.logoUrl ? (
-                      <img src={doc.branding.logoUrl} alt="logo" className="h-12 w-auto object-contain" />
+                      <img src={doc.branding.logoUrl} alt="logo" crossOrigin="anonymous" className="h-12 w-auto object-contain" />
                     ) : null}
                     <EditableText as="h2" value={doc.branding.name} onChange={(v) => patchBranding({ name: v })} className="font-sans font-bold text-3xl" style={{ color: accent }} placeholder="Company name" />
                   </div>
@@ -292,7 +292,7 @@ function ImageView({ block }: { block: ImageBlock }) {
   const pct = block.widthPercent ?? (block.width === 'half' ? 50 : 100);
   return (
     <div className={wrap} style={{ width: `${pct}%` }}>
-      <img src={block.url} alt={block.caption || ''} className="w-full rounded-lg border border-gray-100" />
+      <img src={block.url} alt={block.caption || ''} crossOrigin="anonymous" className="w-full rounded-lg border border-gray-100" />
       {block.caption ? <p className="text-center text-[11px] text-gray-400 mt-1">{block.caption}</p> : null}
     </div>
   );
@@ -391,7 +391,7 @@ function SignatureView({ block, accent }: { block: SignatureBlock; accent: strin
   const wrap = block.align === 'left' ? '' : block.align === 'center' ? 'mx-auto text-center' : 'ml-auto text-right';
   return (
     <div className={`w-56 ${wrap}`}>
-      {block.imageUrl ? <img src={block.imageUrl} alt="signature" className="h-16 w-auto object-contain mb-1" /> : <div className="h-12" />}
+      {block.imageUrl ? <img src={block.imageUrl} alt="signature" crossOrigin="anonymous" className="h-16 w-auto object-contain mb-1" /> : <div className="h-12" />}
       <div className="border-t pt-1" style={{ borderColor: accent }}>
         {block.signerName ? <p className="font-semibold text-[13px] text-gray-800">{block.signerName}</p> : null}
         {block.signerTitle ? <p className="text-[11px] text-gray-500">{block.signerTitle}</p> : null}

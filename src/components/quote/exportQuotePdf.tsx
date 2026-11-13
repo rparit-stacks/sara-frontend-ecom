@@ -39,6 +39,12 @@ export async function exportQuotePdf(
     // particular, can commit before they've actually decoded/laid out).
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
+    // R2/Cloudinary/etc. images must be loaded with crossOrigin=anonymous for
+    // html2canvas(useCORS). A normal <img> preview can show them without CORS,
+    // but a previously cached non-CORS response cannot be painted onto canvas.
+    // Force a CORS-aware reload (cache-bust) and wait before rasterizing.
+    await prepareCrossOriginImages(container);
+
     const nodes = Array.from(container.querySelectorAll<HTMLElement>('.quote-page'));
     if (!nodes.length) return null;
 
@@ -61,4 +67,41 @@ export async function exportQuotePdf(
     root.unmount();
     document.body.removeChild(container);
   }
+}
+
+/** Reload remote images with CORS so html2canvas can draw them. */
+function prepareCrossOriginImages(root: HTMLElement): Promise<void> {
+  const imgs = Array.from(root.querySelectorAll('img'));
+  return Promise.all(imgs.map((img) => new Promise<void>((resolve) => {
+    const raw = img.currentSrc || img.getAttribute('src') || img.src;
+    if (!raw || raw.startsWith('data:') || raw.startsWith('blob:')) {
+      resolve();
+      return;
+    }
+
+    let url: URL;
+    try {
+      url = new URL(raw, window.location.href);
+    } catch {
+      resolve();
+      return;
+    }
+
+    // Same-origin assets (e.g. /bg_images/...) do not need CORS reload.
+    if (url.origin === window.location.origin) {
+      if (img.complete) resolve();
+      else {
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+      }
+      return;
+    }
+
+    url.searchParams.set('_cors', '1');
+    const done = () => resolve();
+    img.crossOrigin = 'anonymous';
+    img.onload = done;
+    img.onerror = done;
+    img.src = url.toString();
+  }))).then(() => undefined);
 }
