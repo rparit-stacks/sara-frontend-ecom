@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { AdminLayout } from '@/components/admin/AdminLayout';
+import { LogsTabs } from '@/components/admin/LogsTabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -248,6 +249,7 @@ const AdminLogs = () => {
   return (
     <AdminLayout>
       <div className="space-y-6">
+        <LogsTabs />
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}

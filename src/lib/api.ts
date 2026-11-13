@@ -3753,6 +3753,34 @@ export interface LiveVisitors {
   history: { t: string; live: number; peak: number }[];
 }
 
+export interface IncidentRca {
+  id: number;
+  createdAt: string;
+  triggerKind: 'API_INCIDENT' | 'VPS_INCIDENT' | 'REPEATING_ERROR' | 'STARTUP_CRASH' | 'MANUAL' | string;
+  sourceRef?: string | null;
+  service: string;
+  windowFrom: string;
+  windowTo: string;
+  fingerprint?: string | null;
+  title: string;
+  errorCount: number;
+  distinctErrors: number;
+  status: 'DONE' | 'AI_FAILED' | 'NO_EVIDENCE' | string;
+  severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string | null;
+  confidence?: 'LOW' | 'MEDIUM' | 'HIGH' | string | null;
+  summary?: string | null;
+  rootCause?: string | null;
+  evidence?: string | null;
+  affected?: string | null;
+  suggestedFix?: string | null;
+  model?: string | null;
+  tokensIn?: number | null;
+  tokensOut?: number | null;
+  bundleChars?: number | null;
+  logBytesRead?: number | null;
+  bundle?: string | null;
+}
+
 export interface JobHealthBrief {
   windowHours: number;
   from: string;
@@ -3827,6 +3855,10 @@ export const logsApi = {
   getJobHealth: (windowHours = 24) =>
     fetchApi<JobHealthBrief>(`/api/admin/system-health/jobs?windowHours=${windowHours}`),
 
+  getRcaList: (days = 14) => fetchApi<IncidentRca[]>(`/api/admin/system-health/rca?days=${days}&limit=100`),
+  getRca: (id: number) => fetchApi<IncidentRca>(`/api/admin/system-health/rca/${id}`),
+  analyzeRca: (service: string, minutes: number) =>
+    fetchApi<IncidentRca>('/api/admin/system-health/rca/analyze', { method: 'POST', body: JSON.stringify({ service, minutes }) }),
   getVisitors: (hours = 24) => fetchApi<LiveVisitors>(`/api/admin/system-health/visitors?hours=${hours}`),
   getVpsHealth: () => fetchApi<VpsHealth>('/api/admin/system-health/vps'),
   getVpsHistory: (hours = 24) => fetchApi<VpsHistory>(`/api/admin/system-health/vps/history?hours=${hours}`),

@@ -89,6 +89,7 @@ import WhatsAppTemplateEditor from "./pages/admin/whatsapp/WhatsAppTemplateEdito
 import AdminPlatformPayments from "./pages/admin/AdminPlatformPayments";
 import AdminNotificationCenter from "./pages/admin/AdminNotificationCenter";
 import AdminLogs from "./pages/admin/AdminLogs";
+import AdminIncidentRca from "./pages/admin/AdminIncidentRca";
 import AdminRuntimeConfig from "./pages/admin/AdminRuntimeConfig";
 import AdminMarketplace from "./pages/admin/AdminMarketplace";
 import AdminMarketplaceItem from "./pages/admin/AdminMarketplaceItem";
@@ -638,6 +639,14 @@ const App = () =>
             element={
               <ProtectedAdminRoute>
                 <AdminLogs />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin-sara/logs/rca"
+            element={
+              <ProtectedAdminRoute>
+                <AdminIncidentRca />
               </ProtectedAdminRoute>
             }
           />
