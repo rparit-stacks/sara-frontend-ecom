@@ -10,6 +10,7 @@ import { logsApi } from '@/lib/api';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { HealthAlertRecipients } from '@/components/admin/HealthAlertRecipients';
 import { VpsHealthPanel } from '@/components/admin/VpsHealthPanel';
+import { LiveVisitorsPanel } from '@/components/admin/LiveVisitorsPanel';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -192,14 +193,19 @@ export const SystemHealthPanel = () => {
               <div className="text-sm font-medium mb-2 flex items-center gap-1">
                 <AlertTriangle className="w-4 h-4 text-red-600" /> Incidents ({data.incidentCount})
               </div>
+              <p className="mb-1 text-[11px] text-muted-foreground">
+                Serious only: 10+ server errors and 20%+ of requests within 5 minutes, or every request failing. These also trigger the alert.
+              </p>
               {data.incidents.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No incidents in this window.</p>
               ) : (
                 <ul className="space-y-1 max-h-40 overflow-y-auto">
                   {data.incidents.slice().reverse().map((i, idx) => (
-                    <li key={idx} className="text-sm flex justify-between rounded bg-red-50 px-2 py-1">
+                    <li key={idx} className={`text-sm flex justify-between rounded px-2 py-1 ${i.severity === 'CRITICAL' ? 'bg-red-100' : 'bg-orange-50'}`}>
                       <span>{fmtTime(i.from)} → {fmtTime(i.to)}</span>
-                      <span className="text-red-700 font-medium">{i.serverErrors} 5xx</span>
+                      <span className={`font-medium ${i.severity === 'CRITICAL' ? 'text-red-700' : 'text-orange-700'}`}>
+                        {i.severity === 'CRITICAL' ? 'Downtime · ' : ''}{i.serverErrors} 5xx
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -358,6 +364,10 @@ export const SystemHealthPanel = () => {
           )}
         </div>
       )}
+
+      <div className="border-t border-border pt-4">
+        <LiveVisitorsPanel windowHours={Number(windowHours)} />
+      </div>
 
       <div className="border-t border-border pt-4">
         <VpsHealthPanel windowHours={Number(windowHours)} />

@@ -682,7 +682,7 @@ const AdminLogs = () => {
                 <>Are you sure you want to delete {selectedIds.size} selected log entries? This action cannot be undone.</>
               ) : (
                 <div className="space-y-4">
-                  <p>This will delete success logs (2xx) older than the specified days. Error logs will be preserved for analysis.</p>
+                  <p>This will delete ALL logs older than the specified days: successful, error and slow. (Automatic cleanup already removes bot/client errors after 15 days and everything after 60 days.)</p>
                   <div className="flex items-center gap-4">
                     <label className="text-sm font-medium">Delete logs older than:</label>
                     <Input

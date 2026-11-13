@@ -2116,6 +2116,36 @@ export async function recordVisit(): Promise<void> {
   }
 }
 
+// Live presence ("who is on the site right now"). Own server only. Admins and opted-out browsers are never counted.
+export const IGNORE_VISITS_KEY = 'sara_ignore_visits';
+
+export function isVisitTrackingIgnored(): boolean {
+  try {
+    return localStorage.getItem(IGNORE_VISITS_KEY) === '1' || !!localStorage.getItem('adminToken');
+  } catch {
+    return false;
+  }
+}
+
+/** Heartbeat while a page is open (leaving=true sends a beacon so the visitor disappears at once). */
+export function sendVisitPing(path: string, leaving = false): void {
+  if (typeof window === 'undefined' || isVisitTrackingIgnored()) return;
+  const id = getOrCreateVisitorId();
+  if (!id) return;
+  const body = JSON.stringify({ v: id, p: path, l: leaving });
+  const url = `${API_BASE_URL}/api/visit/ping`;
+  try {
+    // text/plain keeps it a "simple" request: no CORS preflight, works with sendBeacon
+    if (leaving && navigator.sendBeacon) {
+      navigator.sendBeacon(url, new Blob([body], { type: 'text/plain' }));
+      return;
+    }
+    fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body, keepalive: true }).catch(() => {});
+  } catch {
+    // never block the app
+  }
+}
+
 // ===============================
 // Admin Management API
 // ===============================
@@ -3604,7 +3634,7 @@ export interface SystemHealthBrief {
   avgResponseMs: number;
   maxResponseMs: number;
   incidentCount: number;
-  incidents: { from: string; to: string; serverErrors: number }[];
+  incidents: { from: string; to: string; serverErrors: number; severity?: 'WARN' | 'CRITICAL' | string }[];
   topFailingEndpoints: {
     method: string;
     endpoint: string;
@@ -3707,6 +3737,22 @@ export interface VpsHistory {
   avgCpuPercent: number;
 }
 
+export interface LiveVisitors {
+  liveNow: number;
+  byArea: Record<string, number>;
+  topPages: { path: string; visitors: number }[];
+  peakToday: number;
+  peakTodayAt: string | null;
+  uniqueToday: number;
+  engagedToday: number;
+  uniqueYesterday: number;
+  engagedYesterday: number;
+  avgUnique7d: number;
+  days: { day: string; unique: number; engaged: number; peak: number }[];
+  hours: number;
+  history: { t: string; live: number; peak: number }[];
+}
+
 export interface JobHealthBrief {
   windowHours: number;
   from: string;
@@ -3781,6 +3827,7 @@ export const logsApi = {
   getJobHealth: (windowHours = 24) =>
     fetchApi<JobHealthBrief>(`/api/admin/system-health/jobs?windowHours=${windowHours}`),
 
+  getVisitors: (hours = 24) => fetchApi<LiveVisitors>(`/api/admin/system-health/visitors?hours=${hours}`),
   getVpsHealth: () => fetchApi<VpsHealth>('/api/admin/system-health/vps'),
   getVpsHistory: (hours = 24) => fetchApi<VpsHistory>(`/api/admin/system-health/vps/history?hours=${hours}`),
   getVpsIncidents: (days = 7) => fetchApi<VpsIncident[]>(`/api/admin/system-health/vps/incidents?days=${days}`),
