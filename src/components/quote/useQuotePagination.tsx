@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { PreviewBlock } from './QuotePreview';
+import { PreviewBlock, PageHeader } from './QuotePreview';
 import { computeTotals } from './computeTotals';
 import {
   packLayoutPages, flattenVisibleBlocks, rowCount, sliceRows,
@@ -80,15 +80,26 @@ function measureNode(
 ): Promise<number> {
   return new Promise((resolve) => {
     probe.root.render(
-      <div style={{ width: PAGE_WIDTH_PX - PAGE_PADDING_PX * 2 }}>{node}</div>,
+      // flow-root so children's outer margins (e.g. the bill-to `mb-6`) count
+      // toward the measured height instead of collapsing out of it.
+      <div style={{ width: PAGE_WIDTH_PX - PAGE_PADDING_PX * 2, display: 'flow-root' }}>{node}</div>,
     );
     // Two rAFs: one for React's commit to land in the DOM, one more so any
     // <img> that was already cached reports its natural size before we read
     // offsetHeight (a single rAF occasionally raced ahead of layout in testing).
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      resolve(probe.container.firstElementChild?.firstElementChild instanceof HTMLElement
-        ? (probe.container.firstElementChild.firstElementChild as HTMLElement).offsetHeight
-        : probe.container.offsetHeight);
+    requestAnimationFrame(() => requestAnimationFrame(async () => {
+      const wrapper = probe.container.firstElementChild as HTMLElement | null;
+      // Images change height once loaded — wait for them (bounded) before measuring.
+      if (wrapper) {
+        const pending = Array.from(wrapper.querySelectorAll('img')).filter((i) => !i.complete);
+        if (pending.length) {
+          await Promise.race([
+            Promise.all(pending.map((i) => new Promise<void>((r) => { i.onload = () => r(); i.onerror = () => r(); }))),
+            new Promise((r) => setTimeout(r, 5000)),
+          ]);
+        }
+      }
+      resolve(wrapper ? wrapper.offsetHeight : probe.container.offsetHeight);
     }));
   });
 }
@@ -128,7 +139,9 @@ async function measure(
   for (const block of blocks) {
     const rows = rowCount(block);
     if (rows == null || rows <= 1) continue;
-    if (heights[block.id] <= PAGE_CONTENT_HEIGHT_PX) continue;
+    // Grids always get split points: a grid that merely doesn't fit the space left on
+    // the current page should break between its rows instead of leaving a blank gap.
+    if (block.type !== 'grid' && heights[block.id] <= PAGE_CONTENT_HEIGHT_PX) continue;
     const points: number[] = [];
     for (let n = 0; n <= rows; n++) {
       const slice = sliceRows(block, 0, n);
@@ -143,51 +156,17 @@ async function measure(
 
   // Always measured — the "Prepared for" block renders on page 1 regardless
   // of whether the branding header itself is toggled on.
-  const headerHeight = await measureNode(probe, <BrandingAndBillToProbe doc={doc} accent={accent} />);
+  const headerHeight = await measureNode(probe, <PageHeader doc={doc} accent={accent} reference={null} />);
 
   return packLayoutPages(
     doc,
     (id) => heights[id] ?? 0,
     (id) => splitPoints[id],
     headerHeight,
+    !hasSummaryBlock(doc) && doc.showTotal !== false,
   );
 }
 
-/** Mirrors QuotePreview's page-0-only branding header + "Prepared for" block,
- *  so its measured height matches exactly what the real first page reserves. */
-function BrandingAndBillToProbe({ doc, accent }: { doc: QuoteDoc; accent: string }) {
-  return (
-    <div>
-      {doc.branding.showHeader && (
-        <div className="flex items-start justify-between gap-6 pb-6 mb-6 border-b" style={{ borderColor: `${accent}33` }}>
-          <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              {doc.branding.logoUrl ? <img src={doc.branding.logoUrl} alt="logo" crossOrigin="anonymous" className="h-12 w-auto object-contain" /> : null}
-              <h2 className="font-sans font-bold text-3xl" style={{ color: accent }}>{doc.branding.name}</h2>
-            </div>
-            <p className="text-[12px] text-gray-500 mt-0.5">{doc.branding.tagline || ''}</p>
-            <div className="mt-3 text-[12px] text-gray-600 leading-relaxed">
-              {doc.branding.addressLines.map((line, i) => <p key={i}>{line}</p>)}
-            </div>
-            <div className="mt-2 text-[12px] text-gray-600 space-x-3">
-              <span>{doc.branding.phone}</span><span>{doc.branding.email}</span><span>{doc.branding.website}</span>
-            </div>
-          </div>
-          <div className="text-right shrink-0">
-            <h1 className="font-sans font-bold text-2xl tracking-wide uppercase" style={{ color: accent }}>{doc.meta.quoteTitle}</h1>
-            <p className="text-[12px] text-gray-500 mt-1">Ref: —</p>
-            <div className="text-[12px] text-gray-600 mt-1">Date: {doc.meta.date}</div>
-            <p className="text-[12px] text-gray-600">Valid for {doc.meta.validityDays} days</p>
-            {doc.branding.gstin ? <p className="text-[11px] text-gray-400 mt-1">GSTIN: {doc.branding.gstin}</p> : null}
-          </div>
-        </div>
-      )}
-      <div className="mb-6">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-1">Prepared for</p>
-        <p className="font-semibold text-[15px] text-gray-800">{doc.meta.clientName}</p>
-        <p className="text-[12px] text-gray-500">{doc.meta.clientEmail}</p>
-        <p className="text-[12px] text-gray-500">{doc.meta.clientAddress}</p>
-      </div>
-    </div>
-  );
+function hasSummaryBlock(doc: QuoteDoc) {
+  return doc.pages.some((p) => p.blocks.some((b) => b.type === 'summary' && !b.hidden));
 }

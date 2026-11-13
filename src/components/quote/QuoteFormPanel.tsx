@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
 import type { QuoteDoc, QuoteBlock, QuoteBlockType, QuoteCalc } from './quoteDoc';
-import { Group, BrandingForm, QuoteDetailsForm, ClientInfoForm, CalcForm, SectionsEditor, inputCls } from './quoteFormParts';
+import { Group, BrandingForm, QuoteDetailsForm, ClientInfoForm, CalcForm, SectionsEditor, Toggle, inputCls } from './quoteFormParts';
 
 /** The split-view left panel: every form group stacked, sections inline. */
 export default function QuoteFormPanel({
   doc, currency, accent, focusBlockId, focusClientInfo,
-  onPatchMeta, onPatchBranding, onPatchCalc, onPatchBlock, onAddBlock, onRemoveBlock, onReorder, onToggle, onAddPage, onRemovePage, onPatchFooter,
+  onPatchMeta, onPatchBranding, onPatchCalc, onPatchBlock, onAddBlock, onRemoveBlock, onDuplicateBlock, onReorder, onToggle, onAddPage, onRemovePage, onPatchFooter, onPatchShowTotal, onEjectGridCell,
 }: {
   doc: QuoteDoc; currency: string; accent: string; focusBlockId?: string | null; focusClientInfo?: boolean;
   onPatchMeta: (p: Partial<QuoteDoc['meta']>) => void;
@@ -14,11 +14,14 @@ export default function QuoteFormPanel({
   onPatchBlock: (pageId: string, blockId: string, p: Partial<QuoteBlock>) => void;
   onAddBlock: (pageId: string, t: QuoteBlockType) => void;
   onRemoveBlock: (pageId: string, blockId: string) => void;
+  onDuplicateBlock?: (pageId: string, blockId: string) => void;
   onReorder: (pageId: string, from: number, to: number) => void;
   onToggle: (pageId: string, blockId: string) => void;
   onAddPage: () => void;
   onRemovePage: (pageId: string) => void;
   onPatchFooter: (text: string) => void;
+  onPatchShowTotal?: (v: boolean) => void;
+  onEjectGridCell?: (pageId: string, gridId: string, cellIndex: number) => void;
 }) {
   const calc = doc.calc ?? { gstPercent: 0, discount: 0 };
   const clientInfoRef = useRef<HTMLDivElement>(null);
@@ -63,15 +66,36 @@ export default function QuoteFormPanel({
           onPatchBlock={(blockId, p) => onPatchBlock(page.id, blockId, p)}
           onAddBlock={(t) => onAddBlock(page.id, t)}
           onRemoveBlock={(blockId) => onRemoveBlock(page.id, blockId)}
+          onDuplicateBlock={onDuplicateBlock ? (blockId) => onDuplicateBlock(page.id, blockId) : undefined}
           onReorder={(from, to) => onReorder(page.id, from, to)}
           onToggle={(blockId) => onToggle(page.id, blockId)}
           onRemovePage={() => onRemovePage(page.id)}
+          onEjectGridCell={onEjectGridCell
+            ? (gridId, cellIndex) => onEjectGridCell(page.id, gridId, cellIndex)
+            : undefined}
         />
       ))}
 
       <button onClick={onAddPage} className="w-full py-2.5 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-[#00676a] hover:text-[#00676a] font-semibold text-[13px] flex items-center justify-center gap-2">
         <i className="fa-solid fa-file-circle-plus" /> Add page
       </button>
+
+      {onPatchShowTotal && (
+        <div className="border border-gray-200 rounded-xl bg-white px-3 py-3 space-y-1">
+          <div className="flex items-center gap-2 mb-1">
+            <i className="fa-solid fa-indian-rupee-sign text-[13px]" style={{ color: accent }} />
+            <span className="font-semibold text-[13px]">Quote total</span>
+          </div>
+          <Toggle
+            on={doc.showTotal !== false}
+            onChange={onPatchShowTotal}
+            label="Show Total at bottom of quote"
+          />
+          <p className="text-[11px] text-gray-400 pl-11">
+            Off karoge to last page ka auto Total hide ho jayega (summary section alag hai).
+          </p>
+        </div>
+      )}
 
       <Group title="Footer" icon="fa-shoe-prints" accent={accent} defaultOpen={false}>
         <input className={inputCls} value={doc.footerText} onChange={(e) => onPatchFooter(e.target.value)} />

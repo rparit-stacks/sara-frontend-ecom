@@ -12,6 +12,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import {
   businessConfigToProfile,
   createBlock,
+  duplicateBlock,
   defaultQuoteDoc,
   newId,
   normalizeQuoteDoc,
@@ -136,10 +137,70 @@ export default function PortalAdminQuoteBuilder() {
     doc && update({ ...doc, pages: doc.pages.map((pg, i) => i !== 0 ? pg : { ...pg, blocks: [...pg.blocks, block] }) });
   const removeBlock = (pageId: string, blockId: string) =>
     doc && update({ ...doc, pages: doc.pages.map((pg) => pg.id !== pageId ? pg : { ...pg, blocks: pg.blocks.filter((b) => b.id !== blockId) }) });
+  const duplicateBlockAt = (pageId: string, blockId: string) => {
+    if (!doc) return;
+    update({
+      ...doc,
+      pages: doc.pages.map((pg) => {
+        if (pg.id !== pageId) return pg;
+        const idx = pg.blocks.findIndex((b) => b.id === blockId);
+        if (idx < 0) return pg;
+        const copy = duplicateBlock(pg.blocks[idx]);
+        const blocks = [...pg.blocks];
+        blocks.splice(idx + 1, 0, copy);
+        return { ...pg, blocks };
+      }),
+    });
+  };
   const toggleBlock = (pageId: string, blockId: string) => {
     if (!doc) return;
     const b = doc.pages.find((p) => p.id === pageId)?.blocks.find((x) => x.id === blockId);
     if (b) patchBlock(pageId, blockId, { hidden: !b.hidden });
+  };
+  const patchShowTotal = (showTotal: boolean) => doc && update({ ...doc, showTotal });
+  /** Move a top-level section into a grid cell (swap displaced cell back onto the page). */
+  const moveBlockIntoGridCell = (pageId: string, gridId: string, cellIndex: number, sourceBlockId: string) => {
+    if (!doc || sourceBlockId === gridId) return;
+    update({
+      ...doc,
+      pages: doc.pages.map((pg) => {
+        if (pg.id !== pageId) return pg;
+        const source = pg.blocks.find((b) => b.id === sourceBlockId);
+        if (!source || source.type === 'grid') return pg;
+        let displaced: QuoteBlock | null = null;
+        const withoutSource = pg.blocks.filter((b) => b.id !== sourceBlockId);
+        const blocks = withoutSource.map((b) => {
+          if (b.id !== gridId || b.type !== 'grid') return b;
+          const cells = [...(b.cells || [])];
+          while (cells.length < b.layout) cells.push(null);
+          displaced = cells[cellIndex] ?? null;
+          cells[cellIndex] = source;
+          return { ...b, cells };
+        });
+        if (displaced) blocks.push(displaced);
+        return { ...pg, blocks };
+      }),
+    });
+  };
+  /** Pull a grid cell's content back out onto the page as its own section. */
+  const ejectGridCell = (pageId: string, gridId: string, cellIndex: number) => {
+    if (!doc) return;
+    update({
+      ...doc,
+      pages: doc.pages.map((pg) => {
+        if (pg.id !== pageId) return pg;
+        let ejected: QuoteBlock | null = null;
+        const blocks = pg.blocks.map((b) => {
+          if (b.id !== gridId || b.type !== 'grid') return b;
+          const cells = [...(b.cells || [])];
+          ejected = cells[cellIndex] ?? null;
+          cells[cellIndex] = null;
+          return { ...b, cells };
+        });
+        if (ejected) blocks.push(ejected);
+        return { ...pg, blocks };
+      }),
+    });
   };
   const reorderBlocks = (pageId: string, from: number, to: number) => {
     if (!doc) return;
@@ -563,9 +624,12 @@ export default function PortalAdminQuoteBuilder() {
             onAddBlock={addBlock}
             onAddBlockFull={addBlockFull}
             onRemoveBlock={removeBlock}
+            onDuplicateBlock={duplicateBlockAt}
             onReorder={reorderBlocks}
             onToggle={toggleBlock}
             onRemovePage={removePage}
+            onPatchShowTotal={patchShowTotal}
+            onEjectGridCell={ejectGridCell}
             onGenerate={() => setView('split')}
           />
         </div>
@@ -595,11 +659,14 @@ export default function PortalAdminQuoteBuilder() {
                   onPatchBlock={patchBlock}
                   onAddBlock={addBlock}
                   onRemoveBlock={removeBlock}
+                  onDuplicateBlock={duplicateBlockAt}
                   onReorder={reorderBlocks}
                   onToggle={toggleBlock}
                   onAddPage={addPage}
                   onRemovePage={removePage}
                   onPatchFooter={patchFooter}
+                  onPatchShowTotal={patchShowTotal}
+                  onEjectGridCell={ejectGridCell}
                 />
               </aside>
             </ResizablePanel>
@@ -619,6 +686,8 @@ export default function PortalAdminQuoteBuilder() {
                   onUpdate={update}
                   onEditBlock={editBlock}
                   onAddPage={addPage}
+                  onMoveBlockIntoGridCell={moveBlockIntoGridCell}
+                  onEjectGridCell={ejectGridCell}
                 />
               </div>
             </ResizablePanel>

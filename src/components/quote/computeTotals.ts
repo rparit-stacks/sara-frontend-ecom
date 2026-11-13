@@ -6,7 +6,7 @@
 // items blocks at all but has old tables with an amount column, those are
 // summed so quotes saved before the items/table split keep their total.
 
-import type { QuoteDoc, ItemsBlock, TableBlock } from './quoteDoc';
+import type { QuoteDoc, ItemsBlock, TableBlock, GridBlock, QuoteBlock } from './quoteDoc';
 
 export interface QuoteTotals {
   /** Subtotal per items block, keyed by block id. */
@@ -44,31 +44,43 @@ function legacyTableSubtotal(t: TableBlock): number {
   return sum;
 }
 
+function walkBlocks(blocks: QuoteBlock[], visit: (b: QuoteBlock) => void) {
+  for (const b of blocks) {
+    if (b.hidden) continue;
+    visit(b);
+    if (b.type === 'grid') {
+      for (const cell of (b as GridBlock).cells || []) {
+        if (cell && !cell.hidden) visit(cell);
+      }
+    }
+  }
+}
+
 export function computeTotals(doc: QuoteDoc): QuoteTotals {
   const perBlockSubtotals: Record<string, number> = {};
   let subtotal = 0;
   let hasItems = false;
 
   for (const page of doc.pages) {
-    for (const b of page.blocks) {
-      if (b.type === 'items' && !b.hidden) {
+    walkBlocks(page.blocks, (b) => {
+      if (b.type === 'items') {
         hasItems = true;
         const s = computeItemsSubtotal(b as ItemsBlock);
         perBlockSubtotals[b.id] = s;
         subtotal += s;
       }
-    }
+    });
   }
 
   // Legacy fallback only when there are no items blocks at all.
   if (!hasItems) {
     for (const page of doc.pages) {
-      for (const b of page.blocks) {
-        if (b.type === 'table' && !b.hidden) {
+      walkBlocks(page.blocks, (b) => {
+        if (b.type === 'table') {
           const s = legacyTableSubtotal(b as TableBlock);
           if (s) { perBlockSubtotals[b.id] = s; subtotal += s; }
         }
-      }
+      });
     }
   }
 

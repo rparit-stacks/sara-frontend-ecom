@@ -10,7 +10,9 @@
 import type { CompanyProfile } from '@/lib/api';
 
 export type QuoteAlign = 'left' | 'center' | 'right';
-export type QuoteBlockType = 'items' | 'text' | 'image' | 'table' | 'summary' | 'fields' | 'signature';
+export type QuoteBlockType = 'items' | 'text' | 'image' | 'table' | 'summary' | 'fields' | 'signature' | 'grid';
+/** Grid cell count — only 1 / 2 / 4 (no odd layouts like 3). */
+export type GridLayout = 1 | 2 | 4;
 
 /** Role of a table column — drives auto Qty×Rate→Amount + subtotal maths. */
 export type ColumnRole = 'text' | 'qty' | 'rate' | 'amount';
@@ -86,9 +88,20 @@ export interface SignatureBlock extends QuoteBlockBase {
   imageUrl?: string;
 }
 
+/**
+ * Layout grid: 1 / 2 / 4 cells. Each cell holds at most one nested component
+ * (any block type except another grid — nesting grids is not supported).
+ */
+export interface GridBlock extends QuoteBlockBase {
+  type: 'grid';
+  layout: GridLayout;
+  /** Length always matches `layout`. Empty slots are null. */
+  cells: (QuoteBlock | null)[];
+}
+
 export type QuoteBlock =
   | ItemsBlock | TextBlock | ImageBlock | TableBlock
-  | SummaryBlock | FieldsBlock | SignatureBlock;
+  | SummaryBlock | FieldsBlock | SignatureBlock | GridBlock;
 
 export interface QuotePage {
   id: string;
@@ -133,6 +146,11 @@ export interface QuoteDoc {
   footerText: string;
   accent: string;
   calc?: QuoteCalc;
+  /**
+   * When true (default), and there is no visible summary block, the last page
+   * shows an auto "Total" footer. Set false to hide that fallback total.
+   */
+  showTotal?: boolean;
   /** Saved revision history (appended on each save). */
   revisions?: QuoteRevision[];
 }
@@ -230,9 +248,51 @@ export function createBlock(type: QuoteBlockType): QuoteBlock {
         id: newId(), type: 'signature', title: '', align: 'right',
         signerTitle: 'Authorised Signatory', dateLabel: 'Date',
       };
+    case 'grid':
+      return {
+        id: newId(), type: 'grid', title: '', align: 'left',
+        layout: 2,
+        cells: [null, null],
+      };
     default:
       return { id: newId(), type: 'text', title: '', align: 'left', text: '' };
   }
+}
+
+/** Resize a grid's cells array to match a new layout, keeping existing content. */
+export function resizeGridCells(cells: (QuoteBlock | null)[], layout: GridLayout): (QuoteBlock | null)[] {
+  const next = cells.slice(0, layout);
+  while (next.length < layout) next.push(null);
+  return next;
+}
+
+/** Deep-clone a block with fresh ids (including nested grid cells / rows). */
+export function duplicateBlock(block: QuoteBlock): QuoteBlock {
+  const clone = JSON.parse(JSON.stringify(block)) as QuoteBlock;
+  return reIdBlock(clone);
+}
+
+function reIdBlock(block: QuoteBlock): QuoteBlock {
+  const id = newId();
+  if (block.type === 'items') {
+    return {
+      ...block, id,
+      items: block.items.map((it) => ({ ...it, id: newId('i') })),
+    };
+  }
+  if (block.type === 'fields') {
+    return {
+      ...block, id,
+      fields: block.fields.map((f) => ({ ...f, id: newId('f') })),
+    };
+  }
+  if (block.type === 'grid') {
+    return {
+      ...block, id,
+      cells: block.cells.map((cell) => (cell ? reIdBlock(cell) : null)),
+    };
+  }
+  return { ...block, id };
 }
 
 /** Map the store-wide business config (/admin-sara/business-config) to branding. */
@@ -312,6 +372,7 @@ export function defaultQuoteDoc(profile: CompanyProfile | null): QuoteDoc {
     footerText: 'Thank you for choosing Studio Sara · This quotation is confidential.',
     accent: '#00676a',
     calc: { gstPercent: 18, discount: 0 },
+    showTotal: true,
   };
 }
 
@@ -344,6 +405,15 @@ function normalizeBlock(b: QuoteBlock): QuoteBlock {
     const f = b as FieldsBlock;
     return { ...f, fields: (f.fields || []).map((row) => ({ id: row.id || newId('f'), label: row.label || '', value: row.value || '' })) };
   }
+  if (b.type === 'grid') {
+    const g = b as GridBlock;
+    const layout: GridLayout = (g.layout === 1 || g.layout === 2 || g.layout === 4) ? g.layout : 2;
+    const cells = resizeGridCells(
+      (Array.isArray(g.cells) ? g.cells : []).map((cell) => (cell ? normalizeBlock(cell) : null)),
+      layout,
+    );
+    return { ...g, layout, cells };
+  }
   return b; // text / image / summary / signature pass through unchanged
 }
 
@@ -366,5 +436,6 @@ export function normalizeQuoteDoc(raw: unknown, profile: CompanyProfile | null):
     footerText: d.footerText ?? base.footerText,
     accent: d.accent ?? base.accent,
     calc: { gstPercent: 0, discount: 0, ...(d.calc || {}) },
+    showTotal: d.showTotal ?? true,
   };
 }

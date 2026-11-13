@@ -16,15 +16,22 @@
 // makes it synchronous, testable, and re-runnable without re-measuring
 // anything that didn't change.
 
-import type { QuoteBlock, QuoteDoc, QuotePage, ItemsBlock, TableBlock } from './quoteDoc';
+import type { QuoteBlock, QuoteDoc, QuotePage, ItemsBlock, TableBlock, GridBlock } from './quoteDoc';
 import { newId } from './quoteDoc';
 
 /** CSS px, A4 at 96dpi — same figures QuotePreview/the PDF export already use. */
 export const PAGE_WIDTH_PX = 794;
 export const PAGE_HEIGHT_PX = 1123;
-/** Matches QuotePreview's `p-8 sm:p-12` body padding (48px desktop) on all four sides. */
+/** QuotePreview's `p-12` body padding on all four sides. */
 export const PAGE_PADDING_PX = 48;
-export const PAGE_CONTENT_HEIGHT_PX = PAGE_HEIGHT_PX - PAGE_PADDING_PX * 2;
+/** The accent bar across the top of every page (counts against the page height). */
+export const PAGE_BORDER_TOP_PX = 6;
+/** Fixed-height footer band (gap + footer text + "Page x of y") reserved on EVERY page. */
+export const FOOTER_RESERVE_PX = 96;
+/** Space the footer "Total" row needs on the last page (mt-8 + rule + 22px figure). */
+export const TOTAL_ROW_RESERVE_PX = 88;
+/** Height actually available to blocks on a page (excluding page-1 header). */
+export const PAGE_CONTENT_HEIGHT_PX = PAGE_HEIGHT_PX - PAGE_BORDER_TOP_PX - PAGE_PADDING_PX * 2 - FOOTER_RESERVE_PX;
 /** Matches QuotePreview's `space-y-6` (1.5rem) gap between blocks. */
 export const BLOCK_GAP_PX = 24;
 
@@ -33,6 +40,11 @@ export const BLOCK_GAP_PX = 24;
 export interface LayoutBlock {
   /** Stable per-slice React key (`block.id` or `block.id::startRow`). */
   key: string;
+  /** Id of the ORIGINAL authoring block (slices share it). */
+  origId: string;
+  /** Row range of the original block this slice shows; undefined = whole block. */
+  rowStart?: number;
+  rowEnd?: number;
   block: QuoteBlock;
   /** True for every slice after the first — the renderer suppresses the
    *  block's own title on a continuation. */
@@ -54,6 +66,8 @@ export interface LayoutPage {
 export function rowCount(block: QuoteBlock): number | null {
   if (block.type === 'items') return (block as ItemsBlock).items.length;
   if (block.type === 'table') return (block as TableBlock).rows.length;
+  // A 4-cell grid is two rows of two; it may break between them.
+  if (block.type === 'grid' && (block as GridBlock).layout === 4) return 2;
   return null;
 }
 
@@ -61,6 +75,12 @@ export function rowCount(block: QuoteBlock): number | null {
 export function sliceRows(block: QuoteBlock, startRow: number, endRow: number): QuoteBlock {
   if (block.type === 'items') return { ...block, items: (block as ItemsBlock).items.slice(startRow, endRow) } as QuoteBlock;
   if (block.type === 'table') return { ...block, rows: (block as TableBlock).rows.slice(startRow, endRow) } as QuoteBlock;
+  if (block.type === 'grid') {
+    const g = block as GridBlock;
+    const cells = [...(g.cells || [])];
+    while (cells.length < g.layout) cells.push(null);
+    return { ...g, cells: cells.slice(startRow * 2, endRow * 2), layout: (endRow - startRow) * 2 } as unknown as QuoteBlock;
+  }
   return block;
 }
 
@@ -90,6 +110,7 @@ export function packLayoutPages(
   heightOf: (blockId: string) => number,
   splitPointsOf: (blockId: string) => number[] | undefined,
   headerHeight: number,
+  reserveTotalRow = false,
 ): LayoutPage[] {
   const pages: LayoutPage[] = [];
   let current: LayoutBlock[] = [];
@@ -113,9 +134,12 @@ export function packLayoutPages(
     return PAGE_CONTENT_HEIGHT_PX - reserved - usedHeight - gaps;
   };
 
-  const push = (key: string, block: QuoteBlock, isContinuation: boolean, isFinalSlice: boolean, height: number) => {
+  const push = (
+    key: string, block: QuoteBlock, isContinuation: boolean, isFinalSlice: boolean, height: number,
+    origId: string, range?: [number, number] | null,
+  ) => {
     const gap = current.length > 0 ? BLOCK_GAP_PX : 0;
-    current.push({ key, block, isContinuation, isFinalSlice });
+    current.push({ key, block, isContinuation, isFinalSlice, origId, rowStart: range?.[0], rowEnd: range?.[1] });
     usedHeight += height + gap;
   };
 
@@ -134,15 +158,19 @@ export function packLayoutPages(
   ) => {
     const key = rowRange ? `${originalId}::${rowRange[0]}` : originalId;
     const points = splitPointsOf(originalId);
-    const wholeHeight = rowRange
-      ? (points ? (points[rowRange[1]] ?? Infinity) - (points[rowRange[0]] ?? 0) : heightOf(originalId))
+    // A slice that doesn't start at row 0 renders its own header row again (and
+    // no title), so it costs (rows delta) + the empty-block overhead points[0].
+    const sliceHeight = (a: number, b: number) =>
+      (points![b] ?? Infinity) - (a === 0 ? 0 : (points![a] ?? 0) - (points![0] ?? 0));
+    const wholeHeight = rowRange && points
+      ? sliceHeight(rowRange[0], rowRange[1])
       : heightOf(originalId);
     const remaining = remainingHeight();
     const sliceBlock = rowRange ? sliceRows(originalBlock, rowRange[0], rowRange[1]) : originalBlock;
     const isFinalSlice = trueTotalRows == null || (rowRange ? rowRange[1] : trueTotalRows) >= trueTotalRows;
 
     if (wholeHeight <= remaining) {
-      push(key, sliceBlock, isContinuation, isFinalSlice, wholeHeight);
+      push(key, sliceBlock, isContinuation, isFinalSlice, wholeHeight, originalId, rowRange);
       return;
     }
 
@@ -152,7 +180,7 @@ export function packLayoutPages(
       // it regardless (a single block genuinely bigger than one A4 page,
       // e.g. one oversized image, is a content problem, not a pagination bug).
       if (current.length > 0) flushPage();
-      push(key, sliceBlock, isContinuation, isFinalSlice, wholeHeight);
+      push(key, sliceBlock, isContinuation, isFinalSlice, wholeHeight, originalId, rowRange);
       return;
     }
 
@@ -163,17 +191,26 @@ export function packLayoutPages(
     const budget = remaining;
     const rangeStart = rowRange ? rowRange[0] : 0;
     const rangeEnd = rowRange ? rowRange[1] : rangeRows;
-    const baseHeight = points[rangeStart] ?? 0;
     let fitCount = 0;
     for (let n = rangeStart + 1; n <= rangeEnd; n++) {
-      if ((points[n] ?? Infinity) - baseHeight <= budget) fitCount = n - rangeStart; else break;
+      if (sliceHeight(rangeStart, n) <= budget) fitCount = n - rangeStart; else break;
+    }
+    if (fitCount === 0) {
+      // Not even one row fits here. Move to a fresh page and retry; on an
+      // already-empty page force one row so we always make progress.
+      if (current.length > 0) {
+        flushPage();
+        place(originalBlock, originalId, trueTotalRows, isContinuation, rowRange);
+        return;
+      }
+      fitCount = 1;
     }
 
     if (fitCount > 0) {
-      const headHeight = (points[rangeStart + fitCount] ?? Infinity) - baseHeight;
+      const headHeight = sliceHeight(rangeStart, rangeStart + fitCount);
       const head = sliceRows(originalBlock, rangeStart, rangeStart + fitCount);
       const headIsFinal = trueTotalRows != null && rangeStart + fitCount >= trueTotalRows;
-      push(`${originalId}::${rangeStart}`, head, isContinuation, headIsFinal, headHeight);
+      push(`${originalId}::${rangeStart}`, head, isContinuation || rangeStart > 0, headIsFinal, headHeight, originalId, [rangeStart, rangeStart + fitCount]);
     }
     flushPage();
 
@@ -182,8 +219,26 @@ export function packLayoutPages(
     }
   };
 
-  for (const block of flattenVisibleBlocks(doc)) {
-    place(block, block.id, rowCount(block), false, null);
+  // Respect the admin's own page breaks so the PDF matches the quote page:
+  // every authoring page starts a fresh layout page; only a page whose content
+  // truly overflows A4 spills onto extra pages.
+  doc.pages.forEach((authoringPage, pi) => {
+    const visible = authoringPage.blocks.filter((b) => !b.hidden);
+    if (pi > 0) {
+      const prevEmpty = doc.pages[pi - 1].blocks.every((b) => b.hidden);
+      if (current.length > 0 || prevEmpty) flushPage();
+    }
+    for (const block of visible) place(block, block.id, rowCount(block), false, null);
+  });
+  // The footer Total row lives under the last page's blocks — if it doesn't
+  // fit there, it gets its own page rather than overlapping the footer.
+  if (reserveTotalRow) {
+    const used = (isFirstPage ? headerHeight : 0) + usedHeight;
+    if (used + TOTAL_ROW_RESERVE_PX > PAGE_CONTENT_HEIGHT_PX && (current.length > 0 || pages.length > 0)) {
+      if (current.length > 0) flushPage();
+      flushPage();
+      return pages;
+    }
   }
   if (current.length > 0 || pages.length === 0) flushPage();
   return pages;

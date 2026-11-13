@@ -53,7 +53,7 @@ export default function QuotePdfPreviewModal({
           <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-white/15"><Sym name="close" /></button>
         </div>
       </header>
-      <div className="flex-1 overflow-y-auto py-8 px-4 flex flex-col items-center gap-8" style={{ background: '#e5e7eb' }}>
+      <div className="flex-1 overflow-auto py-8 px-4 flex flex-col items-start gap-8 [&>*]:mx-auto" style={{ background: '#e5e7eb' }}>
         <QuotePrintPreview doc={doc} accent={accent} currency={currency} reference={reference} />
       </div>
     </div>

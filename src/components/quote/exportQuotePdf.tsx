@@ -23,6 +23,8 @@ export async function exportQuotePdf(
   container.style.position = 'fixed';
   container.style.top = '0';
   container.style.left = '-99999px';
+  // Fixed A4 width so pages never shrink-to-fit a narrow viewport (would reflow text vs. the measured layout).
+  container.style.width = '794px';
   container.setAttribute('aria-hidden', 'true');
   document.body.appendChild(container);
   const root = createRoot(container);

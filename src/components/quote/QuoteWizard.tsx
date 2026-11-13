@@ -28,8 +28,8 @@ const STEPS = [
  */
 export default function QuoteWizard({
   doc, currency, accent, inquiry, canPickInquiry, onPickInquiry,
-  onPatchMeta, onPatchBranding, onPatchCalc, onPatchBlock, onAddBlock, onAddBlockFull, onRemoveBlock, onReorder, onToggle, onRemovePage,
-  onGenerate,
+  onPatchMeta, onPatchBranding, onPatchCalc, onPatchBlock, onAddBlock, onAddBlockFull, onRemoveBlock, onDuplicateBlock, onReorder, onToggle, onRemovePage, onPatchShowTotal,
+  onEjectGridCell, onGenerate,
 }: {
   doc: QuoteDoc; currency: string; accent: string;
   inquiry?: ManufacturingInquiryDto | null;
@@ -42,9 +42,12 @@ export default function QuoteWizard({
   onAddBlock: (pageId: string, t: QuoteBlockType) => void;
   onAddBlockFull: (block: QuoteBlock) => void;
   onRemoveBlock: (pageId: string, blockId: string) => void;
+  onDuplicateBlock?: (pageId: string, blockId: string) => void;
   onReorder: (pageId: string, from: number, to: number) => void;
   onToggle: (pageId: string, blockId: string) => void;
   onRemovePage: (pageId: string) => void;
+  onPatchShowTotal?: (v: boolean) => void;
+  onEjectGridCell?: (pageId: string, gridId: string, cellIndex: number) => void;
   onGenerate: () => void;
 }) {
   const [step, setStep] = useState(0);
@@ -122,9 +125,13 @@ export default function QuoteWizard({
                     onPatchBlock={(blockId, p) => onPatchBlock(page.id, blockId, p)}
                     onAddBlock={(t) => onAddBlock(page.id, t)}
                     onRemoveBlock={(blockId) => onRemoveBlock(page.id, blockId)}
+                    onDuplicateBlock={onDuplicateBlock ? (blockId) => onDuplicateBlock(page.id, blockId) : undefined}
                     onReorder={(from, to) => onReorder(page.id, from, to)}
                     onToggle={(blockId) => onToggle(page.id, blockId)}
                     onRemovePage={() => onRemovePage(page.id)}
+                    onEjectGridCell={onEjectGridCell
+                      ? (gridId, cellIndex) => onEjectGridCell(page.id, gridId, cellIndex)
+                      : undefined}
                   />
                 ))}
                 {/* "Add page" lives only in the Split view's form panel now — having it
@@ -137,7 +144,13 @@ export default function QuoteWizard({
           {step === 3 && (
             <>
               <StepHead icon="fa-percent" title="Tax & discount" subtitle="GST aur discount — Summary section inhi se calculate hota hai." accent={accent} />
-              <CalcForm calc={calc} currency={currency} onPatchCalc={onPatchCalc} />
+              <CalcForm
+                calc={calc}
+                currency={currency}
+                showTotal={doc.showTotal}
+                onPatchCalc={onPatchCalc}
+                onPatchShowTotal={onPatchShowTotal}
+              />
               <div className="mt-4 rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-1.5">
                 <Line label="Subtotal" value={money(totals.subtotal, currency)} />
                 {totals.discount > 0 && <Line label="Discount" value={`− ${money(totals.discount, currency)}`} />}

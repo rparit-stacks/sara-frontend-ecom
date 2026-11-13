@@ -13,9 +13,9 @@ import { mediaApi } from '@/lib/api';
 import { RichTextEditor } from './RichText';
 import type {
   QuoteDoc, QuoteBlock, QuoteBlockType, QuoteCalc, ItemsBlock, TextBlock, ImageBlock,
-  TableBlock, SummaryBlock, FieldsBlock, SignatureBlock, QuotePage,
+  TableBlock, SummaryBlock, FieldsBlock, SignatureBlock, GridBlock, GridLayout, QuotePage,
 } from './quoteDoc';
-import { newId } from './quoteDoc';
+import { newId, resizeGridCells } from './quoteDoc';
 
 export const BLOCK_META: Record<QuoteBlockType, { label: string; icon: string; hint: string }> = {
   items: { label: 'Line items', icon: 'fa-list-check', hint: 'Priced items — Amount = Qty × Rate (auto). Feeds the grand total.' },
@@ -25,6 +25,7 @@ export const BLOCK_META: Record<QuoteBlockType, { label: string; icon: string; h
   summary: { label: 'Summary / totals', icon: 'fa-calculator', hint: 'Subtotal, GST and grand total — from your line items.' },
   fields: { label: 'Custom fields', icon: 'fa-list', hint: 'Label-value rows, e.g. “Lead time: 3 weeks”.' },
   signature: { label: 'Signature', icon: 'fa-signature', hint: 'Sign-off line with name, title and date.' },
+  grid: { label: 'Grid layout', icon: 'fa-th-large', hint: '1 / 2 / 4 cells on the quote page — tap + or drop a section into a cell.' },
 };
 
 export const inputCls = 'w-full h-9 px-2.5 rounded-lg border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#00676a]/20';
@@ -131,7 +132,13 @@ export function ClientInfoForm({ doc, onPatchMeta, highlight }: { doc: QuoteDoc;
 }
 
 /* ---------- tax & discount form ---------- */
-export function CalcForm({ calc, currency, onPatchCalc }: { calc: QuoteCalc; currency: string; onPatchCalc: (p: Partial<QuoteCalc>) => void }) {
+export function CalcForm({
+  calc, currency, showTotal = true, onPatchCalc, onPatchShowTotal,
+}: {
+  calc: QuoteCalc; currency: string; showTotal?: boolean;
+  onPatchCalc: (p: Partial<QuoteCalc>) => void;
+  onPatchShowTotal?: (v: boolean) => void;
+}) {
   return (
     <>
       <div className="grid grid-cols-2 gap-2">
@@ -139,6 +146,13 @@ export function CalcForm({ calc, currency, onPatchCalc }: { calc: QuoteCalc; cur
         <div><label className={labelCls}>Discount {calc.discountIsPercent ? '%' : `(${currency})`}</label><input type="number" className={inputCls} value={calc.discount} onChange={(e) => onPatchCalc({ discount: +e.target.value })} /></div>
       </div>
       <Toggle on={!!calc.discountIsPercent} onChange={(v) => onPatchCalc({ discountIsPercent: v })} label="Discount is a percentage" />
+      {onPatchShowTotal && (
+        <Toggle
+          on={showTotal !== false}
+          onChange={onPatchShowTotal}
+          label="Show Total at bottom of quote"
+        />
+      )}
     </>
   );
 }
@@ -146,15 +160,18 @@ export function CalcForm({ calc, currency, onPatchCalc }: { calc: QuoteCalc; cur
 /* ---------- sortable sections editor (used by both panel & wizard) ---------- */
 export function SectionsEditor({
   page, accent, currency, pageIdx, removablePage, focusBlockId,
-  onPatchBlock, onAddBlock, onRemoveBlock, onReorder, onToggle, onRemovePage,
+  onPatchBlock, onAddBlock, onRemoveBlock, onDuplicateBlock, onReorder, onToggle, onRemovePage,
+  onEjectGridCell,
 }: {
   page: QuotePage; accent: string; currency: string; pageIdx: number; removablePage: boolean; focusBlockId?: string | null;
   onPatchBlock: (blockId: string, p: Partial<QuoteBlock>) => void;
   onAddBlock: (t: QuoteBlockType) => void;
   onRemoveBlock: (blockId: string) => void;
+  onDuplicateBlock?: (blockId: string) => void;
   onReorder: (from: number, to: number) => void;
   onToggle: (blockId: string) => void;
   onRemovePage?: () => void;
+  onEjectGridCell?: (gridId: string, cellIndex: number) => void;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -188,7 +205,9 @@ export function SectionsEditor({
                 focus={focusBlockId === block.id}
                 onPatch={(p) => onPatchBlock(block.id, p)}
                 onRemove={() => onRemoveBlock(block.id)}
+                onDuplicate={onDuplicateBlock ? () => onDuplicateBlock(block.id) : undefined}
                 onToggle={() => onToggle(block.id)}
+                onEjectGridCell={onEjectGridCell}
               />
             ))}
           </div>
@@ -200,9 +219,10 @@ export function SectionsEditor({
 }
 
 /* ---------- sortable section row ---------- */
-export function SectionRow({ block, accent, currency, onPatch, onRemove, onToggle, defaultOpen = false, focus = false }: {
+export function SectionRow({ block, accent, currency, onPatch, onRemove, onDuplicate, onToggle, defaultOpen = false, focus = false, onEjectGridCell }: {
   block: QuoteBlock; accent: string; currency: string;
-  onPatch: (p: Partial<QuoteBlock>) => void; onRemove: () => void; onToggle: () => void; defaultOpen?: boolean; focus?: boolean;
+  onPatch: (p: Partial<QuoteBlock>) => void; onRemove: () => void; onDuplicate?: () => void; onToggle: () => void; defaultOpen?: boolean; focus?: boolean;
+  onEjectGridCell?: (gridId: string, cellIndex: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const [open, setOpen] = useState(defaultOpen);
@@ -221,7 +241,11 @@ export function SectionRow({ block, accent, currency, onPatch, onRemove, onToggl
   const setRefs = (el: HTMLDivElement | null) => { setNodeRef(el); rowRef.current = el; };
 
   return (
-    <div ref={setRefs} style={style} className={`border rounded-xl bg-white shadow-sm ${block.hidden ? 'border-gray-200 opacity-60' : 'border-gray-200'} ${open ? 'ring-1 ring-[#00676a]/20' : ''} ${focus ? 'ring-2 ring-[#00676a]/50' : ''}`}>
+    <div
+      ref={setRefs}
+      style={style}
+      className={`border rounded-xl bg-white shadow-sm ${block.hidden ? 'border-gray-200 opacity-60' : 'border-gray-200'} ${open ? 'ring-1 ring-[#00676a]/20' : ''} ${focus ? 'ring-2 ring-[#00676a]/50' : ''}`}
+    >
       {/* rich card header */}
       <div className="flex items-center gap-3 px-3 py-2.5">
         <button {...attributes} {...listeners} className="cursor-grab text-gray-300 hover:text-gray-500 px-0.5" title="Drag to reorder"><i className="fa-solid fa-grip-vertical text-[15px]" /></button>
@@ -231,6 +255,9 @@ export function SectionRow({ block, accent, currency, onPatch, onRemove, onToggl
           <div className="text-[11px] text-gray-400 truncate">{meta.label}{block.hidden ? ' · hidden' : ''}</div>
         </button>
         <button onClick={onToggle} title={block.hidden ? 'Show in quote' : 'Hide from quote'} className="w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"><i className={`fa-solid fa-${block.hidden ? 'eye-slash' : 'eye'} text-[13px]`} /></button>
+        {onDuplicate && (
+          <button onClick={onDuplicate} title="Duplicate section" className="w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"><i className="fa-solid fa-copy text-[13px]" /></button>
+        )}
         <button onClick={() => setOpen((o) => !o)} className="w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100"><i className={`fa-solid fa-chevron-${open ? 'up' : 'down'} text-[12px]`} /></button>
         <button onClick={onRemove} title="Delete section" className="w-8 h-8 rounded-lg text-gray-300 hover:bg-red-50 hover:text-red-500"><i className="fa-solid fa-trash text-[13px]" /></button>
       </div>
@@ -252,7 +279,13 @@ export function SectionRow({ block, accent, currency, onPatch, onRemove, onToggl
               </div>
             </div>
           </div>
-          <BlockForm block={block} accent={accent} currency={currency} onPatch={onPatch} />
+          <BlockForm
+            block={block}
+            accent={accent}
+            currency={currency}
+            onPatch={onPatch}
+            onEjectGridCell={onEjectGridCell}
+          />
         </div>
       )}
     </div>
@@ -260,7 +293,10 @@ export function SectionRow({ block, accent, currency, onPatch, onRemove, onToggl
 }
 
 /* ---------- per-type block form ---------- */
-export function BlockForm({ block, accent, currency, onPatch }: { block: QuoteBlock; accent: string; currency: string; onPatch: (p: Partial<QuoteBlock>) => void }) {
+export function BlockForm({ block, accent, currency, onPatch, onEjectGridCell }: {
+  block: QuoteBlock; accent: string; currency: string; onPatch: (p: Partial<QuoteBlock>) => void;
+  onEjectGridCell?: (gridId: string, cellIndex: number) => void;
+}) {
   if (block.type === 'items') return <ItemsForm block={block as ItemsBlock} accent={accent} currency={currency} onPatch={onPatch} />;
   if (block.type === 'text') {
     return <div><label className={labelCls}>Content</label><RichTextEditor html={(block as TextBlock).text} accent={accent} onChange={(v) => onPatch({ text: v } as Partial<QuoteBlock>)} /></div>;
@@ -270,6 +306,19 @@ export function BlockForm({ block, accent, currency, onPatch }: { block: QuoteBl
   if (block.type === 'summary') return <SummaryForm block={block as SummaryBlock} onPatch={onPatch} />;
   if (block.type === 'fields') return <FieldsForm block={block as FieldsBlock} accent={accent} onPatch={onPatch} />;
   if (block.type === 'signature') return <SignatureForm block={block as SignatureBlock} onPatch={onPatch} />;
+  if (block.type === 'grid') {
+    return (
+      <GridForm
+        block={block as GridBlock}
+        accent={accent}
+        currency={currency}
+        onPatch={onPatch}
+        onEjectCell={onEjectGridCell
+          ? (cellIndex) => onEjectGridCell(block.id, cellIndex)
+          : undefined}
+      />
+    );
+  }
   return null;
 }
 
@@ -483,10 +532,76 @@ function SignatureForm({ block, onPatch }: { block: SignatureBlock; onPatch: (p:
   );
 }
 
-/* ---------- add section ---------- */
+/* ---------- grid layout form ---------- */
+function GridForm({
+  block, accent, currency, onPatch, onEjectCell,
+}: {
+  block: GridBlock; accent: string; currency: string; onPatch: (p: Partial<QuoteBlock>) => void;
+  onEjectCell?: (cellIndex: number) => void;
+}) {
+  const setLayout = (layout: GridLayout) => {
+    onPatch({ layout, cells: resizeGridCells(block.cells || [], layout) } as Partial<QuoteBlock>);
+  };
+  const patchCell = (index: number, p: Partial<QuoteBlock>) => {
+    const cells = [...(block.cells || [])];
+    while (cells.length < block.layout) cells.push(null);
+    const cell = cells[index];
+    if (!cell) return;
+    cells[index] = { ...cell, ...p } as QuoteBlock;
+    onPatch({ cells } as Partial<QuoteBlock>);
+  };
+  const cells = [...(block.cells || [])];
+  while (cells.length < block.layout) cells.push(null);
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className={labelCls}>Layout</label>
+        <div className="flex gap-2">
+          {([1, 2, 4] as GridLayout[]).map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setLayout(n)}
+              className={`h-9 px-3 rounded-lg text-[12px] font-semibold border ${block.layout === n ? 'text-white' : 'border-gray-200 text-gray-600'}`}
+              style={block.layout === n ? { background: accent, borderColor: accent } : undefined}
+            >
+              {n === 1 ? '1' : n === 2 ? '2' : '2×2'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="text-[12px] text-gray-500">
+        Empty cells pe quote page pe beech mein <span className="font-semibold">+</span> hai — drop existing section ya naya add karo.
+      </p>
+      <div className="space-y-2">
+        {cells.slice(0, block.layout).map((cell, i) => (
+          <div key={i} className="rounded-xl border border-gray-200 bg-gray-50/40 p-2.5 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Cell {i + 1}</span>
+              {cell ? (
+                <>
+                  <i className={`fa-solid ${BLOCK_META[cell.type].icon} text-[12px]`} style={{ color: accent }} />
+                  <span className="text-[12px] font-semibold text-gray-700 truncate flex-1">{cell.title || BLOCK_META[cell.type].label}</span>
+                  {onEjectCell && (
+                    <button type="button" onClick={() => onEjectCell(i)} className="text-[11px] text-red-500 hover:underline shrink-0">Remove</button>
+                  )}
+                </>
+              ) : (
+                <span className="text-[12px] text-gray-400 flex-1">Empty — use + on quote page</span>
+              )}
+            </div>
+            {cell && <BlockForm block={cell} accent={accent} currency={currency} onPatch={(p) => patchCell(i, p)} />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function AddSection({ onAdd, accent }: { onAdd: (t: QuoteBlockType) => void; accent: string }) {
   const [open, setOpen] = useState(false);
-  const types: QuoteBlockType[] = ['items', 'text', 'image', 'table', 'summary', 'fields', 'signature'];
+  const types: QuoteBlockType[] = ['items', 'text', 'image', 'table', 'grid', 'summary', 'fields', 'signature'];
   return (
     <div className="relative">
       <button onClick={() => setOpen((o) => !o)} className="w-full py-2 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-[#00676a] hover:text-[#00676a] text-[13px] font-semibold flex items-center justify-center gap-2">
